@@ -1,0 +1,114 @@
+#!/bin/bash
+
+###############
+# Generate a linker script for GNU ld.
+# 
+#
+#
+
+
+
+error () {
+    echo "error: $*" 1>&2
+}
+
+info () {
+    echo "$*" 1>&2
+}
+
+usage () {
+    info "usage: $0 [-p <pattern>] [-I <ignore-list>] -o <output> <inputs>"
+    exit ${1:-1}
+}
+
+emit () {
+    echo "$*" >> $OUTPUT
+}
+
+
+# set up defaults
+PATTERN="^mrp_"                       # export everything prefixed with mrp_
+IGNORE="MRP_PRINTF_LIKE"              # ignore these symbols/macros
+IT=","                                # ignore-list is comma-separated
+SOURCES=""                            # no default input, must be specified
+OUTPUT=""                             # no default output, must be specified
+
+# parse command line
+while [ -n "${1#-}" ]; do
+    case $1 in
+        -o)
+            if [ -z "$OUTPUT" ]; then
+                shift
+                OUTPUT="$1"
+            else
+                error "Multiple output files requested."
+                usage
+            fi
+            ;;
+        -p)
+            if [ -z "$PATTERN" ]; then
+                shift
+                PATTERN="$1"
+            else
+                error "Multiple patterns given ($PATTERN, $1)."
+                usage
+            fi
+            ;;
+        -I)
+            shift
+            IGNORE="$IGNORE$IT$1"
+	    IT=","
+            ;;
+        -h)
+            usage 0
+            ;;
+        -*)
+            error "Unknown option '$1'."
+            usage
+            ;;
+        *)
+            SOURCES="$SOURCES $1"
+            ;;
+    esac
+    shift
+done
+
+# check that we've got everything mandatory
+if [ -z "$OUTPUT" ]; then
+    error "No output file specified (use the -o option)."
+    usage
+fi
+
+if [ -z "$SOURCES" ]; then
+    error "No input files specified."
+    usage
+fi
+
+if [ -z "$PATTERN" ]; then
+    error "Invalid (empty) pattern."
+    usage
+fi
+
+if [ -n "$IGNORE" ]; then
+    ignore_opts="-I $IGNORE"
+else
+    ignore_opts=""
+fi
+
+# generate the output
+info "Generating linker script $OUTPUT..."
+rm -f $OUTPUT
+touch $OUTPUT
+
+emit "{"
+emit "    global:"
+ctags $ignore_opts -f - --c-kinds=p $SOURCES | \
+    awk "/$PATTERN/ { print \$1; }" | \
+        sort | \
+            while read sym; do
+                emit "        $sym;"
+            done
+
+emit "    local:"
+emit "        *;"
+emit "};"
