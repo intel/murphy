@@ -5,6 +5,13 @@
 
 typedef struct mdb_table_s mdb_table_t;
 
+
+uint32_t mdb_transaction_begin(void);
+int mdb_transaction_commit(uint32_t);
+int mdb_transaction_rollback(uint32_t);
+uint32_t mdb_transaction_get_depth(void);
+
+
 mdb_table_t *mdb_table_create(char *, char **, mqi_column_def_t *);
 int mdb_table_drop(mdb_table_t *);
 int mdb_table_create_index(mdb_table_t *, char **);

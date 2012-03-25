@@ -1,7 +1,7 @@
 #ifndef __MQL_STATEMENT_H__
 #define __MQL_STATEMENT_H__
 
-#include <murphy-db/result.h>
+#include <murphy-db/mql-result.h>
 
 typedef struct mql_result_s mql_result_t;
 

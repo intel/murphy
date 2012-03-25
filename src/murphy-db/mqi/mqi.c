@@ -9,8 +9,8 @@
 #include <murphy-db/assert.h>
 #include <murphy-db/handle.h>
 #include <murphy-db/mqi.h>
-#include <mdb/table.h>
-#include <mdb/transaction.h>
+#include <murphy-db/handle.h>
+#include <murphy-db/hash.h>
 #include "mdb-backend.h"
 
 #define MAX_DB 2

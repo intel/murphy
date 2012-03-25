@@ -4,7 +4,7 @@ PARSER_PREFIX   = yy_mql_
 AM_YFLAGS       = -p $(PARSER_PREFIX)
 LEX_OUTPUT_ROOT = ./lex.$(PARSER_PREFIX)
 
-libmql_la_CFLAGS = -I.. -I../include
+libmql_la_CFLAGS = -I../include
 
 libmql_la_SOURCES = ../include/murphy-db/mql.h \
                     ../include/murphy-db/statement.h \

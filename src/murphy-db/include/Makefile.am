@@ -1,6 +1,5 @@
-nobase_include_HEADERS = murphy-db/mqi-types.h  \
-                         murphy-db/mdb.h \
-                         murphy-db/mqi.h \
+nobase_include_HEADERS = murphy-db/mqi.h \
+                         murphy-db/mqi-types.h \
                          murphy-db/mql.h \
-                         murphy-db/statement.h \
-                         murphy-db/result.h
+                         murphy-db/mql-statement.h \
+                         murphy-db/mql-result.h

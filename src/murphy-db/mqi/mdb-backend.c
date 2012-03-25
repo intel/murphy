@@ -8,9 +8,7 @@
 
 #include <murphy-db/assert.h>
 #include <murphy-db/handle.h>
-
-#include <mdb/table.h>
-#include <mdb/transaction.h>
+#include <murphy-db/mdb.h>
 
 #include "mdb-backend.h"
 
