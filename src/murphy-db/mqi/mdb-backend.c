@@ -1,0 +1,203 @@
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+
+#define _GNU_SOURCE
+#include <string.h>
+
+#include <murphy-db/assert.h>
+#include <murphy-db/handle.h>
+
+#include <mdb/table.h>
+#include <mdb/transaction.h>
+
+#include "mdb-backend.h"
+
+
+static uint32_t begin_transaction(void);
+static int      commit_transaction(uint32_t);
+static int      rollback_transaction(uint32_t);
+static uint32_t get_transaction_id(void);
+static void *   create_table(char *, char **, mqi_column_def_t *);
+static int      create_index(void *, char **);
+static int      drop_table(void *);
+static int      describe(void *, mqi_column_def_t *, int);
+static int      insert_into(void *, int, mqi_column_desc_t *, void **);
+static int      select_general(void *, mqi_cond_entry_t *, mqi_column_desc_t *,
+                               void *, int, int);
+static int      select_by_index(void *, mqi_variable_t *, mqi_column_desc_t *,
+                                 void *);
+static int      update(void *, mqi_cond_entry_t *, mqi_column_desc_t*,void*);
+static int      delete_from(void *, mqi_cond_entry_t *);
+static void *   find_table(char *);
+static int      get_column_index(void *, char *);
+static int      get_table_size(void *);
+static char *   get_column_name(void *, int);
+static mqi_data_type_t get_column_type(void *, int);
+static int      get_column_size(void *, int);
+static int      print_rows(void *, char *, int);
+
+static mqi_db_functbl_t functbl = {
+    begin_transaction,
+    commit_transaction,
+    rollback_transaction,
+    get_transaction_id,
+    create_table,
+    create_index,
+    drop_table,
+    describe,
+    insert_into,
+    select_general,
+    select_by_index,
+    update,
+    delete_from,
+    find_table,
+    get_column_index,
+    get_table_size,
+    get_column_name,
+    get_column_type,
+    get_column_size,
+    print_rows
+};
+
+
+mqi_db_functbl_t *mdb_backend_init(void)
+{
+    return &functbl;
+}
+
+
+static uint32_t begin_transaction(void)
+{
+    uint32_t depth = mdb_transaction_begin();
+
+    if (!depth)
+        return MDB_HANDLE_INVALID;
+
+    return depth;
+}
+
+static int commit_transaction(uint32_t depth)
+{
+    return mdb_transaction_commit(depth);
+}
+
+static int rollback_transaction(uint32_t depth)
+{
+    return mdb_transaction_rollback(depth);
+}
+
+static uint32_t get_transaction_id(void)
+{
+    return mdb_transaction_get_depth();
+}
+
+static void *create_table(char *name,
+                          char **index_columns,
+                          mqi_column_def_t *cdefs)
+{
+    return mdb_table_create(name, index_columns, cdefs);
+}
+
+
+static int create_index(void *t, char **index_columns)
+{
+    return mdb_table_create_index((mdb_table_t *)t, index_columns);
+}
+
+static int drop_table(void *t)
+{
+    return mdb_table_drop((mdb_table_t *)t);
+}
+
+static int describe(void *t, mqi_column_def_t *defs, int len)
+{
+    return mdb_table_describe((mdb_table_t *)t, defs, len);
+}
+
+static int insert_into(void               *t,
+                        int                 ignore,
+                        mqi_column_desc_t  *cds,
+                        void              **data)
+{
+    return mdb_table_insert((mdb_table_t *)t, ignore, cds, data);
+} 
+
+static int select_general(void              *t,
+                          mqi_cond_entry_t  *cond,
+                          mqi_column_desc_t *cds,
+                          void              *results,
+                          int                size,
+                          int                dim)
+{
+    return mdb_table_select((mdb_table_t *)t, cond, cds, results, size, dim);
+}
+
+static int select_by_index(void              *t,
+                            mqi_variable_t    *idxvars,
+                            mqi_column_desc_t *cds,
+                            void              *result)
+{
+    return mdb_table_select_by_index((mdb_table_t *)t, idxvars, cds, result);
+}
+
+
+static int update(void              *t,
+                  mqi_cond_entry_t  *cond,
+                  mqi_column_desc_t *cds,
+                  void              *data)
+{
+    return mdb_table_update((mdb_table_t *)t, cond, cds, data);
+}
+
+static int delete_from(void *t, mqi_cond_entry_t *cond)
+{
+    return mdb_table_delete((mdb_table_t *)t, cond);
+}
+
+
+static void *find_table(char *table_name)
+{
+    return mdb_table_find(table_name);
+}
+
+
+static int get_column_index(void *t, char *column_name)
+{
+    return mdb_table_get_column_index((mdb_table_t *)t, column_name);
+}
+
+static int get_table_size(void *t)
+{
+    return  mdb_table_get_size((mdb_table_t *)t);
+}
+
+static char *get_column_name(void *t, int colidx)
+{
+    return  mdb_table_get_column_name((mdb_table_t *)t, colidx);
+}
+
+static mqi_data_type_t get_column_type(void *t, int colidx)
+{
+    return  mdb_table_get_column_type((mdb_table_t *)t, colidx);
+}
+
+static int get_column_size(void *t, int colidx)
+{
+    return  mdb_table_get_column_size((mdb_table_t *)t, colidx);
+}
+
+static int print_rows(void *t, char *buf, int len)
+{
+    return mdb_table_print_rows((mdb_table_t *)t, buf, len);
+}
+
+
+/*
+ * Local Variables:
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ *
+ */

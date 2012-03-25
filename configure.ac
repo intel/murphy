@@ -37,6 +37,16 @@ AC_PROG_AWK
 AC_PROG_INSTALL
 AM_PROG_CC_C_O
 AM_PROG_LIBTOOL
+AC_PROG_LEX
+AC_PROG_YACC
+
+if test "$LEX" != "flex" ; then
+   AC_MSG_ERROR([flex is required])
+fi
+
+if test "$YACC" != "bison -y" ; then
+   AC_MSG_ERROR([bison is required])
+fi
 
 # Checks for libraries.
 AC_CHECK_LIB([dl], [dlopen dlclose dlsym dlerror])
@@ -81,6 +91,7 @@ AC_SUBST(DBUS_LIBS)
 
 DBUS_SESSION_DIR="`pkg-config --variable session_bus_services_dir dbus-1`"
 AC_SUBST(DBUS_SESSION_DIR)
+
 
 # Check and enable extra compiler warnings if they are supported.
 AC_ARG_ENABLE(extra-warnings,
@@ -173,6 +184,9 @@ PKG_CHECK_MODULES(CHECK,
                   [has_check="yes"], [has_check="no"])
 AM_CONDITIONAL(HAVE_CHECK, test "x$has_check" = "xyes")
 
+AC_SUBST(CHECK_CFLAGS)
+AC_SUBST(CHECK_LIBS)
+
 if test "x$has_check" = "xno"; then
     AC_MSG_WARN([Check framework not found, unit tests are DISABLED.])
 fi
@@ -196,6 +210,12 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/daemon/tests/Makefile
 		 src/common/murphy-common.pc
 		 src/core/murphy-core.pc
+                 src/murphy-db/Makefile
+                 src/murphy-db/mdb/Makefile
+                 src/murphy-db/mqi/Makefile
+                 src/murphy-db/mql/Makefile
+                 src/murphy-db/include/Makefile
+                 src/murphy-db/tests/Makefile
 		 doc/Makefile
 		 ])
 AC_OUTPUT

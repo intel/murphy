@@ -1,0 +1,1295 @@
+%{
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <alloca.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+
+#include <murphy-db/assert.h>
+#include <murphy-db/mqi.h>
+#include <murphy-db/mql.h>
+
+#define MQL_SUCCESS                                                     \
+    do {                                                                \
+        if (mode == mql_mode_exec)                                      \
+            result = mql_result_success_create();                       \
+    } while (0)
+
+#define MQL_ERROR(code, fmt...)                                         \
+    do {                                                                \
+        switch (mode) {                                                 \
+        case mql_mode_exec:                                             \
+            result = mql_result_error_create(code, fmt);                \
+            break;                                                      \
+        case mql_mode_precompile:                                       \
+            errno = code;                                               \
+            free(statement);                                            \
+            statement = NULL;                                           \
+            break;                                                      \
+        case mql_mode_parser:                                           \
+            fprintf(mqlout, "%s:%d: error: ", file, yy_mql_lineno);     \
+            fprintf(mqlout, fmt);                                       \
+            fprintf(mqlout, "\n");                                      \
+            break;                                                      \
+        }                                                               \
+        YYERROR;                                                        \
+    } while (0)
+
+
+#define SET_INPUT(t,v)                                                  \
+    input_t *input;                                                     \
+    if (ninput >= MQI_COLUMN_MAX)                                       \
+        MQL_ERROR(EOVERFLOW, "Too many input values\n");                \
+    input = inputs + ninput++;                                          \
+    input->type = mqi_##t;                                              \
+    input->flags = 0;                                                   \
+    input->value.t = (v)
+
+
+typedef enum {
+    mql_mode_parser,
+    mql_mode_exec,
+    mql_mode_precompile,
+} mql_mode_t;
+
+typedef struct {
+    mqi_data_type_t      type;
+    uint32_t             flags;
+    union {
+        char *varchar;
+        int32_t integer;
+        uint32_t unsignd;
+        double floating;
+    }                    value;
+} input_t;
+
+extern int yy_mql_lineno;
+extern int yy_mql_lex(void);
+
+
+void yy_mql_error(const char *);
+
+static void print_query_result(mqi_column_desc_t *, mqi_data_type_t *,
+                               int *, int, int, void *);
+
+mqi_handle_t table;
+uint32_t     table_flags;
+
+
+static mqi_column_def_t   coldefs[MQI_COLUMN_MAX + 1];
+static mqi_column_def_t  *coldef = coldefs;
+
+static char              *colnams[MQI_COLUMN_MAX + 1];
+static int                ncolnam;
+
+static mqi_cond_entry_t   conds[MQI_COND_MAX + 1];
+static mqi_cond_entry_t  *cond = conds;
+static int                binds;
+
+static input_t            inputs[MQI_COLUMN_MAX];
+static int                ninput;
+
+static mqi_column_desc_t  coldescs[MQI_COLUMN_MAX + 1];
+static int                ncoldesc;
+
+static char    *strs[256];
+static int      nstr;
+
+static int32_t  ints[256];
+static int      nint;
+
+static uint32_t uints[32];
+static int      nuint;
+
+static double   floats[256];
+static int      nfloat;
+
+static mql_mode_t mode;
+
+static mql_statement_t   *statement;
+
+static mql_result_type_t  rtype;
+static mql_result_t      *result;
+
+static char        *file;
+static const char  *mqlbuf;
+static int          mqlin;
+static FILE        *mqlout;
+
+%}
+
+%union {
+    mqi_data_type_t  type;
+    char            *string;
+    long long int    number;
+    double           floating;
+    int              integer;
+};
+
+
+%defines
+
+%token <string>   TKN_SHOW
+%token <string>   TKN_BEGIN
+%token <string>   TKN_COMMIT
+%token <string>   TKN_ROLLBACK
+%token <string>   TKN_TRANSACTION
+%token <string>   TKN_CREATE
+%token <string>   TKN_UPDATE
+%token <string>   TKN_REPLACE
+%token <string>   TKN_DELETE
+%token <string>   TKN_DROP
+%token <string>   TKN_DESCRIBE
+%token <string>   TKN_TABLE
+%token <string>   TKN_TABLES
+%token <string>   TKN_INDEX
+%token <string>   TKN_INSERT
+%token <string>   TKN_SELECT
+%token <string>   TKN_INTO
+%token <string>   TKN_FROM
+%token <string>   TKN_WHERE
+%token <string>   TKN_VALUES
+%token <string>   TKN_SET
+%token <string>   TKN_ON
+%token <string>   TKN_OR
+%token <string>   TKN_PERSISTENT
+%token <string>   TKN_TEMPORARY
+%token <string>   TKN_VARCHAR
+%token <string>   TKN_INTEGER
+%token <string>   TKN_UNSIGNED
+%token <string>   TKN_REAL
+%token <string>   TKN_BLOB
+%token <integer>  TKN_PARAMETER
+%token <string>   TKN_LOGICAL_AND
+%token <string>   TKN_LOGICAL_OR
+%token <string>   TKN_LESS
+%token <string>   TKN_LESS_OR_EQUAL
+%token <string>   TKN_EQUAL
+%token <string>   TKN_GREATER_OR_EQUAL
+%token <string>   TKN_GREATER
+%token <string>   TKN_NOT
+%token <string>   TKN_LEFT_PAREN
+%token <string>   TKN_RIGHT_PAREN
+%token <string>   TKN_COMMA
+%token <string>   TKN_SEMICOLON
+%token <string>   TKN_PLUS
+%token <string>   TKN_MINUS
+%token <string>   TKN_STAR
+%token <string>   TKN_SLASH
+%token <number>   TKN_NUMBER
+%token <floating> TKN_FLOATING
+%token <string>   TKN_IDENTIFIER
+%token <string>   TKN_QUOTED_STRING
+
+%type <integer>   insert
+%type <integer>   insert_or_replace
+%type <integer>   insert_option
+
+%type <integer>   varchar
+%type <integer>   blob
+%type <integer>   sign
+
+%type <floating>  floating_value
+
+%start statement_list
+
+%code requires {
+    #include <murphy-db/mqi.h>
+    #include <murphy-db/mql.h>
+
+    int yy_mql_input(void *, unsigned);
+
+    mql_statement_t *mql_make_show_tables_statement(uint32_t);
+    mql_statement_t *mql_make_describe_statement(mqi_handle_t);
+    mql_statement_t *mql_make_insert_statement(mqi_handle_t, int, int,
+                                               mqi_data_type_t*,
+                                               mqi_column_desc_t*, void*);
+    mql_statement_t *mql_make_update_statement(mqi_handle_t, int,
+                                               mqi_cond_entry_t *, int,
+                                               mqi_data_type_t *,
+                                               mqi_column_desc_t *, void *);
+    mql_statement_t *mql_make_delete_statement(mqi_handle_t, int,
+                                               mqi_cond_entry_t *);
+    mql_statement_t *mql_make_select_statement(mqi_handle_t, int, int,
+                                               mqi_cond_entry_t *, int,
+                                               char **, mqi_data_type_t *,
+                                               int *, mqi_column_desc_t *);
+
+    mql_result_t *mql_result_success_create(void);
+    mql_result_t *mql_result_error_create(int, const char *, ...);
+    mql_result_t *mql_result_columns_create(int, mqi_column_def_t *);
+    mql_result_t *mql_result_rows_create(int, mqi_column_desc_t*,
+                                         mqi_data_type_t*,int*,int,int,void*);
+    mql_result_t *mql_result_string_create_table_list(int, char **);
+    mql_result_t *mql_result_string_create_column_list(int, mqi_column_def_t*);
+    mql_result_t *mql_result_string_create_row_list(int, char **,
+                                                    mqi_column_desc_t *,
+                                                    mqi_data_type_t *, int *,
+                                                    int, int, void *);
+    mql_result_t *mql_result_list_create(mqi_data_type_t, int, void *);
+}
+
+
+%%
+
+statement_list:
+  statement
+| statement_list semicolon statement
+;
+
+semicolon: TKN_SEMICOLON {
+    if (mode != mql_mode_parser) {
+        result = mql_result_error_create(EINVAL, "multiple MQL statements");
+        YYERROR;
+    }
+};
+
+statement:
+  TKN_SHOW  show_statement
+| TKN_CREATE create_statement
+| TKN_DROP drop_statement
+| begin_statement
+| commit_statement
+| rollback_statement
+| describe_statement
+| insert_statement
+| update_statement
+| delete_statement
+| select_statement
+| error
+;
+
+/***************************
+ *
+ * Show statement
+ *
+ */
+show_statement:
+  show_tables
+;
+
+show_tables: table_flags TKN_TABLES {
+    char  *names[4096];
+    int    n;
+    
+    if (mode == mql_mode_precompile)
+        statement = mql_make_show_tables_statement(table_flags);
+    else {
+        if ((n = mqi_show_tables(table_flags, names,MQI_DIMENSION(names))) < 0)
+            MQL_ERROR(errno, "can't show tables: %s", strerror(errno));
+        else {
+            if (mode == mql_mode_exec) {
+                switch (rtype) {
+                case mql_result_string:
+                    result = mql_result_string_create_table_list(n, names);
+                    break;
+                case mql_result_list:
+                    result = mql_result_list_create(mqi_string,n,(void*)names);
+                    break;
+                default:
+                    result = mql_result_error_create(EINVAL,
+                                                     "can't show tables: %s",
+                                                     strerror(EINVAL));
+                    break;
+                }
+            }
+            else {
+                mql_result_t *r = mql_result_string_create_table_list(n,names);
+
+                fprintf(mqlout, "%s", mql_result_string_get(r));
+
+                mql_result_free(r);
+            }
+        }
+    }
+};
+
+/***********************************
+ *
+ * Create statement
+ *
+ */
+create_statement:
+  create_table table_definition
+| create_index index_definition
+; 
+
+/* create table */
+
+create_table: table_flags TKN_TABLE {
+    coldef = coldefs;
+    
+    if (table_flags == MQI_ANY)
+        table_flags = MQI_TEMPORARY;
+};
+
+
+
+table_definition: TKN_IDENTIFIER TKN_LEFT_PAREN column_defs TKN_RIGHT_PAREN {
+    if (mqi_create_table($1, table_flags, NULL, coldefs) < 0)
+        MQL_ERROR(errno, "Can't create table: %s\n", strerror(errno));
+    else
+        MQL_SUCCESS;
+};
+
+column_defs:
+  column_def
+| column_defs TKN_COMMA column_def
+;
+
+column_def: column_name column_type {
+    memset(++coldef, 0, sizeof(mqi_column_def_t));
+};
+
+column_name: TKN_IDENTIFIER {
+    if ((coldef - coldefs) >= MQI_COLUMN_MAX) {
+        MQL_ERROR(EOVERFLOW, "Too many columns. Max %d columns allowed\n",
+                  MQI_COLUMN_MAX);
+    }
+
+    coldef->name = $1;
+};
+
+column_type:
+  varchar       { coldef->type = mqi_varchar;   coldef->length = $1; }
+| TKN_INTEGER   { coldef->type = mqi_integer;   coldef->length = 0;  }
+| TKN_UNSIGNED  { coldef->type = mqi_unsignd;   coldef->length = 0;  }
+| TKN_FLOATING  { coldef->type = mqi_floating;  coldef->length = 0;  }
+| blob          { coldef->type = mqi_blob;      coldef->length = $1; }
+;
+
+varchar: TKN_VARCHAR TKN_LEFT_PAREN TKN_NUMBER TKN_RIGHT_PAREN {
+    $$ = (int)$3;
+};
+
+blob: TKN_BLOB TKN_LEFT_PAREN TKN_NUMBER TKN_RIGHT_PAREN {
+    $$ = (int)$3;
+};
+
+/* create index */
+
+create_index: TKN_INDEX {
+    ncolnam = 0;
+};
+
+index_definition: TKN_ON table_name TKN_LEFT_PAREN column_list TKN_RIGHT_PAREN
+{
+    colnams[ncolnam] = NULL;
+
+    if (mqi_create_index(table, colnams) < 0)
+        MQL_ERROR(errno, "failed to create index: %s", strerror(errno));
+    else
+        MQL_SUCCESS;
+};
+
+
+/***********************************
+ *
+ * Drop statement
+ *
+ */
+drop_statement:
+  drop_table
+| drop_index
+; 
+
+/* drop table */
+
+drop_table: TKN_TABLE  table_name {
+    if (mqi_drop_table(table) < 0)
+        MQL_ERROR(errno, "failed to drop table: %s", strerror(errno));
+    else
+        MQL_SUCCESS;
+}
+;
+
+
+/* drop index */
+
+drop_index: TKN_INDEX {
+};
+
+
+/***********************************
+ *
+ * Begin/Commit/Rollback statement
+ *
+ */
+begin_statement: TKN_BEGIN transaction {
+    if (mqi_begin_transaction() == MQI_HANDLE_INVALID)
+        MQL_ERROR(errno, "Can't start transaction: %s", strerror(errno));
+    else
+        MQL_SUCCESS;
+};
+
+commit_statement: TKN_COMMIT transaction {
+    mqi_handle_t txh = mqi_get_transaction_handle();
+
+    if (txh == MQI_HANDLE_INVALID || mqi_commit_transaction(txh) < 0)
+        MQL_ERROR(errno, "failed to commit transaction: %s", strerror(errno));
+    else
+        MQL_SUCCESS;
+};
+
+rollback_statement: TKN_ROLLBACK transaction {
+    mqi_handle_t txh = mqi_get_transaction_handle();
+
+    if (txh == MQI_HANDLE_INVALID || mqi_rollback_transaction(txh) < 0)
+        MQL_ERROR(errno, "can't rollback transaction: %s", strerror(errno));
+    else
+        MQL_SUCCESS;
+};
+
+
+
+/***********************************
+ *
+ * Describe statement
+ *
+ */
+describe_statement: TKN_DESCRIBE table_name {
+    mqi_column_def_t defs[MQI_COLUMN_MAX];
+    int              n;
+
+    if (mode == mql_mode_precompile)
+        statement = mql_make_describe_statement(table);
+    else {
+        if ((n = mqi_describe(table, defs, MQI_COLUMN_MAX)) < 0)
+            MQL_ERROR(errno, "can't describe table: %s", strerror(errno));
+        else {
+            if (mode == mql_mode_exec) {
+                switch (rtype) {
+                case mql_result_columns:
+                    result = mql_result_columns_create(n, defs);
+                    break;
+                case mql_result_string:
+                    result = mql_result_string_create_column_list(n, defs);
+                    break;
+                default:
+                    result = mql_result_error_create(EINVAL, "describe failed:"
+                                                     " invalid result type %d",
+                                                     rtype);
+                    break;
+                }
+            }
+            else {
+                mql_result_t *r = mql_result_string_create_column_list(n,defs);
+
+                fprintf(mqlout, "%s", mql_result_string_get(r));
+
+                mql_result_free(r);
+            }
+        }
+    }
+};
+
+/***********************************
+ *
+ * Insert statement
+ *
+ */
+insert_statement: insert table_name insert_columns TKN_VALUES insert_values {
+    void              *row[2];
+    char              *col;
+    mqi_column_desc_t *cd;
+    mqi_data_type_t    coltypes[MQI_COLUMN_MAX + 1];
+    input_t           *inp;
+    mqi_data_type_t    type;
+    int                cindex;
+    int                err;
+    int                i;
+
+    if (!ncolnam) {
+        while ((colnams[ncolnam] = mqi_get_column_name(table, ncolnam)))
+            ncolnam++;
+    }
+
+    if (ncolnam != ninput)
+        MQL_ERROR(EINVAL, "unbalanced set of columns and values");
+
+    for (i = 0, err = 0; i < ncolnam; i++) {
+        col = colnams[i];
+        cd  = coldescs + i;
+        inp = inputs + i;
+
+        if ((cindex = mqi_get_column_index(table, col)) < 0) {
+            MQL_ERROR(ENOENT, "know nothing about '%s'", col);
+            err = 1;
+            continue;
+        }
+
+        type = coltypes[i] = mqi_get_column_type(table, cindex);
+
+        if (type != inp->type) {
+            if (type != mqi_integer ||
+                inp->type != mqi_unsignd ||
+                inp->value.unsignd > INT32_MAX)
+            {
+                MQL_ERROR(EINVAL, "mismatching column and value type for '%s'",
+                          col);
+                err = 1;
+                continue;
+            }
+        }
+
+        cd->cindex = cindex;
+        cd->offset = (void *)&inp->value - (void *)inputs;
+    }
+
+    cd = coldescs + i;
+    cd->cindex = -1;
+    cd->offset = -1;
+
+
+    if (mode == mql_mode_precompile) {
+        statement = mql_make_insert_statement(table, $1, ncolnam, coltypes,
+                                              coldescs, inputs);
+    }
+    else {
+        row[0] = (void *)inputs;
+        row[1] = NULL;
+
+        if (err || mqi_insert_into(table, $1, coldescs, row) < 0)
+            MQL_ERROR(errno, "insert failed: %s\n", strerror(errno));
+        else
+            MQL_SUCCESS;
+    }
+};
+
+
+insert: insert_or_replace {
+      table = MQI_HANDLE_INVALID;
+      ncolnam = 0;
+      ninput = 0;
+      ncoldesc = 0;
+      $$ = $1;
+};
+
+insert_or_replace:
+  TKN_INSERT insert_option TKN_INTO  { $$ = $2; }
+| TKN_REPLACE TKN_INTO               { $$ = 1;  } 
+;
+
+insert_option:
+   /* no option */     { $$ = 0; }
+| TKN_OR TKN_REPLACE   { $$ = 1; }
+/*
+| TKN_IGNORE           { $$ = 1; }
+*/
+;
+
+
+insert_columns: 
+  /* all columns: leaves ncolnam as zero */
+| TKN_LEFT_PAREN column_list TKN_RIGHT_PAREN
+;
+
+insert_values: TKN_LEFT_PAREN input_value_list TKN_RIGHT_PAREN;
+
+input_value_list:
+  input_value
+| input_value_list TKN_COMMA input_value
+; 
+
+
+
+/***********************************
+ *
+ * Update statement
+ *
+ */
+update_statement: update table_name TKN_SET assignment_list where_clause {
+    mqi_column_desc_t *cd    = coldescs + ninput;
+    mqi_cond_entry_t  *where = (cond == conds) ? NULL : conds;
+    mqi_data_type_t    coltypes[MQI_COLUMN_MAX + 1];
+    int                i;
+
+    if (!ninput)
+        MQL_ERROR(ENOMEDIUM, "No column to update");
+
+    cd->cindex = -1;
+    cd->offset = -1;
+
+    if (mode == mql_mode_precompile) {
+        for (i = 0;  i < ninput; i++)
+            coltypes[i] = inputs[i].type;
+
+        statement = mql_make_update_statement(table, cond - conds, conds,
+                                              ninput, coltypes, coldescs,
+                                              inputs);
+    }
+    else {
+        if (mqi_update(table, where, coldescs, inputs) < 0)
+            MQL_ERROR(errno, "update failed: %s", strerror(errno));
+        else
+            MQL_SUCCESS;
+    }
+};
+
+update: TKN_UPDATE {
+      table = MQI_HANDLE_INVALID;
+      ninput = 0;
+      ncoldesc = 0;
+      nstr = 0;
+      nint = 0;
+      nuint = 0;
+      nfloat = 0;
+      cond = conds;
+      binds = 0;
+};
+
+
+assignment_list:
+  assignment
+| assignment_list TKN_COMMA assignment
+;
+
+assignment: TKN_IDENTIFIER TKN_EQUAL input_value {
+    int                i   = ninput - 1;
+    input_t           *inp = inputs + i;
+    mqi_column_desc_t *cd  = coldescs + i;
+    int                cindex;
+    int                offset;
+    mqi_data_type_t    type;
+
+    if ((cindex = mqi_get_column_index(table, $1)) < 0)
+        MQL_ERROR(ENOENT, "know nothing about '%s'", $1);
+ 
+    if ((inp->flags & MQL_BINDABLE))
+        offset = -(MQL_BIND_INDEX(inp->flags) + 1);
+    else {
+        if ((type = mqi_get_column_type(table, cindex)) != inp->type) {
+            if (type != mqi_integer ||
+                inp->type != mqi_unsignd ||
+                inp->value.unsignd > INT32_MAX)
+            {
+                MQL_ERROR(EINVAL, "mismatching column and value type "
+                          "for '%s'",$1);
+            }
+        }
+        offset = (void *)&inp->value - (void *)inputs;
+    }
+
+    cd->cindex = cindex;
+    cd->offset = offset;
+};
+
+
+
+/***********************************
+ *
+ * Delete statement
+ *
+ */
+delete_statement: delete table_name where_clause {
+    mqi_cond_entry_t *where = (cond == conds) ? NULL : conds;
+
+    if (mode == mql_mode_precompile)
+        statement = mql_make_delete_statement(table, cond - conds, where);
+    else {
+        if (mqi_delete_from(table, where) < 0)
+            MQL_ERROR(errno, "delete failed: %s", strerror(errno));
+        else
+            MQL_SUCCESS;
+    }
+};
+
+delete: TKN_DELETE TKN_FROM {
+    table = MQI_HANDLE_INVALID;
+    nstr = 0;
+    nint = 0;
+    nuint = 0;
+    nfloat = 0;
+    cond = conds;
+    binds = 0;
+};
+
+/***********************************
+ *
+ * Select statement
+ *
+ */
+select_statement: select columns TKN_FROM table_name where_clause {
+    mqi_column_desc_t *cd;
+    int colsizes[MQI_COLUMN_MAX + 1];
+    int colsize;
+    int colidx;
+    mqi_data_type_t coltypes[MQI_COLUMN_MAX + 1];
+    mqi_data_type_t coltype;
+    mqi_cond_entry_t *where;
+    int rowsize;
+    int tsiz;
+    size_t rsiz;
+    void *rows;
+    int i, n;
+
+
+    if ((tsiz = mqi_get_table_size(table)) < 0)
+        MQL_ERROR(errno, "can't get table size: %s", strerror(errno));
+
+
+    if (!ncolnam) {
+        while ((colnams[ncolnam] = mqi_get_column_name(table, ncolnam)))
+            ncolnam++;
+    }
+
+    for (i = 0, rowsize = 0;  i < ncolnam;   i++) {
+        cd = coldescs + i;
+        
+        if ((colidx  = mqi_get_column_index(table, colnams[i])) < 0 ||
+            (colsize = mqi_get_column_size(table, colidx))      < 0 ||
+            (coltype = mqi_get_column_type(table, colidx)) == mqi_error)
+        {
+            MQL_ERROR(errno, "invalid column '%s'\n", colnams[i]);
+        }
+        cd->cindex = colidx;
+        cd->offset = rowsize;
+        
+        coltypes[i] = coltype;
+        colsizes[i] = colsize;
+        
+        switch (coltype) {
+        case mqi_varchar:   rowsize += sizeof(char *);    break;
+        case mqi_integer:   rowsize += sizeof(int32_t);   break;
+        case mqi_unsignd:   rowsize += sizeof(uint32_t);  break;
+        case mqi_floating:  rowsize += sizeof(double);    break;
+        case mqi_blob:      rowsize += sizeof(void *);    break;
+        default:                                         break;
+        }
+    } /* for */
+
+    
+    cd = coldescs + i;
+    cd->cindex = -1;
+    cd->offset = -1;
+
+    if (mode != mql_mode_precompile && !tsiz) {
+        if (mode == mql_mode_parser)
+            fprintf(mqlout, "no rows\n");
+    }
+    else {
+        rsiz  = tsiz * rowsize;
+        rows  = alloca(rsiz);
+        where = (cond == conds) ? NULL : conds;
+
+        if (mode != mql_mode_precompile) {
+            if ((n = mqi_select(table, where,coldescs, rows,rowsize,tsiz)) < 0)
+                MQL_ERROR(errno, "select failed: %s", strerror(errno));
+        }
+
+        switch (mode) {
+        case mql_mode_parser:
+            fprintf(mqlout, "Selected %d rows:\n", n);
+            print_query_result(coldescs, coltypes, colsizes, n, rowsize, rows);
+            break;
+        case mql_mode_exec:
+            if (rtype == mql_result_rows) {
+                result = mql_result_rows_create(ncolnam, coldescs, coltypes,
+                                                colsizes, n, rowsize, rows);
+            }
+            else {
+                result = mql_result_string_create_row_list(ncolnam, colnams,
+                                                           coldescs, coltypes,
+                                                           colsizes,
+                                                           n, rowsize, rows);
+            }
+            break;
+        case mql_mode_precompile:
+            statement = mql_make_select_statement(table, rowsize,
+                                                  cond - conds, where,
+                                                  ncolnam, colnams, coltypes,
+                                                  colsizes, coldescs); 
+            break;
+        }
+    }
+};
+
+
+select: TKN_SELECT {
+    table = MQI_HANDLE_INVALID;
+    ncolnam = 0;
+    nstr = 0;
+    nint = 0;
+    nuint = 0;
+    nfloat = 0;
+    cond = conds;
+    binds = 0;
+};
+
+columns:
+  TKN_STAR
+| column_list
+;
+
+/***********************************
+ *
+ * Transaction
+ *
+ */
+transaction:
+  /* no token */
+| TKN_TRANSACTION
+;
+
+/***********************************
+ *
+ * Table name
+ *
+ */
+table_name: TKN_IDENTIFIER {
+    if ((table = mqi_get_table_handle($1)) == MQI_HANDLE_INVALID)
+        MQL_ERROR(errno, "Do not know anything about '%s'", $1);
+};
+
+/***********************************
+ *
+ * Table flags
+ *
+ */
+table_flags:
+  /* no option */ { table_flags = MQI_ANY;        }
+| TKN_PERSISTENT  { table_flags = MQI_PERSISTENT; }
+| TKN_TEMPORARY   { table_flags = MQI_TEMPORARY;  }
+;
+
+/***********************************
+ *
+ * Column list
+ *
+ */
+column_list:
+  column
+| column_list TKN_COMMA column
+;
+
+column: TKN_IDENTIFIER {
+    if (ncolnam < MQI_COLUMN_MAX)
+        colnams[ncolnam++] = $1;
+    else
+        MQL_ERROR(EOVERFLOW, "Too many columns");
+};
+
+/***********************************
+ *
+ * Input value
+ *
+ */
+input_value:
+  string_input
+| integer_input
+| unsigned_input
+| floating_input
+| parameter_input
+;
+
+string_input:   TKN_QUOTED_STRING { SET_INPUT(varchar,  $1);              };
+integer_input:  sign TKN_NUMBER   { SET_INPUT(integer,  $1 * $2);         };
+unsigned_input: TKN_NUMBER        { SET_INPUT(unsignd,  $1);              };
+floating_input: TKN_FLOATING      { SET_INPUT(floating, $1);              }
+|               sign TKN_FLOATING { SET_INPUT(floating, (double)$1 * $2); };
+
+parameter_input: TKN_PARAMETER {
+    input_t *input;
+
+    if (mode != mql_mode_precompile) {
+        MQL_ERROR(EINVAL, "parameters are allowed only in "
+                  "precompilation mode");
+    }
+    if (binds >= MQL_PARAMETER_MAX) {
+        MQL_ERROR(EOVERFLOW, "number of parameters exceeds %d",
+                  MQL_PARAMETER_MAX);
+    }
+
+    input = inputs + ninput++;
+    input->type = $1;
+    input->flags = MQL_BINDABLE | MQL_BIND_INDEX(binds++);
+
+    memset(&input->value, 0, sizeof(input->value));
+};
+
+
+/***********************************
+ *
+ * Where clause
+ *
+ */
+where_clause:
+  /* no where clause  */ {
+  }
+| TKN_WHERE conditional_expression {
+    cond->type = mqi_operator;
+    cond->operator = mqi_end;
+    cond++;
+  };
+
+
+conditional_expression:
+  relational_expression
+| relational_expression logical_operator relational_expression
+;
+
+relational_expression: value relational_operator value;
+
+value: 
+  column_value
+| string_variable
+| integer_variable
+| unsigned_variable
+| floating_variable
+| parameter_value
+| expression_value
+| unary_operator value
+;
+
+column_value: TKN_IDENTIFIER {
+    int cx;
+
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+
+    if ((cx = mqi_get_column_index(table,$1)) < 0)
+        MQL_ERROR(ENOENT, "no column with name '%s'", $1);
+
+    cond->type = mqi_column;
+    cond->column = cx;
+    cond++;
+};
+
+string_variable: TKN_QUOTED_STRING {
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    strs[nstr] = $1;
+    cond->type = mqi_variable;
+    cond->variable.flags = 0;
+    cond->variable.type = mqi_varchar;
+    cond->variable.varchar = strs + nstr++;
+    cond++;
+};
+
+integer_variable: sign TKN_NUMBER {
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    ints[nint] = $1 * $2;
+    cond->type = mqi_variable;
+    cond->variable.type = mqi_integer;
+    cond->variable.integer = ints + nint++;
+    cond++;
+};
+
+unsigned_variable: TKN_NUMBER {
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    uints[nuint] = $1;
+    cond->type = mqi_variable;
+    cond->variable.flags = 0;
+    cond->variable.type = mqi_unsignd;
+    cond->variable.unsignd = uints + nuint++;
+    cond++;
+};
+
+floating_variable: floating_value {
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    floats[nfloat] = $1;
+    cond->type = mqi_variable;
+    cond->variable.flags = 0;
+    cond->variable.type = mqi_floating;
+    cond->variable.floating = floats + nfloat++;
+    cond++;
+};
+
+floating_value:
+  TKN_FLOATING        { return $1;              }
+| sign TKN_FLOATING   { return (double)$1 * $2; }
+
+
+parameter_value: TKN_PARAMETER {
+    if (mode != mql_mode_precompile) {
+        MQL_ERROR(EINVAL, "parameters are allowed only in "
+                  "precompilation mode");
+    }
+    if (binds >= MQL_PARAMETER_MAX) {
+        MQL_ERROR(EOVERFLOW, "number of parameters exceeds %d",
+                  MQL_PARAMETER_MAX);
+    }
+    if (cond - conds >= MQI_COND_MAX) {
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    }
+    cond->type = mqi_variable;
+    cond->variable.flags = MQL_BINDABLE | MQL_BIND_INDEX(binds++);
+    cond->variable.type = $1;
+    cond->variable.generic = NULL;
+    cond++;
+};
+
+expression_value:
+  TKN_LEFT_PAREN  {
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    cond->type = mqi_operator;
+    cond->operator = mqi_begin;
+    cond++;
+  }
+  conditional_expression
+  TKN_RIGHT_PAREN {
+    if (cond - conds >= MQI_COND_MAX)
+        MQL_ERROR(EOVERFLOW, "too complex condition");
+    cond->type = mqi_operator;
+    cond->operator = mqi_end;
+    cond++;
+  }
+;
+
+
+sign:
+  TKN_PLUS  { $$ = +1; }
+| TKN_MINUS { $$ = -1; }
+;
+
+
+unary_operator:
+  TKN_NOT {
+      cond->type = mqi_operator;
+      cond->operator = mqi_not;
+      cond++;
+  }
+;
+
+relational_operator:
+  TKN_LESS {
+      cond->type = mqi_operator;
+      cond->operator = mqi_less;
+      cond++;
+  }
+| TKN_LESS_OR_EQUAL {
+    cond->type = mqi_operator;
+    cond->operator = mqi_leq;
+    cond++;
+  }
+| TKN_EQUAL {
+    cond->type = mqi_operator;
+    cond->operator = mqi_eq;
+    cond++;
+  }
+| TKN_GREATER_OR_EQUAL {
+    cond->type = mqi_operator;
+    cond->operator = mqi_geq;
+    cond++;
+  }
+| TKN_GREATER {
+    cond->type = mqi_operator;
+    cond->operator = mqi_gt;
+    cond++;
+  }
+;
+
+logical_operator:
+  TKN_LOGICAL_AND {
+      cond->type = mqi_operator;
+      cond->operator = mqi_and;
+      cond++;
+  }
+| TKN_LOGICAL_OR {
+    cond->type = mqi_operator;
+    cond->operator = mqi_or;
+    cond++;
+  }
+;
+
+
+%%
+
+
+int mql_exec_file(const char *path)
+{
+    char buf[1024];
+    int sts;
+
+    mode   = mql_mode_parser;
+    rtype  = mql_result_unknown;
+    mqlbuf = NULL;
+    mqlout = stdout;
+    
+    if (!path) {
+        mqlin = fileno(stdin);
+        sts = yy_mql_parse() ? -1 : 0;
+    }
+    else {
+        strncpy(buf, path, sizeof(buf));
+        buf[sizeof(buf)-1] = '\0';
+        
+        file = basename(buf);
+
+        if ((mqlin = open(path, O_RDONLY)) < 0) {
+            sts = -1;
+            fprintf(mqlout, "could not open file '%s': %s\n",
+                    path, strerror(errno));
+        }
+        else {
+            sts = yy_mql_parse() ? -1 : 0;
+            close(mqlin);
+        }
+    }
+
+    mqlin = -1;
+    
+    return sts;
+}
+
+
+mql_result_t *mql_exec_string(mql_result_type_t result_type, const char *str)
+{
+    MDB_CHECKARG((result_type == mql_result_columns  ||
+                  result_type == mql_result_rows ||
+                  result_type == mql_result_string  ) && 
+                 str, NULL);
+
+    mode = mql_mode_exec;
+    result = NULL;
+    rtype  = result_type;
+    mqlbuf = str;
+
+    if (yy_mql_parse() && !result) {
+        result = mql_result_error_create(EIO, "Syntax error in '%s'", str);
+    }
+
+
+    return result;
+}
+
+mql_statement_t *mql_precompile(const char *str)
+{
+    MDB_CHECKARG(str, NULL);
+
+    mode = mql_mode_precompile;
+    rtype = mql_result_unknown;
+    statement = NULL;
+    mqlbuf = str;
+    
+    yy_mql_parse();
+
+    return statement;
+} 
+
+int yy_mql_input(void *dst, unsigned dstlen)
+{
+    int len = 0;
+
+    if (dst && dstlen > 0) {
+
+        if (mqlbuf) {
+            if ((len = strlen(mqlbuf)) < 1)
+                len = 0;
+            else if (len + 1 <= dstlen) {
+                memcpy(dst, mqlbuf, len + 1);
+                mqlbuf += len;
+            }
+            else {
+                memcpy(dst, mqlbuf, dstlen);
+                mqlbuf += dstlen;
+            }
+        }
+        else if (mqlin >= 0) {
+            while ((len = read(mqlin, dst, dstlen)) < 0) {
+                if (errno != EINTR) {
+                    break;
+                }
+            }
+        }
+    }
+
+    return len;
+}
+
+
+void yy_mql_error(const char *msg)
+{
+    if (mode == mql_mode_parser)
+        fprintf(mqlout, "Error: '%s'\n", msg);
+}
+
+
+
+static void print_query_result(mqi_column_desc_t *coldescs,
+                               mqi_data_type_t   *coltypes,
+                               int               *colsizes,
+                               int                nresult,
+                               int                recsize,
+                               void              *results)
+{
+    int i, j, recoffs;
+    void *data;
+    char  name[4096];
+    int   clgh;
+    int   clghs[MQI_COLUMN_MAX + 1];
+    int   n;
+
+    for (j = 0, n = 0;  j < ncolnam;  j++) {
+        snprintf(name, sizeof(name),  "%s", colnams[j]);
+
+        switch (coltypes[j]) {
+        case mqi_varchar:   clgh = colsizes[j] - 1;  break;
+        case mqi_integer:   clgh = 11;               break;
+        case mqi_unsignd:   clgh = 10;               break;
+        case mqi_floating:  clgh = 10;               break;
+        default:            clgh = 0;                break;
+        }
+
+        clghs[j] = clgh;
+
+        if (clgh < sizeof(name))
+            name[clgh] = '\0';
+
+        n += fprintf(mqlout, "%s%*s", j?" ":"", clgh,name);
+
+    }
+
+    if (n > sizeof(name)-1)
+        n = sizeof(name)-1;
+    memset(name, '-', n);
+    name[n] = '\0';
+
+    fprintf(mqlout, "\n%s\n", name);
+
+
+
+    for (i = 0, recoffs = 0;  i < nresult;  i++, recoffs += recsize) {
+        for (j = 0;  j < ncolnam;  j++) {
+            if (j) fprintf(mqlout, " ");
+
+            data = results + (recoffs + coldescs[j].offset);
+            clgh = clghs[j];
+
+#define PRINT(t,f) fprintf(mqlout, f, clgh, *(t *)data)
+
+            switch (coltypes[j]) {
+            case mqi_varchar:     PRINT(char *  , "%*s"   );    break;
+            case mqi_integer:     PRINT(int32_t , "%*d"   );    break;
+            case mqi_unsignd:     PRINT(uint32_t, "%*u"   );    break;
+            case mqi_floating:    PRINT(double  , "%*.2lf");    break;
+            case mqi_blob:                                      break;
+            default:                                            break;
+            }
+
+#undef PRINT
+
+        }
+        fprintf(mqlout, "\n");
+    }
+}
+
+/*
+ * Local Variables:
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ * vim:set expandtab shiftwidth=4:
+ */

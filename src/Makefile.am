@@ -1,4 +1,4 @@
-SUBDIRS         = . common/tests core/tests daemon/tests
+SUBDIRS         = . murphy-db common/tests core/tests daemon/tests
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
