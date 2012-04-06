@@ -185,13 +185,9 @@ AC_CONFIG_FILES([build-aux/shave
 		 build-aux/shave-libtool
 		 Makefile
 		 src/Makefile
-		 src/common/Makefile
 		 src/common/tests/Makefile
-		 src/core/Makefile
 		 src/core/tests/Makefile
-		 src/daemon/Makefile
 		 src/daemon/tests/Makefile
-		 src/plugins/Makefile
 		 ])
 AC_OUTPUT
 
