@@ -68,12 +68,12 @@ libmurphy_core_ladir      =		\
 		$(includedir)/murphy/core
 
 libmurphy_core_la_HEADERS =		\
-		core/context.h		
-
+		core/context.h		\
+		core/plugin.h
 
 libmurphy_core_la_SOURCES =		\
-		core/context.c		
-
+		core/context.c		\
+		core/plugin.c
 
 libmurphy_core_la_CFLAGS  =		\
 		$(AM_CFLAGS)
