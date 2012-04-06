@@ -142,6 +142,24 @@ plugin_dbus_la_LIBADD  = $(DBUS_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-dbus.la
 endif
 
+# glib plugin
+GLIB_PLUGIN_SOURCES = plugins/plugin-glib.c
+GLIB_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
+GLIB_PLUGIN_LIBS    = $(DBUS_LIBS)
+
+if BUILTIN_PLUGIN_GLIB
+BUILTIN_PLUGINS += $(GLIB_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(GLIB_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(GLIB_PLUGIN_LIBS)
+else
+plugin_glib_la_SOURCES = $(GLIB_PLUGIN_SOURCES)
+plugin_glib_la_CFLAGS  = $(GLIB_PLUGIN_CFLAGS) $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_glib_la_LDFLAGS = -module -avoid-version
+plugin_glib_la_LIBADD  = $(GLIB_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES    += plugin-glib.la
+endif
+
 
 ###################################
 # murphy daemon
