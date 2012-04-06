@@ -93,3 +93,26 @@ libmurphy_core_la_DEPENDENCIES = linker-script.core
 linker-script.core: $(libmurphy_core_la_HEADERS)
 	$(top_builddir)/build-aux/gen-linker-script -o $@ $^
 
+
+###################################
+# murphy daemon
+#
+
+bin_PROGRAMS += murphyd
+
+murphyd_SOURCES =			\
+		daemon/daemon.c		\
+		daemon/config.c		\
+		$(BUILTIN_PLUGINS)
+
+murphyd_CFLAGS  =			\
+		$(AM_CFLAGS)		\
+		$(BUILTIN_CFLAGS)
+
+murphyd_LDADD  =			\
+		libmurphy-core.la	\
+		libmurphy-common.la	\
+		$(BUILTIN_LIBS)
+
+murphyd_LDFLAGS = -rdynamic
+
