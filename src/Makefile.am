@@ -27,13 +27,15 @@ libmurphy_common_la_HEADERS =		\
 		common/log.h		\
 		common/mm.h		\
 		common/hashtbl.h	\
-		common/mainloop.h
+		common/mainloop.h	\
+		common/utils.h
 
 libmurphy_common_la_SOURCES =		\
 		common/log.c		\
 		common/mm.c		\
 		common/hashtbl.c	\
-		common/mainloop.c
+		common/mainloop.c	\
+		common/utils.c
 
 libmurphy_common_la_CFLAGS  =		\
 		$(AM_CFLAGS)
