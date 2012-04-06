@@ -124,6 +124,24 @@ plugin_test_la_LIBADD  = $(TEST_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-test.la
 endif
 
+# dbus plugin
+DBUS_PLUGIN_SOURCES = plugins/plugin-dbus.c
+DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
+DBUS_PLUGIN_LIBS    = $(DBUS_LIBS)
+
+if BUILTIN_PLUGIN_DBUS
+BUILTIN_PLUGINS += $(DBUS_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(DBUS_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(DBUS_PLUGIN_LIBS)
+else
+plugin_dbus_la_SOURCES = $(DBUS_PLUGIN_SOURCES)
+plugin_dbus_la_CFLAGS  = $(DBUS_PLUGIN_CFLAGS) $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_dbus_la_LDFLAGS = -module -avoid-version
+plugin_dbus_la_LIBADD  = $(DBUS_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES    += plugin-dbus.la
+endif
+
 
 ###################################
 # murphy daemon
