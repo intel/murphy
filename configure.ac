@@ -112,7 +112,7 @@ AC_ARG_WITH(builtin-plugins,
             [builtin_plugins=$withval],[builtin_plugins=all])
 
 all_plugins=$(ls src/plugins/*.c 2>/dev/null | \
-              sed 's#src/murphy-plugin-##g;s#\.c$##g' | tr '\n' ' ')
+              sed 's#src/plugins/plugin-##g;s#\.c$##g' | tr '\n' ' ')
 
 case $builtin_plugins in
     all)  builtin_plugins="$all_plugins";;

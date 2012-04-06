@@ -95,6 +95,37 @@ linker-script.core: $(libmurphy_core_la_HEADERS)
 
 
 ###################################
+# murphy plugins
+#
+
+BUILTIN_PLUGINS    =
+BUILTIN_CFLAGS     = -D__MURPHY_BUILTIN_PLUGIN__ $(AM_CFLAGS)
+BUILTIN_LIBS       =
+
+plugin_LTLIBRARIES = 
+plugindir          = $(libdir)/murphy
+
+
+# test plugin
+TEST_PLUGIN_SOURCES = plugins/plugin-test.c
+TEST_PLUGIN_CFLAGS  =
+TEST_PLUGIN_LIBS    =
+
+if BUILTIN_PLUGIN_TEST
+BUILTIN_PLUGINS += $(TEST_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(TEST_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(TEST_PLUGIN_LIBS)
+else
+plugin_test_la_SOURCES = $(TEST_PLUGIN_SOURCES)
+plugin_test_la_CFLAGS  = $(TEST_PLUGIN_CFLAGS) $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_test_la_LDFLAGS = -module -avoid-version
+plugin_test_la_LIBADD  = $(TEST_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES    += plugin-test.la
+endif
+
+
+###################################
 # murphy daemon
 #
 
