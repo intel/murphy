@@ -10,43 +10,70 @@
 #include <murphy-db/mql-result.h>
 #include "mql-parser.h"
 
-typedef struct {
+typedef struct column_desc_s          column_desc_t;
+typedef struct error_desc_s           error_desc_t;
+typedef struct result_error_s         result_error_t;
+typedef struct result_event_s         result_event_t;
+typedef struct result_event_colchg_s  result_event_colchg_t;
+typedef struct result_columns_s       result_columns_t;
+typedef struct result_rows_s          result_rows_t;
+typedef struct result_string_s        result_string_t;
+typedef struct result_list_s          result_list_t;
+
+struct column_desc_s {
     int                   cindex;
     mqi_data_type_t       type;
     int                   offset;
-} column_desc_t;
+};
 
-typedef struct {
+struct error_desc_s {
     int                   code;
     char                  msg[0];
-} error_desc_t;
+};
 
-typedef struct {
+struct result_error_s {
     mql_result_type_t     type;
     error_desc_t          error;
-} result_error_t;
+};
 
-typedef struct {
+struct result_event_s {
+    mql_result_type_t     type;
+    mqi_event_type_t      event;
+    uint8_t               data[0];
+};
+
+struct result_event_colchg_s {
+    mql_result_type_t     type;
+    mqi_event_type_t      event;
+    mqi_handle_t          table;
+    int                   column;
+    mqi_change_value_t    value;
+    mql_result_t         *select;
+    uint8_t               data[0];
+};
+
+struct result_columns_s {
     mql_result_type_t     type;
     int                   ncol;
     mqi_column_def_t      cols[0];
-} result_columns_t;
+};
 
-typedef struct {
+struct result_rows_s {
     mql_result_type_t     type;
     int                   rowsize;
     int                   ncol;
     int                   nrow;
     void                 *data;
     column_desc_t         cols[0];
-} result_rows_t;
+};
 
-typedef struct {
+struct result_string_s {
     mql_result_type_t     type;
+    int                   length;
     char                  string[0];
-} result_string_t;
+};
 
-typedef struct {
+struct result_list_s {
     mql_result_type_t     type;
     int                   length;
     struct {
@@ -59,7 +86,7 @@ typedef struct {
             int       generic[0];
         };
     }                     value;
-} result_list_t;
+};
 
 static inline mqi_data_type_t get_column_type(result_rows_t *, int);
 static inline void *get_column_address(result_rows_t *, int, int);
@@ -141,6 +168,73 @@ const char *mql_result_error_get_message(mql_result_t *r)
 
     return msg;
 }
+
+mql_result_t *mql_result_event_column_change_create(mqi_handle_t        table,
+                                                    int                 column,
+                                                    mqi_change_value_t *value,
+                                                    mql_result_t       *select)
+{
+    result_event_colchg_t *rslt;
+    int                    osiz;
+    int                    nsiz;
+    int                    poollen;
+    void                  *poolptr;
+    size_t                 size;
+
+    MDB_CHECKARG(table != MQI_HANDLE_INVALID &&
+                 column >= 0 && column < MQI_COLUMN_MAX && value &&
+                 (!select || (select && select->type == mql_result_rows)),
+                 NULL);
+
+    switch (value->type) {
+
+    case mqi_varchar:
+        osiz = strlen(value->old.varchar) + 1;
+        nsiz = strlen(value->new.varchar) + 1;
+        break;
+
+    case mqi_blob:
+        if ((osiz = nsiz = mqi_get_column_size(table, column)) < 0)
+            return NULL;
+        break;
+
+    default:
+        osiz = nsiz = 0;
+        break;
+    }
+
+    poollen = osiz + nsiz;
+    size = sizeof(result_event_colchg_t) + poollen;
+
+    if (!(rslt = calloc(1, size))) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    poolptr = (void *)rslt->data;
+
+    rslt->type   = mql_result_event;
+    rslt->event  = mqi_column_changed;
+    rslt->table  = table;
+    rslt->column = column;
+    rslt->value  = *value;
+    rslt->select = select;
+
+    if (osiz > 0) {
+        rslt->value.old.generic = poolptr;
+        memcpy(poolptr, value->old.generic, osiz);
+        poolptr += osiz;
+    }
+
+    if (nsiz > 0) {
+        rslt->value.new.generic = poolptr;
+        memcpy(poolptr, value->new.generic, nsiz);
+        poolptr += nsiz;
+    }
+
+    return (mql_result_t *)rslt;
+}
+
 
 mql_result_t *mql_result_columns_create(int ncol, mqi_column_def_t *defs)
 {
@@ -238,7 +332,6 @@ mql_result_t *mql_result_rows_create(int                ncol,
                                      int                nrow,
                                      int                rowsize,
                                      void              *rows)
-
 {
     result_rows_t     *rslt;
     column_desc_t     *col;
@@ -430,7 +523,7 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
 
     MDB_CHECKARG(n >= 0 && n < MQI_DIMENSION(nlgh) && names, NULL);
 
-    len = sizeof(result_string_t) + 1;
+    len = 1;  /* zero terminator */
 
     if (!n)
         len += strlen(no_tables) + 1;
@@ -448,12 +541,13 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
         }
     }
         
-    if (!(rslt = calloc(1, len))) {
+    if (!(rslt = calloc(1, sizeof(result_string_t) + len))) {
         errno = ENOMEM;
         return NULL;
     }
 
     rslt->type = mql_result_string;
+    rslt->length = len;
 
     if (!n)
         strcpy(rslt->string, no_tables);
@@ -485,6 +579,107 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
     return (mql_result_t *)rslt;
 }
 
+mql_result_t *mql_result_string_create_column_change(const char         *table,
+                                                     const char         *col,
+                                                     mqi_change_value_t *value,
+                                                     mql_result_t       *rsel)
+{
+#define EVENT   0
+#define TABLE   1
+#define COLUMN  2
+#define VALUE   3
+#define FLDS    4
+
+    static const char *hstr[FLDS]  = {"event", "table" , "column", "change"};
+    static int         hlen[FLDS]  = {   5   ,    5    ,     6   ,     6   };
+
+
+    result_string_t *rs = (result_string_t *)rsel;
+    result_string_t *rslt;
+
+    char             buf[1024];
+    char             sep[1024];
+    int              l;
+    int              len[FLDS];
+    const char      *cstr[FLDS];
+    int              cw[FLDS];
+    int              linlen;
+    size_t           esiz;
+    size_t           ssiz;
+    size_t           size;
+    char            *p;
+    int              i;
+
+    MDB_CHECKARG(table && col && value &&
+                 (!rsel || (rsel && rsel->type == mql_result_string)), NULL);
+
+    cstr[EVENT]  = "column change";
+    cstr[TABLE]  = table;
+    cstr[COLUMN] = col;
+    cstr[VALUE]  = buf;
+
+    for (i = 0;  i < VALUE;  i++)
+        len[i] = strlen(cstr[i]);
+
+#define PRINT_VALUE(fmt,t) \
+    snprintf(buf, sizeof(buf), fmt " => " fmt, value->old.t, value->new.t)
+#define PRINT_UNKNOWN \
+    snprintf(buf, sizeof(buf), "<unknown> => <unknown>");
+
+    switch (value->type) {
+    case mqi_varchar:    l = PRINT_VALUE("'%s'" , varchar );    break;
+    case mqi_integer:    l = PRINT_VALUE("%d"   , integer );    break;
+    case mqi_unsignd:    l = PRINT_VALUE("%u"   , unsignd );    break;
+    case mqi_floating:   l = PRINT_VALUE("%.2lf", floating);    break;
+    default:             l = PRINT_UNKNOWN;                     break;
+    }
+
+#undef PRINT    
+
+    len[VALUE] = l;
+
+
+    for (linlen = (FLDS-1) * 2 + 1,  i = 0;   i < FLDS;   i++)
+        linlen += (cw[i] = len[i] > hlen[i] ?  len[i] : hlen[i]);
+
+    esiz = linlen * 3;
+    ssiz = rs ? rs->length : 0;
+    size = esiz + ssiz + 2;
+
+    if (!(rslt = calloc(1, sizeof(result_string_t) + size))) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    p = rslt->string;
+
+    for (i = 0;  i < FLDS;  i++)
+        p += sprintf(p, "%-*s%s", cw[i],  hstr[i], i == FLDS-1 ? "\n" : "  ");
+
+    memset(p, '-', linlen-1);
+    p[linlen-1] = '\n';
+    p += linlen;
+
+    for (i = 0;  i < FLDS;  i++)
+        p += sprintf(p, "%-*s%s", cw[i], cstr[i], i == FLDS-1 ? "\n" : "  ");
+
+
+    if (ssiz > 0) {
+        *p++ = '\n';
+        memcpy(p, rs->string, ssiz);
+    }
+
+    rslt->type = mql_result_string;
+    rslt->length = p - rslt->string;
+ 
+    return (mql_result_t *)rslt;
+
+#undef FLDS
+#undef VALUE
+#undef COLUMN
+#undef TABLE
+#undef EVENT
+}
 
 mql_result_t *mql_result_string_create_column_list(int               ncol,
                                                    mqi_column_def_t *defs)
@@ -530,16 +725,19 @@ mql_result_t *mql_result_string_create_column_list(int               ncol,
     for (linlen = FLDS, i = 0;  i < FLDS;  linlen += fldlen[i++])
         ;
 
+    len = linlen * (ncol+2) + 1;
 
     /*
      * allocate and initialize the result structure
      */
-    if (!(rslt = calloc(1, sizeof(result_string_t) + linlen * (ncol+2) + 1))) {
+    if (!(rslt = calloc(1, sizeof(result_string_t) + len))) {
         errno = ENOMEM;
         return NULL;
     }
 
     rslt->type = mql_result_string;
+    rslt->length = len;
+
     p = rslt->string;
     memset(p, ' ', linlen * (ncol+2));
 
@@ -626,19 +824,20 @@ mql_result_t *mql_result_string_create_row_list(int                 ncol,
     }
 
     if (!nrow)
-        len = sizeof(result_string_t) + rwidth * 2 + strlen(no_rows) + 1;
+        len = rwidth * 2 + strlen(no_rows) + 1;
     else
-        len = sizeof(result_string_t) + rwidth * (nrow + 2) + 1;
+        len = rwidth * (nrow + 2) + 1;
 
     /*
      * setup the result structure
      */
-    if (!(rslt = calloc(1, len))) {
+    if (!(rslt = calloc(1, sizeof(result_string_t) + len))) {
         errno = ENOMEM;
         return NULL;
     }
 
-    rslt->type = mql_result_string;
+    rslt->type   = mql_result_string;
+    rslt->length = len;
 
     p = rslt->string;
 
@@ -900,6 +1099,16 @@ double mql_result_list_get_floating(mql_result_t *r, int idx)
 
 void mql_result_free(mql_result_t *r)
 {
+    result_event_colchg_t *colchg = (result_event_colchg_t *)r;
+    mql_result_t          *select;
+
+    if (r->type == mql_result_event) {
+        if (colchg->event == mqi_column_changed && (select = colchg->select)) {
+            if (select->type == mql_result_rows)
+                mql_result_free(colchg->select);
+        }
+    }
+
     free(r);
 }
 

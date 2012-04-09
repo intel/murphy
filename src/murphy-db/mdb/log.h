@@ -6,11 +6,14 @@
 
 typedef struct mdb_table_s  mdb_table_t;
 
-#define MDB_TRANSACTION_LOG_FOR_EACH(depth, entry, curs)                 \
-    for (curs = NULL;  (entry = mdb_log_transaction_iterate(depth, &curs, 0));)
+#define MDB_FORWARD  true
+#define MDB_BACKWARD false
 
-#define MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, entry, curs)       \
-    for (curs = NULL;  (entry = mdb_log_transaction_iterate(depth, &curs, 1));)
+#define MDB_TRANSACTION_LOG_FOR_EACH(depth, entry, fw, curs)            \
+    for (curs = NULL; (entry = mdb_log_transaction_iterate(depth,&curs,fw,0));)
+
+#define MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, entry, fw, curs)      \
+    for (curs = NULL; (entry = mdb_log_transaction_iterate(depth,&curs,fw,1));)
 
 #define MDB_TABLE_LOG_FOR_EACH(table, entry, curs)                 \
     for (curs = NULL;  (entry = mdb_log_table_iterate(table, &curs, 0));)
@@ -28,6 +31,7 @@ typedef enum {
 typedef struct {
     mdb_table_t    *table;
     mdb_log_type_t  change;
+    mqi_bitfld_t    colmask;
     mdb_row_t      *before;
     mdb_row_t      *after;
 } mdb_log_entry_t;
@@ -35,8 +39,8 @@ typedef struct {
 
 int mdb_log_create(mdb_table_t *);
 int mdb_log_change(mdb_table_t *, uint32_t, mdb_log_type_t,
-                   mdb_row_t *, mdb_row_t *);
-mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t, void **, int);
+                   mqi_bitfld_t, mdb_row_t *, mdb_row_t *);
+mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t, void **, bool, int);
 mdb_log_entry_t *mdb_log_table_iterate(mdb_table_t *, void **, int);
 
 

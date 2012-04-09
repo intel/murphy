@@ -110,6 +110,7 @@ BEGIN             begin
 COMMIT            commit
 ROLLBACK          rollback
 TRANSACTION       transaction
+TRANSACTIONS      transactions
 CREATE            create
 UPDATE            update
 REPLACE           replace
@@ -119,6 +120,9 @@ DESCRIBE          describe
 TABLE             table
 TABLES            tables
 INDEX             index
+ROWS              rows
+COLUMN            column
+TRIGGER           trigger
 INSERT            insert
 SELECT            select
 INTO              into
@@ -127,9 +131,11 @@ WHERE             where
 VALUES            values
 SET               set
 ON                on
+IN                in
 OR                or
 PERSISTENT        persistent
 TEMPORARY         temporary
+CALLBACK          callback
 
 VARCHAR           varchar
 INTEGER           integer
@@ -175,6 +181,7 @@ SLASH             \/
 {COMMIT}           { ARGLESS_TOKEN (COMMIT);           }
 {ROLLBACK}         { ARGLESS_TOKEN (ROLLBACK);         }
 {TRANSACTION}      { ARGLESS_TOKEN (TRANSACTION);      }
+{TRANSACTIONS}     { ARGLESS_TOKEN (TRANSACTIONS);     }
 {CREATE}           { ARGLESS_TOKEN (CREATE);           }
 {UPDATE}           { ARGLESS_TOKEN (UPDATE);           }
 {REPLACE}          { ARGLESS_TOKEN (REPLACE);          }
@@ -184,6 +191,9 @@ SLASH             \/
 {TABLE}            { ARGLESS_TOKEN (TABLE);            }
 {TABLES}           { ARGLESS_TOKEN (TABLES);           }
 {INDEX}            { ARGLESS_TOKEN (INDEX);            }
+{ROWS}             { ARGLESS_TOKEN (ROWS);             }
+{COLUMN}           { ARGLESS_TOKEN (COLUMN);           }
+{TRIGGER}          { ARGLESS_TOKEN (TRIGGER);          }
 {INSERT}           { ARGLESS_TOKEN (INSERT);           }
 {SELECT}           { ARGLESS_TOKEN (SELECT);           }
 {INTO}             { ARGLESS_TOKEN (INTO);             }
@@ -192,9 +202,11 @@ SLASH             \/
 {VALUES}           { ARGLESS_TOKEN (VALUES);           }
 {SET}              { ARGLESS_TOKEN (SET);              }
 {ON}               { ARGLESS_TOKEN (ON);               }
+{IN}               { ARGLESS_TOKEN (IN);               }
 {OR}               { ARGLESS_TOKEN (OR);               }
 {PERSISTENT}       { ARGLESS_TOKEN (PERSISTENT);       }
 {TEMPORARY}        { ARGLESS_TOKEN (TEMPORARY);        }
+{CALLBACK}         { ARGLESS_TOKEN (CALLBACK);         }
 
 {VARCHAR}          { ARGLESS_TOKEN (VARCHAR);          }
 {INTEGER}          { ARGLESS_TOKEN (INTEGER);          }

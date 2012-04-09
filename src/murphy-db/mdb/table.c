@@ -27,6 +27,7 @@ typedef struct {
 static mdb_hash_t *table_hash;
 static int         table_count;
 
+static void destroy_table(mdb_table_t *);
 static mdb_row_t *table_iterator(mdb_table_t *, table_iterator_t *);
 static int table_print_info(mdb_table_t *, char *, int);
 static int select_conditional(mdb_table_t *, mqi_cond_entry_t *,
@@ -71,7 +72,7 @@ mdb_table_t *mdb_table_create(char *name,
         type   = cdef->type;
         length = cdef->length;
 
-        if (!cdef->name || !cdef->name[0]) {
+        if (!cdef->name[0]) {
             ncolumn = 0;
             break;
         }
@@ -81,15 +82,11 @@ mdb_table_t *mdb_table_create(char *name,
                 ncolumn = 0;
                 break;
             }
-            length++; /* zero termination */
         }
-        else if (type == mqi_integer) {
-            length = sizeof(int32_t);
-        }
-        else if (type == mqi_unsignd) {
-            length = sizeof(uint32_t);
-        }
-        else {
+        else if (type != mqi_integer &&
+                 type != mqi_unsignd &&
+                 type != mqi_floating )
+        {
             ncolumn = 0;
             break;
         }
@@ -99,8 +96,11 @@ mdb_table_t *mdb_table_create(char *name,
         errno = EINVAL;
         return NULL;
     }
+
+
+    length = sizeof(mdb_table_t) + sizeof(mdb_dlist_t) * ncolumn;
     
-    if (!(tbl = calloc(1, sizeof(mdb_table_t))) ||
+    if (!(tbl = calloc(1, length)) ||
         !(columns = calloc(ncolumn, sizeof(mdb_column_t))))
     { 
         free(tbl);
@@ -122,6 +122,7 @@ mdb_table_t *mdb_table_create(char *name,
         case mqi_varchar:  length = cdef->length + 1;  align = 1;    break;
         case mqi_integer:  length = sizeof(int32_t);   align = 4;    break;
         case mqi_unsignd:  length = sizeof(uint32_t);  align = 4;    break;
+        case mqi_floating: length = sizeof(double);    align = 4;    break;
         default:           length = cdef->length;      align = 2;    break;
         }
 
@@ -137,6 +138,7 @@ mdb_table_t *mdb_table_create(char *name,
 
     dlgh = (dlgh + 3) & ~3;
 
+    tbl->handle  = MQI_HANDLE_INVALID;
     tbl->name    = strdup(name);
     tbl->chash   = chash;
     tbl->ncolumn = ncolumn;
@@ -145,9 +147,10 @@ mdb_table_t *mdb_table_create(char *name,
 
     MDB_DLIST_INIT(tbl->rows);
     mdb_log_create(tbl);
+    mdb_trigger_init(&tbl->trigger, ncolumn);
 
     if (mdb_hash_add(table_hash, 0,tbl->name, tbl) < 0) {
-        mdb_table_drop(tbl);
+        destroy_table(tbl);
         return NULL;
     }
 
@@ -159,29 +162,28 @@ mdb_table_t *mdb_table_create(char *name,
     return tbl;
 }
 
+int mdb_table_register_handle(mdb_table_t *tbl, mqi_handle_t handle)
+{
+    MDB_CHECKARG(tbl && handle != MQI_HANDLE_INVALID, -1);
+    MDB_PREREQUISITE(tbl->handle == MQI_HANDLE_INVALID, -1);
+
+    tbl->handle = handle;
+
+    mdb_trigger_table_create(tbl);
+
+    return 0;
+}
+
 int mdb_table_drop(mdb_table_t *tbl)
 {
-    mdb_row_t    *row, *n;
-    mdb_column_t *cols;
-    int           i;
-
     MDB_CHECKARG(tbl, -1);
+
+    mdb_trigger_table_drop(tbl);
+    mdb_trigger_reset(&tbl->trigger, tbl->ncolumn);
 
     mdb_transaction_drop_table(tbl);
 
-    mdb_index_drop(tbl);
-
-    mdb_hash_table_destroy(tbl->chash);
-
-    MDB_DLIST_FOR_EACH_SAFE(mdb_row_t, link, row,n, &tbl->rows)
-        mdb_row_delete(tbl, row, 0, 1);
-
-    for (i = 0, cols = tbl->columns;   i < tbl->ncolumn;    i++)
-        free(cols[i].name);
-
-    free(tbl->columns);
-    free(tbl->name);
-    free(tbl);
+    destroy_table(tbl);
 
     if (table_count > 1)
         table_count--;
@@ -210,7 +212,7 @@ int mdb_table_create_index(mdb_table_t *tbl, char **index_columns)
         return -1;
 
     MDB_DLIST_FOR_EACH_SAFE(mdb_row_t, link, row,n, &tbl->rows) {
-        if (mdb_index_insert(tbl, row, 0) < 0) {
+        if (mdb_index_insert(tbl, row, 0, 0) < 0) {
             if ((error = errno) != EEXIST)
                 return -1;
         }
@@ -255,11 +257,12 @@ int mdb_table_insert(mdb_table_t        *tbl,
                      void              **data)
 {
     uint32_t   txdepth = mdb_transaction_get_depth();
-    mdb_row_t *row;
-    int        error;
-    int        nrow;
-    int        ninsert;
-    int        i;
+    mdb_row_t    *row;
+    int           error;
+    int           nrow;
+    int           ninsert;
+    mqi_bitfld_t  cmask;
+    int           i;
 
     MDB_CHECKARG(tbl && cds && data && data[0], -1);
 
@@ -269,9 +272,9 @@ int mdb_table_insert(mdb_table_t        *tbl,
             return -1;
         }
 
-        mdb_row_update(tbl, row, cds, data[i], 0);
+        mdb_row_update(tbl, row, cds, data[i], 0, &cmask);
 
-        if ((nrow = mdb_index_insert(tbl, row, ignore)) < 0) {
+        if ((nrow = mdb_index_insert(tbl, row, cmask, ignore)) < 0) {
             if ((error = errno) != EEXIST)
                 return -1;
 
@@ -280,7 +283,7 @@ int mdb_table_insert(mdb_table_t        *tbl,
         else if (nrow > 0) {
             tbl->nrow++;
 
-            if (mdb_log_change(tbl, txdepth, mdb_log_insert, NULL, row) < 0)
+            if (mdb_log_change(tbl,txdepth,mdb_log_insert,cmask,NULL,row) < 0)
                 ninsert = -1;
             else
                 ninsert += (ninsert >= 0) ? 1 : 0;
@@ -481,6 +484,27 @@ int mdb_table_print_rows(mdb_table_t *tbl, char *buf, int len)
     return p - buf;
 }
 
+
+static void destroy_table(mdb_table_t *tbl)
+{
+    mdb_row_t    *row, *n;
+    mdb_column_t *cols;
+    int           i;
+
+    mdb_index_drop(tbl);
+
+    mdb_hash_table_destroy(tbl->chash);
+
+    MDB_DLIST_FOR_EACH_SAFE(mdb_row_t, link, row,n, &tbl->rows)
+        mdb_row_delete(tbl, row, 0, 1);
+
+    for (i = 0, cols = tbl->columns;   i < tbl->ncolumn;    i++)
+        free(cols[i].name);
+
+    free(tbl->columns);
+    free(tbl->name);
+    free(tbl);
+}
 
 
 static mdb_row_t *table_iterator(mdb_table_t *tbl, table_iterator_t *it)
@@ -684,16 +708,18 @@ static int update_single_row(mdb_table_t       *tbl,
                              void              *data,
                              int                index_update)
 {
-    mdb_row_t *before  = NULL;
-    uint32_t   txdepth = mdb_transaction_get_depth(); 
+    mdb_row_t   *before  = NULL;
+    uint32_t     txdepth = mdb_transaction_get_depth(); 
+    mqi_bitfld_t cmask;
+
 
     if (txdepth > 0 && !(before = mdb_row_duplicate(tbl, row)))
         return -1;
 
-    if (mdb_row_update(tbl, row, cds, data, index_update) < 0)
+    if (mdb_row_update(tbl, row, cds, data, index_update, &cmask) < 0)
         return -1;
-
-    if (mdb_log_change(tbl, txdepth, mdb_log_update, before, row) < 0)
+    
+    if (mdb_log_change(tbl, txdepth, mdb_log_update, cmask, before, row) < 0)
         return -1;
 
     return 0;
@@ -743,7 +769,7 @@ static int delete_single_row(mdb_table_t *tbl, mdb_row_t *row,int index_update)
     uint32_t txdepth = mdb_transaction_get_depth();
 
     mdb_row_delete(tbl, row, index_update, !txdepth);
-    mdb_log_change(tbl, txdepth, mdb_log_delete, row, NULL);
+    mdb_log_change(tbl, txdepth, mdb_log_delete, 0, row, NULL);
 
     return 0;
 }

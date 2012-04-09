@@ -13,11 +13,22 @@
 #include "mdb-backend.h"
 
 
+static int      create_transaction_trigger(mqi_trigger_cb_t, void *);
+static int      create_table_trigger(mqi_trigger_cb_t, void *);
+static int      create_row_trigger(void *, mqi_trigger_cb_t, void *,
+                                   mqi_column_desc_t *);
+static int      create_column_trigger(void *, int, mqi_trigger_cb_t, void *,
+                                      mqi_column_desc_t *);
+static int      drop_transaction_trigger(mqi_trigger_cb_t, void *);
+static int      drop_table_trigger(mqi_trigger_cb_t, void *);
+static int      drop_row_trigger(void *, mqi_trigger_cb_t, void *);
+static int      drop_column_trigger(void*, int, mqi_trigger_cb_t, void *);
 static uint32_t begin_transaction(void);
 static int      commit_transaction(uint32_t);
 static int      rollback_transaction(uint32_t);
 static uint32_t get_transaction_id(void);
 static void *   create_table(char *, char **, mqi_column_def_t *);
+static int      register_table_handle(void *, mqi_handle_t);
 static int      create_index(void *, char **);
 static int      drop_table(void *);
 static int      describe(void *, mqi_column_def_t *, int);
@@ -37,11 +48,20 @@ static int      get_column_size(void *, int);
 static int      print_rows(void *, char *, int);
 
 static mqi_db_functbl_t functbl = {
+    create_transaction_trigger,
+    create_table_trigger,
+    create_row_trigger,
+    create_column_trigger,
+    drop_transaction_trigger,
+    drop_table_trigger,
+    drop_row_trigger,
+    drop_column_trigger,
     begin_transaction,
     commit_transaction,
     rollback_transaction,
     get_transaction_id,
     create_table,
+    register_table_handle,
     create_index,
     drop_table,
     describe,
@@ -65,6 +85,57 @@ mqi_db_functbl_t *mdb_backend_init(void)
     return &functbl;
 }
 
+
+static int create_transaction_trigger(mqi_trigger_cb_t cb, void *data)
+{
+    return mdb_trigger_add_transaction_callback(cb, data);
+}
+
+static int create_table_trigger(mqi_trigger_cb_t cb, void *data)
+{
+    return mdb_trigger_add_table_callback(cb, data);
+}
+
+static int create_row_trigger(void *t,
+                              mqi_trigger_cb_t cb,
+                              void *data,
+                              mqi_column_desc_t *cds)
+{
+    return mdb_trigger_add_row_callback((mdb_table_t *)t, cb, data, cds);
+}
+
+static int create_column_trigger(void *t,
+                                 int colidx,
+                                 mqi_trigger_cb_t cb,
+                                 void *data,
+                                 mqi_column_desc_t *cds)
+{
+    return mdb_trigger_add_column_callback((mdb_table_t *)t, colidx,
+                                         cb, data, cds);
+}
+
+static int drop_transaction_trigger(mqi_trigger_cb_t cb, void *data)
+{
+    return mdb_trigger_delete_transaction_callback(cb, data);
+}
+
+static int drop_table_trigger(mqi_trigger_cb_t cb, void *data)
+{
+    return mdb_trigger_delete_table_callback(cb, data);
+}
+
+static int drop_row_trigger(void *t, mqi_trigger_cb_t cb, void *data)
+{
+    return mdb_trigger_delete_row_callback((mdb_table_t *)t, cb, data); 
+}
+
+static int drop_column_trigger(void *t,
+                               int colidx,
+                               mqi_trigger_cb_t cb,
+                               void *data)
+{
+    return mdb_trigger_delete_column_callback((mdb_table_t *)t,colidx,cb,data);
+}
 
 static uint32_t begin_transaction(void)
 {
@@ -97,6 +168,12 @@ static void *create_table(char *name,
 {
     return mdb_table_create(name, index_columns, cdefs);
 }
+
+static int register_table_handle(void *t, mqi_handle_t handle)
+{
+    return mdb_table_register_handle((mdb_table_t *)t, handle);
+}
+
 
 
 static int create_index(void *t, char **index_columns)

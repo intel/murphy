@@ -30,27 +30,65 @@ uint32_t mdb_transaction_begin(void)
 
 int mdb_transaction_commit(uint32_t depth)
 {
+#define DATA_MAX  (MQI_COLUMN_MAX * MQI_QUERY_RESULT_MAX)
+
+    static uint8_t    blank[sizeof(mdb_row_t) + DATA_MAX];
+
     mdb_log_entry_t  *en;
+    mdb_row_t        *before;
+    mdb_row_t        *after;
     void             *cursor;
+    bool              start_triggered = false;
     int               sts = 0, s;
 
     MDB_CHECKARG(depth > 0 && depth == txdepth, -1);
 
-    MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, en, cursor) {
+    MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, en, MDB_BACKWARD, cursor) {
 
+        if (!start_triggered) {
+            start_triggered = true;
+            mdb_trigger_transaction_start();
+        }
+
+        if (!(before = en->before))
+            before = (mdb_row_t *)blank;
+
+        if (!(after = en->after))
+            after = (mdb_row_t *)blank;
+            
         switch (en->change) {
 
-        case mdb_log_insert:  s = 0;                                     break;
+        case mdb_log_insert:
+            mdb_trigger_row_insert(en->table, after);
+            mdb_trigger_column_change(en->table, en->colmask, before, after);
+            s = 0;
+            break;
+
+        case mdb_log_update:
+            mdb_trigger_column_change(en->table, en->colmask, before, after);
+            s = destroy_row(en->table, en->before);
+            break;
+
         case mdb_log_delete: 
-        case mdb_log_update:  s = destroy_row(en->table, en->before);    break;
-        default:              s = -1;                                    break;
+            mdb_trigger_row_delete(en->table, before);
+            s = destroy_row(en->table, en->before);
+            break;
+
+        default:
+            s = -1;
+            break;
         }
 
         if (sts == 0)
             sts = s;
     }
+
+    if (start_triggered)
+        mdb_trigger_transaction_end();
     
     return sts;
+
+#undef DATA_MAX
 }
 
 int mdb_transaction_rollback(uint32_t depth)
@@ -62,7 +100,7 @@ int mdb_transaction_rollback(uint32_t depth)
 
     MDB_CHECKARG(depth > 0 && depth == txdepth, -1);
 
-    MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, en, cursor) {
+    MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, en, MDB_FORWARD, cursor) {
 
         tbl = en->table;
 
@@ -137,7 +175,7 @@ static int add_row(mdb_table_t *tbl, mdb_row_t *row)
 
     MDB_DLIST_APPEND(mdb_row_t, link, row, &tbl->rows);
 
-    return mdb_index_insert(tbl, row, 0);
+    return mdb_index_insert(tbl, row, 0, 0);
 }
 
 static int copy_row(mdb_table_t *tbl, mdb_row_t *dst, mdb_row_t *src)

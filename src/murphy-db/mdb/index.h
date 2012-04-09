@@ -27,7 +27,7 @@ typedef struct {
 int mdb_index_create(mdb_table_t *, char **);
 void mdb_index_drop(mdb_table_t *);
 void mdb_index_reset(mdb_table_t *);
-int mdb_index_insert(mdb_table_t *, mdb_row_t *, int);
+int mdb_index_insert(mdb_table_t *, mdb_row_t *, mqi_bitfld_t, int);
 int mdb_index_delete(mdb_table_t *, mdb_row_t *);
 mdb_row_t *mdb_index_get_row(mdb_table_t *, int, void *);
 int mdb_index_print(mdb_table_t *, char *, int);

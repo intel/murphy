@@ -53,14 +53,17 @@
     input->flags = 0;                                                   \
     input->value.t = (v)
 
+typedef struct mql_callback_s  mql_callback_t;
+typedef enum mql_mode_e        mql_mode_t;
+typedef struct input_s         input_t;
 
-typedef enum {
+enum mql_mode_e {
     mql_mode_parser,
     mql_mode_exec,
     mql_mode_precompile,
-} mql_mode_t;
+};
 
-typedef struct {
+struct input_s {
     mqi_data_type_t      type;
     uint32_t             flags;
     union {
@@ -69,7 +72,7 @@ typedef struct {
         uint32_t unsignd;
         double floating;
     }                    value;
-} input_t;
+};
 
 extern int yy_mql_lineno;
 extern int yy_mql_lex(void);
@@ -77,12 +80,15 @@ extern int yy_mql_lex(void);
 
 void yy_mql_error(const char *);
 
+static int set_select_variables(int *, mqi_data_type_t *, int *, char *,int);
 static void print_query_result(mqi_column_desc_t *, mqi_data_type_t *,
                                int *, int, int, void *);
 
-mqi_handle_t table;
-uint32_t     table_flags;
+static mqi_handle_t table;
+static uint32_t     table_flags;
 
+static char              *trigger_name;
+static mql_callback_t    *callback;
 
 static mqi_column_def_t   coldefs[MQI_COLUMN_MAX + 1];
 static mqi_column_def_t  *coldef = coldefs;
@@ -132,6 +138,7 @@ static FILE        *mqlout;
     long long int    number;
     double           floating;
     int              integer;
+    bool             boolean;
 };
 
 
@@ -142,6 +149,7 @@ static FILE        *mqlout;
 %token <string>   TKN_COMMIT
 %token <string>   TKN_ROLLBACK
 %token <string>   TKN_TRANSACTION
+%token <string>   TKN_TRANSACTIONS
 %token <string>   TKN_CREATE
 %token <string>   TKN_UPDATE
 %token <string>   TKN_REPLACE
@@ -151,6 +159,9 @@ static FILE        *mqlout;
 %token <string>   TKN_TABLE
 %token <string>   TKN_TABLES
 %token <string>   TKN_INDEX
+%token <string>   TKN_ROWS
+%token <string>   TKN_COLUMN
+%token <string>   TKN_TRIGGER
 %token <string>   TKN_INSERT
 %token <string>   TKN_SELECT
 %token <string>   TKN_INTO
@@ -159,9 +170,11 @@ static FILE        *mqlout;
 %token <string>   TKN_VALUES
 %token <string>   TKN_SET
 %token <string>   TKN_ON
+%token <string>   TKN_IN
 %token <string>   TKN_OR
 %token <string>   TKN_PERSISTENT
 %token <string>   TKN_TEMPORARY
+%token <string>   TKN_CALLBACK
 %token <string>   TKN_VARCHAR
 %token <string>   TKN_INTEGER
 %token <string>   TKN_UNSIGNED
@@ -189,6 +202,8 @@ static FILE        *mqlout;
 %token <string>   TKN_IDENTIFIER
 %token <string>   TKN_QUOTED_STRING
 
+%type <boolean>   optional_trigger_select
+
 %type <integer>   insert
 %type <integer>   insert_or_replace
 %type <integer>   insert_option
@@ -204,6 +219,8 @@ static FILE        *mqlout;
 %code requires {
     #include <murphy-db/mqi.h>
     #include <murphy-db/mql.h>
+
+    typedef struct mql_callback_s  mql_callback_t;
 
     int yy_mql_input(void *, unsigned);
 
@@ -225,16 +242,30 @@ static FILE        *mqlout;
 
     mql_result_t *mql_result_success_create(void);
     mql_result_t *mql_result_error_create(int, const char *, ...);
+    mql_result_t *mql_result_event_column_change_create(mqi_handle_t, int,
+                                                        mqi_change_value_t *,
+                                                        mql_result_t *);
     mql_result_t *mql_result_columns_create(int, mqi_column_def_t *);
     mql_result_t *mql_result_rows_create(int, mqi_column_desc_t*,
                                          mqi_data_type_t*,int*,int,int,void*);
     mql_result_t *mql_result_string_create_table_list(int, char **);
+    mql_result_t *mql_result_string_create_column_change(const char *,
+                                                         const char *,
+                                                         mqi_change_value_t *,
+                                                         mql_result_t *);
     mql_result_t *mql_result_string_create_column_list(int, mqi_column_def_t*);
     mql_result_t *mql_result_string_create_row_list(int, char **,
                                                     mqi_column_desc_t *,
                                                     mqi_data_type_t *, int *,
                                                     int, int, void *);
     mql_result_t *mql_result_list_create(mqi_data_type_t, int, void *);
+
+    mql_callback_t *mql_find_callback(char *);
+    int mql_create_column_trigger(char *, mqi_handle_t, int,mqi_data_type_t,
+                                  mql_callback_t *,
+                                  int, char **, mqi_column_desc_t *,
+                                  mqi_data_type_t *, int *,
+                                  int);
 }
 
 
@@ -320,6 +351,7 @@ show_tables: table_flags TKN_TABLES {
 create_statement:
   create_table table_definition
 | create_index index_definition
+| create_trigger trigger_definition
 ; 
 
 /* create table */
@@ -390,6 +422,91 @@ index_definition: TKN_ON table_name TKN_LEFT_PAREN column_list TKN_RIGHT_PAREN
         MQL_SUCCESS;
 };
 
+
+/* create trigger */
+
+create_trigger: TKN_TRIGGER TKN_IDENTIFIER TKN_ON {
+    if (mode != mql_mode_exec)
+        MQL_ERROR(EPERM, "only mql_exec_string() can create triggers");
+    else {
+        table = MQI_HANDLE_INVALID;
+        ncolnam = 0;
+        trigger_name = $2;
+        callback = NULL;
+    }
+};
+
+trigger_definition:
+  transaction_trigger
+| table_trigger
+| row_trigger
+| column_trigger
+;
+
+transaction_trigger: TKN_TRANSACTIONS callback {
+};
+
+table_trigger: TKN_TABLES callback {
+};
+
+row_trigger: TKN_ROWS TKN_IN table_name callback trigger_select {
+};
+
+column_trigger: TKN_COLUMN TKN_IDENTIFIER TKN_IN table_name callback
+                optional_trigger_select
+{
+    int colidx;
+    mqi_data_type_t coltype;
+    int rowsize;
+    int colsizes[MQI_COLUMN_MAX + 1];
+    mqi_data_type_t coltypes[MQI_COLUMN_MAX + 1];
+    char errbuf[256];
+    int sts;
+
+    if ((colidx  = mqi_get_column_index(table, $2))    < 0 ||
+        (coltype = mqi_get_column_type(table, colidx)) < 0  )
+    {
+        MQL_ERROR(errno, "do not know trigger column '%s'", $2);
+    }
+
+    if ($6) {
+        sts = set_select_variables(&rowsize, coltypes,colsizes,
+                                   errbuf, sizeof(errbuf));
+        if (sts < 0)
+            MQL_ERROR(errno, errbuf);
+
+        sts = mql_create_column_trigger(trigger_name,
+                                        table, colidx,coltype, callback,
+                                        ncolnam,colnams,
+                                        coldescs,coltypes,colsizes,
+                                        rowsize);
+    }
+    else {
+        sts = mql_create_column_trigger(trigger_name,
+                                        table, colidx,coltype, callback,
+                                        0,NULL,NULL,NULL,NULL, 0);
+    }
+
+    if (sts < 0)
+        MQL_ERROR(errno, "failed to create column triger: %s",strerror(errno));
+    else
+        MQL_SUCCESS;
+};
+
+
+callback: TKN_CALLBACK TKN_IDENTIFIER {
+    if (!(callback = mql_find_callback($2))) {
+        MQL_ERROR(ENOENT, "can't find callback '%s'", $2);
+    }
+};
+
+trigger_select: TKN_SELECT columns
+;
+
+optional_trigger_select:
+  /* no select */   { $$ = false; }
+| trigger_select    { $$ = true;  }
+;
 
 /***********************************
  *
@@ -718,58 +835,27 @@ delete: TKN_DELETE TKN_FROM {
  *
  */
 select_statement: select columns TKN_FROM table_name where_clause {
-    mqi_column_desc_t *cd;
     int colsizes[MQI_COLUMN_MAX + 1];
-    int colsize;
-    int colidx;
     mqi_data_type_t coltypes[MQI_COLUMN_MAX + 1];
-    mqi_data_type_t coltype;
     mqi_cond_entry_t *where;
     int rowsize;
     int tsiz;
     size_t rsiz;
     void *rows;
-    int i, n;
+    char errbuf[256];
+    int sts;
+    int n;
 
 
     if ((tsiz = mqi_get_table_size(table)) < 0)
         MQL_ERROR(errno, "can't get table size: %s", strerror(errno));
 
 
-    if (!ncolnam) {
-        while ((colnams[ncolnam] = mqi_get_column_name(table, ncolnam)))
-            ncolnam++;
-    }
+    sts = set_select_variables(&rowsize, coltypes,colsizes,
+                               errbuf, sizeof(errbuf));
+    if (sts < 0)
+        MQL_ERROR(errno, errbuf);
 
-    for (i = 0, rowsize = 0;  i < ncolnam;   i++) {
-        cd = coldescs + i;
-        
-        if ((colidx  = mqi_get_column_index(table, colnams[i])) < 0 ||
-            (colsize = mqi_get_column_size(table, colidx))      < 0 ||
-            (coltype = mqi_get_column_type(table, colidx)) == mqi_error)
-        {
-            MQL_ERROR(errno, "invalid column '%s'\n", colnams[i]);
-        }
-        cd->cindex = colidx;
-        cd->offset = rowsize;
-        
-        coltypes[i] = coltype;
-        colsizes[i] = colsize;
-        
-        switch (coltype) {
-        case mqi_varchar:   rowsize += sizeof(char *);    break;
-        case mqi_integer:   rowsize += sizeof(int32_t);   break;
-        case mqi_unsignd:   rowsize += sizeof(uint32_t);  break;
-        case mqi_floating:  rowsize += sizeof(double);    break;
-        case mqi_blob:      rowsize += sizeof(void *);    break;
-        default:                                         break;
-        }
-    } /* for */
-
-    
-    cd = coldescs + i;
-    cd->cindex = -1;
-    cd->offset = -1;
 
     if (mode != mql_mode_precompile && !tsiz) {
         if (mode == mql_mode_parser)
@@ -828,6 +914,7 @@ columns:
   TKN_STAR
 | column_list
 ;
+
 
 /***********************************
  *
@@ -1147,7 +1234,11 @@ int mql_exec_file(const char *path)
 
 mql_result_t *mql_exec_string(mql_result_type_t result_type, const char *str)
 {
-    MDB_CHECKARG((result_type == mql_result_columns  ||
+    if (result_type == mql_result_dontcare)
+        result_type = mql_result_string;
+
+    MDB_CHECKARG((result_type == mql_result_event ||
+                  result_type == mql_result_columns  ||
                   result_type == mql_result_rows ||
                   result_type == mql_result_string  ) && 
                  str, NULL);
@@ -1216,6 +1307,58 @@ void yy_mql_error(const char *msg)
         fprintf(mqlout, "Error: '%s'\n", msg);
 }
 
+
+static int set_select_variables(int *rowsize,
+                                mqi_data_type_t *coltypes,
+                                int *colsizes,
+                                char *errbuf, int elgh)
+{
+    mqi_column_desc_t *cd;
+    int i;
+    int rlgh;
+    int colsize;
+    int colidx;
+    mqi_data_type_t coltype;
+
+    if (!ncolnam) {
+        while ((colnams[ncolnam] = mqi_get_column_name(table, ncolnam)))
+            ncolnam++;
+    }
+
+    for (i = 0, rlgh = 0;  i < ncolnam;   i++) {
+        cd = coldescs + i;
+        
+        if ((colidx  = mqi_get_column_index(table, colnams[i])) < 0 ||
+            (colsize = mqi_get_column_size(table, colidx))      < 0 ||
+            (coltype = mqi_get_column_type(table, colidx)) == mqi_error)
+        {
+            snprintf(errbuf, elgh, "invalid column '%s'", colnams[i]);
+            return -1;
+        }
+        cd->cindex = colidx;
+        cd->offset = rlgh;
+        
+        coltypes[i] = coltype;
+        colsizes[i] = colsize;
+        
+        switch (coltype) {
+        case mqi_varchar:   rlgh += sizeof(char *);    break;
+        case mqi_integer:   rlgh += sizeof(int32_t);   break;
+        case mqi_unsignd:   rlgh += sizeof(uint32_t);  break;
+        case mqi_floating:  rlgh += sizeof(double);    break;
+        case mqi_blob:      rlgh += sizeof(void *);    break;
+        default:                                       break;
+        }
+    } /* for */
+    
+    cd = coldescs + i;
+    cd->cindex = -1;
+    cd->offset = -1;
+
+    *rowsize = rlgh;
+
+    return 0;
+}
 
 
 static void print_query_result(mqi_column_desc_t *coldescs,

@@ -3,8 +3,6 @@
 
 #include <murphy-db/mqi-types.h>
 
-#define MQI_HANDLE_INVALID    (~((mqi_handle_t)0))
-
 #define MQI_ALL               NULL
 #define MQI_NO_INDEX          NULL
 
@@ -127,14 +125,22 @@
     mqi_delete_from(table, where)
 
 
-typedef uint32_t mqi_handle_t;
-
 
 int mqi_open(void);
 int mqi_close(void);
 
 int mqi_show_tables(uint32_t, char **, int);
 
+int mqi_create_transaction_trigger(mqi_trigger_cb_t, void *);
+int mqi_create_table_trigger(mqi_trigger_cb_t, void *);
+int mqi_create_row_trigger(mqi_handle_t, mqi_trigger_cb_t, void *,
+                           mqi_column_desc_t *);
+int mqi_create_column_trigger(mqi_handle_t, int, mqi_trigger_cb_t, void *,
+                              mqi_column_desc_t *);
+int mqi_drop_transaction_trigger(mqi_trigger_cb_t, void *);
+int mqi_drop_table_trigger(mqi_trigger_cb_t, void *);
+int mqi_drop_row_trigger(mqi_handle_t, mqi_trigger_cb_t,void *);
+int mqi_drop_column_trigger(mqi_handle_t, int, mqi_trigger_cb_t, void *);
 mqi_handle_t mqi_begin_transaction(void);
 int mqi_commit_transaction(mqi_handle_t);
 int mqi_rollback_transaction(mqi_handle_t);

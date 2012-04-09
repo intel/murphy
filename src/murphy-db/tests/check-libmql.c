@@ -16,6 +16,13 @@
 
 #define PREREQUISITE(t)   t(_i)
 
+#define TRIGGER_DATA(idx) (void *)0xdeadbeef##idx
+#define TRANSACT_TRIGGER_DATA TRIGGER_DATA(1)
+#define TABLE_TRIGGER_DATA    TRIGGER_DATA(2)
+#define ROW_TRIGGER_DATA      TRIGGER_DATA(3)
+#define COLUMN_TRIGGER_DATA   TRIGGER_DATA(4)
+
+
 typedef struct {
     const char  *sex;
     const char  *first_name;
@@ -57,6 +64,8 @@ static struct {
 static Suite *libmql_suite(void);
 static TCase *basic_tests(void);
 
+static void column_event_cb(mql_result_t *, void *);
+
 
 
 int main(int argc, char **argv)
@@ -69,7 +78,7 @@ int main(int argc, char **argv)
     for (i = 1;  i < argc;  i++) {
         if (!strcmp("-v", argv[i]))
             verbose = 1;
-        else if (!strcmp("-f", argv[1]))
+        else if (!strcmp("-f", argv[i]))
             srunner_set_fork_status(sr, CK_NOFORK);
         else {
             printf("Usage: %s [-h] [-v] [-f]\n"
@@ -181,15 +190,21 @@ END_TEST
 
 START_TEST(create_index_on_persons)
 {
+    static bool done;
+
     mql_result_t *r;
 
-    PREREQUISITE(create_table_persons);
+    if (!done) {
+        PREREQUISITE(create_table_persons);
 
-    r = mql_exec_string(mql_result_string,
-                        "CREATE INDEX ON persons (family_name, first_name)");
+        r = mql_exec_string(mql_result_string,
+                    "CREATE INDEX ON persons (family_name, first_name)");
 
-    fail_unless(mql_result_is_success(r), "error: %s",
-                mql_result_error_get_message(r));
+        fail_unless(mql_result_is_success(r), "error: %s",
+                    mql_result_error_get_message(r));
+
+        done = true;
+    }
 }
 END_TEST
 
@@ -406,8 +421,8 @@ START_TEST(exec_precompiled_update_persons)
     int i, n;
 
     /* 2000: Greta Garbo => Marilyn Monroe */
-    if (mql_bind_value(persons.update, 1, mqi_string ,  new_first) < 0 ||
-        mql_bind_value(persons.update, 2, mqi_string , new_family) < 0 ||
+    if (mql_bind_value(persons.update, 1, mqi_string , new_family) < 0 ||
+        mql_bind_value(persons.update, 2, mqi_string ,  new_first) < 0 ||
         mql_bind_value(persons.update, 3, mqi_unsignd,         id) < 0   )
     {
         fail("bind error (%s)", strerror(errno));
@@ -440,8 +455,8 @@ START_TEST(exec_precompiled_update_persons)
         n = mql_result_rows_get_row_count(r);
 
         for (updated = 0, i = 0;   i < n;   i++) {
-            first  = mql_result_rows_get_string(r, 1, i, NULL,0);
-            family = mql_result_rows_get_string(r, 2, i, NULL,0);
+            family = mql_result_rows_get_string(r, 1, i, NULL,0);
+            first  = mql_result_rows_get_string(r, 2, i, NULL,0);
 
             if (p) {
                 fail_if(!strcmp(first, p->first_name), "found original "
@@ -625,6 +640,53 @@ START_TEST(exec_precompiled_insert_into_persons)
 }
 END_TEST
 
+START_TEST(register_column_event_cb)
+{
+    int sts;
+
+    PREREQUISITE(make_persons);
+
+    sts = mql_register_callback("column_event_cb", mql_result_string,
+                                column_event_cb, COLUMN_TRIGGER_DATA);
+
+    fail_if(sts < 0, "failed to create 'column_event_cb': %s",
+            strerror(errno));
+}
+END_TEST
+
+START_TEST(column_trigger)
+{
+    static char *mqlstr = "CREATE TRIGGER column_trigger"
+                          " ON COLUMN first_name IN persons"
+                          " CALLBACK column_event_cb"
+                          " SELECT id, first_name, family_name";
+
+
+    mqi_handle_t  t;
+    mql_result_t *r;
+    int sts;
+
+    PREREQUISITE(register_column_event_cb);
+
+    t = mqi_begin_transaction();
+
+    fail_if(t == MQI_HANDLE_INVALID, "failed to start transaction: %s",
+            strerror(errno));
+    
+    r = mql_exec_string(mql_result_dontcare, mqlstr);
+    
+    fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
+                mql_result_error_get_code(r), mql_result_error_get_message(r));
+
+    PREREQUISITE(exec_precompiled_update_persons);
+
+    sts = mqi_commit_transaction(t);
+
+    fail_if(sts < 0, "commit failed: %s", strerror(errno));
+}
+END_TEST
+
+
 static Suite *libmql_suite(void)
 {
     Suite *s = suite_create("Murphy Query Language - libmql");
@@ -640,6 +702,7 @@ static TCase *basic_tests(void)
 {
     TCase *tc = tcase_create("basic tests");
 
+#if 0
     tcase_add_test(tc, open_db);
     tcase_add_test(tc, create_table_persons);
     tcase_add_test(tc, describe_persons);
@@ -655,10 +718,27 @@ static TCase *basic_tests(void)
     tcase_add_test(tc, exec_precompiled_update_persons);
     tcase_add_test(tc, exec_precompiled_delete_from_persons);
     tcase_add_test(tc, exec_precompiled_insert_into_persons);
+    tcase_add_test(tc, register_column_event_cb);
+#endif
+    tcase_add_test(tc, column_trigger);
 
     return tc;
 }
 
+
+static void column_event_cb(mql_result_t *result, void *user_data)
+{
+    if (result->type == mql_result_string) {
+        if (verbose)
+            printf("---\n%s\n", mql_result_string_get(result));
+    }
+    else if (result->type == mql_result_event) {
+    }
+    else {
+        if (verbose)
+            printf("%s: invalid result type %d\n", __FUNCTION__, result->type);
+    }
+}
 
 /*
  * Local Variables:

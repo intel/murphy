@@ -3,21 +3,25 @@
 
 #include <murphy-db/mqi-types.h>
 
-typedef enum {
+
+typedef enum mql_result_type_e  mql_result_type_t;
+typedef struct mql_result_s     mql_result_t;
+
+enum mql_result_type_e {
     mql_result_error = -1,
     mql_result_unknown = 0,
     mql_result_dontcare = mql_result_unknown,
+    mql_result_event,
     mql_result_columns,
     mql_result_rows,
     mql_result_string,
     mql_result_list,
-} mql_result_type_t;
+};
 
-
-typedef struct mql_result_s {
+struct mql_result_s {
     mql_result_type_t  type;
     uint8_t            data[0];
-} mql_result_t;
+};
 
 int              mql_result_is_success(mql_result_t *);
 

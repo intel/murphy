@@ -7,10 +7,12 @@
 #include "index.h"
 #include "column.h"
 #include "log.h"
+#include "trigger.h"
 
 #define MDB_TABLE_HAS_INDEX(t)  MDB_INDEX_DEFINED(&t->index)
 
 typedef struct mdb_table_s {
+    mqi_handle_t  handle;
     char         *name;
     mdb_index_t   index;
     mdb_hash_t   *chash;         /* hash table for column names */
@@ -20,6 +22,7 @@ typedef struct mdb_table_s {
     int           nrow;
     mdb_dlist_t   rows;
     mdb_dlist_t   logs;         /* transaction logs */
+    mdb_trigger_t trigger;      /* must be the last: it has a array[0] @end  */
 } mdb_table_t;
 
 

@@ -78,11 +78,13 @@ int mdb_row_update(mdb_table_t       *tbl,
                    mdb_row_t         *row,
                    mqi_column_desc_t *cds,
                    void              *data,
-                   int                index_update)
+                   int                index_update,
+                   mqi_bitfld_t      *cmask_ret)
 {
     mdb_column_t      *columns;
     mqi_column_desc_t *source_dsc;
     int                cindex;
+    mqi_bitfld_t       cmask;
     int                i;
 
     MDB_CHECKARG(tbl && row && cds && data, -1);
@@ -92,11 +94,16 @@ int mdb_row_update(mdb_table_t       *tbl,
     if (index_update)
         mdb_index_delete(tbl, row);
 
-    for (i = 0;   (cindex = (source_dsc = cds + i)->cindex) >= 0;    i++)
+    for (cmask = i = 0;  (cindex = (source_dsc = cds + i)->cindex) >= 0;  i++){
+        cmask |= (((mqi_bitfld_t)1) << cindex);
         mdb_column_write(columns + cindex, row->data, source_dsc, data); 
+    }
     
     if (index_update)
-        mdb_index_insert(tbl, row, 0);
+        mdb_index_insert(tbl, row, cmask, 0);
+
+    if (cmask_ret)
+        *cmask_ret = cmask;
 
     return 0;
 }
@@ -110,7 +117,7 @@ int mdb_row_copy_over(mdb_table_t *tbl, mdb_row_t *dst, mdb_row_t *src)
     
     memcpy(dst->data, src->data, tbl->dlgh);
     
-    if (mdb_index_insert(tbl, dst, 0) < 0)
+    if (mdb_index_insert(tbl, dst, 0, 0) < 0)
         return -1;
     
     return 0;

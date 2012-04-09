@@ -14,7 +14,8 @@ typedef struct mdb_row_s {
 mdb_row_t *mdb_row_create(mdb_table_t *);
 mdb_row_t *mdb_row_duplicate(mdb_table_t *, mdb_row_t *);
 int mdb_row_delete(mdb_table_t *, mdb_row_t *, int, int);
-int mdb_row_update(mdb_table_t *, mdb_row_t *, mqi_column_desc_t *,void *,int);
+int mdb_row_update(mdb_table_t *, mdb_row_t *, mqi_column_desc_t *,
+                   void *, int, mqi_bitfld_t *);
 int mdb_row_copy_over(mdb_table_t *, mdb_row_t *, mdb_row_t *);
 
 #endif /* __MDB_ROW_H__ */

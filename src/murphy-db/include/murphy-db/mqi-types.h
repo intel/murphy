@@ -2,12 +2,15 @@
 #define __MQI_TYPES_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
-#define MQI_QUERY_RESULT_MAX  8192
-#define MQI_COLUMN_MAX        64
-#define MQI_COND_MAX          64
-#define MQL_PARAMETER_MAX     16
-#define MQI_TXDEPTH_MAX       16
+#define MQI_QUERY_RESULT_MAX   8192
+#define MQI_COLUMN_MAX         (sizeof(mqi_bitfld_t) * 8)
+#define MQI_COND_MAX           64
+#define MQL_PARAMETER_MAX      16
+#define MQI_TXDEPTH_MAX        16
+
+#define MQI_HANDLE_INVALID     (~((mqi_handle_t)0))
 
 #define MQI_DIMENSION(array)  \
     (sizeof(array) / sizeof(array[0]))
@@ -15,18 +18,48 @@
 #define MQI_OFFSET(structure, member)  \
     ((int)((void *)((&((structure *)0)->member)) - (void *)0))
 
+#define MQI_BIT(b)            (((mqi_bitfld_t)1) << (b))
+
 #define MQL_BIND_INDEX_BITS   8
 #define MQL_BIND_INDEX_MAX    (1 << MQL_BIND_INDEX_BITS)
 #define MQL_BIND_INDEX_MASK   (MQL_BIND_INDEX_MAX - 1)
 
-#define MQL_BINDABLE           (1 << (MQL_BIND_INDEX_BITS + 0))
-#define MQL_BIND_INDEX(v)      ((v) & MQL_BIND_INDEX_MASK)
+#define MQL_BINDABLE          (1 << (MQL_BIND_INDEX_BITS + 0))
+#define MQL_BIND_INDEX(v)     ((v) & MQL_BIND_INDEX_MASK)
 
-#define MQI_COLUMN_KEY          (1UL << 0)
-#define MQI_COLUMN_AUTOINCR     (1UL << 1)
+#define MQI_COLUMN_KEY        (1UL << 0)
+#define MQI_COLUMN_AUTOINCR   (1UL << 1)
+
+typedef uint32_t  mqi_handle_t;
+typedef uint32_t  mqi_bitfld_t;
+
+typedef enum mqi_data_type_e         mqi_data_type_t;
+typedef struct mqi_column_def_s      mqi_column_def_t;
+typedef struct mqi_column_desc_s     mqi_column_desc_t;
+
+typedef enum mqi_operator_e          mqi_operator_t;
+typedef struct mqi_variable_s        mqi_variable_t;
+typedef enum mqi_cond_entry_type_e   mqi_cond_entry_type_t;
+typedef struct mqi_cond_entry_s      mqi_cond_entry_t;
+
+typedef enum mqi_event_type_e        mqi_event_type_t;
+typedef union mqi_event_u            mqi_event_t;
+
+typedef struct mqi_change_table_s    mqi_change_table_t;
+typedef struct mqi_change_select_s   mqi_change_select_t;
+typedef struct mqi_change_coldsc_s   mqi_change_coldsc_t;
+typedef union mqi_change_data_u      mqi_change_data_t;
+typedef struct mqi_change_value_s    mqi_change_value_t;
+
+typedef struct mqi_column_event_s    mqi_column_event_t;
+typedef struct mqi_row_event_s       mqi_row_event_t;
+typedef struct mqi_table_event_s     mqi_table_event_t;
+typedef struct mqi_transact_event_s  mqi_transact_event_t;
+
+typedef void (*mqi_trigger_cb_t)(mqi_event_t *, void *);
 
 
-typedef enum {
+enum mqi_data_type_e {
     mqi_error = -1,    /* not a data type; used to return error conditions */
     mqi_unknown = 0,
     mqi_varchar,
@@ -35,21 +68,21 @@ typedef enum {
     mqi_unsignd,
     mqi_floating,
     mqi_blob,
-} mqi_data_type_t;
+};
 
-typedef struct {
+struct mqi_column_def_s {
     const char      *name;
     mqi_data_type_t  type;
     int              length;
     uint32_t         flags;
-} mqi_column_def_t;
+};
 
-typedef struct {
+struct mqi_column_desc_s {
     int     cindex;              /* column index */
     int     offset;              /* offset within the data struct */
-} mqi_column_desc_t;
+};
 
-typedef enum {
+enum mqi_operator_e {
     mqi_done = 0,
     mqi_end  = mqi_done,
     mqi_begin,                  /* expression start */
@@ -62,10 +95,10 @@ typedef enum {
     mqi_gt,
     mqi_not,
     mqi_operator_max
-} mqi_operator_t;
+};
 
 
-typedef struct {
+struct mqi_variable_s {
     mqi_data_type_t  type;
     uint32_t         flags;
     union {
@@ -76,22 +109,96 @@ typedef struct {
         void       **blob;
         void        *generic;
     };
-} mqi_variable_t;
+};
 
-typedef enum {
+enum mqi_cond_entry_type_e {
     mqi_operator,
     mqi_variable,
     mqi_column
-} mqi_cond_entry_type_t;
+};
 
-typedef struct {
+struct mqi_cond_entry_s {
     mqi_cond_entry_type_t  type;
     union {
         mqi_operator_t     operator;
         mqi_variable_t     variable;
         int                column;     /* column index actually */
     };
-} mqi_cond_entry_t;
+};
+
+enum mqi_event_type_e {
+    mqi_event_unknown = 0,
+    mqi_column_changed,
+    mqi_row_inserted,
+    mqi_row_deleted,
+    mqi_table_created,
+    mqi_table_dropped,
+    mqi_transaction_start,
+    mqi_transaction_end
+};
+
+struct mqi_change_table_s {
+    mqi_handle_t  handle;
+    const char   *name;
+};
+
+struct mqi_change_select_s {
+    int   length;
+    void *data;
+};
+
+struct mqi_change_coldsc_s {
+    int         index;
+    const char *name;
+};
+
+union mqi_change_data_u {
+    char    *varchar;
+    char    *string;
+    int32_t  integer;
+    uint32_t unsignd;
+    double   floating;
+    void    *generic;
+};
+
+struct mqi_change_value_s {
+    mqi_data_type_t   type;
+    mqi_change_data_t old;
+    mqi_change_data_t new;
+};
+
+
+struct mqi_column_event_s {
+    mqi_event_type_t    event;
+    mqi_change_table_t  table;
+    mqi_change_coldsc_t column;
+    mqi_change_value_t  value;
+    mqi_change_select_t select;
+};
+
+struct mqi_row_event_s {
+    mqi_event_type_t    event;
+    mqi_change_table_t  table;
+    mqi_change_select_t select;
+};
+
+struct mqi_table_event_s {
+    mqi_event_type_t   event;
+    mqi_change_table_t table;
+};
+
+struct mqi_transact_event_s {
+    mqi_event_type_t  event;
+};
+
+
+union mqi_event_u {
+    mqi_event_type_t     event;
+    mqi_column_event_t   column;
+    mqi_row_event_t      row;
+    mqi_table_event_t    table;
+    mqi_transact_event_t transact;
+};
 
 
 const char *mqi_data_type_str(mqi_data_type_t);

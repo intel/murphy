@@ -14,6 +14,30 @@
 
 #define PREREQUISITE(t)   t(_i)
 
+#define TRIGGER_DATA(idx)   (void *)0xdeadbeef##idx
+#define TRANSACT_TRIGGER_DATA TRIGGER_DATA(1)
+#define TABLE_TRIGGER_DATA    TRIGGER_DATA(2)
+#define ROW_TRIGGER_DATA      TRIGGER_DATA(3)
+#define COLUMN_TRIGGER_DATA   TRIGGER_DATA(4)
+
+typedef struct {
+    mqi_event_type_t  event;
+    struct {
+        mqi_handle_t handle;
+        char name[256];
+    } table;
+    struct {
+        uint32_t id;
+        char     first_name[14];
+        char     family_name[14];
+    } row;
+    struct {
+        int index;
+        char name[14];
+        char value[32];
+    } col;
+} trigger_t;
+
 typedef struct {
     const char  *sex;
     const char  *first_name;
@@ -74,10 +98,18 @@ static mqi_handle_t persons = MQI_HANDLE_INVALID;
 static int          columns_no_in_persons = -1;
 static int          rows_no_in_persons = -1;
 
+static int          ntrigger;
+static trigger_t    triggers[256];
+
 
 static Suite *libmqi_suite(void);
 static TCase *basic_tests(void);
 static void   print_rows(int, query_t *);
+static void   print_triggers(void);
+static void   transaction_event_cb(mqi_event_t *, void *);
+static void   table_event_cb(mqi_event_t *, void *);
+static void   row_event_cb(mqi_event_t *, void *);
+static void   column_event_cb(mqi_event_t *, void *);
 
 
 int main(int argc, char **argv)
@@ -125,14 +157,16 @@ END_TEST
 
 START_TEST(create_table_persons)
 {
-    PREREQUISITE(open_db);
+    if (persons == MQI_HANDLE_INVALID) {
+        PREREQUISITE(open_db);
 
-    persons = MQI_CREATE_TABLE("persons", MQI_TEMPORARY,
-                               persons_coldefs, persons_indexdef);
+        persons = MQI_CREATE_TABLE("persons", MQI_TEMPORARY,
+                                   persons_coldefs, persons_indexdef);
+        
+        fail_if(persons == MQI_HANDLE_INVALID, "errno (%s)", strerror(errno));
 
-    fail_if(persons == MQI_HANDLE_INVALID, "errno (%s)", strerror(errno));
-
-    columns_no_in_persons = MQI_DIMENSION(persons_coldefs) - 1;
+        columns_no_in_persons = MQI_DIMENSION(persons_coldefs) - 1;
+    }
 }
 END_TEST
 
@@ -526,6 +560,178 @@ START_TEST(transaction_rollback)
 }
 END_TEST
 
+START_TEST(table_trigger)
+{
+    int sts;
+
+    PREREQUISITE(open_db);
+
+    sts = mqi_create_table_trigger(table_event_cb, TABLE_TRIGGER_DATA);
+
+    fail_if(sts < 0, "errno (%s)", strerror(errno));
+    
+    PREREQUISITE(create_table_persons);
+
+    if (verbose)
+        print_triggers();
+
+    fail_unless(ntrigger == 1, "no callback after table creation");
+    fail_unless(triggers->event == mqi_table_created,
+                "wrong event type %d", triggers->event);
+    fail_unless(triggers->table.handle == persons,
+                "wrong table handle (0x%x vs. 0x%x)",
+                triggers->table.handle, persons);
+    fail_unless(!strcmp(triggers->table.name, "persons"),
+                "wrong table name ('%s' vs. 'persons')",
+                triggers->table.name);
+}
+END_TEST
+
+START_TEST(row_trigger)
+{
+    mqi_handle_t trh;
+    record_t *rec;
+    trigger_t *trig;
+    int sts;
+    int i;
+
+    PREREQUISITE(create_table_persons);
+
+    sts = mqi_create_transaction_trigger(transaction_event_cb,
+                                         TRANSACT_TRIGGER_DATA);
+
+    fail_if(sts < 0, "create transaction trigger failed: errno (%s)",
+            strerror(errno));
+
+    sts = mqi_create_row_trigger(persons, row_event_cb, ROW_TRIGGER_DATA,
+                                 persons_select_columns);
+
+    fail_if(sts < 0, "create row trigger failed: errno (%s)", strerror(errno));
+
+    trh = mqi_begin_transaction();
+
+    fail_if(trh == MQI_HANDLE_INVALID, "begin failed: errno(%s)",
+            strerror(errno));
+
+    PREREQUISITE(insert_into_persons);
+
+    sts = mqi_commit_transaction(trh);
+
+    fail_if(sts < 0, "commit failed: errno (%s)", strerror(errno));
+
+    if (verbose)
+        print_triggers();
+
+    fail_unless(ntrigger == rows_no_in_persons + 2,
+                "wrong number of callbacks (%d vs. %d)",
+                ntrigger, rows_no_in_persons);
+
+    for (i = 0;  i < ntrigger-2;  i++) {
+        trig = triggers + (i + 1);
+        rec  = artists[i];
+
+        fail_unless(trig->event == mqi_row_inserted,
+                    "wrong event type (%d vs %d) @ callback %d",
+                    trig->event, mqi_row_inserted, i);
+        fail_unless(trig->table.handle == persons,
+                    "wrong table handle (0x%x vs. 0x%x) @ callback %d",
+                    trig->table.handle, persons, i);
+        fail_unless(!strcmp(trig->table.name, "persons"),
+                    "wrong table name ('%s' vs. 'persons') @ callback %d",
+                    trig->table.name, persons, i);
+        fail_unless(trig->row.id == rec->id,
+                    "id column mismatch (%d vs %s) @ callback %d",
+                    trig->row.id, rec->id, i);
+        fail_unless(!strcmp(trig->row.first_name, rec->first_name),
+                    "first name mismatch ('%s' vs. '%s') @ callback %d",
+                    trig->row.first_name, rec->first_name);
+        fail_unless(!strcmp(trig->row.family_name, rec->family_name),
+                    "first name mismatch ('%s' vs. '%s') @ callback %d",
+                    trig->row.family_name, rec->family_name);
+    }
+
+}
+END_TEST
+
+
+
+START_TEST(column_trigger)
+{
+    MQI_WHERE_CLAUSE(where,
+        MQI_EQUAL( MQI_COLUMN(1), MQI_STRING_VAR(elvis.family_name) ) MQI_AND
+        MQI_EQUAL( MQI_COLUMN(2), MQI_STRING_VAR(elvis.first_name ) )
+    );
+
+    static query_t kalle = {1, "Korhonen", "Kalle"};
+
+    mqi_handle_t trh;
+    trigger_t *trig;
+    int sts;
+    int i, n;
+
+    PREREQUISITE(insert_into_persons);
+
+    sts = mqi_create_column_trigger(persons, 1, column_event_cb,
+                                    COLUMN_TRIGGER_DATA,
+                                    persons_select_columns);
+
+    fail_if(sts < 0, "create column trigger failed: errno (%s)",
+            strerror(errno));
+
+    sts = mqi_create_column_trigger(persons, 2, column_event_cb,
+                                    COLUMN_TRIGGER_DATA,
+                                    persons_select_columns);
+
+    fail_if(sts < 0, "create column trigger failed: errno (%s)",
+            strerror(errno));
+
+    trh = mqi_begin_transaction();
+
+    fail_if(trh == MQI_HANDLE_INVALID, "begin failed: errno(%s)",
+            strerror(errno));
+
+    n = MQI_UPDATE(persons, persons_select_columns, &kalle, where);
+
+    fail_if(n  < 0, "update failed: errno (%s)", strerror(errno));
+    fail_if(n != 1, "updated %d row but supposed to just 1", n);
+
+    sts = mqi_commit_transaction(trh);
+
+    fail_if(sts < 0, "commit failed: errno (%s)", strerror(errno));
+
+    if (verbose)
+        print_triggers();
+
+    fail_unless(ntrigger == 2,
+                "wrong number of callbacks (%d vs. 2)",
+                ntrigger);
+
+    for (i = 0;  i < ntrigger;  i++) {
+        trig = triggers + i;
+
+        fail_unless(trig->event == mqi_column_changed,
+                    "wrong event type (%d vs %d) @ callback %d",
+                    trig->event, mqi_column_changed, i);
+        fail_unless(trig->table.handle == persons,
+                    "wrong table handle (0x%x vs. 0x%x) @ callback %d",
+                    trig->table.handle, persons, i);
+        fail_unless(!strcmp(trig->table.name, "persons"),
+                    "wrong table name ('%s' vs. 'persons') @ callback %d",
+                    trig->table.name, persons, i);
+        fail_unless(trig->row.id == kalle.id,
+                    "id column mismatch (%d vs %d) @ callback %d",
+                    trig->row.id, kalle.id, i);
+        fail_unless(!strcmp(trig->row.first_name, kalle.first_name),
+                    "first name mismatch ('%s' vs. '%s') @ callback %d",
+                    trig->row.first_name, kalle.first_name);
+        fail_unless(!strcmp(trig->row.family_name, kalle.family_name),
+                    "first name mismatch ('%s' vs. '%s') @ callback %d",
+                    trig->row.family_name, kalle.family_name);
+    }
+}
+END_TEST
+
+
 
 static Suite *libmqi_suite(void)
 {
@@ -555,6 +761,9 @@ static TCase *basic_tests(void)
     tcase_add_test(tc, update_in_persons);
     tcase_add_test(tc, delete_from_persons);
     tcase_add_test(tc, transaction_rollback);
+    tcase_add_test(tc, table_trigger);
+    tcase_add_test(tc, row_trigger);
+    tcase_add_test(tc, column_trigger);
 
     return tc;
 }
@@ -580,6 +789,248 @@ static void print_rows(int n, query_t *rows)
     printf("--------------------------------------\n");
 }
 
+
+static void print_triggers(void)
+{
+    static char *separator = "+---------------+-------------------+"
+                             "-------------------------------------+"
+                             "--------------------------------------"
+                             "--------+\n";
+    trigger_t *trig;
+    enum {err, tra, tbl, row, col} t;
+    char *ev;
+    int i;
+
+    printf(separator);
+    printf("| trigger       |      table        |"
+           "      selected columns in row        |"
+           "    altered column                            |\n");
+    printf("| event         |  handle name      |"
+           "   id first_name      family_name    |"
+           " idx name         value                       |\n");
+    printf(separator);
+
+    if (!ntrigger) {
+        printf("|-<no events>---|-------------------|"
+               "-------------------------------------|"
+               "----------------------------------------------|\n");
+    }
+    else {
+        for (i = 0;  i < ntrigger;  i++) {
+            trig = triggers + i;
+            
+            switch (trig->event) {
+            case mqi_column_changed:    t = col; ev = "column_changed";  break;
+            case mqi_row_inserted:      t = row; ev = "row_inserted";    break;
+            case mqi_row_deleted:       t = row; ev = "row_deleted";     break;
+            case mqi_table_created:     t = tbl; ev = "table_created";   break;
+            case mqi_table_dropped:     t = tbl; ev = "table_dropped";   break;
+            case mqi_transaction_start: t = tra; ev = "transact start";  break;
+            case mqi_transaction_end:   t = tra; ev = "transact end";    break;
+            default:                    t = err; ev = "<unknown>";       break;
+            }
+
+
+            printf("| %-14s", ev);
+
+            if (t == tbl || t == row || t == col)
+                printf("|%8x %-10s", trig->table.handle, trig->table.name);
+            else
+                printf("|                   ");
+ 
+            if (t == row || t == col)
+                printf("|%5d %-15s %-15s", trig->row.id, trig->row.first_name,
+                       trig->row.family_name);
+            else
+                printf("|                                     ");
+
+            if (t == col)
+                printf("| %3d %-12s %-28s", trig->col.index, trig->col.name,
+                       trig->col.value);
+            else
+                printf("|                                              ");
+
+            printf("|\n");
+        }
+    }
+
+    printf(separator);
+}
+
+static void transaction_event_cb(mqi_event_t *evt, void *user_data)
+{
+    mqi_event_type_t      event = evt->event;
+    mqi_transact_event_t *te     = &evt->transact;
+    trigger_t            *trig;
+
+    if (ntrigger >= MQI_DIMENSION(triggers)) {
+        if (verbose)
+            printf("test framework error: trigger log overflow\n");
+        return;
+    }
+
+    trig = triggers + ntrigger++;
+
+    if (event != mqi_transaction_start && event != mqi_transaction_end) {
+        if (verbose)
+            printf("invalid event %d for transaction trigger\n", event);
+        return;
+    }
+
+    if (user_data != TRANSACT_TRIGGER_DATA) {
+        if (verbose)
+            printf("invalid user_data 0x%x for transaction trigger\n",
+                   user_data);
+        return;
+    }
+
+    trig->event = event;
+}
+
+static void table_event_cb(mqi_event_t *evt, void *user_data)
+{
+    mqi_event_type_t   event = evt->event;
+    mqi_table_event_t *te    = &evt->table;
+    trigger_t         *trig;
+
+    if (ntrigger >= MQI_DIMENSION(triggers)) {
+        if (verbose)
+            printf("test framework error: trigger log overflow\n");
+        return;
+    }
+
+    trig = triggers + ntrigger++;
+
+    if (event != mqi_table_created && event != mqi_table_dropped) {
+        if (verbose)
+            printf("invalid event %d for table trigger\n", event);
+        return;
+    }
+
+    if (user_data != TABLE_TRIGGER_DATA) {
+        if (verbose)
+            printf("invalid user_data 0x%x for table trigger\n", user_data);
+        return;
+    }
+
+
+    trig->event = event;
+    trig->table.handle = te->table.handle;
+    strncpy(trig->table.name, te->table.name,
+            MQI_DIMENSION(trig->table.name) - 1);
+}
+
+static void row_event_cb(mqi_event_t *evt, void *user_data)
+{
+    mqi_event_type_t  event = evt->event;
+    mqi_row_event_t  *re    = &evt->row;
+    trigger_t        *trig;
+    query_t          *row;
+
+    if (ntrigger >= MQI_DIMENSION(triggers)) {
+        if (verbose)
+            printf("test framework error: trigger log overflow\n");
+        return;
+    }
+
+    trig = triggers + ntrigger++;
+
+    if (event != mqi_row_inserted && event != mqi_row_deleted) {
+        if (verbose)
+            printf("invalid event %d for row trigger\n", event);
+        return;
+    }
+
+    if (user_data != ROW_TRIGGER_DATA) {
+        if (verbose)
+            printf("invalid user_data 0x%x for row trigger\n", user_data);
+        return;
+    }
+
+    if (!(row = (query_t *)re->select.data)) {
+        if (verbose)
+            printf("no selected data\n");
+        return;
+    }
+
+
+    trig->event = event;
+    trig->table.handle = re->table.handle;
+    strncpy(trig->table.name, re->table.name,
+            MQI_DIMENSION(trig->table.name) - 1);
+    trig->row.id = row->id;
+    strncpy(trig->row.first_name, row->first_name,
+            MQI_DIMENSION(trig->row.first_name) - 1);
+    strncpy(trig->row.family_name, row->family_name,
+            MQI_DIMENSION(trig->row.family_name) - 1);
+}
+
+static void column_event_cb(mqi_event_t *evt, void *user_data)
+{
+    mqi_event_type_t    event = evt->event;
+    mqi_column_event_t *ce    = &evt->column;
+    trigger_t          *trig;
+    query_t            *row;
+
+    if (ntrigger >= MQI_DIMENSION(triggers)) {
+        if (verbose)
+            printf("test framework error: trigger log overflow\n");
+        return;
+    }
+
+    trig = triggers + ntrigger++;
+
+    if (event != mqi_column_changed) {
+        if (verbose)
+            printf("invalid event %d for column trigger\n", event);
+        return;
+    }
+
+    if (user_data != COLUMN_TRIGGER_DATA) {
+        if (verbose)
+            printf("invalid user_data 0x%x for column trigger\n", user_data);
+        return;
+    }
+
+    if (!(row = (query_t *)ce->select.data)) {
+        if (verbose)
+            printf("no selected data\n");
+        return;
+    }
+
+
+    trig->event = event;
+    trig->table.handle = ce->table.handle;
+    strncpy(trig->table.name, ce->table.name,
+            MQI_DIMENSION(trig->table.name) - 1);
+    trig->row.id = row->id;
+    strncpy(trig->row.first_name, row->first_name,
+            MQI_DIMENSION(trig->row.first_name) - 1);
+    strncpy(trig->row.family_name, row->family_name,
+            MQI_DIMENSION(trig->row.family_name) - 1);
+    trig->col.index = ce->column.index;
+    strncpy(trig->col.name, ce->column.name,
+            MQI_DIMENSION(trig->col.name) - 1);
+
+#define PRINT_VALUE(fmt,t) \
+    snprintf(trig->col.value, MQI_DIMENSION(trig->col.value) - 1, \
+             fmt " => " fmt, ce->value.old.t, ce->value.new.t)
+#define PRINT_INVALID \
+    snprintf(trig->col.value, MQI_DIMENSION(trig->col.value) - 1, \
+             "<invalid> => <invalid>")
+
+    switch(ce->value.type) {
+    case mqi_varchar:     PRINT_VALUE("'%s'" , varchar );     break;
+    case mqi_integer:     PRINT_VALUE("%d"   , integer );     break;
+    case mqi_unsignd:     PRINT_VALUE("%u"   , unsignd );     break;
+    case mqi_floating:    PRINT_VALUE("%.2lf", floating);     break;
+    case mqi_blob:        PRINT_INVALID;                      break;
+    default:              PRINT_INVALID;                      break;
+    }
+
+#undef PRINT_INVALID
+#undef PRINT_VALUE
+}
 
 /*
  * Local Variables:

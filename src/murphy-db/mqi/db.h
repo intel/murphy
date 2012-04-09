@@ -2,11 +2,22 @@
 #define __MQI_DB_H__
 
 typedef struct {
+    int (*create_transaction_trigger)(mqi_trigger_cb_t, void *);
+    int (*create_table_trigger)(mqi_trigger_cb_t, void *);
+    int (*create_row_trigger)(void *, mqi_trigger_cb_t, void *,
+                              mqi_column_desc_t *);
+    int (*create_column_trigger)(void *, int, mqi_trigger_cb_t, void *,
+                                 mqi_column_desc_t *);
+    int (*drop_transaction_trigger)(mqi_trigger_cb_t, void *);
+    int (*drop_table_trigger)(mqi_trigger_cb_t, void *);
+    int (*drop_row_trigger)(void *, mqi_trigger_cb_t, void *);
+    int (*drop_column_trigger)(void *, int, mqi_trigger_cb_t, void *);
     uint32_t (*begin_transaction)(void);
     int (*commit_transaction)(uint32_t);
     int (*rollback_transaction)(uint32_t);
     uint32_t (*get_transaction_id)(void);
     void *(*create_table)(char *, char **, mqi_column_def_t *);
+    int (*register_table_handle)(void *, mqi_handle_t);
     int (*create_index)(void *, char **);
     int (*drop_table)(void *);
     int (*describe)(void *, mqi_column_def_t *, int);

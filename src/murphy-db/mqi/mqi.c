@@ -129,6 +129,7 @@ int mqi_close(void)
     return 0;
 }
 
+
 int mqi_show_tables(uint32_t flags, char **buf, int len)
 {
     mqi_handle_t h;
@@ -171,6 +172,178 @@ int mqi_show_tables(uint32_t flags, char **buf, int len)
 
     return i;
 }
+
+
+int mqi_create_transaction_trigger(mqi_trigger_cb_t callback, void *user_data)
+{
+    mqi_db_t         *db;
+    mqi_db_functbl_t *ftb;
+    int               i;
+
+    MDB_CHECKARG(callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    for (i = 0;  i < ndb;  i++) {
+        db  = dbs + i;
+        ftb = db->functbl;
+
+        if (ftb->create_transaction_trigger(callback, user_data) < 0) {
+
+            for (i--;  i >= 0;  i--) {
+                db  = dbs + i;
+                ftb = db->functbl;
+
+                ftb->drop_transaction_trigger(callback, user_data);
+            }
+
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int mqi_create_table_trigger(mqi_trigger_cb_t callback, void *user_data)
+{
+    mqi_db_t         *db;
+    mqi_db_functbl_t *ftb;
+    int               i;
+
+    MDB_CHECKARG(callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    for (i = 0;  i < ndb;  i++) {
+        db  = dbs + i;
+        ftb = db->functbl;
+
+        if (ftb->create_table_trigger(callback, user_data) < 0) {
+
+            for (i--;  i >= 0;  i--) {
+                db  = dbs + i;
+                ftb = db->functbl;
+
+                ftb->drop_table_trigger(callback, user_data);
+            }
+
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
+int mqi_create_row_trigger(mqi_handle_t h,
+                           mqi_trigger_cb_t callback,
+                           void *user_data,
+                           mqi_column_desc_t *cds)
+{
+    mqi_db_functbl_t *ftb;
+    void             *tbl;
+
+    MDB_CHECKARG(h != MDB_HANDLE_INVALID && callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    GET_TABLE(tbl, ftb, h, -1);
+
+    return ftb->create_row_trigger(tbl, callback, user_data, cds);
+}
+
+
+int mqi_create_column_trigger(mqi_handle_t h,
+                              int colidx,
+                              mqi_trigger_cb_t callback,
+                              void *user_data,
+                              mqi_column_desc_t *cds)
+{
+    mqi_db_functbl_t *ftb;
+    void             *tbl;
+
+    MDB_CHECKARG(h != MDB_HANDLE_INVALID && callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    GET_TABLE(tbl, ftb, h, -1);
+
+    return ftb->create_column_trigger(tbl, colidx, callback, user_data, cds);
+}
+
+
+int mqi_drop_transaction_trigger(mqi_trigger_cb_t callback, void *user_data)
+{
+    mqi_db_t         *db;
+    mqi_db_functbl_t *ftb;
+    int               sts;
+    int               i;
+
+    MDB_CHECKARG(callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    for (sts = 0, i = 0;  i < ndb;  i++) {
+        db  = dbs + i;
+        ftb = db->functbl;
+
+        if (ftb->drop_transaction_trigger(callback, user_data) < 0)
+            sts = -1;
+    }
+
+    return sts;
+}
+
+
+int mqi_drop_table_trigger(mqi_trigger_cb_t callback, void *user_data)
+{
+    mqi_db_t         *db;
+    mqi_db_functbl_t *ftb;
+    int               sts;
+    int               i;
+
+    MDB_CHECKARG(callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    for (sts = 0, i = 0;  i < ndb;  i++) {
+        db  = dbs + i;
+        ftb = db->functbl;
+
+        if (ftb->drop_table_trigger(callback, user_data) < 0)
+            sts = -1;
+    }
+
+    return sts;
+}
+
+
+int mqi_drop_row_trigger(mqi_handle_t h,
+                         mqi_trigger_cb_t callback,
+                         void *user_data)
+{
+    mqi_db_functbl_t *ftb;
+    void             *tbl;
+
+    MDB_CHECKARG(h != MDB_HANDLE_INVALID && callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    GET_TABLE(tbl, ftb, h, -1);
+
+    return ftb->drop_row_trigger(tbl, callback, user_data);
+}
+
+
+int mqi_drop_column_trigger(mqi_handle_t h,
+                            int colidx,
+                            mqi_trigger_cb_t callback,
+                            void *user_data)
+{
+    mqi_db_functbl_t *ftb;
+    void             *tbl;
+
+    MDB_CHECKARG(h != MDB_HANDLE_INVALID && callback, -1);
+    MDB_PREREQUISITE(dbs && ndb > 0, -1);
+
+    GET_TABLE(tbl, ftb, h, -1);
+
+    return ftb->drop_column_trigger(tbl, colidx, callback, user_data);
+}
+
 
 mqi_handle_t mqi_begin_transaction(void)
 {
@@ -315,6 +488,8 @@ mqi_handle_t mqi_create_table(char *name,
         mdb_handle_delete(table_handle, h);
         h = MQI_HANDLE_INVALID;
     }
+
+    ftb->register_table_handle(tbl->handle, h);
 
     return h;
 

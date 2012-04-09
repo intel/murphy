@@ -16,4 +16,5 @@ libmdb_la_SOURCES = ../include/murphy-db/assert.h \
                     log.h log.c \
                     row.h row.c \
                     table.h table.c \
-                    transaction.h transaction.c
+                    transaction.h transaction.c \
+                    trigger.h trigger.c

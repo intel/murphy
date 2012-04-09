@@ -166,6 +166,7 @@ void mdb_index_reset(mdb_table_t *tbl)
 
 int mdb_index_insert(mdb_table_t   *tbl,
                      mdb_row_t     *row,
+                     mqi_bitfld_t   cmask,
                      int            ignore)
 {
     mdb_index_t    *ix;
@@ -215,7 +216,7 @@ int mdb_index_insert(mdb_table_t   *tbl,
         }
         else {
             if (mdb_row_delete(tbl, old, 0,0) < 0 ||
-                mdb_log_change(tbl, txdepth, mdb_log_update, old, row) < 0)
+                mdb_log_change(tbl, txdepth, mdb_log_update,cmask,old,row) < 0)
             {
                 return -1;
             }

@@ -40,6 +40,7 @@ typedef struct {
 typedef struct {
     mdb_dlist_t     link;
     mdb_log_type_t  type;
+    mqi_bitfld_t    colmask;
     mdb_row_t      *before;
     mdb_row_t      *after;
 } change_t;
@@ -68,6 +69,7 @@ int mdb_log_create(mdb_table_t *tbl)
 int mdb_log_change(mdb_table_t    *tbl,
                    uint32_t        depth,
                    mdb_log_type_t  type,
+                   mqi_bitfld_t    colmask,
                    mdb_row_t      *before,
                    mdb_row_t      *after)
 {
@@ -91,9 +93,10 @@ int mdb_log_change(mdb_table_t    *tbl,
         return -1;
     }
 
-    change->type   = type;
-    change->before = before;
-    change->after  = after;
+    change->type    = type;
+    change->colmask = colmask;
+    change->before  = before;
+    change->after   = after;
 
     MDB_DLIST_PREPEND(change_t, link, change, &tblog->changes);
 
@@ -102,6 +105,7 @@ int mdb_log_change(mdb_table_t    *tbl,
 
 mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
                                              void     **cursor_ptr,
+                                             bool       forward,
                                              int        delete)
 {
     typedef struct {
@@ -156,7 +160,7 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
             cursor->hhead = hhead;
             cursor->chead = chead;
             cursor->hlink = tblog->hlink.next;
-            cursor->clink = chead->next;
+            cursor->clink = forward ? chead->next : chead->prev;
 
             entry->table = tblog->table;
         }
@@ -172,11 +176,12 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
         else {
             change = MDB_LIST_RELOCATE(change_t, link, cursor->clink);
             
-            cursor->clink = change->link.next;
+            cursor->clink = forward ? change->link.next : change->link.prev;
             
-            entry->change = change->type;
-            entry->before = change->before;
-            entry->after  = change->after;
+            entry->change  = change->type;
+            entry->colmask = change->colmask;
+            entry->before  = change->before;
+            entry->after   = change->after;
 
             if (delete) {
                 MDB_DLIST_UNLINK(change_t, link, change);
@@ -199,7 +204,7 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
             
             cursor->hlink = tblog->hlink.next;
             cursor->chead = chead;
-            cursor->clink = chead->next;
+            cursor->clink = forward ? chead->next : chead->prev;
             
             entry->table  = tblog->table;
         }
@@ -273,9 +278,10 @@ mdb_log_entry_t *mdb_log_table_iterate(mdb_table_t  *tbl,
             
             cursor->clink = change->link.next;
             
-            entry->change = change->type;
-            entry->before = change->before;
-            entry->after  = change->after;
+            entry->change  = change->type;
+            entry->colmask = change->colmask;
+            entry->before  = change->before;
+            entry->after   = change->after;
 
             if (delete) {
                 MDB_DLIST_UNLINK(change_t, link, change);
