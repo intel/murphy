@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 #define MQI_QUERY_RESULT_MAX   8192
-#define MQI_COLUMN_MAX         (sizeof(mqi_bitfld_t) * 8)
+#define MQI_COLUMN_MAX         ((int)(sizeof(mqi_bitfld_t) * 8))
 #define MQI_COND_MAX           64
 #define MQL_PARAMETER_MAX      16
 #define MQI_TXDEPTH_MAX        16

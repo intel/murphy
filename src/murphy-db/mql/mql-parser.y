@@ -245,6 +245,11 @@ static FILE        *mqlout;
     mql_result_t *mql_result_event_column_change_create(mqi_handle_t, int,
                                                         mqi_change_value_t *,
                                                         mql_result_t *);
+    mql_result_t *mql_result_event_row_change_create(mqi_event_type_t,
+                                                     mqi_handle_t,
+                                                     mql_result_t *);
+    mql_result_t *mql_result_event_table_create(mqi_event_type_t,mqi_handle_t);
+    mql_result_t *mql_result_event_transaction_create(mqi_event_type_t);
     mql_result_t *mql_result_columns_create(int, mqi_column_def_t *);
     mql_result_t *mql_result_rows_create(int, mqi_column_desc_t*,
                                          mqi_data_type_t*,int*,int,int,void*);
@@ -253,6 +258,13 @@ static FILE        *mqlout;
                                                          const char *,
                                                          mqi_change_value_t *,
                                                          mql_result_t *);
+    mql_result_t *mql_result_string_create_row_change(mqi_event_type_t,
+                                                      const char *,
+                                                      mql_result_t *);
+    mql_result_t *mql_result_string_create_table_change(mqi_event_type_t,
+                                                        const char *);
+    mql_result_t *mql_result_string_create_transaction_change(
+                                                            mqi_event_type_t);
     mql_result_t *mql_result_string_create_column_list(int, mqi_column_def_t*);
     mql_result_t *mql_result_string_create_row_list(int, char **,
                                                     mqi_column_desc_t *,
@@ -266,6 +278,11 @@ static FILE        *mqlout;
                                   int, char **, mqi_column_desc_t *,
                                   mqi_data_type_t *, int *,
                                   int);
+    int mql_create_row_trigger(char *, mqi_handle_t, mql_callback_t *,
+                               int, char **, mqi_column_desc_t *,
+                               mqi_data_type_t *, int *, int);
+    int mql_create_table_trigger(char *, mql_callback_t *);
+    int mql_create_transaction_trigger(char *, mql_callback_t *);
 }
 
 
@@ -436,6 +453,8 @@ create_trigger: TKN_TRIGGER TKN_IDENTIFIER TKN_ON {
     }
 };
 
+
+
 trigger_definition:
   transaction_trigger
 | table_trigger
@@ -444,12 +463,46 @@ trigger_definition:
 ;
 
 transaction_trigger: TKN_TRANSACTIONS callback {
+
+    if (mql_create_transaction_trigger(trigger_name, callback) < 0) {
+        MQL_ERROR(errno, "failed to create transaction trigger: %s",
+                  strerror(errno));
+    }
+    else {
+        MQL_SUCCESS;
+    }
 };
 
 table_trigger: TKN_TABLES callback {
+
+    if (mql_create_table_trigger(trigger_name, callback) < 0)
+        MQL_ERROR(errno, "failed to create table trigger: %s",strerror(errno));
+    else
+        MQL_SUCCESS;
+
 };
 
 row_trigger: TKN_ROWS TKN_IN table_name callback trigger_select {
+
+    int rowsize;
+    int colsizes[MQI_COLUMN_MAX + 1];
+    mqi_data_type_t coltypes[MQI_COLUMN_MAX + 1];
+    char errbuf[256];
+    int sts;
+
+    sts = set_select_variables(&rowsize, coltypes,colsizes,
+                               errbuf, sizeof(errbuf));
+    if (sts < 0)
+        MQL_ERROR(errno, errbuf);
+
+    sts = mql_create_row_trigger(trigger_name, table, callback,
+                                 ncolnam,colnams,
+                                 coldescs, coltypes, colsizes,
+                                 rowsize);
+    if (sts < 0)
+        MQL_ERROR(errno, "failed to create row triger: %s",strerror(errno));
+    else
+        MQL_SUCCESS;
 };
 
 column_trigger: TKN_COLUMN TKN_IDENTIFIER TKN_IN table_name callback
@@ -488,7 +541,7 @@ column_trigger: TKN_COLUMN TKN_IDENTIFIER TKN_IN table_name callback
     }
 
     if (sts < 0)
-        MQL_ERROR(errno, "failed to create column triger: %s",strerror(errno));
+        MQL_ERROR(errno,"failed to create column trigger: %s",strerror(errno));
     else
         MQL_SUCCESS;
 };

@@ -339,8 +339,8 @@ START_TEST(filtered_select_from_persons)
         MQI_GREATER( MQI_COLUMN(3), MQI_UNSIGNED_VAR(idlimit) )
     );
 
-    query_t *r, rows[32];
-    int i, n;
+    query_t rows[32];
+    int n;
 
     PREREQUISITE(replace_in_persons);
 
@@ -860,7 +860,7 @@ static void print_triggers(void)
 static void transaction_event_cb(mqi_event_t *evt, void *user_data)
 {
     mqi_event_type_t      event = evt->event;
-    mqi_transact_event_t *te     = &evt->transact;
+ /* mqi_transact_event_t *te    = &evt->transact; */
     trigger_t            *trig;
 
     if (ntrigger >= MQI_DIMENSION(triggers)) {
@@ -879,7 +879,7 @@ static void transaction_event_cb(mqi_event_t *evt, void *user_data)
 
     if (user_data != TRANSACT_TRIGGER_DATA) {
         if (verbose)
-            printf("invalid user_data 0x%x for transaction trigger\n",
+            printf("invalid user_data %p for transaction trigger\n",
                    user_data);
         return;
     }
@@ -909,7 +909,7 @@ static void table_event_cb(mqi_event_t *evt, void *user_data)
 
     if (user_data != TABLE_TRIGGER_DATA) {
         if (verbose)
-            printf("invalid user_data 0x%x for table trigger\n", user_data);
+            printf("invalid user_data %p for table trigger\n", user_data);
         return;
     }
 
@@ -943,7 +943,7 @@ static void row_event_cb(mqi_event_t *evt, void *user_data)
 
     if (user_data != ROW_TRIGGER_DATA) {
         if (verbose)
-            printf("invalid user_data 0x%x for row trigger\n", user_data);
+            printf("invalid user_data %p for row trigger\n", user_data);
         return;
     }
 
@@ -988,7 +988,7 @@ static void column_event_cb(mqi_event_t *evt, void *user_data)
 
     if (user_data != COLUMN_TRIGGER_DATA) {
         if (verbose)
-            printf("invalid user_data 0x%x for column trigger\n", user_data);
+            printf("invalid user_data %p for column trigger\n", user_data);
         return;
     }
 

@@ -502,7 +502,7 @@ static int get_select_params(mdb_table_t       *tbl,
 {
     mqi_column_desc_t *cd;
     int ncd, length;
-    int size, end;
+    int end;
     int cx;
     
     *ncd_ret = *length_ret = 0;
@@ -523,12 +523,11 @@ static void row_change(mqi_event_type_t  event,
                        mdb_table_t      *tbl,
                        mdb_row_t        *row)
 {
-    mqi_event_t        evt;
-    row_trigger_t     *tr;
-    mqi_column_desc_t  cd;
-    mqi_row_event_t   *re;
-    int                sx;
-    int                i;
+    mqi_event_t      evt;
+    row_trigger_t   *tr;
+    mqi_row_event_t *re;
+    int              sx;
+    int              i;
 
     memset(&evt, 0, sizeof(evt));
     re = &evt.row;

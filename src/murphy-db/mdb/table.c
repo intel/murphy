@@ -29,7 +29,9 @@ static int         table_count;
 
 static void destroy_table(mdb_table_t *);
 static mdb_row_t *table_iterator(mdb_table_t *, table_iterator_t *);
+#if 0
 static int table_print_info(mdb_table_t *, char *, int);
+#endif
 static int select_conditional(mdb_table_t *, mqi_cond_entry_t *,
                               mqi_column_desc_t *,void *, int, int);
 static int select_all(mdb_table_t *, mqi_column_desc_t  *, void *, int, int);
@@ -533,6 +535,7 @@ static mdb_row_t *table_iterator(mdb_table_t *tbl, table_iterator_t *it)
     return row;
 }
 
+#if 0
 static int table_print_info(mdb_table_t *tbl, char *buf, int len)
 {
 #define PRINT(args...)  if (e > p) p += snprintf(p, e-p, args)
@@ -567,7 +570,7 @@ static int table_print_info(mdb_table_t *tbl, char *buf, int len)
 
 #undef PRINT
 }
-
+#endif
 
 
 static int select_conditional(mdb_table_t       *tbl,

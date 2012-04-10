@@ -64,6 +64,9 @@ static struct {
 static Suite *libmql_suite(void);
 static TCase *basic_tests(void);
 
+static void transaction_event_cb(mql_result_t *, void *);
+static void table_event_cb(mql_result_t *, void *);
+static void row_event_cb(mql_result_t *, void *);
 static void column_event_cb(mql_result_t *, void *);
 
 
@@ -640,6 +643,47 @@ START_TEST(exec_precompiled_insert_into_persons)
 }
 END_TEST
 
+START_TEST(register_transaction_event_cb)
+{
+    int sts;
+
+    PREREQUISITE(open_db);
+
+    sts = mql_register_callback("transaction_event_cb", mql_result_string,
+                                transaction_event_cb, TRANSACT_TRIGGER_DATA);
+
+    fail_if(sts < 0, "failed to create 'table_event_cb': %s",
+            strerror(errno));
+}
+END_TEST
+
+
+START_TEST(register_table_event_cb)
+{
+    int sts;
+
+    sts = mql_register_callback("table_event_cb", mql_result_string,
+                                table_event_cb, TABLE_TRIGGER_DATA);
+
+    fail_if(sts < 0, "failed to create 'table_event_cb': %s",
+            strerror(errno));
+}
+END_TEST
+
+START_TEST(register_row_event_cb)
+{
+    int sts;
+
+    PREREQUISITE(make_persons);
+
+    sts = mql_register_callback("row_event_cb", mql_result_string,
+                                row_event_cb, ROW_TRIGGER_DATA);
+
+    fail_if(sts < 0, "failed to create 'row_event_cb': %s",
+            strerror(errno));
+}
+END_TEST
+
 START_TEST(register_column_event_cb)
 {
     int sts;
@@ -651,6 +695,58 @@ START_TEST(register_column_event_cb)
 
     fail_if(sts < 0, "failed to create 'column_event_cb': %s",
             strerror(errno));
+}
+END_TEST
+
+START_TEST(table_trigger)
+{
+    static char *mqlstr = "CREATE TRIGGER table_trigger"
+                          " ON TABLES CALLBACK table_event_cb";
+
+    mql_result_t *r;
+
+    PREREQUISITE(open_db);
+    PREREQUISITE(register_table_event_cb);
+
+    r = mql_exec_string(mql_result_dontcare, mqlstr);
+    
+    fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
+                mql_result_error_get_code(r), mql_result_error_get_message(r));
+
+    PREREQUISITE(make_persons);
+}
+END_TEST
+
+START_TEST(row_trigger)
+{
+    static char *mqlstr = "CREATE TRIGGER row_trigger"
+                          " ON ROWS IN persons"
+                          " CALLBACK row_event_cb"
+                          " SELECT id, first_name, family_name";
+
+
+    mqi_handle_t  t;
+    mql_result_t *r;
+    int sts;
+
+    PREREQUISITE(register_row_event_cb);
+
+    t = mqi_begin_transaction();
+
+    fail_if(t == MQI_HANDLE_INVALID, "failed to start transaction: %s",
+            strerror(errno));
+    
+    r = mql_exec_string(mql_result_dontcare, mqlstr);
+    
+    fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
+                mql_result_error_get_code(r), mql_result_error_get_message(r));
+
+    PREREQUISITE(exec_precompiled_insert_into_persons);
+    PREREQUISITE(exec_precompiled_delete_from_persons);
+
+    sts = mqi_commit_transaction(t);
+
+    fail_if(sts < 0, "commit failed: %s", strerror(errno));
 }
 END_TEST
 
@@ -687,6 +783,24 @@ START_TEST(column_trigger)
 END_TEST
 
 
+START_TEST(transaction_trigger)
+{
+    static char *mqlstr = "CREATE TRIGGER transaction_trigger ON TRANSACTIONS"
+                          " CALLBACK transaction_event_cb";
+
+    mql_result_t *r;
+
+    PREREQUISITE(register_transaction_event_cb);
+
+    r = mql_exec_string(mql_result_dontcare, mqlstr);
+    
+    fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
+                mql_result_error_get_code(r), mql_result_error_get_message(r));
+
+    PREREQUISITE(column_trigger);
+}
+END_TEST
+
 static Suite *libmql_suite(void)
 {
     Suite *s = suite_create("Murphy Query Language - libmql");
@@ -718,13 +832,61 @@ static TCase *basic_tests(void)
     tcase_add_test(tc, exec_precompiled_update_persons);
     tcase_add_test(tc, exec_precompiled_delete_from_persons);
     tcase_add_test(tc, exec_precompiled_insert_into_persons);
+    tcase_add_test(tc, register_transaction_event_cb);
+    tcase_add_test(tc, register_table_event_cb);
+    tcase_add_test(tc, register_row_event_cb);
     tcase_add_test(tc, register_column_event_cb);
-#endif
+    tcase_add_test(tc, table_trigger);
+    tcase_add_test(tc, row_trigger);
     tcase_add_test(tc, column_trigger);
+#endif
+    tcase_add_test(tc, transaction_trigger);
 
     return tc;
 }
 
+
+static void transaction_event_cb(mql_result_t *result, void *user_data)
+{
+    if (result->type == mql_result_string) {
+        if (verbose)
+            printf("---\n%s\n", mql_result_string_get(result));
+    }
+    else if (result->type == mql_result_event) {
+    }
+    else {
+        if (verbose)
+            printf("%s: invalid result type %d\n", __FUNCTION__, result->type);
+    }
+}
+
+static void table_event_cb(mql_result_t *result, void *user_data)
+{
+    if (result->type == mql_result_string) {
+        if (verbose)
+            printf("---\n%s\n", mql_result_string_get(result));
+    }
+    else if (result->type == mql_result_event) {
+    }
+    else {
+        if (verbose)
+            printf("%s: invalid result type %d\n", __FUNCTION__, result->type);
+    }
+}
+
+static void row_event_cb(mql_result_t *result, void *user_data)
+{
+    if (result->type == mql_result_string) {
+        if (verbose)
+            printf("---\n%s\n", mql_result_string_get(result));
+    }
+    else if (result->type == mql_result_event) {
+    }
+    else {
+        if (verbose)
+            printf("%s: invalid result type %d\n", __FUNCTION__, result->type);
+    }
+}
 
 static void column_event_cb(mql_result_t *result, void *user_data)
 {
