@@ -235,7 +235,11 @@ typedef enum {                           /* action types */
     ACTION_UNKNOWN = 0,
     ACTION_LOAD,                         /* load a plugin */
     ACTION_TRYLOAD,                      /* load a plugin, ignore errors */
-    ACTION_IF                            /* if-else branch */
+    ACTION_IF,                           /* if-else branch */
+    ACTION_INFO,                         /* emit an info message */
+    ACTION_WARNING,                      /* emit a warning message */
+    ACTION_ERROR,                        /* emit and error message and exit */
+    ACTION_MAX,
 } action_type_t;
 
 typedef enum {                           /* branch operators */
@@ -270,13 +274,57 @@ typedef struct {                         /* a branch test action */
     mrp_list_hook_t  neg;                /* negative branch */
 } branch_action_t;
 
+typedef struct {                         /* a branch test action */
+    COMMON_ACTION_FIELDS;                /* type, hook */
+    char            *message;            /* message to show */
+} message_action_t;
+
+
+typedef struct {
+    const char   *keyword;
+    any_action_t *(*parse)(input_t *in, char **args, int narg);
+    int           (*exec)(mrp_context_t *ctx, any_action_t *action);
+    void          (*free)(any_action_t *a);
+} action_descr_t;
+
+
+
+static any_action_t *parse_action(input_t *in, char **args, int narg);
+static any_action_t *parse_load(input_t *in, char **argv, int argc);
+static any_action_t *parse_if_else(input_t *in, char **argv, int argc);
+static any_action_t *parse_message(input_t *in, char **argv, int argc);
+static int exec_action(mrp_context_t *ctx, any_action_t *action);
+static int exec_load(mrp_context_t *ctx, any_action_t *action);
+static int exec_if_else(mrp_context_t *ctx, any_action_t *action);
+static int exec_message(mrp_context_t *ctx, any_action_t *action);
+static void free_action(any_action_t *action);
+static void free_if_else(any_action_t *action);
+static void free_load(any_action_t *action);
+static void free_message(any_action_t *action);
 
 static char *get_next_token(input_t *in);
 static int get_next_line(input_t *in, char **args, size_t size);
-static any_action_t *parse_action(input_t *in, char *a, char **args, int narg);
-static void free_action(any_action_t *action);
-static void free_if_else(branch_action_t *branch);
-static int exec_action(mrp_context_t *ctx, any_action_t *action);
+
+
+#define A(type, keyword, parse, exec, free) \
+    [ACTION_##type] = { MRP_KEYWORD_##keyword, parse, exec, free }
+
+static action_descr_t actions[] = {
+    [ACTION_UNKNOWN] = { NULL, NULL, NULL, NULL },
+
+    A(LOAD   , LOAD   , parse_load   , exec_load   , free_load),
+    A(TRYLOAD, TRYLOAD, parse_load   , exec_load   , free_load),
+    A(IF     , IF     , parse_if_else, exec_if_else, free_if_else),
+    A(INFO   , INFO   , parse_message, exec_message, free_message),
+    A(WARNING, WARNING, parse_message, exec_message, free_message),
+    A(ERROR  , ERROR  , parse_message, exec_message, free_message),
+
+    [ACTION_MAX]     = { NULL, NULL, NULL, NULL }
+};
+
+#undef A
+
+
 
 mrp_cfgfile_t *mrp_parse_cfgfile(const char *path)
 {
@@ -311,7 +359,7 @@ mrp_cfgfile_t *mrp_parse_cfgfile(const char *path)
     mrp_list_init(&cfg->actions);
 
     while ((narg = get_next_line(&input, args, sizeof(args))) > 0) {
-	a = parse_action(&input, args[0], args + 1, narg - 1);
+	a = parse_action(&input, args, narg);
 		
 	if (a != NULL)
 	    mrp_list_append(&cfg->actions, &a->hook);
@@ -361,22 +409,70 @@ int mrp_exec_cfgfile(mrp_context_t *ctx, mrp_cfgfile_t *cfg)
 }
 
 
-static any_action_t *parse_load(action_type_t t, char **argv, int argc)
+static any_action_t *parse_action(input_t *in, char **args, int narg)
+{
+    action_descr_t *ad = actions + 1;
+    
+    while (ad->keyword != NULL) {
+	if (!strcmp(args[0], ad->keyword))
+	    return ad->parse(in, args, narg);
+	ad++;
+    }
+
+    mrp_log_error("Unknown command '%s' in file '%s'.", args[0], in->file);    
+    return NULL;
+}
+
+
+static void free_action(any_action_t *action)
+{
+    mrp_list_delete(&action->hook);
+
+    if (ACTION_UNKNOWN < action->type && action->type < ACTION_MAX)
+	actions[action->type].free(action);
+    else {
+	mrp_log_error("Unknown configuration action of type 0x%x.",
+		      action->type);
+	mrp_free(action);
+    }
+}
+
+
+static int exec_action(mrp_context_t *ctx, any_action_t *action)
+{
+    if (ACTION_UNKNOWN < action->type && action->type < ACTION_MAX)
+	return actions[action->type].exec(ctx, action);
+    else {
+	mrp_log_error("Unknown configuration action of type 0x%x.",
+		      action->type);
+	return FALSE;
+    }
+}
+
+
+static any_action_t *parse_load(input_t *in, char **argv, int argc)
 {
     load_action_t    *action;
+    action_type_t     type;
     mrp_plugin_arg_t *args, *a;
     int               i, start;
     char             *k, *v;
 
+    MRP_UNUSED(in);
 
-    if (argc < 1 || (action = mrp_allocz(sizeof(*action))) == NULL) {
+    if (!strcmp(argv[0], MRP_KEYWORD_LOAD))
+	type = ACTION_LOAD;
+    else
+	type = ACTION_TRYLOAD;
+    
+    if (argc < 2 || (action = mrp_allocz(sizeof(*action))) == NULL) {
 	mrp_log_error("Failed to allocate load config action.");
 	return NULL;
     }
     
     mrp_list_init(&action->hook);
-    action->type = t;
-    action->name = mrp_strdup(argv[0]);
+    action->type = type;
+    action->name = mrp_strdup(argv[1]);
     
     if (action->name == NULL) {
 	mrp_log_error("Failed to allocate load config action.");
@@ -384,9 +480,12 @@ static any_action_t *parse_load(action_type_t t, char **argv, int argc)
 	return NULL;
     }
 
-    if (argc > 2 && !strcmp(argv[1], MRP_KEYWORD_AS)) {
-	action->instance = mrp_strdup(argv[2]);
-	start = 3;
+    args = NULL;
+
+    if (argc > 3 && !strcmp(argv[2], MRP_KEYWORD_AS)) {
+	/* [try-]load-plugin name as instance [args...] */
+	action->instance = mrp_strdup(argv[3]);
+	start = 4;
 
 	if (action->instance == NULL) {
 	    mrp_log_error("Failed to allocate load config action.");
@@ -395,8 +494,10 @@ static any_action_t *parse_load(action_type_t t, char **argv, int argc)
 	    goto fail;
 	}
     }
-    else
-	start = 1;
+    else {
+	/* [try-]load-plugin name [args...] */
+	start = 2;
+    }
 
     if (start < argc) {
 	if ((args = mrp_allocz_array(typeof(*args), argc - 1)) != NULL) {
@@ -422,8 +523,6 @@ static any_action_t *parse_load(action_type_t t, char **argv, int argc)
 	    }
 	}
     }
-    else
-	args = NULL;
     
     action->args = args;
     action->narg = argc - 1;
@@ -444,27 +543,30 @@ static any_action_t *parse_load(action_type_t t, char **argv, int argc)
 }
 
 
-static void free_load(load_action_t *action)
+static void free_load(any_action_t *action)
 {
-    int i;
+    load_action_t *load = (load_action_t *)action;
+    int            i;
     
-    if (action != NULL) {
-	mrp_free(action->name);
+    if (load != NULL) {
+	mrp_free(load->name);
 	
-	for (i = 0; i < action->narg; i++) {
-	    mrp_free(action->args[i].key);
-	    mrp_free(action->args[i].str);
+	for (i = 0; i < load->narg; i++) {
+	    mrp_free(load->args[i].key);
+	    mrp_free(load->args[i].str);
 	}
 
-	mrp_free(action->args);
+	mrp_free(load->args);
     }
 }
 
 
-static int exec_load(mrp_context_t *ctx, load_action_t *a)
+static int exec_load(mrp_context_t *ctx, any_action_t *action)
 {
-    if (!mrp_load_plugin(ctx, a->name, a->instance, NULL, 0))
-	return (a->type == ACTION_TRYLOAD);
+    load_action_t *load = (load_action_t *)action;
+
+    if (!mrp_load_plugin(ctx, load->name, load->instance, NULL, 0))
+	return (load->type == ACTION_TRYLOAD);
     else
 	return TRUE;
 }
@@ -485,8 +587,8 @@ static any_action_t *parse_if_else(input_t *in, char **argv, int argc)
     }
     
     start = in->line - 1;
-    op    = argv[0];
-    name  = argv[1];
+    op    = argv[1];
+    name  = argv[2];
 
     if (strcmp(op, MRP_KEYWORD_EXISTS)) {
 	mrp_log_error("%s:%d: unknown operator '%s' in if-conditional.",
@@ -528,7 +630,7 @@ static any_action_t *parse_if_else(input_t *in, char **argv, int argc)
 		}
 	    }
 	    else {
-		a = parse_action(in, args[0], args + 1, narg - 1);
+		a = parse_action(in, args, narg);
 		
 		if (a != NULL)
 		    mrp_list_append(actions, &a->hook);
@@ -546,15 +648,16 @@ static any_action_t *parse_if_else(input_t *in, char **argv, int argc)
 		  in->file, start);
     
  fail:
-    free_if_else(branch);
+    free_action((any_action_t *)branch);
     return NULL;
 }
 
 
-static void free_if_else(branch_action_t *branch)
+static void free_if_else(any_action_t *action)
 {
-    mrp_list_hook_t *p, *n;
+    branch_action_t *branch = (branch_action_t *)action;
     any_action_t    *a;
+    mrp_list_hook_t *p, *n;
 
     if (branch != NULL) {
 	mrp_free(branch->arg1);
@@ -575,8 +678,9 @@ static void free_if_else(branch_action_t *branch)
 }
 
 
-static int exec_if_else(mrp_context_t *ctx, branch_action_t *branch)
+static int exec_if_else(mrp_context_t *ctx, any_action_t *action)
 {
+    branch_action_t *branch = (branch_action_t *)action;
     mrp_list_hook_t *p, *n, *actions;
     any_action_t    *a;
 
@@ -599,65 +703,76 @@ static int exec_if_else(mrp_context_t *ctx, branch_action_t *branch)
 }
 
 
-static any_action_t *parse_action(input_t *in, char *act, char **args, int narg)
+static any_action_t *parse_message(input_t *in, char **argv, int argc)
 {
-    any_action_t *a;
+    message_action_t *msg;
+    action_type_t     type;
+    char              buf[4096], *p;
+    const char       *t;
+    int               i, l, n;
 
-    if (!strcmp(act, MRP_KEYWORD_LOAD))
-	a = parse_load(ACTION_LOAD, args, narg);
-    else if (!strcmp(act, MRP_KEYWORD_TRYLOAD))
-	a = parse_load(ACTION_TRYLOAD, args, narg);
-    else if (!strcmp(act, MRP_KEYWORD_IF))
-	a = parse_if_else(in, args, narg);
-    else {
-	mrp_log_error("Unknown command '%s' in file '%s'.", args[0], in->file);
-	a = NULL;
+    MRP_UNUSED(in);
+
+    if (argc < 2) {
+	mrp_log_error("%s requires at least one argument.", argv[0]);
+	return NULL;
     }
 
-    return a;
+    if (!strcmp(argv[0], MRP_KEYWORD_ERROR))
+	type = ACTION_ERROR;
+    else if (!strcmp(argv[0], MRP_KEYWORD_WARNING))
+	type = ACTION_WARNING;
+    else if (!strcmp(argv[0], MRP_KEYWORD_INFO))
+	type = ACTION_INFO;
+    else
+	return NULL;
+
+    p = buf;
+    n = sizeof(buf);
+    if ((msg = mrp_allocz(sizeof(*msg))) != NULL) {
+	for (i = 1, t=""; i < argc && n > 0; i++, t=" ") {
+	    l  = snprintf(p, n, "%s%s", t, argv[i]);
+	    p += l;
+	    n -= l;
+	}
+
+	msg->type    = type;
+	msg->message = mrp_strdup(buf);
+
+	if (msg->message == NULL) {
+	    mrp_log_error("Failed to allocate %s config action.", argv[0]);
+	    mrp_free(msg);
+	    msg = NULL;
+	}
+    }
+
+    return (any_action_t *)msg;
 }
 
 
-static void free_action(any_action_t *action)
+static int exec_message(mrp_context_t *ctx, any_action_t *action)
 {
-    mrp_list_delete(&action->hook);
-    
-    switch (action->type) {
-    case ACTION_LOAD:
-    case ACTION_TRYLOAD:
-	free_load((load_action_t *)action);
-	break;
-	
-    case ACTION_IF:
-	free_if_else((branch_action_t *)action);
-	break;
-	
-    default:
-	mrp_log_error("Unknown configuration action of type 0x%x.",
-		      action->type);
-	mrp_list_delete(&action->hook);
-	mrp_free(action);
-    }
-}
+    message_action_t *msg = (message_action_t *)action;
 
+    MRP_UNUSED(ctx);
 
-static int exec_action(mrp_context_t *ctx, any_action_t *action)
-{
     switch (action->type) {
-    case ACTION_LOAD:
-    case ACTION_TRYLOAD:
-	return exec_load(ctx, (load_action_t *)action);
-	
-    case ACTION_IF:
-	return exec_if_else(ctx, (branch_action_t *)action);
-	
+    case ACTION_ERROR:   mrp_log_error("%s", msg->message);   exit(1);
+    case ACTION_WARNING: mrp_log_warning("%s", msg->message); return TRUE;
+    case ACTION_INFO:    mrp_log_info("%s", msg->message);    return TRUE;
     default:
-	mrp_log_error("Unknown configuration action of type 0x%x.",
-		      action->type);
-	mrp_list_delete(&action->hook);
-	mrp_free(action);
-	
 	return FALSE;
+    }
+}
+
+
+static void free_message(any_action_t *action)
+{
+    message_action_t *msg = (message_action_t *)action;
+    
+    if (msg != NULL) {
+	mrp_free(msg->message);
+	mrp_free(msg);
     }
 }
 

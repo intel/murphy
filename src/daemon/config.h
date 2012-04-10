@@ -34,7 +34,9 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv);
 #define MRP_KEYWORD_ELSE    "else"
 #define MRP_KEYWORD_END     "end"
 #define MRP_KEYWORD_EXISTS  "plugin-exists"
-#define MRP_KEYWORD_FAIL    "fail"
+#define MRP_KEYWORD_ERROR   "error"
+#define MRP_KEYWORD_WARNING "warning"
+#define MRP_KEYWORD_INFO    "info"
 #define MRP_START_COMMENT   '#'
 
 
