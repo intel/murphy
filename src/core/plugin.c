@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <errno.h>
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -89,8 +90,8 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
     
     if (dynamic != NULL) {
 	if (builtin != NULL)
-    	    mrp_log_error("Dynamic plugin '%s' shadow builtin plugin '%s'.",
-			  path, builtin->path);
+    	    mrp_log_warning("Dynamic plugin '%s' shadows builtin plugin '%s'.",
+			    path, builtin->path);
     }
     else {
 	if (builtin == NULL) {
@@ -256,13 +257,15 @@ static mrp_plugin_descr_t *open_dynamic(const char *path, void **handle)
 		mrp_log_error("Plugin '%s' provided NULL descriptor.", path);
 	}
 	else
-	    mrp_log_error("Plugin '%s' cannot provide a descriptor.", path);
+	    mrp_log_error("Plugin '%s' does not provide a descriptor.", path);
     }
     else {
-	char *err = dlerror();
+	if (access(path, F_OK) == 0) {
+	    char *err = dlerror();
 
-	mrp_log_error("Failed to dlopen plugin '%s' (%s).", path,
-		      err ? err : "unknown error");
+	    mrp_log_error("Failed to dlopen plugin '%s' (%s).", path,
+			  err ? err : "unknown error");
+	}
     }
     
     if (h != NULL)
