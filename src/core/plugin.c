@@ -14,6 +14,8 @@ static mrp_plugin_descr_t *open_dynamic(const char *path, void **handle);
 static mrp_plugin_t *find_plugin(mrp_context_t *ctx, char *name);
 static mrp_plugin_t *find_plugin_instance(mrp_context_t *ctx,
 					  const char *instance);
+static int parse_plugin_args(mrp_plugin_t *plugin,
+			     mrp_plugin_arg_t *argv, int argc);
 
 
 static MRP_LIST_HOOK(builtin_plugins);    /* list of built-in plugins */
@@ -60,16 +62,14 @@ int mrp_plugin_exists(mrp_context_t *ctx, const char *name)
 
 
 mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
-			      const char *instance, char **args, int narg)
+			      const char *instance, mrp_plugin_arg_t *args,
+			      int narg)
 {
     mrp_plugin_t       *plugin;
     char                path[PATH_MAX];
     mrp_plugin_descr_t *dynamic, *builtin;
     void               *handle;
     
-    MRP_UNUSED(args);
-    MRP_UNUSED(narg);
-
     if (name == NULL)
 	return NULL;
 
@@ -116,6 +116,9 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	plugin->refcnt     = 1;
 	plugin->handle     = handle;
 	
+	if (!parse_plugin_args(plugin, args, narg))
+	    goto fail;
+	
 	mrp_list_append(&ctx->plugins, &plugin->hook);
 
 	return plugin;
@@ -132,9 +135,23 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 
 int mrp_unload_plugin(mrp_plugin_t *plugin)
 {
+    mrp_plugin_arg_t *pa, *da;
+    int               i;
+
     if (plugin != NULL) {
 	if (plugin->refcnt == 0) {
 	    mrp_list_delete(&plugin->hook);
+
+	    pa = plugin->args;
+	    da = plugin->descriptor->args;
+	    if (pa != da) {
+		for (i = 0; i < plugin->descriptor->narg; i++, pa++, da++) {
+		    if (pa->type == MRP_PLUGIN_ARG_TYPE_STRING)
+			if (pa->str != da->str)
+			    mrp_free(pa->str);
+		}
+		mrp_free(plugin->args);
+	    }
 
 	    if (plugin->handle != NULL)
 		dlclose(plugin->handle);
@@ -291,3 +308,109 @@ static mrp_plugin_descr_t *open_builtin(const char *name)
     return NULL;
 }
 
+
+static int parse_plugin_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *parg)
+{
+    char *end;
+
+    switch (parg->type) {
+    case MRP_PLUGIN_ARG_TYPE_STRING:
+	if (arg->str != NULL)
+	    parg->str = arg->str;
+	return TRUE;
+
+    case MRP_PLUGIN_ARG_TYPE_BOOL:
+	if (arg->str != NULL) {
+	    if (!strcasecmp(arg->str, "TRUE"))
+		parg->bln = TRUE;
+	    else if (!strcasecmp(arg->str, "FALSE"))
+		parg->bln = FALSE;
+	    else
+		return FALSE;
+	}
+	else
+	    parg->bln = TRUE;
+	return TRUE;
+
+    case MRP_PLUGIN_ARG_TYPE_UINT32:
+	parg->u32 = (uint32_t)strtoul(arg->str, &end, 0);
+	if (end && !*end)
+	    return TRUE;
+	else
+	    return FALSE;
+
+    case MRP_PLUGIN_ARG_TYPE_INT32:
+	parg->i32 = (int32_t)strtol(arg->str, &end, 0);
+	if (end && !*end)
+	    return TRUE;
+	else
+	    return FALSE;
+
+    case MRP_PLUGIN_ARG_TYPE_DOUBLE:
+	parg->dbl = strtod(arg->str, &end);
+	if (end && !*end)
+	    return TRUE;
+	else
+	    return FALSE;
+
+    default:
+	return FALSE;
+    }
+}
+
+
+static int parse_plugin_args(mrp_plugin_t *plugin,
+			     mrp_plugin_arg_t *argv, int argc)
+{
+    mrp_plugin_descr_t *descr;
+    mrp_plugin_arg_t   *valid, *args, *pa, *a;
+    int                 i, j, cnt;
+
+    if (argv == NULL) {
+	plugin->args = plugin->descriptor->args;
+	return TRUE;
+    }
+    
+    descr = plugin->descriptor;
+    valid = descr->args;
+
+    if (valid == NULL && argv != NULL) {
+	mrp_log_error("Plugin '%s' (%s) does not take any arguments.",
+		      plugin->instance, descr->name);
+	return FALSE;
+    }
+
+    if ((args = mrp_allocz_array(typeof(*args), descr->narg)) == NULL) {
+	mrp_log_error("Failed to allocate arguments for plugin '%s'.",
+		      plugin->instance);
+	return FALSE;
+    }
+    
+    memcpy(args, descr->args, descr->narg * sizeof(*args));
+    plugin->args = args;
+
+    j = 0;
+    for (i = 0, a = argv; i < argc; i++, a++) {
+	for (cnt = 0, pa = NULL; pa == NULL && cnt < descr->narg; cnt++) {
+	    if (!strcmp(a->key, args[j].key))
+		pa = args + j;
+	    if (++j >= descr->narg)
+		j = 0;
+	}
+	
+	if (pa != NULL) {
+	    if (!parse_plugin_arg(a, pa)) {
+		mrp_log_error("Invalid argument '%s' for plugin '%s'.",
+			      a->key, plugin->instance);
+		return FALSE;
+	    }
+	}
+	else {
+	    mrp_log_error("Plugin '%s' (%s) does not support argument '%s'",
+			  plugin->instance, descr->name, a->key);
+	    return FALSE;
+	}
+    }
+
+    return TRUE;
+}

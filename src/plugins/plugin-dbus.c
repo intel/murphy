@@ -347,4 +347,4 @@ static void dbus_exit(mrp_plugin_t *plugin)
 
 #define DBUS_HELP "DBUS pump plugin (DBUS-mainloop integration)."
 
-MURPHY_REGISTER_CORE_PLUGIN("dbus", DBUS_HELP, dbus_init, dbus_exit);
+MURPHY_REGISTER_CORE_PLUGIN("dbus", DBUS_HELP, dbus_init, dbus_exit, NULL);

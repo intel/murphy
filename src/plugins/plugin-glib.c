@@ -141,4 +141,4 @@ static void plugin_exit(mrp_plugin_t *plugin)
 
 #define PLUGIN_HELP "Glib mainloop pump plugin."
 
-MURPHY_REGISTER_PLUGIN("glib", PLUGIN_HELP, plugin_init, plugin_exit);
+MURPHY_REGISTER_PLUGIN("glib", PLUGIN_HELP, plugin_init, plugin_exit, NULL);

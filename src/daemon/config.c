@@ -525,7 +525,7 @@ static any_action_t *parse_load(input_t *in, char **argv, int argc)
     }
     
     action->args = args;
-    action->narg = argc - 1;
+    action->narg = argc - start;
     
     return (any_action_t *)action;
     
@@ -565,7 +565,8 @@ static int exec_load(mrp_context_t *ctx, any_action_t *action)
 {
     load_action_t *load = (load_action_t *)action;
 
-    if (!mrp_load_plugin(ctx, load->name, load->instance, NULL, 0))
+    if (!mrp_load_plugin(ctx, load->name, load->instance,
+			 load->args, load->narg))
 	return (load->type == ACTION_TRYLOAD);
     else
 	return TRUE;
