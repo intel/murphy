@@ -51,8 +51,8 @@ MRP_CDECL_BEGIN
 #define mrp_clear(obj) memset((obj), 0, sizeof(*(obj)))
 
 
-#define mrp_alloc_array(type, n)  (type *)mrp_alloc(sizeof(type) * (n))
-#define mrp_allocz_array(type, n) (type *)mrp_allocz(sizeof(type) * (n))
+#define mrp_alloc_array(type, n)  ((type *)mrp_alloc(sizeof(type) * (n)))
+#define mrp_allocz_array(type, n) ((type *)mrp_allocz(sizeof(type) * (n)))
 
 typedef enum {
     MRP_MM_PASSTHRU = 0,                 /* passthru allocator */
