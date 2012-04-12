@@ -52,7 +52,8 @@ int mrp_plugin_exists(mrp_context_t *ctx, const char *name)
     if (open_builtin(name))
 	return TRUE;
     else {
-	snprintf(path, sizeof(path), "%s/plugin-%s.so", ctx->plugin_dir, name);
+	snprintf(path, sizeof(path), "%s/%s%s.so", ctx->plugin_dir,
+		 PLUGIN_PREFIX, name);
 	if (stat(path, &st) == 0)
 	    return TRUE;
 	else
@@ -83,7 +84,8 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 
     plugin = NULL;
     handle = NULL;
-    snprintf(path, sizeof(path), "%s/plugin-%s.so", ctx->plugin_dir, name);
+    snprintf(path, sizeof(path), "%s/%s%s.so", ctx->plugin_dir,
+	     PLUGIN_PREFIX, name);
     
     dynamic = open_dynamic(path, &handle);
     builtin = open_builtin(name);
