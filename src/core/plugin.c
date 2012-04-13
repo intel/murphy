@@ -5,6 +5,7 @@
 #include <sys/types.h>
 
 #include <murphy/common/list.h>
+#include <murphy/common/file-utils.h>
 #include <murphy/core/plugin.h>
 
 #define PLUGIN_PREFIX "plugin-"
@@ -62,13 +63,43 @@ int mrp_plugin_exists(mrp_context_t *ctx, const char *name)
 }
 
 
+static inline int check_plugin_version(mrp_plugin_descr_t *descr)
+{
+    int major, minor;
+    
+    major = MRP_VERSION_MAJOR(descr->mrp_version);
+    minor = MRP_VERSION_MINOR(descr->mrp_version);
+
+    if (major != MRP_PLUGIN_API_MAJOR || minor > MRP_PLUGIN_API_MINOR) {
+	mrp_log_error("Plugin '%s' uses incompatible version (%d.%d vs. %d.%d)",
+		      descr->name, major, minor,
+		      MRP_PLUGIN_API_MAJOR, MRP_PLUGIN_API_MINOR);
+	return FALSE;
+    }
+    
+    return TRUE;
+}
+
+
+static inline int check_plugin_singleton(mrp_plugin_descr_t *descr)
+{
+    if (descr->singleton && descr->ninstance > 1) {
+	mrp_log_error("Singleton plugin '%s' has already been instantiated.",
+		      descr->name);
+	return FALSE;
+    }
+    else
+	return TRUE;
+}
+
+
 mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 			      const char *instance, mrp_plugin_arg_t *args,
 			      int narg)
 {
     mrp_plugin_t       *plugin;
     char                path[PATH_MAX];
-    mrp_plugin_descr_t *dynamic, *builtin;
+    mrp_plugin_descr_t *dynamic, *builtin, *descr;
     void               *handle;
     
     if (name == NULL)
@@ -94,19 +125,26 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	if (builtin != NULL)
     	    mrp_log_warning("Dynamic plugin '%s' shadows builtin plugin '%s'.",
 			    path, builtin->path);
+	descr = dynamic;
     }
     else {
 	if (builtin == NULL) {
 	    mrp_log_error("Could not find plugin '%s'.", name);
 	    return NULL;
 	}
+	descr = builtin;
     }
-	
+
+    descr->ninstance++;
+
+    if (!check_plugin_version(descr) || !check_plugin_singleton(descr))
+	goto fail;
+    
     if ((plugin = mrp_allocz(sizeof(*plugin))) != NULL) {
 	mrp_list_init(&plugin->hook);
 	
 	plugin->instance = mrp_strdup(instance);
-	plugin->path     = mrp_strdup(handle ? path : builtin->path);
+	plugin->path     = mrp_strdup(handle ? path : descr->path);
 
 	if (plugin->instance == NULL || plugin->path == NULL) {
 	    mrp_log_error("Failed to allocate plugin '%s'.", name);
@@ -114,7 +152,7 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	}
 	
 	plugin->ctx        = ctx;
-	plugin->descriptor = handle ? dynamic : builtin;
+	plugin->descriptor = descr;
 	plugin->refcnt     = 1;
 	plugin->handle     = handle;
 	
@@ -132,6 +170,67 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	
 	return NULL;
     }
+}
+
+
+static int load_plugin_cb(const char *file, mrp_dirent_type_t type, void *data)
+{
+    mrp_context_t *ctx = (mrp_context_t *)data;
+    char           name[PATH_MAX], *start, *end;
+    int            len;
+
+    MRP_UNUSED(type);
+
+    if ((start = strstr(file, PLUGIN_PREFIX)) != NULL) {
+	start += sizeof(PLUGIN_PREFIX) - 1;
+	if ((end = strstr(start, ".so")) != NULL) {
+	    len = end - start;
+	    strncpy(name, start, len);
+	    name[len] = '\0';
+	    mrp_load_plugin(ctx, name, NULL, NULL, 0);
+	}
+    }
+
+    return TRUE;
+}
+
+
+int mrp_load_all_plugins(mrp_context_t *ctx)
+{
+    mrp_dirent_type_t  type;
+    const char        *pattern;
+    mrp_list_hook_t   *p, *n;
+    mrp_plugin_t      *plugin;
+    
+    type    = MRP_DIRENT_REG;
+    pattern = PLUGIN_PREFIX".*\\.so$";
+    mrp_scan_dir(ctx->plugin_dir, pattern, type, load_plugin_cb, ctx);
+
+
+    mrp_list_foreach(&builtin_plugins, p, n) {
+	plugin = mrp_list_entry(p, typeof(*plugin), hook);
+	
+	mrp_load_plugin(ctx, plugin->descriptor->name, NULL, NULL, 0);
+    }
+
+    return TRUE;
+}
+
+
+int mrp_request_plugin(mrp_context_t *ctx, const char *name,
+		       const char *instance)
+{
+    mrp_plugin_t *plugin;
+
+    if (instance == NULL)
+	instance = name;
+
+    if ((plugin = find_plugin_instance(ctx, instance)) != NULL) {
+	if (instance == name || !strcmp(plugin->descriptor->name, name))
+	    return TRUE;
+    }
+
+    return (mrp_load_plugin(ctx, name, instance, NULL, 0) != NULL);
 }
 
 
@@ -154,6 +253,8 @@ int mrp_unload_plugin(mrp_plugin_t *plugin)
 		}
 		mrp_free(plugin->args);
 	    }
+
+	    plugin->descriptor->ninstance--;
 
 	    if (plugin->handle != NULL)
 		dlclose(plugin->handle);

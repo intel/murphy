@@ -32,11 +32,6 @@ static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
 }
 
 
-/*
- * a quick-hack plugin test
- */
-
-
 int main(int argc, char *argv[])
 {
     mrp_context_t *ctx;

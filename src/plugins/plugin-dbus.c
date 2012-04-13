@@ -345,6 +345,12 @@ static void dbus_exit(mrp_plugin_t *plugin)
 }
 
 
-#define DBUS_HELP "DBUS pump plugin (DBUS-mainloop integration)."
+#define DBPLG_DESCRIPTION "A plugin to pump DBusConnections."
+#define DBPLG_HELP "DBUS pump plugin (DBUS-mainloop integration)."
+#define DBPLG_VERSION     MRP_VERSION_INT(0, 0, 1)
+#define DBPLG_AUTHORS     "Krisztian Litkey <krisztian.litkey@intel.com>"
 
-MURPHY_REGISTER_CORE_PLUGIN("dbus", DBUS_HELP, dbus_init, dbus_exit, NULL);
+MURPHY_REGISTER_CORE_PLUGIN("dbus",
+			    DBPLG_VERSION, DBPLG_DESCRIPTION, DBPLG_AUTHORS,
+			    DBPLG_HELP, MRP_SINGLETON,
+			    dbus_init, dbus_exit, NULL);

@@ -49,7 +49,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 	   "      E.g -a foo:bar=xyzzy sets the value of configuration key\n"
 	   "      'bar' to the value 'xyzzy' for plugin 'foo'.\n"
 #endif
-           "  -h, --help                     show help on usage\n",
+           "  -h, --help                     show help on usage\n"
+           "  -q, --query-plugins            show detailed information about\n"
+	   "                                 all the available plugins\n",
            argv0, MRP_DEFAULT_CONFIG_FILE, MRP_DEFAULT_CONFIG_DIR,
 	   MRP_DEFAULT_PLUGIN_DIR);
 
@@ -60,29 +62,83 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 }
 
 
-static void print_plugin_help(mrp_context_t *ctx)
+static void print_plugin_help(mrp_context_t *ctx, int detailed)
 {
-    MRP_UNUSED(ctx);
+#define PRNT(fmt, arg) snprintf(defval, sizeof(defval), fmt, arg)
 
-#if 0
-    mrp_plugin_t    *plugin;
-    mrp_list_hook_t *p, *n;
-
+    mrp_plugin_t       *plugin;
+    mrp_plugin_descr_t *descr;
+    mrp_plugin_arg_t   *arg;
+    mrp_list_hook_t    *p, *n;
+    char               *type, defval[64];
+    int                 i;
+    
     mrp_load_all_plugins(ctx);
     
-    printf("\n");
-    printf("Available plugins:\n\n");
+    printf("\nAvailable plugins:\n\n");
+
     mrp_list_foreach(&ctx->plugins, p, n) {
 	plugin = mrp_list_entry(p, typeof(*plugin), hook);
-	printf("- %s plugin '%s' (%s)\n",
-	       plugin->dynamic ? "external" : "internal",
-	       plugin->descriptor->name, plugin->path);
+	descr  = plugin->descriptor;
 	
-	if (plugin->descriptor->help != NULL && plugin->descriptor->help[0])
-	    printf("%s\n", plugin->descriptor->help);
+	printf("- %splugin %s:", plugin->handle ? "" : "Builtin ", descr->name);
+	if (detailed) {
+	    printf(" (%s, version %d.%d.%d)\n", plugin->path,
+		   MRP_VERSION_MAJOR(descr->version),
+		   MRP_VERSION_MINOR(descr->version),
+		   MRP_VERSION_MICRO(descr->version));
+	    printf("  Authors: %s\n", descr->authors);
+	}
+	else
+	    printf("\n");
+	
+	if (detailed)
+	    printf("  Description:\n    %s\n", descr->description);
+	
+	if (descr->args != NULL) {
+	    printf("  Arguments:\n");
+
+	    for (i = 0, arg = descr->args; i < descr->narg; i++, arg++) {
+		printf("    %s: ", arg->key);
+		switch (arg->type) {
+		case MRP_PLUGIN_ARG_TYPE_STRING:
+		    type = "string";
+		    PRNT("%s", arg->str ? arg->str : "<none>");
+		    break;
+		case MRP_PLUGIN_ARG_TYPE_BOOL:
+		    type = "boolean";
+		    PRNT("%s", arg->bln ? "TRUE" : "FALSE");
+		    break;
+		case MRP_PLUGIN_ARG_TYPE_UINT32:
+		    type = "unsigned 32-bit integer";
+		    PRNT("%u", arg->u32);
+		    break;
+		case MRP_PLUGIN_ARG_TYPE_INT32:
+		    type = "signed 32-bit integer";
+		    PRNT("%d", arg->i32);
+		    break;
+		case MRP_PLUGIN_ARG_TYPE_DOUBLE:
+		    type = "double-precision floating point";
+		    PRNT("%f", arg->dbl);
+		    break;
+		default:
+		    type = "<unknown argument type>";
+		    PRNT("%s", "<unknown>");
+		}
+
+		printf("%s, default value=%s\n", type, defval);
+	    }
+	}
+	
+	if (descr->help != NULL && descr->help[0])
+	    printf("  Help:\n    %s\n", descr->help);
+	
+	printf("\n");
     }
     
     printf("\n");
+
+#if 0
     printf("Note that you can disable any plugin from the command line by\n");
     printf("using the '-a name:%s' option.\n", MURPHY_PLUGIN_ARG_DISABLED);
 #endif
@@ -101,20 +157,21 @@ static void config_set_defaults(mrp_context_t *ctx)
 
 int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
 {
-    #define OPTIONS "C:D:l:t:fP:a:vdh"
+    #define OPTIONS "C:D:l:t:fP:a:vdhq"
     struct option options[] = {
-	{ "config-file", required_argument, NULL, 'C' },
-	{ "config-dir" , required_argument, NULL, 'D' },
-	{ "plugin-dir" , required_argument, NULL, 'P' },
-	{ "log-level"  , required_argument, NULL, 'l' },
-	{ "log-target" , required_argument, NULL, 't' },
-	{ "verbose"    , optional_argument, NULL, 'v' },
-	{ "debug"      , no_argument      , NULL, 'd' },
-	{ "foreground" , no_argument      , NULL, 'f' },
+	{ "config-file"  , required_argument, NULL, 'C' },
+	{ "config-dir"   , required_argument, NULL, 'D' },
+	{ "plugin-dir"   , required_argument, NULL, 'P' },
+	{ "log-level"    , required_argument, NULL, 'l' },
+	{ "log-target"   , required_argument, NULL, 't' },
+	{ "verbose"      , optional_argument, NULL, 'v' },
+	{ "debug"        , no_argument      , NULL, 'd' },
+	{ "foreground"   , no_argument      , NULL, 'f' },
 #if 0
-	{ "plugin"    , required_argument, NULL, 'a' },
+	{ "plugin"       , required_argument, NULL, 'a' },
 #endif
-	{ "help"      , no_argument      , NULL, 'h' },
+	{ "help"         , no_argument      , NULL, 'h' },
+	{ "query-plugins", no_argument      , NULL, 'q' },
 	{ NULL, 0, NULL, 0 }
     };
 
@@ -192,8 +249,12 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
 	    
 	case 'h':
 	    print_usage(argv[0], -1, "");
-	    print_plugin_help(ctx);
+	    print_plugin_help(ctx, FALSE);
 	    exit(0);
+	    break;
+
+	case 'q':
+	    print_plugin_help(ctx, TRUE);
 	    break;
 	    
         default:

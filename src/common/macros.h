@@ -95,6 +95,22 @@
 #    define MRP_ASSERT(expr, msg) do { } while (0)
 #endif
 
+/** Create a version integer from a (major, minor, micro) tuple. */
+#define MRP_VERSION_INT(maj, min, mic) \
+    ((((maj) & 0xff) << 16) | (((min) & 0xff) << 8) | ((mic) & 0xff))
+
+/** Create a version string from a (const) (major, minor, micro) tuple.  */
+#define MRP_VERSION_STRING(maj, min, mic) #maj"."#min"."#mic
+
+/** Extract major version from a version integer. */
+#define MRP_VERSION_MAJOR(ver) (((ver) >> 16) & 0xff)
+
+/** Extract minor version from a version integer. */
+#define MRP_VERSION_MINOR(ver) (((ver) >>  8) & 0xff)
+
+/** Extract micro version from a version intege. */
+#define MRP_VERSION_MICRO(ver) ((ver) & 0xff)
+
 
 /** C++-compatibility macros. */
 #ifdef __cplusplus

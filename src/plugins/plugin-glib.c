@@ -139,6 +139,12 @@ static void plugin_exit(mrp_plugin_t *plugin)
 }
 
 
-#define PLUGIN_HELP "Glib mainloop pump plugin."
+#define GLIB_DESCRIPTION "Glib mainloop pump plugin."
+#define GLIB_HELP        "Glib pump plugin (GMainLoop integration)."
+#define GLIB_VERSION     MRP_VERSION_INT(0, 0, 1)
+#define GLIB_AUTHORS     "Krisztian Litkey <krisztian.litkey@intel.com>"
 
-MURPHY_REGISTER_PLUGIN("glib", PLUGIN_HELP, plugin_init, plugin_exit, NULL);
+MURPHY_REGISTER_PLUGIN("glib", GLIB_VERSION, GLIB_DESCRIPTION, GLIB_AUTHORS,
+		       GLIB_HELP, MRP_SINGLETON,
+		       plugin_init, plugin_exit, NULL);
+
