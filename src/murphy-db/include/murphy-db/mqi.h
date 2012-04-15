@@ -91,7 +91,7 @@
     }
 
 #define MQI_BEGIN                                               \
-    mqi_begin_transaction();
+    mqi_begin_transaction()
 
 #define MQI_COMMIT(id)                                          \
     mqi_commit_transaction(id)

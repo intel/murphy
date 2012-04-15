@@ -53,6 +53,9 @@ static int persons_nrow = MQI_DIMENSION(persons_rows);
 
 static int verbose;
 static struct {
+    mql_statement_t *begin;
+    mql_statement_t *commit;
+    mql_statement_t *rollback;
     mql_statement_t *filtered_select;
     mql_statement_t *full_select;
     mql_statement_t *update;
@@ -246,6 +249,42 @@ START_TEST(make_persons)
         PREREQUISITE(insert_into_persons);
         done = 1;
     }
+}
+END_TEST
+
+START_TEST(precompile_transaction_statements)
+{
+#define TRID "transaction_1"
+
+    static char *string[] = {
+        "BEGIN "    TRID,
+        "COMMIT "   TRID,
+        "ROLLBACK " TRID
+    };
+
+    static mql_statement_t **stmnt[] = {
+        &persons.begin,
+        &persons.commit,
+        &persons.rollback
+    };
+
+    static int done;
+    
+    int i;
+
+    if (!done) {
+        fail_unless(MQI_DIMENSION(string) == MQI_DIMENSION(stmnt),
+                    "internal error: dimension mismatch in %s()", __FILE__);
+
+        for (i = 0;  i < MQI_DIMENSION(string);  i++) {
+            if (!(*(stmnt[i]) = mql_precompile(string[i]))) {
+                fail("precompilation error of '%s' (%s)",
+                     string[i], strerror(errno));
+            }
+        }
+    }
+
+#undef TRID
 }
 END_TEST
 
@@ -725,16 +764,15 @@ START_TEST(row_trigger)
                           " SELECT id, first_name, family_name";
 
 
-    mqi_handle_t  t;
     mql_result_t *r;
-    int sts;
 
     PREREQUISITE(register_row_event_cb);
+    PREREQUISITE(precompile_transaction_statements);
 
-    t = mqi_begin_transaction();
+    r = mql_exec_statement(mql_result_string, persons.begin);
 
-    fail_if(t == MQI_HANDLE_INVALID, "failed to start transaction: %s",
-            strerror(errno));
+    fail_unless(mql_result_is_success(r), "failed to begin transaction: %s",
+                strerror(errno));
     
     r = mql_exec_string(mql_result_dontcare, mqlstr);
     
@@ -744,9 +782,10 @@ START_TEST(row_trigger)
     PREREQUISITE(exec_precompiled_insert_into_persons);
     PREREQUISITE(exec_precompiled_delete_from_persons);
 
-    sts = mqi_commit_transaction(t);
+    r = mql_exec_statement(mql_result_string, persons.commit);
 
-    fail_if(sts < 0, "commit failed: %s", strerror(errno));
+    fail_unless(mql_result_is_success(r), "failed to commit transaction: %s",
+                strerror(errno));
 }
 END_TEST
 
@@ -757,17 +796,15 @@ START_TEST(column_trigger)
                           " CALLBACK column_event_cb"
                           " SELECT id, first_name, family_name";
 
-
-    mqi_handle_t  t;
     mql_result_t *r;
-    int sts;
 
     PREREQUISITE(register_column_event_cb);
+    PREREQUISITE(precompile_transaction_statements);
 
-    t = mqi_begin_transaction();
+    r = mql_exec_statement(mql_result_string, persons.begin);
 
-    fail_if(t == MQI_HANDLE_INVALID, "failed to start transaction: %s",
-            strerror(errno));
+    fail_unless(mql_result_is_success(r), "failed to begin transaction: %s",
+                strerror(errno));
     
     r = mql_exec_string(mql_result_dontcare, mqlstr);
     
@@ -776,9 +813,10 @@ START_TEST(column_trigger)
 
     PREREQUISITE(exec_precompiled_update_persons);
 
-    sts = mqi_commit_transaction(t);
+    r = mql_exec_statement(mql_result_string, persons.commit);
 
-    fail_if(sts < 0, "commit failed: %s", strerror(errno));
+    fail_unless(mql_result_is_success(r), "failed to commit transaction: %s",
+                strerror(errno));
 }
 END_TEST
 
@@ -816,12 +854,12 @@ static TCase *basic_tests(void)
 {
     TCase *tc = tcase_create("basic tests");
 
-#if 0
     tcase_add_test(tc, open_db);
     tcase_add_test(tc, create_table_persons);
     tcase_add_test(tc, describe_persons);
     tcase_add_test(tc, create_index_on_persons);
     tcase_add_test(tc, insert_into_persons);
+    tcase_add_test(tc, precompile_transaction_statements);
     tcase_add_test(tc, precompile_filtered_person_select);
     tcase_add_test(tc, precompile_full_person_select);
     tcase_add_test(tc, precompile_update_persons);
@@ -839,7 +877,6 @@ static TCase *basic_tests(void)
     tcase_add_test(tc, table_trigger);
     tcase_add_test(tc, row_trigger);
     tcase_add_test(tc, column_trigger);
-#endif
     tcase_add_test(tc, transaction_trigger);
 
     return tc;

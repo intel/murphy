@@ -226,6 +226,8 @@ static FILE        *mqlout;
 
     mql_statement_t *mql_make_show_tables_statement(uint32_t);
     mql_statement_t *mql_make_describe_statement(mqi_handle_t);
+    mql_statement_t *mql_make_transaction_statement(mql_statement_type_t,
+                                                    char *);
     mql_statement_t *mql_make_insert_statement(mqi_handle_t, int, int,
                                                mqi_data_type_t*,
                                                mqi_column_desc_t*, void*);
@@ -283,6 +285,10 @@ static FILE        *mqlout;
                                mqi_data_type_t *, int *, int);
     int mql_create_table_trigger(char *, mql_callback_t *);
     int mql_create_transaction_trigger(char *, mql_callback_t *);
+
+    int mql_begin_transaction(char *);
+    int mql_rollback_transaction(char *);
+    int mql_commit_transaction(char *);
 }
 
 
@@ -593,29 +599,37 @@ drop_index: TKN_INDEX {
  * Begin/Commit/Rollback statement
  *
  */
-begin_statement: TKN_BEGIN transaction {
-    if (mqi_begin_transaction() == MQI_HANDLE_INVALID)
-        MQL_ERROR(errno, "Can't start transaction: %s", strerror(errno));
-    else
-        MQL_SUCCESS;
+begin_statement: TKN_BEGIN transaction TKN_IDENTIFIER {
+    if (mode == mql_mode_precompile)
+        statement = mql_make_transaction_statement(mql_statement_begin, $3);
+    else {
+        if (mql_begin_transaction($3) < 0)
+            MQL_ERROR(errno, "can't start transaction: %s", strerror(errno));
+        else
+            MQL_SUCCESS;
+    }
 };
 
-commit_statement: TKN_COMMIT transaction {
-    mqi_handle_t txh = mqi_get_transaction_handle();
-
-    if (txh == MQI_HANDLE_INVALID || mqi_commit_transaction(txh) < 0)
-        MQL_ERROR(errno, "failed to commit transaction: %s", strerror(errno));
-    else
-        MQL_SUCCESS;
+commit_statement: TKN_COMMIT transaction TKN_IDENTIFIER {
+    if (mode == mql_mode_precompile)
+        statement = mql_make_transaction_statement(mql_statement_commit, $3);
+    else {
+        if (mql_commit_transaction($3) < 0)
+            MQL_ERROR(errno, "can't commit transaction: %s", strerror(errno));
+        else
+            MQL_SUCCESS;
+    }
 };
 
-rollback_statement: TKN_ROLLBACK transaction {
-    mqi_handle_t txh = mqi_get_transaction_handle();
-
-    if (txh == MQI_HANDLE_INVALID || mqi_rollback_transaction(txh) < 0)
-        MQL_ERROR(errno, "can't rollback transaction: %s", strerror(errno));
-    else
-        MQL_SUCCESS;
+rollback_statement: TKN_ROLLBACK transaction TKN_IDENTIFIER {
+    if (mode == mql_mode_precompile)
+        statement = mql_make_transaction_statement(mql_statement_rollback, $3);
+    else {
+        if (mql_rollback_transaction($3) < 0)
+            MQL_ERROR(errno, "can't rollback transaction: %s",strerror(errno));
+        else
+            MQL_SUCCESS;
+    }
 };
 
 

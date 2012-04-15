@@ -32,6 +32,11 @@ typedef struct {
 
 typedef struct {
     mql_statement_type_t type;
+    char                 trnam[0];
+} transact_statement_t;
+
+typedef struct {
+    mql_statement_type_t type;
     mqi_handle_t         table;
     int                  ignore;
     int                  ncolumn;
@@ -72,6 +77,8 @@ typedef struct {
     value_t              values[0];
 } select_statement_t;
 
+
+
 static void count_condition_values(int, mqi_cond_entry_t *, int*, int*, int*);
 static void count_column_values(mqi_column_desc_t *, mqi_data_type_t*, void*,
                                 int *, int *, int *);
@@ -83,6 +90,9 @@ static void copy_conditions_and_values(int,mqi_cond_entry_t*,mqi_cond_entry_t*,
 
 static mql_result_t *exec_show_tables(mql_result_type_t, shtable_statement_t*);
 static mql_result_t *exec_describe(mql_result_type_t, describe_statement_t *);
+static mql_result_t *exec_begin(transact_statement_t *);
+static mql_result_t *exec_commit(transact_statement_t *);
+static mql_result_t *exec_rollback(transact_statement_t *);
 static mql_result_t *exec_insert(insert_statement_t *);
 static mql_result_t *exec_update(update_statement_t *);
 static mql_result_t *exec_delete(delete_statement_t *);
@@ -123,6 +133,27 @@ mql_statement_t *mql_make_describe_statement(mqi_handle_t table)
     dis->table = table;
 
     return (mql_statement_t *)dis;
+}
+
+mql_statement_t *mql_make_transaction_statement(mql_statement_type_t  type,
+                                                char                 *trnam)
+{
+    transact_statement_t *tra;
+
+    MDB_CHECKARG((type == mql_statement_begin  ||
+                  type == mql_statement_commit ||
+                  type == mql_statement_rollback)
+                 && trnam && trnam[0], NULL);
+
+    if (!(tra = calloc(1, sizeof(transact_statement_t) + strlen(trnam) + 1))) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    tra->type = type;
+    strcpy(tra->trnam, trnam);
+
+    return (mql_statement_t *)tra;
 }
 
 
@@ -461,6 +492,18 @@ mql_result_t *mql_exec_statement(mql_result_type_t type, mql_statement_t *s)
         result = exec_describe(type, (describe_statement_t *)s);
         break;
 
+    case mql_statement_begin:
+        result = exec_begin((transact_statement_t *)s);
+        break;
+
+    case mql_statement_commit:
+        result = exec_commit((transact_statement_t *)s);
+        break;
+
+    case mql_statement_rollback:
+        result = exec_rollback((transact_statement_t *)s);
+        break;
+
     case mql_statement_insert:
         result = exec_insert((insert_statement_t *)s);
         break;
@@ -746,6 +789,51 @@ static mql_result_t *exec_describe(mql_result_type_t type,
 
     return rslt;
 }
+
+static mql_result_t *exec_begin(transact_statement_t *b)
+{
+    mql_result_t *rslt;
+
+    if (mql_begin_transaction(b->trnam) == 0)
+        rslt = mql_result_success_create();
+    else {
+        rslt = mql_result_error_create(errno, "begin failed: %s",
+                                       strerror(errno));
+    }
+
+    return rslt;
+}
+
+
+static mql_result_t *exec_commit(transact_statement_t *c)
+{
+    mql_result_t *rslt;
+
+    if (mql_commit_transaction(c->trnam) == 0)
+        rslt = mql_result_success_create();
+    else {
+        rslt = mql_result_error_create(errno, "commit failed: %s",
+                                       strerror(errno));
+    }
+
+    return rslt;
+}
+
+
+static mql_result_t *exec_rollback(transact_statement_t *r)
+{
+    mql_result_t *rslt;
+
+    if (mql_rollback_transaction(r->trnam) == 0)
+        rslt = mql_result_success_create();
+    else {
+        rslt = mql_result_error_create(errno, "rollback failed: %s",
+                                       strerror(errno));
+    }
+
+    return rslt;
+}
+
 
 static mql_result_t *exec_insert(insert_statement_t *i)
 {

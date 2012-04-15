@@ -4,6 +4,7 @@ PARSER_PREFIX   = yy_mql_
 AM_YFLAGS       = -p $(PARSER_PREFIX)
 LEX_OUTPUT_ROOT = ./lex.$(PARSER_PREFIX)
 
+
 libmql_la_CFLAGS = -I../include
 
 libmql_la_SOURCES = ../include/murphy-db/mql.h \
@@ -11,7 +12,7 @@ libmql_la_SOURCES = ../include/murphy-db/mql.h \
                     ../include/murphy-db/mql-result.h \
                     ../include/murphy-db/mql-trigger.h \
                     mql-scanner.l mql-parser.y \
-                    statement.c result.c trigger.c
+                    statement.c result.c trigger.c transaction.c
 
 mql-parser.h mql-parser.c: mql-parser.y
 	$(YACCCOMPILE) $<
