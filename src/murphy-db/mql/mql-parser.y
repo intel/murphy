@@ -294,6 +294,7 @@ static FILE        *mqlout;
 
 %%
 
+/*#toplevel#*/
 statement_list:
   statement
 | statement_list semicolon statement
@@ -306,10 +307,11 @@ semicolon: TKN_SEMICOLON {
     }
 };
 
+/*#toplevel#*/
 statement:
-  TKN_SHOW  show_statement
-| TKN_CREATE create_statement
-| TKN_DROP drop_statement
+  show_statement
+| create_statement
+| drop_statement
 | begin_statement
 | commit_statement
 | rollback_statement
@@ -326,8 +328,12 @@ statement:
  * Show statement
  *
  */
+/*#toplevel#*/
 show_statement:
-  show_tables
+  show_table_statement
+;
+
+show_table_statement: TKN_SHOW show_tables
 ;
 
 show_tables: table_flags TKN_TABLES {
@@ -371,11 +377,29 @@ show_tables: table_flags TKN_TABLES {
  * Create statement
  *
  */
+/*#toplevel#*/
 create_statement:
-  create_table table_definition
-| create_index index_definition
-| create_trigger trigger_definition
+  create_table_statement
+| create_index_statement
+| create_trigger_statement
 ; 
+
+/*#toplevel#*/
+create_table_statement: TKN_CREATE create_table table_definition
+;
+
+/*#toplevel#*/
+create_index_statement: TKN_CREATE create_index index_definition
+;
+
+/*#toplevel#*/
+create_trigger_statement:
+  create_transaction_trigger
+| create_table_trigger
+| create_row_trigger
+| create_column_trigger
+;
+
 
 /* create table */
 
@@ -395,11 +419,13 @@ table_definition: TKN_IDENTIFIER TKN_LEFT_PAREN column_defs TKN_RIGHT_PAREN {
         MQL_SUCCESS;
 };
 
+/*#toplevel#*/
 column_defs:
   column_def
 | column_defs TKN_COMMA column_def
 ;
 
+/*#toplevel#*/
 column_def: column_name column_type {
     memset(++coldef, 0, sizeof(mqi_column_def_t));
 };
@@ -413,6 +439,7 @@ column_name: TKN_IDENTIFIER {
     coldef->name = $1;
 };
 
+/*#toplevel#*/
 column_type:
   varchar       { coldef->type = mqi_varchar;   coldef->length = $1; }
 | TKN_INTEGER   { coldef->type = mqi_integer;   coldef->length = 0;  }
@@ -448,6 +475,22 @@ index_definition: TKN_ON table_name TKN_LEFT_PAREN column_list TKN_RIGHT_PAREN
 
 /* create trigger */
 
+/*#toplevel#*/
+create_transaction_trigger: TKN_CREATE create_trigger transaction_trigger
+;
+
+/*#toplevel#*/
+create_table_trigger: TKN_CREATE create_trigger table_trigger
+;
+
+/*#toplevel#*/
+create_row_trigger: TKN_CREATE create_trigger row_trigger
+;
+
+/*#toplevel#*/
+create_column_trigger: TKN_CREATE create_trigger column_trigger
+;
+
 create_trigger: TKN_TRIGGER TKN_IDENTIFIER TKN_ON {
     if (mode != mql_mode_exec)
         MQL_ERROR(EPERM, "only mql_exec_string() can create triggers");
@@ -460,13 +503,6 @@ create_trigger: TKN_TRIGGER TKN_IDENTIFIER TKN_ON {
 };
 
 
-
-trigger_definition:
-  transaction_trigger
-| table_trigger
-| row_trigger
-| column_trigger
-;
 
 transaction_trigger: TKN_TRANSACTIONS callback {
 
@@ -572,14 +608,16 @@ optional_trigger_select:
  * Drop statement
  *
  */
+/*#toplevel#*/
 drop_statement:
-  drop_table
-| drop_index
+  drop_table_statement
+| drop_index_statement
 ; 
 
 /* drop table */
 
-drop_table: TKN_TABLE  table_name {
+/*#toplevel#*/
+drop_table_statement: TKN_DROP TKN_TABLE  table_name {
     if (mqi_drop_table(table) < 0)
         MQL_ERROR(errno, "failed to drop table: %s", strerror(errno));
     else
@@ -590,7 +628,8 @@ drop_table: TKN_TABLE  table_name {
 
 /* drop index */
 
-drop_index: TKN_INDEX {
+/*#toplevel#*/
+drop_index_statement: TKN_DROP TKN_INDEX table_name {
 };
 
 
@@ -599,6 +638,7 @@ drop_index: TKN_INDEX {
  * Begin/Commit/Rollback statement
  *
  */
+/*#toplevel#*/
 begin_statement: TKN_BEGIN transaction TKN_IDENTIFIER {
     if (mode == mql_mode_precompile)
         statement = mql_make_transaction_statement(mql_statement_begin, $3);
@@ -610,6 +650,7 @@ begin_statement: TKN_BEGIN transaction TKN_IDENTIFIER {
     }
 };
 
+/*#toplevel#*/
 commit_statement: TKN_COMMIT transaction TKN_IDENTIFIER {
     if (mode == mql_mode_precompile)
         statement = mql_make_transaction_statement(mql_statement_commit, $3);
@@ -621,6 +662,7 @@ commit_statement: TKN_COMMIT transaction TKN_IDENTIFIER {
     }
 };
 
+/*#toplevel#*/
 rollback_statement: TKN_ROLLBACK transaction TKN_IDENTIFIER {
     if (mode == mql_mode_precompile)
         statement = mql_make_transaction_statement(mql_statement_rollback, $3);
@@ -639,6 +681,7 @@ rollback_statement: TKN_ROLLBACK transaction TKN_IDENTIFIER {
  * Describe statement
  *
  */
+/*#toplevel#*/
 describe_statement: TKN_DESCRIBE table_name {
     mqi_column_def_t defs[MQI_COLUMN_MAX];
     int              n;
@@ -680,6 +723,7 @@ describe_statement: TKN_DESCRIBE table_name {
  * Insert statement
  *
  */
+/*#toplevel#*/
 insert_statement: insert table_name insert_columns TKN_VALUES insert_values {
     void              *row[2];
     char              *col;
@@ -778,6 +822,7 @@ insert_columns:
 
 insert_values: TKN_LEFT_PAREN input_value_list TKN_RIGHT_PAREN;
 
+/*#toplevel#*/
 input_value_list:
   input_value
 | input_value_list TKN_COMMA input_value
@@ -790,6 +835,7 @@ input_value_list:
  * Update statement
  *
  */
+/*#toplevel#*/
 update_statement: update table_name TKN_SET assignment_list where_clause {
     mqi_column_desc_t *cd    = coldescs + ninput;
     mqi_cond_entry_t  *where = (cond == conds) ? NULL : conds;
@@ -831,11 +877,13 @@ update: TKN_UPDATE {
 };
 
 
+/*#toplevel#*/
 assignment_list:
   assignment
 | assignment_list TKN_COMMA assignment
 ;
 
+/*#toplevel#*/
 assignment: TKN_IDENTIFIER TKN_EQUAL input_value {
     int                i   = ninput - 1;
     input_t           *inp = inputs + i;
@@ -873,6 +921,7 @@ assignment: TKN_IDENTIFIER TKN_EQUAL input_value {
  * Delete statement
  *
  */
+/*#toplevel#*/
 delete_statement: delete table_name where_clause {
     mqi_cond_entry_t *where = (cond == conds) ? NULL : conds;
 
@@ -901,6 +950,7 @@ delete: TKN_DELETE TKN_FROM {
  * Select statement
  *
  */
+/*#toplevel#*/
 select_statement: select columns TKN_FROM table_name where_clause {
     int colsizes[MQI_COLUMN_MAX + 1];
     mqi_data_type_t coltypes[MQI_COLUMN_MAX + 1];
@@ -1019,6 +1069,7 @@ table_flags:
  * Column list
  *
  */
+/*#toplevel#*/
 column_list:
   column
 | column_list TKN_COMMA column
@@ -1036,6 +1087,7 @@ column: TKN_IDENTIFIER {
  * Input value
  *
  */
+/*#toplevel#*/
 input_value:
   string_input
 | integer_input
@@ -1085,13 +1137,16 @@ where_clause:
   };
 
 
+/*#toplevel#*/
 conditional_expression:
   relational_expression
 | relational_expression logical_operator relational_expression
 ;
 
+/*#toplevel#*/
 relational_expression: value relational_operator value;
 
+/*#toplevel#*/
 value: 
   column_value
 | string_variable

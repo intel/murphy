@@ -153,7 +153,6 @@ GREATER_OR_EQUAL  >=
 GREATER           >
 NOT               \!
 
-
 NUMBER            [0-9]+
 FLOATING          [0-9]\.[0-9]*
 IDENTIFIER        [a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])*
