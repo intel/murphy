@@ -1,5 +1,5 @@
 SUBDIRS         = . common/tests core/tests daemon/tests
-AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir)
+AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
 
@@ -15,7 +15,7 @@ EXTRA_DIST      =
 
 lib_LTLIBRARIES += libmurphy-common.la
 EXTRA_DIST      += common/murphy-common.pc
-#pkgconfig_DATA += common/murphy-common.pc
+pkgconfig_DATA  += common/murphy-common.pc
 
 
 libmurphy_common_ladir      =		\
@@ -65,7 +65,7 @@ linker-script.common: $(libmurphy_common_la_HEADERS)
 
 lib_LTLIBRARIES += libmurphy-core.la
 EXTRA_DIST      += core/murphy-core.pc
-#pkgconfig_DATA  += core/murphy-core.pc
+pkgconfig_DATA  += core/murphy-core.pc
 
 
 libmurphy_core_ladir      =		\
@@ -105,7 +105,7 @@ BUILTIN_CFLAGS     = -D__MURPHY_BUILTIN_PLUGIN__ $(AM_CFLAGS)
 BUILTIN_LIBS       =
 
 plugin_LTLIBRARIES = 
-plugindir          = $(libdir)/murphy
+plugindir          = $(libdir)/murphy/plugins
 
 
 # test plugin

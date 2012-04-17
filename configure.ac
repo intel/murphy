@@ -101,10 +101,16 @@ fi
 AC_SUBST(WARNING_CFLAGS)
 
 
+# Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS="$GLIB_CFLAGS $DBUS_CFLAGS"
 MURPHY_LIBS="$GLIB_LIBS $DBUS_LIBS"
 AC_SUBST(MURPHY_CFLAGS)
 AC_SUBST(MURPHY_LIBS)
+
+# Add LIBDIR to config.h.
+AC_MSG_CHECKING([libdir])
+AC_MSG_RESULT([$libdir])
+AC_SUBST(LIBDIR, [$libdir])
 
 # Check which plugins should be built in.
 AC_ARG_WITH(builtin-plugins,
@@ -188,6 +194,9 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/tests/Makefile
 		 src/core/tests/Makefile
 		 src/daemon/tests/Makefile
+		 src/common/murphy-common.pc
+		 src/core/murphy-core.pc
+		 doc/Makefile
 		 ])
 AC_OUTPUT
 

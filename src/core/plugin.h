@@ -11,7 +11,7 @@
 #include <murphy/core/context.h>
 
 #ifndef MRP_DEFAULT_PLUGIN_DIR
-#    define MRP_DEFAULT_PLUGIN_DIR "/usr/lib/murphy/plugins"
+#    define MRP_DEFAULT_PLUGIN_DIR LIBDIR"/murphy/plugins"
 #endif
 
 #define MRP_PLUGIN_DESCRIPTOR "mrp_get_plugin_descriptor"
