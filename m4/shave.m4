@@ -79,6 +79,8 @@ AC_DEFUN([SHAVE_INIT],
     SHAVE_SAVED_F77=$F77
     SHAVE_SAVED_OBJC=$OBJC
     SHAVE_SAVED_MCS=$MCS
+    SHAVE_SAVED_LEX=$LEX
+    SHAVE_SAVED_YACC=$YACC
     CCAS="${SHELL} ${shavedir}/shave ccas ${SHAVE_SAVED_CCAS}"
     CC="${SHELL} ${shavedir}/shave cc ${SHAVE_SAVED_CC}"
     CXX="${SHELL} ${shavedir}/shave cxx ${SHAVE_SAVED_CXX}"
@@ -86,6 +88,8 @@ AC_DEFUN([SHAVE_INIT],
     F77="${SHELL} ${shavedir}/shave f77 ${SHAVE_SAVED_F77}"
     OBJC="${SHELL} ${shavedir}/shave objc ${SHAVE_SAVED_OBJC}"
     MCS="${SHELL} ${shavedir}/shave mcs ${SHAVE_SAVED_MCS}"
+    LEX="${SHELL} ${shavedir}/shave lex ${SHAVE_SAVED_LEX}"
+    YACC="${SHELL} ${shavedir}/shave yacc ${SHAVE_SAVED_YACC}"
     AC_SUBST(CCAS)
     AC_SUBST(CC)
     AC_SUBST(CXX)
@@ -93,6 +97,8 @@ AC_DEFUN([SHAVE_INIT],
     AC_SUBST(F77)
     AC_SUBST(OBJC)
     AC_SUBST(MCS)
+    AC_SUBST(LEX)
+    AC_SUBST(YACC)
 
     V=@
   else

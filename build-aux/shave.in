@@ -60,6 +60,18 @@ while test "$#" -gt 0; do
         lt_output="${opt#-out:}"
         preserved_args="$preserved_args $opt"
         ;;
+    *.l)
+         if [ "$tool" = "lex" ]; then
+          lt_output="$opt"
+        fi
+        preserved_args="$preserved_args $opt"
+        ;;
+    *.y)
+         if [ "$tool" = "yacc" ]; then
+          lt_output="$opt"
+        fi
+        preserved_args="$preserved_args $opt"
+        ;;
     *)
         preserved_args="$preserved_args '$opt'"
         ;;
@@ -91,6 +103,12 @@ link,*)
     ;;
 *,mcs)
     Q="  MCS   "
+    ;;
+*,lex)
+    Q="  LEX   "
+    ;;
+*,yacc)
+    Q="  YACC  "
     ;;
 *,*)
     # should not happen
