@@ -46,13 +46,8 @@ while [ -n "${1#-}" ]; do
             fi
             ;;
         -p)
-            if [ -z "$PATTERN" ]; then
-                shift
-                PATTERN="$1"
-            else
-                error "Multiple patterns given ($PATTERN, $1)."
-                usage
-            fi
+	    shift;
+            PATTERN="$1"
             ;;
         -I)
             shift
@@ -85,8 +80,7 @@ if [ -z "$SOURCES" ]; then
 fi
 
 if [ -z "$PATTERN" ]; then
-    error "Invalid (empty) pattern."
-    usage
+    PATTERN="^mrp_"
 fi
 
 if [ -n "$IGNORE" ]; then
