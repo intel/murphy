@@ -1230,7 +1230,7 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
 	if (!mrp_list_empty(&w->slave))
 	    dispatch_slaves(w, e);
 	
-	if (e->events & POLLHUP)
+	if (e->events & EPOLLRDHUP)
 	    epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
 
 	if (is_deleted(w))

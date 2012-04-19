@@ -1,7 +1,8 @@
 #ifndef __MURPHY_MAINLOOP_H__
 #define __MURPHY_MAINLOOP_H__
 
-#include <poll.h>
+#include <sys/poll.h>
+#include <sys/epoll.h>
 
 #include <murphy/common/macros.h>
 
@@ -16,13 +17,15 @@ typedef struct mrp_mainloop_s mrp_mainloop_t;
 /** I/O events */
 typedef enum {
     MRP_IO_EVENT_NONE  = 0x0,
-    MRP_IO_EVENT_IN    = POLLIN,
-    MRP_IO_EVENT_PRI   = POLLPRI,
-    MRP_IO_EVENT_OUT   = POLLOUT,
-    MRP_IO_EVENT_HUP   = POLLHUP,
-    MRP_IO_EVENT_ERR   = POLLERR,
-    MRP_IO_EVENT_INOUT = POLLIN|POLLOUT,
-    MRP_IO_EVENT_ALL   = POLLIN|POLLPRI|POLLOUT|POLLHUP|POLLERR
+    MRP_IO_EVENT_IN    = EPOLLIN,
+    MRP_IO_EVENT_PRI   = EPOLLPRI,
+    MRP_IO_EVENT_OUT   = EPOLLOUT,
+    MRP_IO_EVENT_RDHUP = EPOLLRDHUP,
+    MRP_IO_EVENT_WRHUP = EPOLLHUP,
+    MRP_IO_EVENT_HUP   = EPOLLRDHUP|EPOLLHUP,
+    MRP_IO_EVENT_ERR   = EPOLLERR,
+    MRP_IO_EVENT_INOUT = EPOLLIN|EPOLLOUT,
+    MRP_IO_EVENT_ALL   = EPOLLIN|EPOLLPRI|EPOLLOUT|EPOLLRDHUP|EPOLLERR
 } mrp_io_event_t;
 
 typedef struct mrp_io_watch_s mrp_io_watch_t;
