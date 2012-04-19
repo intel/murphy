@@ -58,6 +58,8 @@ libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
 linker-script.common: $(libmurphy_common_la_HEADERS)
 	$(top_builddir)/build-aux/gen-linker-script -o $@ $^
 
+clean-linker-script::
+	-rm -f linker-script.common
 
 ###################################
 # murphy core library
@@ -91,10 +93,12 @@ libmurphy_core_la_LIBADD  =	\
 
 libmurphy_core_la_DEPENDENCIES = linker-script.core
 
-# linker script generation
+# core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS)
 	$(top_builddir)/build-aux/gen-linker-script -o $@ $^
 
+clean-linker-script::
+	-rm -f linker-script.core
 
 ###################################
 # murphy plugins
@@ -185,3 +189,7 @@ murphyd_LDADD  =			\
 
 murphyd_LDFLAGS = -rdynamic
 
+
+# cleanup
+clean-local:: clean-linker-script
+	-rm -f *~
