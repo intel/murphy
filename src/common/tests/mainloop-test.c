@@ -1163,6 +1163,10 @@ int main(int argc, char *argv[])
 	cfg.runtime = (int)strtoul(argv[1], NULL, 10);
     else
 	cfg.runtime = DEFAULT_RUNTIME;
+
+    mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_INFO));
+    mrp_log_set_target(MRP_LOG_TO_STDOUT);
+
     
     if ((ml = mrp_mainloop_create()) == NULL)
 	fatal("failed to create main loop.");
