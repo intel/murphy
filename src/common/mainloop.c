@@ -23,7 +23,7 @@
 
 struct mrp_io_watch_s {
     mrp_list_hook_t    hook;                     /* to list of watches */
-    void             (*free)(void *ptr);         /* cb to free memory */
+    int              (*free)(void *ptr);         /* cb to free memory */
     mrp_mainloop_t    *ml;                       /* mainloop */
     int                fd;                       /* file descriptor to watch */
     mrp_io_event_t     events;                   /* events of interest */
@@ -43,7 +43,7 @@ struct mrp_io_watch_s {
 
 struct mrp_timer_s {
     mrp_list_hook_t  hook;                       /* to list of timers */
-    void           (*free)(void *ptr);           /* cb to free memory */
+    int            (*free)(void *ptr);           /* cb to free memory */
     mrp_mainloop_t  *ml;                         /* mainloop */
     unsigned int     msecs;                      /* timer interval */
     uint64_t         expire;                     /* next expiration time */
@@ -58,7 +58,7 @@ struct mrp_timer_s {
 
 struct mrp_deferred_s {
     mrp_list_hook_t    hook;                     /* to list of cbs */
-    void             (*free)(void *ptr);         /* cb to free memory */
+    int              (*free)(void *ptr);         /* cb to free memory */
     mrp_mainloop_t    *ml;                       /* mainloop */
     mrp_deferred_cb_t  cb;                       /* user callback */
     void              *user_data;                /* opaque user data */
@@ -72,7 +72,7 @@ struct mrp_deferred_s {
 
 struct mrp_sighandler_s {
     mrp_list_hook_t      hook;                   /* to list of handlers */
-    void               (*free)(void *ptr);       /* cb to free memory */
+    int                (*free)(void *ptr);       /* cb to free memory */
     mrp_mainloop_t      *ml;                     /* mainloop */
     int                  signum;                 /* signal number */
     mrp_sighandler_cb_t  cb;                     /* user callback */
@@ -98,7 +98,7 @@ struct mrp_sighandler_s {
 
 typedef struct {
     mrp_list_hook_t  hook;                       /* unfreed deleted items */
-    void           (*free)(void *ptr);           /* cb to free memory */
+    int            (*free)(void *ptr);           /* cb to free memory */
 } deleted_t;
 
 
@@ -108,7 +108,7 @@ typedef struct {
 
 struct mrp_subloop_s {
     mrp_list_hook_t     hook;                    /* to list of subloops */
-    void              (*free)(void *ptr);        /* cb to free memory */
+    int               (*free)(void *ptr);        /* cb to free memory */
     mrp_subloop_ops_t  *cb;                      /* subloop glue callbacks */
     void               *user_data;               /* opaque subloop data */
     int                 epollfd;                 /* epollfd for this subloop */
@@ -218,6 +218,27 @@ static uint32_t slave_io_events(mrp_io_watch_t *watch, mrp_io_watch_t **master)
 }
 
 
+static int free_io_watch(void *ptr)
+{
+    mrp_io_watch_t     *w = (typeof(w))ptr;
+    struct epoll_event  evt;
+
+    /*
+     * try removing from epoll if we failed to do so
+     */
+    
+    if (w->fd != -1) {
+	if (epoll_ctl(w->ml->epollfd, EPOLL_CTL_DEL, w->fd, &evt) != 0)
+	    if (errno != EBADF)
+		return FALSE;
+    }
+    
+    mrp_free(w);
+    
+    return TRUE;
+}
+
+
 mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
 				 mrp_io_event_t events,
 				 mrp_io_watch_cb_t cb, void *user_data)
@@ -236,6 +257,7 @@ mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
 	w->events    = events & MRP_IO_EVENT_ALL;
 	w->cb        = cb;
 	w->user_data = user_data;
+	w->free      = free_io_watch;
 	
 	evt.events   = w->events;
 	evt.data.ptr = w;
@@ -275,11 +297,12 @@ static void delete_io_watch(mrp_io_watch_t *w)
     mrp_mainloop_t     *ml = w->ml;
     mrp_io_watch_t     *master;
     struct epoll_event  evt;
-    int                 op;
+    int                 op, was_master;
 
+    was_master = is_master(w);
     mrp_list_delete(&w->hook);
 
-    if (is_master(w)) {
+    if (was_master) {
 	if (mrp_list_empty(&w->slave)) {
 	    op = EPOLL_CTL_DEL;
 	}
@@ -309,7 +332,11 @@ static void delete_io_watch(mrp_io_watch_t *w)
 	mrp_list_append(&ml->deleted, &w->hook);
     }
     
-    epoll_ctl(ml->epollfd, w->fd, op, &evt);
+    if (epoll_ctl(ml->epollfd, op, w->fd, &evt) == 0 || errno == EBADF)
+	w->fd = -1;
+    else
+	mrp_log_error("Failed to update epoll for deleted I/O watch %p.", w);
+    
     ml->niowatch--;
 }
 
@@ -649,13 +676,15 @@ void mrp_del_sighandler(mrp_sighandler_t *h)
  * external mainloops
  */
 
-static void free_subloop(void *ptr)
+static int free_subloop(void *ptr)
 {
     mrp_subloop_t *sl = (mrp_subloop_t *)ptr;
     
     mrp_free(sl->pollfds);
     mrp_free(sl->events);
     mrp_free(sl);
+
+    return TRUE;
 }
 
 
@@ -821,8 +850,12 @@ static void purge_deleted(mrp_mainloop_t *ml)
 	mrp_list_delete(&d->hook);
 	if (d->free == NULL)
 	    mrp_free(d);
-	else
-	    d->free(d);
+	else {
+	    if (!d->free(d)) {
+		mrp_log_error("Failed to free purged item %p.", d);
+		mrp_list_prepend(p, &d->hook);
+	    }
+	}
     }
 }
 
