@@ -18,6 +18,12 @@ EXTRA_DIST      += common/murphy-common.pc
 pkgconfig_DATA  += common/murphy-common.pc
 
 
+libmurphy_commonh_ladir      =		\
+		$(includedir)/murphy
+
+libmurphy_commonh_la_HEADERS =		\
+		common.h
+
 libmurphy_common_ladir      =		\
 		$(includedir)/murphy/common
 
@@ -69,6 +75,11 @@ lib_LTLIBRARIES += libmurphy-core.la
 EXTRA_DIST      += core/murphy-core.pc
 pkgconfig_DATA  += core/murphy-core.pc
 
+libmurphy_coreh_ladir      =		\
+		$(includedir)/murphy
+
+libmurphy_coreh_la_HEADERS =		\
+		core.h
 
 libmurphy_core_ladir      =		\
 		$(includedir)/murphy/core
