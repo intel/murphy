@@ -57,6 +57,9 @@ while [ -n "${1#-}" ]; do
         -h)
             usage 0
             ;;
+	-q)
+	    QUIET="yes"
+	    ;;
         -*)
             error "Unknown option '$1'."
             usage
@@ -90,7 +93,7 @@ else
 fi
 
 # generate the output
-info "Generating linker script $OUTPUT..."
+[ -n "$QUIET" ] || info "Generating linker script $OUTPUT..."
 rm -f $OUTPUT
 touch $OUTPUT
 

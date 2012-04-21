@@ -5,6 +5,7 @@ AM_YFLAGS       = -p $(PARSER_PREFIX)
 LEX_OUTPUT_ROOT = ./lex.$(PARSER_PREFIX)
 
 LINKER_SCRIPT = linker-script.mql
+QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
 
 libmql_la_CFLAGS = -I../include
 
@@ -46,7 +47,8 @@ clean-scanner:
 
 # linker script generation
 $(LINKER_SCRIPT): $(libmql_la_HEADERS)
-	$(top_builddir)/build-aux/gen-linker-script -p "^mql_" -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	    -p "^mql_" -o $@ $^
 
 clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)

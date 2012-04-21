@@ -8,6 +8,7 @@ lib_LTLIBRARIES =
 pkgconfig_DATA  =
 EXTRA_DIST      =
 
+QUIET_GEN       = $(Q:@=@echo '  GEN   '$@;)
 
 ###################################
 # murphy common library
@@ -62,7 +63,7 @@ libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
 
 # linker script generation
 linker-script.common: $(libmurphy_common_la_HEADERS)
-	$(top_builddir)/build-aux/gen-linker-script -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.common
@@ -106,7 +107,7 @@ libmurphy_core_la_DEPENDENCIES = linker-script.core
 
 # core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS)
-	$(top_builddir)/build-aux/gen-linker-script -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.core

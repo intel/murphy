@@ -1,6 +1,7 @@
 pkglib_LTLIBRARIES = libmdb.la
 
 LINKER_SCRIPT = linker-script.mdb
+QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
 
 libmdb_la_CFLAGS = -I../include
 
@@ -36,7 +37,8 @@ libmdb_la_DEPENDENCIES = $(LINKER_SCRIPT)
 
 # linker script generation
 $(LINKER_SCRIPT): $(libmdb_la_HEADERS)
-	$(top_builddir)/build-aux/gen-linker-script -p "^(mdb_)|(mqi_)" -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	    -p "^(mdb_)|(mqi_)" -o $@ $^
 
 clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)
