@@ -1,0 +1,12 @@
+.SUFFIXES: .svg .pdf .png .lyx
+
+vpath %.svg  $(MRP_FIGDIR)
+
+.svg.pdf:
+	$(MRP_INKSCAPE) --export-area-drawing --export-pdf=$@ $<
+
+
+.svg.png:
+	$(MRP_INKSCAPE) --export-area-drawing --export-png=$@ $<
+
+

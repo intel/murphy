@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:osb="http://www.openswatchbook.org/uri/2009/osb"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="297mm"
+   height="210mm"
+   id="svg2985"
+   version="1.1"
+   inkscape:version="0.48.1 r9760"
+   sodipodi:docname="db-layers.svg">
+  <defs
+     id="defs2987">
+    <linearGradient
+       id="linearGradient3783"
+       osb:paint="solid">
+      <stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop3785" />
+    </linearGradient>
+    <filter
+       id="filter3857"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur3859"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix3861"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset3863"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge3865">
+        <feMergeNode
+           id="feMergeNode3867"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode3869"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter3871"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur3873"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix3875"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset3877"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge3879">
+        <feMergeNode
+           id="feMergeNode3881"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode3883"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter3885"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur3887"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix3889"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset3891"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge3893">
+        <feMergeNode
+           id="feMergeNode3895"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode3897"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter3899"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur3901"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix3903"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset3905"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge3907">
+        <feMergeNode
+           id="feMergeNode3909"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode3911"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter3913"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur3915"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix3917"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset3919"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge3921">
+        <feMergeNode
+           id="feMergeNode3923"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode3925"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter3985"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur3987"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix3989"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset3991"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge3993">
+        <feMergeNode
+           id="feMergeNode3995"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode3997"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter4081"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur4083"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix4085"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset4087"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge4089">
+        <feMergeNode
+           id="feMergeNode4091"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode4093"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       color-interpolation-filters="sRGB"
+       id="filter4081-7"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-0.25"
+       y="-0.25">
+      <feGaussianBlur
+         id="feGaussianBlur4083-6"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix4085-9"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset4087-4"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge4089-0">
+        <feMergeNode
+           id="feMergeNode4091-9"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode4093-5"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter4253"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur4255"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix4257"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset4259"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge4261">
+        <feMergeNode
+           id="feMergeNode4263"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode4265"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter
+       id="filter4267"
+       inkscape:label="Drop shadow"
+       width="1.5"
+       height="1.5"
+       x="-.25"
+       y="-.25">
+      <feGaussianBlur
+         id="feGaussianBlur4269"
+         in="SourceAlpha"
+         stdDeviation="5.7"
+         result="blur" />
+      <feColorMatrix
+         id="feColorMatrix4271"
+         result="bluralpha"
+         type="matrix"
+         values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0.493 0 " />
+      <feOffset
+         id="feOffset4273"
+         in="bluralpha"
+         dx="11.6"
+         dy="10.5"
+         result="offsetBlur" />
+      <feMerge
+         id="feMerge4275">
+        <feMergeNode
+           id="feMergeNode4277"
+           in="offsetBlur" />
+        <feMergeNode
+           id="feMergeNode4279"
+           in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <sodipodi:namedview
+     inkscape:document-units="mm"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1"
+     inkscape:cx="676.99722"
+     inkscape:cy="373.08197"
+     inkscape:current-layer="layer1"
+     id="namedview2989"
+     showgrid="false"
+     inkscape:snap-grids="true"
+     inkscape:window-width="1511"
+     inkscape:window-height="1051"
+     inkscape:window-x="249"
+     inkscape:window-y="49"
+     inkscape:window-maximized="0"
+     showguides="true"
+     inkscape:guide-bbox="true">
+    <inkscape:grid
+       type="xygrid"
+       id="grid3999" />
+  </sodipodi:namedview>
+  <metadata
+     id="metadata2991">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="fill:#a18689;fill-opacity:1;stroke:none;filter:url(#filter3985)"
+       d="m 193,698.09448 1,-371 310,0 0,-128 344,0 -2,500 z"
+       id="path3983"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccccc"
+       inkscape:label="#mdb-path" />
+    <rect
+       style="fill:#a02c2c;fill-opacity:1;stroke:none;filter:url(#filter3913)"
+       id="rect3001"
+       width="602.41913"
+       height="116"
+       x="220.72061"
+       y="356.09448"
+       ry="0.5"
+       inkscape:label="#mql-rect" />
+    <rect
+       style="fill:#a05a2c;fill-opacity:1;stroke:none;filter:url(#filter3899)"
+       id="rect3797"
+       width="286.07703"
+       height="110"
+       x="220"
+       y="499.09448"
+       ry="0.5" />
+    <rect
+       style="fill:#a05a2c;fill-opacity:1;stroke:none;filter:url(#filter3885)"
+       id="rect3797-5"
+       width="290.4006"
+       height="110"
+       x="533.09937"
+       y="500.09448"
+       ry="0.5" />
+    <rect
+       style="fill:#c8ab37;fill-opacity:1;stroke:none;filter:url(#filter3871)"
+       id="rect3797-5-8"
+       width="290.4006"
+       height="110"
+       x="531.6582"
+       y="222.09448"
+       ry="0.5" />
+    <path
+       style="fill:#d0b69d;fill-opacity:1;stroke:none;filter:url(#filter3857)"
+       d="m 172.78059,290.09448 282.57583,-1 -0.7206,-129 390.50156,0 -1.3394,-134 -671.01739,0 z"
+       id="path3835"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccccc"
+       transform="matrix(0.97088079,0,0,1,26.971249,10)" />
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;filter:url(#filter4081);font-family:Sans"
+       x="429"
+       y="665.09448"
+       id="text4077"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4079"
+         x="429"
+         y="665.09448"
+         style="font-size:32px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Sans;-inkscape-font-specification:Sans Bold">Murphy-DB</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;filter:url(#filter4081-7);font-family:Sans"
+       x="399.42969"
+       y="117.92261"
+       id="text4077-2"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4079-4"
+         x="399.42969"
+         y="117.92261"
+         style="font-size:32px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;text-align:start;line-height:125%;writing-mode:lr-tb;text-anchor:start;font-family:Sans;-inkscape-font-specification:Sans Bold">Murphy Plugin</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;font-family:Sans"
+       x="676.5293"
+       y="266.09448"
+       id="text4137"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4139"
+         x="676.5293"
+         y="266.09448"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'">MQL</tspan><tspan
+         sodipodi:role="line"
+         x="676.5293"
+         y="296.09448"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4141">Murphy Query Language</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;font-family:Sans"
+       x="529.13477"
+       y="403.63159"
+       id="text4137-2"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4139-2"
+         x="529.13477"
+         y="403.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'">MQI</tspan><tspan
+         sodipodi:role="line"
+         x="529.13477"
+         y="433.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4141-2">Murphy Query Interface</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;font-family:Sans"
+       x="365.13477"
+       y="500.63159"
+       id="text4137-2-8"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4139-2-7"
+         x="365.13477"
+         y="500.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'" /><tspan
+         sodipodi:role="line"
+         x="365.13477"
+         y="530.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4195">Temporary Data Backend</tspan><tspan
+         sodipodi:role="line"
+         x="365.13477"
+         y="560.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4201">MDE</tspan><tspan
+         sodipodi:role="line"
+         x="365.13477"
+         y="590.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4141-2-4">Memory Database Engine</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;font-family:Sans"
+       x="678.13477"
+       y="502.83667"
+       id="text4137-2-8-7"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4139-2-7-1"
+         x="678.13477"
+         y="502.83667"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'" /><tspan
+         sodipodi:role="line"
+         x="678.13477"
+         y="532.83667"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4195-5">Persistent Data Backend</tspan><tspan
+         sodipodi:role="line"
+         x="678.13477"
+         y="562.83667"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4201-0" /><tspan
+         sodipodi:role="line"
+         x="678.13477"
+         y="592.83667"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4141-2-4-8">SQLite</tspan></text>
+    <path
+       style="fill:#c8ab37;fill-opacity:1;stroke:none;filter:url(#filter4267)"
+       d="m 867,184.09448 30,-49 -1,20 141,-1 0,61 -141,0 0,19 z"
+       id="path4233"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccc" />
+    <path
+       style="fill:#a02c2c;fill-opacity:1;stroke:#7b5555;stroke-opacity:1;filter:url(#filter4253)"
+       d="m 177,314.09448 -30,-49 1,20 -141,-1 0,61 141,0 0,19 z"
+       id="path4233-0"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccccc" />
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;font-family:Sans"
+       x="965.13477"
+       y="177.63159"
+       id="text4137-8"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         x="965.13477"
+         y="177.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4141-24">High level</tspan><tspan
+         sodipodi:role="line"
+         x="965.13477"
+         y="207.63159"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4307">API</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#ffffff;fill-opacity:1;stroke:none;font-family:Sans"
+       x="80.035217"
+       y="307.42651"
+       id="text4137-8-0"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         x="80.035217"
+         y="307.42651"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4141-24-3">Low level</tspan><tspan
+         sodipodi:role="line"
+         x="80.035217"
+         y="337.42651"
+         style="font-size:24px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;font-family:Times New Roman;-inkscape-font-specification:'Times New Roman,'"
+         id="tspan4307-8">API</tspan></text>
+  </g>
+</svg>

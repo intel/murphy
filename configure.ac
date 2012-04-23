@@ -124,6 +124,7 @@ AC_MSG_CHECKING([libdir])
 AC_MSG_RESULT([$libdir])
 AC_SUBST(LIBDIR, [$libdir])
 
+
 # Check which plugins should be built in.
 AC_ARG_WITH(builtin-plugins,
             [  --with-builtin-plugins=<plugin-list>  specify which plugins to link in],
@@ -192,6 +193,56 @@ if test "x$has_check" = "xno"; then
     AC_MSG_WARN([Check framework not found, unit tests are DISABLED.])
 fi
 
+# Check for documentation tools
+AC_ARG_WITH([documentation],
+            [AS_HELP_STRING([--with-documentation],
+                            [generate pdf, html and other doc files])],
+            [],
+            [with_documentation=auto]
+)
+
+AS_IF( [ test x$with_documentation = xno ],
+       [ has_doc_tools="no" ],
+       [ AC_PATH_TOOL([MRP_DOXYGEN], doxygen)
+         AC_PATH_TOOL([MRP_LYX], lyx)
+         AC_PATH_TOOL([MRP_INKSCAPE], inkscape)
+         AC_PATH_TOOL([MRP_PYTHON], python)
+         AC_PATH_TOOL([MRP_DBLATEX], dblatex)
+         AC_PATH_TOOL([MRP_XMLTO], xmlto)
+
+         AS_IF( [ test x$MRP_DOXYGEN = x -o x$MRP_LYX = x -o \
+                       x$MRP_INKSCAPE = x -o x$MRP_PYTHON = x ],
+                [ has_doc_tools="no";
+                  AC_MSG_WARN([Some essential doc-tool is missing]) ],
+                [ has_doc_tools="yes" ]
+         ) ]
+)
+
+AS_IF([ test x$has_doc_tools == "xno" -o x$MRP_DBLATEX = x ],
+      [ can_make_pdfs="no";
+        AC_WARN([No PDF documentation will be generated]) ],
+      [ can_make_pdfs="yes"]
+)
+
+AS_IF([ test x$has_doc_tools == "xno" -o x$MRP_XMLTO = x ],
+      [ can_make_html="no";
+        AC_WARN([No HTML documentation will be generated]) ],
+      [ can_make_html="yes" ]
+)
+
+
+AM_CONDITIONAL(BUILD_DOCUMENTATION,  [ test x$has_doc_tools = "xyes" ])
+AM_CONDITIONAL(BUILD_PDF_DOCUMENTS,  [ test x$can_make_pdfs = "xyes" ])
+AM_CONDITIONAL(BUILD_HTML_DOCUMENTS, [ test x$can_make_html = "xyes" ])
+
+AC_SUBST(MRP_DOCDIR, [`pwd`/doc])
+AC_SUBST(MRP_FIGDIR, [$MRP_DOCDIR/common/figures])
+AC_SUBST(MRP_MAKE_DOCRULES, [$MRP_DOCDIR/Makefile.rules])
+AC_SUBST(MRP_DOCSCRIPT_DIR, [$MRP_DOCDIR/scripts])
+AC_SUBST(MRP_ABNF, [$MRP_DOCSCRIPT_DIR/abnf.py])
+AC_SUBST(MRP_DBLYXFIX, [$MRP_DOCSCRIPT_DIR/dblyxfix.py])
+
+
 # Shave by default.
 SHAVE_INIT([build-aux], [enable])
 
@@ -218,8 +269,10 @@ AC_CONFIG_FILES([build-aux/shave
                  src/murphy-db/include/Makefile
                  src/murphy-db/tests/Makefile
 		 doc/Makefile
+                 doc/plugin-developer-guide/db/Makefile
 		 ])
 AC_OUTPUT
+
 
 # Display the configuration.
 echo "----- configuration -----"
