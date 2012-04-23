@@ -14,7 +14,7 @@ endif
 
 SUBDIRS = $(DOCDIRS)
 
-doc_DATA = CODING-STYLE $(DOCFILES)
+doc_DATA = CODING-STYLE # $(DOCFILES)
 
 
 all-am: $(TARGETS)

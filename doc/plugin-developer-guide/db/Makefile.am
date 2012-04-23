@@ -5,13 +5,11 @@ vpath %.lyx ../lyx
 include $(MRP_MAKE_DOCRULES)
 
 
-
 FIGURES_SVG = db-layers.svg
 FIGURES_PNG = $(FIGURES_SVG:.svg=.png)
 FIGURES_PDF = $(FIGURES_SVG:.svg=.pdf)
 
-FIGURES = copy_svgs $(FIGURES_PNG) $(FIGURES_PDF)
-FIGURE_FILES = $(FIGURES_SVG) $(FIGURES_PNG) $(FIGURES_PDF)
+FIGURES = $(FIGURES_SVG) $(FIGURES_PNG) $(FIGURES_PDF)
 
 LYX_DOCS = murphy-db.lyx
 XML_DOCS = $(LYX_DOCS:.lyx=.xml)
@@ -23,8 +21,14 @@ TARGETS = $(FIGURES) plugin-developer-guide.xml
 
 all-am: $(TARGETS)
 
-copy_svgs: $(FIGURES_SVG)
-	for file in $^ ; do cp $(MRP_FIGDIR)/$$file . ; done
+figures: $(FIGURES_SVG)
+	for svg in $^ ; do \
+	    pdf=`basename($${svg/.svg/.pdf})` ; \
+	    png=$${pdf/.pdf/.png} ; \
+	    cp $$svg . ; \
+	    $(MRP_INKSCAPE) --export-area-drawing --export-pdf=$$pdf $$svg ; \
+	    ${MRP_INKSCAPE) --export-area-drawing --export-png=$$png $$svg ; \
+	done
 
 $(MQL_GRAMMAR): $(TOP_SRCDIR)/murphy-db/mql/mql-scanner.l \
                 $(TOP_SRCDIR)/murphy-db/mql/mql-parser.y
@@ -49,5 +53,5 @@ plugin-developer-guide.xml: plugin-developer-guide.lyx \
 	rm -f ../lyx/plugin-devloper-guide.xml
 
 clean-local:
-	rm -f $(TARGETS) $(FIGURES_SVG) $(GENERATED_GRAMMARS) $(XML_DOCS) \
+	rm -f $(TARGETS) $(FIGURES) $(GENERATED_GRAMMARS) $(XML_DOCS) \
 		../lyx/*.xml
