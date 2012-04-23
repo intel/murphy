@@ -49,4 +49,5 @@ plugin-developer-guide.xml: plugin-developer-guide.lyx \
 	rm -f ../lyx/plugin-devloper-guide.xml
 
 clean-local:
-	rm -f $(TARGETS) $(GENERATED_GRAMMARS) $(XML_DOCS) ../lyx/*.xml
+	rm -f $(TARGETS) $(FIGURES_SVG) $(GENERATED_GRAMMARS) $(XML_DOCS) \
+		../lyx/*.xml
