@@ -5,19 +5,32 @@
 import os, sys, re
 from lxml import etree
 
+def fix_dummy(broken_xml):
+    start = 0
+    end = len(broken_xml)
+    fixed_xml = ""
+
+    for match in re.finditer(dummy_pattern, broken_xml):
+        fixed_xml += broken_xml[start:match.start()]
+        start = match.end()
+
+    if start < end:
+        fixed_xml += broken_xml[start:end]
+    return fixed_xml
+
 def fix_graphs(broken_xml):
     start = 0
     end = len(broken_xml)
     fixed_xml = ""
 
     for match in re.finditer(graph_pattern, broken_xml):
-        fixed_xml += broken_xml[start:match.start()]
+        fixed_xml += fix_dummy(broken_xml[start:match.start()])
         fixed_xml += "<!ENTITY graph%s \"%s\">" % \
             (match.group(1), os.path.basename(match.group(2)))
         start = match.end()
 
     if start < end:
-        fixed_xml += broken_xml[start:end]
+        fixed_xml += fix_dummy(broken_xml[start:end])
     return fixed_xml
 
 def fix_files(broken_xml):
@@ -50,6 +63,7 @@ except IOError as (errno, strerror):
     print "Input error %d - %s" % (errno, strerror)
     exit(errno)
 
+dummy_pattern = re.compile("<[/]?dummy>")
 file_pattern = re.compile("<!ENTITY file([0-9]*) \"([^\"]*)\">")
 graph_pattern = re.compile("<!ENTITY graph([0-9]*) \"([^\"]*)\">")
 

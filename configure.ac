@@ -244,7 +244,7 @@ AC_SUBST(MRP_DBLYXFIX, [$MRP_DOCSCRIPT_DIR/dblyxfix.py])
 
 
 # Shave by default.
-SHAVE_INIT([build-aux], [enable])
+#SHAVE_INIT([build-aux], [enable])
 
 # Create murphy symlink to src.
 if test ! -L murphy; then

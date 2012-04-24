@@ -85,7 +85,87 @@ Murphy in Brief
 \end_layout
 
 \begin_layout Standard
-jhkjhkjh
+blah blah bla ....
+\end_layout
+
+\begin_layout Standard
+this is the enumeration test:
+\end_layout
+
+\begin_layout Itemize
+First level bbbbbb
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+second level
+\end_layout
+
+\begin_layout Itemize
+another second level
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+first level again
+\end_layout
+
+\begin_layout Itemize
+now we try third level as well
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+second
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+third
+\end_layout
+
+\begin_layout Itemize
+jjjjj
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+again second
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+third
+\end_layout
+
+\end_deeper
+\end_deeper
+\begin_layout Itemize
+first
+\end_layout
+
+\begin_layout Enumerate
+This is for 1
+\end_layout
+
+\begin_layout Enumerate
+for 2
+\end_layout
+
+\begin_layout Enumerate
+and for three
+\end_layout
+
+\begin_layout Description
+This will be the first among description thing
+\end_layout
+
+\begin_layout Description
+here we have the second
+\end_layout
+
+\begin_layout Description
+and the third
 \end_layout
 
 \begin_layout Part
