@@ -18,6 +18,14 @@ MRP_CDECL_BEGIN
 #define mrp_realloc(ptr, size) mrp_mm_realloc((ptr), (size), __LOC__)
 #define mrp_free(ptr)          mrp_mm_free((ptr), __LOC__)
 #define mrp_strdup(s)          mrp_mm_strdup((s), __LOC__)
+#define mrp_datadup(ptr, size) ({			\
+	    typeof(ptr) _ptr = mrp_alloc(size);		\
+	    						\
+	    if (_ptr != NULL)				\
+		memcpy(_ptr, ptr, size);		\
+							\
+	    _ptr;					\
+	})
 
 #define mrp_allocz(size) ({					\
 	    void *_ptr;						\
