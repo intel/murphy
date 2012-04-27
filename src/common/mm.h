@@ -14,7 +14,6 @@ MRP_CDECL_BEGIN
 #define MRP_MM_CONFIG_ENVVAR "__MURPHY_MM_CONFIG"
 
 #define mrp_alloc(size)        mrp_mm_alloc((size), __LOC__)
-#define mrp_realloc(ptr, size) mrp_mm_realloc((ptr), (size), __LOC__)
 #define mrp_free(ptr)          mrp_mm_free((ptr), __LOC__)
 #define mrp_strdup(s)          mrp_mm_strdup((s), __LOC__)
 #define mrp_datadup(ptr, size) ({			\
@@ -56,6 +55,15 @@ MRP_CDECL_BEGIN
             }                                                           \
             __ptr; })
 
+#define mrp_realloc(ptr, size) ({					\
+            typeof(ptr) __ptr;                                          \
+            size_t      __size = size;					\
+									\
+            __ptr = mrp_mm_realloc(ptr, __size, __LOC__);		\
+	    if (__ptr != NULL)						\
+                ptr = __ptr;                                            \
+									\
+            __ptr; })
 
 #define mrp_clear(obj) memset((obj), 0, sizeof(*(obj)))
 
