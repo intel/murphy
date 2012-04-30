@@ -332,7 +332,8 @@ static void delete_io_watch(mrp_io_watch_t *w)
 	mrp_list_append(&ml->deleted, &w->hook);
     }
     
-    if (epoll_ctl(ml->epollfd, op, w->fd, &evt) == 0 || errno == EBADF)
+    if (epoll_ctl(ml->epollfd, op, w->fd, &evt) == 0 ||
+	errno == EBADF || errno == ENOENT)
 	w->fd = -1;
     else
 	mrp_log_error("Failed to update epoll for deleted I/O watch %p.", w);
