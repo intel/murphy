@@ -7,7 +7,7 @@
 
 #include <syslog.h>
 
-#include <common/macros.h>
+#include <murphy/common/macros.h>
 
 MRP_CDECL_BEGIN
 
