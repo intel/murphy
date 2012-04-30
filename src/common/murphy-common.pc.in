@@ -7,5 +7,5 @@ Name: murphy-common
 Description: Murphy policy framework, common library.
 Requires:
 Version: @PACKAGE_VERSION@
-Libs: -L${libdir} -lsysinfo-common @GLIB_LIBS@ @DBUS_LIBS@
+Libs: -L${libdir} -lmurphy-common @GLIB_LIBS@ @DBUS_LIBS@
 Cflags: -I${includedir} @GLIB_CFLAGS@ @DBUS_CFLAGS@ 
