@@ -1,4 +1,5 @@
 #include <murphy/core/plugin.h>
+#include <murphy/core/console.h>
 
 enum {
     ARG_STRING1,
@@ -11,6 +12,74 @@ enum {
     ARG_FAILINIT,
     ARG_FAILEXIT,
 };
+
+
+void one_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+
+
+MRP_CONSOLE_GROUP(test_group, "test", NULL, {
+	MRP_PARSED_CMD("one"  , "command 1", "description 1", one_cb),
+        MRP_PARSED_CMD("two"  , "command 2", "description 2", two_cb),
+        MRP_PARSED_CMD("three", "command 3", "description 3", three_cb),
+        MRP_PARSED_CMD("four" , "command 4", "description 4", four_cb)
+    });
+
+
+void one_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    int i;
+
+    MRP_UNUSED(user_data);
+
+    for (i = 0; i < argc; i++) {
+	printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+	mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+    }
+}
+
+
+void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    int i;
+
+    MRP_UNUSED(user_data);
+
+    for (i = 0; i < argc; i++) {
+	printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+	mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+    }
+}
+
+
+void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    int i;
+
+    MRP_UNUSED(user_data);
+
+    for (i = 0; i < argc; i++) {
+	printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+	mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+    }
+}
+
+
+void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    int i;
+
+    MRP_UNUSED(user_data);
+
+    for (i = 0; i < argc; i++) {
+	printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+	mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
+    }
+}
+
+
 
 
 static int test_init(mrp_plugin_t *plugin)
@@ -30,7 +99,14 @@ static int test_init(mrp_plugin_t *plugin)
     printf("  double:  %f\n", args[ARG_DOUBLE1].dbl);
     printf("init fail: %s\n", args[ARG_FAILINIT].bln ? "TRUE" : "FALSE");
     printf("exit fail: %s\n", args[ARG_FAILEXIT].bln ? "TRUE" : "FALSE");
+
+    mrp_list_init(&test_group.hook);
     
+    if (mrp_add_console_group(plugin->ctx, &test_group))
+	mrp_log_info("console group successfully added");
+    else
+	mrp_log_error("failed to add console group");
+
     return !args[ARG_FAILINIT].bln;
 }
 
@@ -40,6 +116,11 @@ static void test_exit(mrp_plugin_t *plugin)
     mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
 		 plugin->instance);
 
+    if (mrp_del_console_group(plugin->ctx, &test_group))
+	mrp_log_info("console group successfully deleted");
+    else
+	mrp_log_error("failed to delete console group");
+    
     /*return !args[ARG_FAILINIT].bln;*/
 }
 
