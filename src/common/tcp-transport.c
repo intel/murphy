@@ -31,7 +31,7 @@ typedef struct {
 static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 			mrp_io_event_t events, void *user_data);
 static int tcp_disconnect(mrp_transport_t *mt);
-
+static int open_socket(tcp_t *t, int family);
 
 static int tcp_open(mrp_transport_t *mt)
 {
@@ -40,6 +40,19 @@ static int tcp_open(mrp_transport_t *mt)
     t->sock = -1;
 
     return TRUE;
+}
+
+
+static int tcp_bind(mrp_transport_t *mt, void *addr, socklen_t addrlen)
+{
+    tcp_t *t = (tcp_t *)mt;
+    
+    if (t->sock != -1 || open_socket(t, ((struct sockaddr *)addr)->sa_family)) {
+	if (bind(t->sock, (struct sockaddr *)addr, addrlen) == 0)
+	    return TRUE;
+    }
+    
+    return FALSE;
 }
 
 
@@ -212,6 +225,28 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 }
 
 
+static int open_socket(tcp_t *t, int family)
+{
+    mrp_io_event_t events;
+
+    t->sock = socket(family, SOCK_STREAM, 0);
+    
+    if (t->sock != -1) {
+	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+	t->iow = mrp_add_io_watch(t->ml, t->sock, events, tcp_recv_cb, t);
+    
+	if (t->iow != NULL)
+	    return TRUE;
+	else {
+	    close(t->sock);
+	    t->sock = -1;
+	}
+    }
+
+    return FALSE;
+}
+
+
 static int tcp_connect(mrp_transport_t *mt, void *addrstr)
 {
     tcp_t           *t = (tcp_t *)mt;
@@ -311,7 +346,7 @@ static int tcp_send(mrp_transport_t *mt, mrp_msg_t *msg)
 }
 
 
-MRP_REGISTER_TRANSPORT("tcp", tcp_t,
-		       tcp_open, tcp_accept, tcp_close,
+MRP_REGISTER_TRANSPORT("tcp", tcp_t, NULL,
+		       tcp_open, tcp_bind, tcp_accept, tcp_close,
 		       tcp_connect, tcp_disconnect,
 		       tcp_send, NULL);

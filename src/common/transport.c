@@ -72,6 +72,44 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 }
 
 
+socklen_t mrp_transport_resolve(mrp_transport_t *t, char *str, void *addr,
+				socklen_t size)
+{
+    mrp_transport_descr_t *d;
+    char                  *p, type[32];
+    int                    n;
+
+    if (t != NULL) {
+	mrp_log_warning("%s@%s:%d: t != NULL but transport-relative resolving",
+			__FUNCTION__, __FILE__, __LINE__);
+	mrp_log_warning("is not implemented! Ignoring t (%p)...", t);
+    }
+
+    if ((p = strchr(str, ':')) != NULL && (n = p - str) < (int)sizeof(type)) {
+	strncpy(type, str, n);
+	type[n] = '\0';
+
+	if ((d = find_transport(type)) != NULL)
+	    return d->resolve(p + 1, addr, size);
+    }
+
+    return 0;
+}
+
+
+int mrp_transport_bind(mrp_transport_t *t, void *addr, socklen_t addrlen)
+{
+    if (t != NULL) {
+	if (t->req.bind != NULL)
+	    return t->req.bind(t, addr, addrlen);
+	else
+	    return TRUE;                  /* assume no binding is needed */
+    }
+    else
+	return FALSE;
+}
+
+
 mrp_transport_t *mrp_transport_accept(mrp_mainloop_t *ml, const char *type,
 				      void *conn, mrp_transport_evt_t *evt,
 				      void *user_data)
@@ -198,13 +236,14 @@ int mrp_transport_send(mrp_transport_t *t, mrp_msg_t *msg)
 }
 
 
-int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg, void *addr)
+int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
+			 socklen_t addrlen)
 {
     int result;
     
     if (!t->connected && t->req.sendto) {
 	MRP_TRANSPORT_BUSY(t, {
-		result = t->req.sendto(t, msg, addr);
+		result = t->req.sendto(t, msg, addr, addrlen);
 	    });
 
 	purge_destroyed(t);

@@ -1,6 +1,8 @@
 #ifndef __MURPHY_TRANSPORT_H__
 #define __MURPHY_TRANSPORT_H__
 
+#include <sys/socket.h>
+
 #include <murphy/common/list.h>
 #include <murphy/common/mainloop.h>
 #include <murphy/common/msg.h>
@@ -65,6 +67,8 @@ typedef struct mrp_transport_s mrp_transport_t;
 typedef struct {
     /** Open a new transport. */
     int  (*open)(mrp_transport_t *t);
+    /** Bind a transport to a given transport-specific address. */
+    int  (*bind)(mrp_transport_t *t, void *addr, socklen_t addrlen);
     /** Accept a new transport connection. */
     int  (*accept)(mrp_transport_t *t, void *conn);
     /** Connect a transport to an endpoint. */
@@ -76,7 +80,8 @@ typedef struct {
     /** Send a message over a (connected) transport. */
     int  (*send)(mrp_transport_t *t, mrp_msg_t *msg);
     /** Send a message over an unconnected transport to an address. */
-    int  (*sendto)(mrp_transport_t *t, mrp_msg_t *msg, void *addr);
+    int  (*sendto)(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
+		   socklen_t addrlen);
 } mrp_transport_req_t;
 
 
@@ -93,7 +98,7 @@ typedef struct {
 typedef struct {
     void (*recv)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
     void (*recvfrom)(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
-		     void *user_data);
+		     socklen_t addrlen, void *user_data);
     void (*closed)(mrp_transport_t *t, int error, void *user_data);
 } mrp_transport_evt_t;
 
@@ -106,6 +111,7 @@ typedef struct {
     const char          *type;           /* transport type */
     size_t               size;           /* full transport struct size */
     mrp_transport_req_t  req;            /* transport requests */
+    socklen_t          (*resolve)(char *str, void *addr, socklen_t size);
     mrp_list_hook_t      hook;           /* to list of registered transports */
 } mrp_transport_descr_t;
 
@@ -204,18 +210,20 @@ struct mrp_transport_s {
 
 
 /** Automatically register a transport on startup. */
-#define MRP_REGISTER_TRANSPORT(_typename, _structtype,			\
-			       _open, _accept, _close,			\
+#define MRP_REGISTER_TRANSPORT(_typename, _structtype, _resolve,	\
+			       _open, _bind, _accept, _close,		\
 			       _connect, _disconnect,			\
 			       _send, _sendto)				\
     static void register_transport(void) __attribute__((constructor));	\
     									\
     static void register_transport(void) {				\
 	static mrp_transport_descr_t descriptor = {			\
-	    .type   = _typename,					\
-	    .size = sizeof(_structtype),				\
-	    .req = {							\
+	    .type    = _typename,					\
+	    .size    = sizeof(_structtype),				\
+	    .resolve = _resolve,					\
+	    .req     = {						\
 		.open       = _open,					\
+		.bind       = _bind,					\
 		.accept     = _accept,					\
 		.close      = _close,					\
 		.connect    = _connect,					\
@@ -246,6 +254,13 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 				      mrp_transport_evt_t *evt,
 				      void *user_data);
 
+/** Resolve an address string to a transport-specific address. */
+socklen_t mrp_transport_resolve(mrp_transport_t *t, char *str,
+				void *addr, socklen_t size);
+
+/** Bind a given transport to a transport-specific address. */
+int mrp_transport_bind(mrp_transport_t *t, void *addr, socklen_t addrlen);
+
 /** Accept a new transport connection. */
 mrp_transport_t *mrp_transport_accept(mrp_mainloop_t *ml, const char *type,
 				      void *conn, mrp_transport_evt_t *evt,
@@ -264,7 +279,8 @@ int mrp_transport_disconnect(mrp_transport_t *t);
 int mrp_transport_send(mrp_transport_t *t, mrp_msg_t *msg);
 
 /** Send a message through the given transport to the remote address. */
-int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg, void *addr);
+int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
+			 socklen_t addrlen);
 
 
 #endif /* __MURPHY_TRANSPORT_H__ */
