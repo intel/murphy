@@ -954,6 +954,7 @@ static char *get_next_token(input_t *in)
     skip_whitespace(in);
     
     quote = FALSE;
+    quote_line = 0;
 
     p = in->out;
     q = in->next;
