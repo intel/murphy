@@ -419,7 +419,7 @@ mrp_cfgfile_t *mrp_parse_cfgfile(const char *path)
 
     mrp_list_init(&cfg->actions);
 
-    while ((narg = get_next_line(&input, args, sizeof(args))) > 0) {
+    while ((narg = get_next_line(&input, args, MRP_ARRAY_SIZE(args))) > 0) {
 	a = parse_action(&input, args, narg);
 		
 	if (a != NULL)
