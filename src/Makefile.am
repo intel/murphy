@@ -93,11 +93,14 @@ libmurphy_core_ladir      =		\
 
 libmurphy_core_la_HEADERS =		\
 		core/context.h		\
-		core/plugin.h
+		core/plugin.h		\
+		core/console-command.h	\
+		core/console.h
 
 libmurphy_core_la_SOURCES =		\
 		core/context.c		\
-		core/plugin.c
+		core/plugin.c		\
+		core/console.c
 
 libmurphy_core_la_CFLAGS  =		\
 		$(AM_CFLAGS)

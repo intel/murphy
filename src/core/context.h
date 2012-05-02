@@ -19,6 +19,8 @@ typedef struct {
     /* actual runtime context data */
     mrp_mainloop_t  *ml;                   /* mainloop */
     mrp_list_hook_t  plugins;              /* list of loaded plugins */
+    mrp_list_hook_t  cmd_groups;           /* console command groups */
+    mrp_list_hook_t  consoles;             /* active consoles */
 } mrp_context_t;
 
 /** Create a new murphy context. */
