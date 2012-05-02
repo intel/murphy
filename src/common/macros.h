@@ -108,9 +108,8 @@
 /** Extract minor version from a version integer. */
 #define MRP_VERSION_MINOR(ver) (((ver) >>  8) & 0xff)
 
-/** Extract micro version from a version intege. */
+/** Extract micro version from a version integer. */
 #define MRP_VERSION_MICRO(ver) ((ver) & 0xff)
-
 
 /** C++-compatibility macros. */
 #ifdef __cplusplus
