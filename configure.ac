@@ -172,6 +172,7 @@ function check_if_internal() {
 AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,    [check_if_internal test])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,    [check_if_internal dbus])
 AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,    [check_if_internal glib])
+AM_CONDITIONAL(BUILTIN_PLUGIN_CONSOLE, [check_if_internal console])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 

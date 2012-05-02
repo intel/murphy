@@ -187,6 +187,24 @@ plugin_glib_la_LIBADD  = $(GLIB_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-glib.la
 endif
 
+# console plugin
+CONSOLE_PLUGIN_SOURCES = plugins/plugin-console.c
+CONSOLE_PLUGIN_CFLAGS  =
+CONSOLE_PLUGIN_LIBS    =
+
+if BUILTIN_PLUGIN_CONSOLE
+BUILTIN_PLUGINS += $(CONSOLE_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(CONSOLE_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(CONSOLE_PLUGIN_LIBS)
+else
+plugin_console_la_SOURCES = $(CONSOLE_PLUGIN_SOURCES)
+plugin_console_la_CFLAGS  = $(CONSOLE_PLUGIN_CFLAGS) \
+			    $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_console_la_LDFLAGS = -module -avoid-version
+plugin_console_la_LIBADD  = $(CONSOLE_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES    += plugin-console.la
+endif
 
 ###################################
 # murphy daemon
