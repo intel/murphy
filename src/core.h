@@ -3,5 +3,6 @@
 
 #include <murphy/core/context.h>
 #include <murphy/core/plugin.h>
+#include <murphy/core/console.h>
 
 #endif

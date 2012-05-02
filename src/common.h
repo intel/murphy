@@ -9,5 +9,7 @@
 #include <murphy/common/hashtbl.h>
 #include <murphy/common/utils.h>
 #include <murphy/common/file-utils.h>
+#include <murphy/common/msg.h>
+#include <murphy/common/transport.h>
 
 #endif
