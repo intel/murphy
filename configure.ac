@@ -172,12 +172,6 @@ function check_if_internal() {
 AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,    [check_if_internal test])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,    [check_if_internal dbus])
 AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,    [check_if_internal glib])
-#AM_CONDITIONAL(BUILTIN_PLUGIN_STORAGE, [check_if_internal storage])
-#AM_CONDITIONAL(BUILTIN_PLUGIN_SYSFS,   [check_if_internal sysfs  ])
-#AM_CONDITIONAL(BUILTIN_PLUGIN_DISPLAY, [check_if_internal display])
-#AM_CONDITIONAL(BUILTIN_PLUGIN_NETWORK, [check_if_internal network])
-#AM_CONDITIONAL(BUILTIN_PLUGIN_BATTERY, [check_if_internal battery])
-#AM_CONDITIONAL(BUILTIN_PLUGIN_XFS,     [check_if_internal xfs])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 
