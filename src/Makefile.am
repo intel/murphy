@@ -36,7 +36,9 @@ libmurphy_common_la_HEADERS =		\
 		common/hashtbl.h	\
 		common/mainloop.h	\
 		common/utils.h		\
-		common/file-utils.h
+		common/file-utils.h	\
+		common/msg.h
+
 
 libmurphy_common_la_SOURCES =		\
 		common/log.c		\
@@ -44,7 +46,8 @@ libmurphy_common_la_SOURCES =		\
 		common/hashtbl.c	\
 		common/mainloop.c	\
 		common/utils.c		\
-		common/file-utils.c
+		common/file-utils.c	\
+		common/msg.c
 
 libmurphy_common_la_CFLAGS  =		\
 		$(AM_CFLAGS)
