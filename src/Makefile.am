@@ -228,6 +228,27 @@ murphyd_LDADD  =			\
 
 murphyd_LDFLAGS = -rdynamic
 
+###################################
+# murphy console client
+#
+
+#if BUILD_CONSOLE_CLIENT # XXX TODO need to check for libreadline
+
+bin_PROGRAMS += murphy-console
+
+murphy_console_SOURCES =		\
+		console-client/client.c
+
+murphy_console_CFLAGS  =		\
+		$(AM_CFLAGS)
+
+murphy_console_LDADD  =			\
+		libmurphy-common.la	\
+		$(BUILTIN_LIBS)
+
+murphy_console_LDFLAGS = -rdynamic -lreadline
+
+#end
 
 # cleanup
 clean-local:: clean-linker-script
