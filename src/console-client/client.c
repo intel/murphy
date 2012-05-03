@@ -17,7 +17,7 @@
 #define client_error mrp_log_error
 
 #define DEFAULT_PROMPT  "murphy> "
-#define DEFAULT_CONSOLE "127.0.0.1:3000"
+#define DEFAULT_CONSOLE "tcp:127.0.0.1:3000"
 
 static void input_process_cb(char *input);
 

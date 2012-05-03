@@ -72,8 +72,8 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 }
 
 
-socklen_t mrp_transport_resolve(mrp_transport_t *t, char *str, void *addr,
-				socklen_t size)
+socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
+				void *addr, socklen_t size)
 {
     mrp_transport_descr_t *d;
     char                  *p, type[32];

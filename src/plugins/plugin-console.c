@@ -41,26 +41,18 @@ typedef struct {
 
 static int console_listen(const char *address)
 {
-    struct addrinfo *ai;
-    char             node[512], *port;
-    int              sock, error, on;
+    struct sockaddr addr;
+    socklen_t       addrlen;
+    int             sock, on;
 
-    strncpy(node, address, sizeof(node) - 1);
-    node[sizeof(node) - 1] = '\0';
+    addrlen = mrp_transport_resolve(NULL, address, &addr, sizeof(addr));
 
-    if ((port = strrchr(node, ':')) == NULL) {
+    if (!addrlen) {
 	console_error("invalid console address '%s'.", address);
 	return FALSE;
     }
-    *port++ = '\0';
-
-    if ((error = getaddrinfo(node, port, NULL, &ai)) != 0) {
-	console_error("invalid console address '%s' (%s).",
-		      address, gai_strerror(error));
-	return FALSE;
-    }
     
-    if ((sock = socket(ai->ai_family, SOCK_STREAM, 0)) < 0) {
+    if ((sock = socket(addr.sa_family, SOCK_STREAM, 0)) < 0) {
 	console_error("failed to create console socket (%d: %s).",
 		      errno, strerror(errno));
 	goto fail;
@@ -69,7 +61,7 @@ static int console_listen(const char *address)
     on = 1;
     setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
-    if (bind(sock, ai->ai_addr, ai->ai_addrlen) != 0) {
+    if (bind(sock, &addr, addrlen) != 0) {
 	console_error("failed to bind to address '%s' (%d: %s).",
 		      address, errno, strerror(errno));
 	goto fail;
@@ -81,16 +73,12 @@ static int console_listen(const char *address)
 	goto fail;
     }
 
-    freeaddrinfo(ai);
     return sock;
 
  fail:
     if (sock >= 0)
 	close(sock);
-
-    if (ai != NULL)
-	freeaddrinfo(ai);
-
+    
     return FALSE;
 }
 
@@ -307,7 +295,7 @@ static void console_exit(mrp_plugin_t *plugin)
 
 
 static mrp_plugin_arg_t console_args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "127.0.0.1:3000"),
+    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "tcp:127.0.0.1:3000"),
 };
 
 MURPHY_REGISTER_CORE_PLUGIN("console",

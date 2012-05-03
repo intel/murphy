@@ -33,7 +33,7 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 static int tcp_disconnect(mrp_transport_t *mt);
 static int open_socket(tcp_t *t, int family);
 
-static socklen_t tcp_resolve(char *str, void *addr, socklen_t size)
+static socklen_t tcp_resolve(const char *str, void *addr, socklen_t size)
 {
     struct addrinfo *ai, hints;
     char             node[512], *port;

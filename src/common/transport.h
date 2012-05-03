@@ -111,7 +111,7 @@ typedef struct {
     const char          *type;           /* transport type */
     size_t               size;           /* full transport struct size */
     mrp_transport_req_t  req;            /* transport requests */
-    socklen_t          (*resolve)(char *str, void *addr, socklen_t size);
+    socklen_t          (*resolve)(const char *str, void *addr, socklen_t size);
     mrp_list_hook_t      hook;           /* to list of registered transports */
 } mrp_transport_descr_t;
 
@@ -255,7 +255,7 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 				      void *user_data);
 
 /** Resolve an address string to a transport-specific address. */
-socklen_t mrp_transport_resolve(mrp_transport_t *t, char *str,
+socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
 				void *addr, socklen_t size);
 
 /** Bind a given transport to a transport-specific address. */

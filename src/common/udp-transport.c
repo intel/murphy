@@ -32,7 +32,7 @@ static int udp_disconnect(mrp_transport_t *mu);
 static int open_socket(udp_t *u, int family);
 
 
-static socklen_t udp_resolve(char *str, void *addr, socklen_t size)
+static socklen_t udp_resolve(const char *str, void *addr, socklen_t size)
 {
     struct addrinfo *ai, hints;
     char             node[512], *port;
