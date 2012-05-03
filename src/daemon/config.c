@@ -883,6 +883,13 @@ static inline void skip_whitespace(input_t *in)
 }
 
 
+static inline void skip_rest_of_line(input_t *in)
+{
+    while (*in->out != '\n' && in->out < in->in)
+	in->out++;
+}
+
+
 static char *get_next_token(input_t *in)
 {
     ssize_t len;
@@ -1069,6 +1076,34 @@ static char *get_next_token(input_t *in)
 		    in->next_newline = TRUE;
 		    return in->token;
 		}
+	    }
+	    break;
+
+	    /*
+	     * Comments:
+	     *
+	     *     Attempt to allow and filter out partial-line comments.
+	     *
+	     *     This has not been thoroughly thought through. Probably
+	     *     there are broken border-cases. The whole tokenizing loop
+	     *     has not been written so that it could grow the buffer and
+	     *     refill it even if even we run out of input and we're not
+	     *     sure whehter a full token has been consumed... beware.
+	     *     To be sure, we bail out here if it looks like we exhausted
+	     *     the input buffer while skipping a comment. This needs to
+	     *     be thought through properly.
+	     */
+	case MRP_START_COMMENT:
+	    skip_rest_of_line(in);
+	    if (in->out == in->in) {
+		mrp_log_error("%s:%d Exhausted input buffer while skipping "
+			      "a comment.", in->file, in->line);
+		in->error = TRUE;
+		return NULL;
+	    }
+	    else {
+		p = in->out;
+		in->line++;
 	    }
 	    break;
 
