@@ -353,4 +353,4 @@ static void dbus_exit(mrp_plugin_t *plugin)
 MURPHY_REGISTER_CORE_PLUGIN("dbus",
 			    DBPLG_VERSION, DBPLG_DESCRIPTION, DBPLG_AUTHORS,
 			    DBPLG_HELP, MRP_SINGLETON,
-			    dbus_init, dbus_exit, NULL);
+			    dbus_init, dbus_exit, NULL, NULL);

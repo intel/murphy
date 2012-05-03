@@ -301,6 +301,6 @@ static mrp_plugin_arg_t console_args[] = {
 MURPHY_REGISTER_CORE_PLUGIN("console",
 			    CONSOLE_VERSION, CONSOLE_DESCRIPTION,
 			    CONSOLE_AUTHORS, CONSOLE_HELP, MRP_SINGLETON,
-			    console_init, console_exit, console_args);
+			    console_init, console_exit, console_args, NULL);
 
 

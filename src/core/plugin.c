@@ -97,10 +97,12 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 			      const char *instance, mrp_plugin_arg_t *args,
 			      int narg)
 {
-    mrp_plugin_t       *plugin;
-    char                path[PATH_MAX];
-    mrp_plugin_descr_t *dynamic, *builtin, *descr;
-    void               *handle;
+    mrp_plugin_t        *plugin;
+    char                 path[PATH_MAX];
+    mrp_plugin_descr_t  *dynamic, *builtin, *descr;
+    void                *handle;
+    mrp_console_group_t *cmds;
+    char                 grpbuf[PATH_MAX], *cmdgrp;
     
     if (name == NULL)
 	return NULL;
@@ -150,6 +152,41 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	    mrp_log_error("Failed to allocate plugin '%s'.", name);
 	    goto fail;
 	}
+
+	if (descr->cmds != NULL) {
+	    plugin->cmds = cmds = mrp_allocz(sizeof(*plugin->cmds));
+
+	    if (cmds != NULL) {
+		mrp_list_init(&cmds->hook);
+		
+		if (instance != name) {
+		    snprintf(grpbuf, sizeof(grpbuf), "%s-%s", name, instance);
+		    cmdgrp = grpbuf;
+		}
+		else
+		    cmdgrp = (char *)name;
+
+		cmds->name = mrp_strdup(cmdgrp);
+
+		if (cmds->name == NULL) {
+		    mrp_log_error("Failed to allocate plugin commands.");
+		    goto fail;
+		}
+		
+		cmds->commands = descr->cmds->commands;
+		cmds->ncommand = descr->cmds->ncommand;
+		
+		if (MRP_UNLIKELY(descr->cmds->user_data != NULL))
+		    cmds->user_data = descr->cmds->user_data;
+		else
+		    cmds->user_data = plugin;
+	    }
+	    else {
+		mrp_log_error("Failed to allocate plugin commands.");
+		goto fail;
+	    }
+	}
+
 	
 	plugin->ctx        = ctx;
 	plugin->descriptor = descr;
@@ -158,6 +195,9 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	
 	if (!parse_plugin_args(plugin, args, narg))
 	    goto fail;
+	
+	if (plugin->cmds != NULL)
+	    mrp_add_console_group(plugin->ctx, plugin->cmds);
 	
 	mrp_list_append(&ctx->plugins, &plugin->hook);
 
@@ -259,6 +299,13 @@ int mrp_unload_plugin(mrp_plugin_t *plugin)
 	    if (plugin->handle != NULL)
 		dlclose(plugin->handle);
 	
+	    if (plugin->cmds != NULL) {
+		mrp_del_console_group(plugin->ctx, plugin->cmds);
+		
+		mrp_free(plugin->cmds->name);
+		mrp_free(plugin->cmds);
+	    }
+
 	    mrp_free(plugin->instance);
 	    mrp_free(plugin->path);
 	    mrp_free(plugin);

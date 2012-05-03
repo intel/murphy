@@ -146,5 +146,5 @@ static void plugin_exit(mrp_plugin_t *plugin)
 
 MURPHY_REGISTER_PLUGIN("glib", GLIB_VERSION, GLIB_DESCRIPTION, GLIB_AUTHORS,
 		       GLIB_HELP, MRP_SINGLETON,
-		       plugin_init, plugin_exit, NULL);
+		       plugin_init, plugin_exit, NULL, NULL);
 

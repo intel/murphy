@@ -100,13 +100,6 @@ static int test_init(mrp_plugin_t *plugin)
     printf("init fail: %s\n", args[ARG_FAILINIT].bln ? "TRUE" : "FALSE");
     printf("exit fail: %s\n", args[ARG_FAILEXIT].bln ? "TRUE" : "FALSE");
 
-    mrp_list_init(&test_group.hook);
-    
-    if (mrp_add_console_group(plugin->ctx, &test_group))
-	mrp_log_info("console group successfully added");
-    else
-	mrp_log_error("failed to add console group");
-
     return !args[ARG_FAILINIT].bln;
 }
 
@@ -115,11 +108,6 @@ static void test_exit(mrp_plugin_t *plugin)
 {
     mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
 		 plugin->instance);
-
-    if (mrp_del_console_group(plugin->ctx, &test_group))
-	mrp_log_info("console group successfully deleted");
-    else
-	mrp_log_error("failed to delete console group");
     
     /*return !args[ARG_FAILINIT].bln;*/
 }
@@ -144,4 +132,4 @@ static mrp_plugin_arg_t args[] = {
 
 MURPHY_REGISTER_PLUGIN("test",
 		       TEST_VERSION, TEST_DESCRIPTION, TEST_AUTHORS, TEST_HELP,
-		       MRP_MULTIPLE, test_init, test_exit, args);
+		       MRP_MULTIPLE, test_init, test_exit, args, &test_group);

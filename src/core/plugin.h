@@ -9,6 +9,7 @@
 #include <murphy/common/log.h>
 #include <murphy/common/list.h>
 #include <murphy/core/context.h>
+#include <murphy/core/console-command.h>
 
 #ifndef MRP_DEFAULT_PLUGIN_DIR
 #    define MRP_DEFAULT_PLUGIN_DIR LIBDIR"/murphy/plugins"
@@ -168,6 +169,7 @@ typedef struct {
     const char          *description;          /* plugin description */
     const char          *authors;              /* plugin authors */
     const char          *help;                 /* plugin help string */
+    mrp_console_group_t *cmds;                 /* default console commands */
 } mrp_plugin_descr_t;
 
 
@@ -182,16 +184,17 @@ typedef enum {
 } mrp_plugin_state_t;
 
 struct mrp_plugin_s {
-    char               *path;                  /* plugin path */
-    char               *instance;              /* plugin instance */
-    mrp_list_hook_t     hook;                  /* hook to list of plugins */
-    mrp_context_t      *ctx;                   /* murphy context */
-    mrp_plugin_descr_t *descriptor;            /* plugin descriptor */
-    void               *handle;                /* DSO handle */
-    mrp_plugin_state_t  state;                 /* plugin state */
-    int                 refcnt;                /* reference count */
-    void               *data;                  /* private plugin data */
-    mrp_plugin_arg_t   *args;                  /* plugin arguments */
+    char                *path;                 /* plugin path */
+    char                *instance;             /* plugin instance */
+    mrp_list_hook_t      hook;                 /* hook to list of plugins */
+    mrp_context_t       *ctx;                  /* murphy context */
+    mrp_plugin_descr_t  *descriptor;           /* plugin descriptor */
+    void                *handle;               /* DSO handle */
+    mrp_plugin_state_t   state;                /* plugin state */
+    int                  refcnt;               /* reference count */
+    void                *data;                 /* private plugin data */
+    mrp_plugin_arg_t    *args;                 /* plugin arguments */
+    mrp_console_group_t *cmds;                 /* default console commands */
 };
 
 
@@ -206,7 +209,8 @@ struct mrp_plugin_s {
 				     _single,				\
 				     _init,				\
 				     _exit,				\
-				     _args)				\
+				     _args,				\
+				     _cmds)				\
     static void register_plugin(void) __attribute__((constructor));	\
     									\
     static void register_plugin(void) {					\
@@ -225,6 +229,7 @@ struct mrp_plugin_s {
 	    .ninstance   = 0,						\
             .args        = _args,					\
 	    .narg        = MRP_ARRAY_SIZE(_args),			\
+	    .cmds = _cmds,						\
 	};								\
 									\
 	if ((base = strrchr(path, '/')) != NULL)			\
@@ -245,7 +250,8 @@ struct mrp_plugin_s {
 				     _single,				\
 				     _init,				\
 				     _exit,				\
-				     _args)				\
+				     _args,				\
+				     _cmds)				\
     									\
     mrp_plugin_descr_t *mrp_get_plugin_descriptor(void) {		\
 	static mrp_plugin_descr_t descriptor = {			\
@@ -262,6 +268,7 @@ struct mrp_plugin_s {
 	    .ninstance   = 0,						\
 	    .args        = _args,					\
 	    .narg        = MRP_ARRAY_SIZE(_args),			\
+	    .cmds        = _cmds,					\
 	};								\
 									\
 	return &descriptor;						\
@@ -270,11 +277,11 @@ struct mrp_plugin_s {
 #endif
 
 
-#define MURPHY_REGISTER_PLUGIN(_n, _v, _d, _a, _h, _s, _i, _e, _args)	\
-    __MURPHY_REGISTER_PLUGIN(_n, _v, _d, _a, _h, FALSE, _s, _i, _e, _args)
+#define MURPHY_REGISTER_PLUGIN(_n, _v, _d, _a, _h, _s, _i, _e, _args, _c) \
+    __MURPHY_REGISTER_PLUGIN(_n, _v, _d, _a, _h, FALSE, _s, _i, _e, _args, _c)
 
-#define MURPHY_REGISTER_CORE_PLUGIN(_n, _v, _d, _a, _h, _s, _i, _e, _args) \
-    __MURPHY_REGISTER_PLUGIN(_n, _v, _d, _a, _h, TRUE, _s, _i, _e, _args)
+#define MURPHY_REGISTER_CORE_PLUGIN(_n, _v, _d, _a, _h, _s, _i, _e, _args, _c) \
+    __MURPHY_REGISTER_PLUGIN(_n, _v, _d, _a, _h, TRUE, _s, _i, _e, _args, _c)
 
 #define MRP_REGISTER_PLUGIN MURPHY_REGISTER_PLUGIN
 #define MRP_REGISTER_CORE_PLUGIN MURPHY_REGISTER_CORE_PLUGIN

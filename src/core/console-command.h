@@ -61,7 +61,7 @@
 #define MRP_CONSOLE_GROUP(_var, _name, _data, ...)	   \
     MRP_CONSOLE_COMMANDS(_var##_cmds, __VA_ARGS__);	   \
     static mrp_console_group_t _var = {			   \
-        .name      = _name,                                \
+        .name      = (char *)_name,			   \
         .user_data = _data,                                \
         .commands  = _var##_cmds,                          \
         .ncommand  = MRP_ARRAY_SIZE(_var##_cmds),          \
@@ -69,18 +69,18 @@
     };
 
 #define MRP_PARSED_CMD(_name, _summ, _descr, _cb) {			\
-	.name = _name,							\
-	.summary = _summ,						\
+	.name        = _name,						\
+	.summary     = _summ,						\
 	.description = _descr,					        \
-	.tok = _cb							\
+	.tok         = _cb						\
     }
 
 #define MRP_RAW_CMD(_name, _summ, _descr, _cb) {			\
-	.name = _name,							\
-	.summary = _summ,						\
+	.name        = _name,						\
+	.summary     = _summ,						\
 	.description = _descr,					        \
-        .flags = MRP_CONSOLE_RAWINPUT,				        \
-	.raw = _cb							\
+        .flags       = MRP_CONSOLE_RAWINPUT,				\
+	.raw         = _cb						\
     }
 
 typedef struct mrp_console_s mrp_console_t;
@@ -117,7 +117,7 @@ typedef struct {
  */
 
 typedef struct {
-    const char        *name;             /* command group name/prefix */
+    char              *name;             /* command group name/prefix */
     void              *user_data;        /* opaque callback data */
     mrp_console_cmd_t *commands;         /* commands in this group */
     int                ncommand;         /* number of commands */
