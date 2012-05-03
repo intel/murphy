@@ -163,7 +163,7 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 
     if (events & MRP_IO_EVENT_IN) {
 	/*
-	 * enlarge the buffer buddy-style if we're out of space
+	 * enlarge the buffer if we're out of space
 	 */
     realloc:
 	if (t->idata == t->isize) {
