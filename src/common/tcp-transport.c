@@ -13,7 +13,7 @@
 #include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
 
-#define DEFAULT_SIZE 1024                   /* default input buffer size */
+#define DEFAULT_SIZE 128                 /* default input buffer size */
 
 typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
@@ -32,6 +32,41 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 			mrp_io_event_t events, void *user_data);
 static int tcp_disconnect(mrp_transport_t *mt);
 static int open_socket(tcp_t *t, int family);
+
+static socklen_t tcp_resolve(char *str, void *addr, socklen_t size)
+{
+    struct addrinfo *ai, hints;
+    char             node[512], *port;
+    
+    mrp_clear(&hints);    
+    hints.ai_family = AF_UNSPEC;
+    ai              = NULL;
+
+    if      (!strncmp(str, "tcp:" , 4)) str += 4;
+    else if (!strncmp(str, "tcp4:", 5)) str += 5, hints.ai_family = AF_INET;
+    else if (!strncmp(str, "tcp6:", 5)) str += 5, hints.ai_family = AF_INET6;
+    
+    strncpy(node, str, sizeof(node) - 1);
+    node[sizeof(node) - 1] = '\0';
+    if ((port = strrchr(node, ':')) == NULL)
+	return FALSE;
+    *port++ = '\0';
+
+    if (getaddrinfo(node, port, &hints, &ai) == 0) {
+	if (size >= ai->ai_addrlen) {
+	    memcpy(addr, ai->ai_addr, ai->ai_addrlen);
+	    size = ai->ai_addrlen;
+	}
+	else
+	    size = 0;
+	freeaddrinfo(ai);
+
+	return size;
+    }
+    else
+	return 0;
+}
+
 
 static int tcp_open(mrp_transport_t *mt)
 {
@@ -112,40 +147,13 @@ static void tcp_close(mrp_transport_t *mt)
 }
 
 
-static socklen_t getaddr(char *str, int *family, struct sockaddr *addr)
-{
-    struct addrinfo *ai;
-    char             node[512], *port;
-    socklen_t        len;
-    
-    ai = NULL;
-    strncpy(node, (char *)str, sizeof(node) - 1);
-    node[sizeof(node) - 1] = '\0';
-
-    if ((port = strrchr(node, ':')) == NULL)
-	return FALSE;
-    *port++ = '\0';
-
-    if (getaddrinfo(node, port, NULL, &ai) == 0) {
-	*family = ai->ai_family;
-	memcpy(addr, ai->ai_addr, ai->ai_addrlen);
-	len = ai->ai_addrlen;
-	freeaddrinfo(ai);
-
-	return len;
-    }
-    else
-	return 0;
-}
-
-
 static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 			 mrp_io_event_t events, void *user_data)
 {
     tcp_t           *t  = (tcp_t *)user_data;
     mrp_transport_t *mt = (mrp_transport_t *)t;
     uint32_t        *sizep, size;
-    ssize_t          n;
+    ssize_t          n, space, left;
     void            *data;
     int              old, error;
     mrp_msg_t       *msg;
@@ -154,10 +162,16 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     MRP_UNUSED(w);
 
     if (events & MRP_IO_EVENT_IN) {
+	/*
+	 * enlarge the buffer buddy-style if we're out of space
+	 */
+    realloc:
 	if (t->idata == t->isize) {
-	    if (t->isize != 0) {
-		old      = t->isize;
-		t->isize *= 2;
+	    if (t->isize > sizeof(size)) {
+		old       = t->isize;
+		sizep     = t->ibuf;
+		size      = sizeof(size) + ntohl(*sizep);
+		t->isize  = size;
 	    }
 	    else {
 		old      = 0;
@@ -179,37 +193,49 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 	    }
 	}
 
-	while ((n = read(fd, t->ibuf + t->idata, sizeof(size))) > 0) {
+	
+	space = t->isize - t->idata;
+	while ((n = read(fd, t->ibuf + t->idata, space)) > 0) {
 	    t->idata += n;
 
-	    sizep = t->ibuf;
-	    size  = ntohl(*sizep);
-	    while (t->idata >= sizeof(size) + size) {
-		data = t->ibuf + sizeof(size);
-		msg  = mrp_msg_default_decode(data, size);
-
-		if (msg != NULL) {
-		    MRP_TRANSPORT_BUSY(mt, {
-			    mt->evt.recv(mt, msg, mt->user_data);
-			});
-
-		    mrp_msg_unref(msg);
-
-		    if (t->check_destroy(mt))
-			return;
-		}
-		else {
-		    error = EPROTO;
-		    goto fatal_error;
-		}
-
-		size = t->idata - (sizeof(size) + size);
-		memmove(t->ibuf, t->ibuf + sizeof(size) + size, size);
-		t->idata = size;
-		
+	    if (t->idata >= sizeof(size)) {
 		sizep = t->ibuf;
 		size  = ntohl(*sizep);
+		
+		while (t->idata >= sizeof(size) + size) {
+		    data = t->ibuf + sizeof(size);
+		    msg  = mrp_msg_default_decode(data, size);
+
+		    if (msg != NULL) {
+			MRP_TRANSPORT_BUSY(mt, {
+				mt->evt.recv(mt, msg, mt->user_data);
+			    });
+
+			mrp_msg_unref(msg);
+
+			if (t->check_destroy(mt))
+			    return;
+		    }
+		    else {
+			error = EPROTO;
+			goto fatal_error;
+		    }
+
+		    left = t->idata - (sizeof(size) + size);
+		    memmove(t->ibuf, t->ibuf + sizeof(size) + size, left);
+		    t->idata = left;
+		    
+		    if (t->idata >= sizeof(size)) {
+			sizep = t->ibuf;
+			size = ntohl(*sizep);
+		    }
+		    else
+			size = (uint32_t)-1;
+		}
 	    }
+	    space = t->isize - t->idata;
+	    if (space == 0)
+		goto realloc;
 	}
 	
 	if (n < 0 && errno != EAGAIN) {
@@ -252,14 +278,14 @@ static int tcp_connect(mrp_transport_t *mt, void *addrstr)
     tcp_t           *t = (tcp_t *)mt;
     struct sockaddr  addr;
     int              addrlen;
-    int              family, reuse;
+    int              reuse;
     long             nonblk;
     mrp_io_event_t   events;
 
-    addrlen = getaddr(addrstr, &family, &addr);
+    addrlen = mrp_transport_resolve(mt, addrstr, &addr, sizeof(addr));
     
     if (addrlen > 0) {
-	t->sock = socket(family, SOCK_STREAM, 0);
+	t->sock = socket(addr.sa_family, SOCK_STREAM, 0);
 
 	if (t->sock < 0)
 	    return FALSE;
@@ -346,7 +372,7 @@ static int tcp_send(mrp_transport_t *mt, mrp_msg_t *msg)
 }
 
 
-MRP_REGISTER_TRANSPORT("tcp", tcp_t, NULL,
+MRP_REGISTER_TRANSPORT("tcp", tcp_t, tcp_resolve,
 		       tcp_open, tcp_bind, tcp_accept, tcp_close,
 		       tcp_connect, tcp_disconnect,
 		       tcp_send, NULL);

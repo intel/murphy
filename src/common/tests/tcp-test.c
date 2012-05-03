@@ -20,31 +20,6 @@ typedef struct {
 } context_t;
 
 
-static socklen_t getaddr(char *str, int *family, struct sockaddr *addr)
-{
-    struct addrinfo *ai;
-    char             node[512], *port;
-    
-    ai = NULL;
-    strncpy(node, (char *)str, sizeof(node) - 1);
-    node[sizeof(node) - 1] = '\0';
-
-    if ((port = strrchr(node, ':')) == NULL)
-	return FALSE;
-    *port++ = '\0';
-
-    if (getaddrinfo(node, port, NULL, &ai) == 0) {
-	*family = ai->ai_family;
-	memcpy(addr, ai->ai_addr, ai->ai_addrlen);
-	freeaddrinfo(ai);
-
-	return ai->ai_addrlen;
-    }
-    else
-	return 0;
-}
-
-
 void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
     context_t *c = (context_t *)user_data;
@@ -56,6 +31,12 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
     mrp_msg_dump(msg, stdout);
     
     if (c->server) {
+
+#define REPLY_KEY "this_is_a_rather_long_reply_field_name_that_I_hope_will_cause_reallocation_of_the_message_receiving_buffer_on_the_server_side_and_we_will_see_if_it_can_automatically_readjust_its_buffers"
+#define REPLY_VAL "and_this_is_the_rather_long_value_of_the_rather_long_field_name_that_we_hope_might_break_something_if_the_allocation_algorithm_has_horrible_easy_to_exploit_holes"
+
+	mrp_msg_append(msg, REPLY_KEY, REPLY_VAL, strlen(REPLY_VAL) + 1);
+
 	if (mrp_transport_send(t, msg))
 	    mrp_log_info("Reply successfully sent.");
 	else
@@ -115,15 +96,14 @@ void server_init(context_t *c)
 {
     struct sockaddr addr;
     socklen_t       addrlen;
-    int             family;
     mrp_io_event_t  events;
     int             reuse;
     long            nonblk;
 
-    addrlen = getaddr(c->addr, &family, &addr);
+    addrlen = mrp_transport_resolve(NULL, c->addr, &addr, sizeof(addr));
 
     if (addrlen > 0) {
-	c->sock = socket(family, SOCK_STREAM, 0);
+	c->sock = socket(addr.sa_family, SOCK_STREAM, 0);
 	
 	if (c->sock < 0) {
 	    mrp_log_error("Failed to create socket.");
@@ -155,6 +135,10 @@ void server_init(context_t *c)
 	    exit(1);
 	}
     }
+    else {
+	mrp_log_error("Failed to resolve address %s.", c->addr);
+	exit(1);
+    }
 }
 
 
@@ -177,11 +161,15 @@ void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 
     len = snprintf(seq, sizeof(seq), "%d", seqno);
     
+#define LONG_KEY "aaaaaaaaaaaallllllllllllloooooooooooonnnnnnnnnnngggggggggffffffffffffiiiiiiiiiiiiieeeeeeeeeeeelllllllllllllddddddddddddnnnnnnnnnnnnnnnaaaaaaaaaaaaaaaammmmmmmmmmmmmmmeeeeeeeeeeeeeeeeeeeeee"
+#define LONG_VAL "aaaaaaaaaaallllllllllllllllloooooooooooonnnnnnnnngggggggggggvvvvvvvvvvvvaaaaaaaaaaaaaalllllllllluuuuuuuuuuuuuueeeeee"
+
     if (!mrp_msg_append(msg, "seq", seq, len + 1) ||
 	!mrp_msg_append(msg, "foo", "bar", sizeof("bar")) ||
 	!mrp_msg_append(msg, "bar", "foo", sizeof("foo")) ||
 	!mrp_msg_append(msg, "foobar", "barfoo", sizeof("barfoo")) ||
-	!mrp_msg_append(msg, "barfoo", "foobar", sizeof("foobar"))) {
+	!mrp_msg_append(msg, "barfoo", "foobar", sizeof("foobar")) ||
+	!mrp_msg_append(msg, LONG_KEY, LONG_VAL, strlen(LONG_VAL) + 1)) {
 	mrp_log_error("Failed to construct message #%d.", seqno);
 	exit(1);
     }
