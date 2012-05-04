@@ -59,7 +59,7 @@ def _main():
             dbfile = sys.stdout
             close_dbfile = False
         else:
-            dbfile = open(sys.argv[-1])
+            dbfile = open(sys.argv[-1], "w")
             close_dbfile = True
 
 
