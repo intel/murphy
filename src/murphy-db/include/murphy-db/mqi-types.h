@@ -4,12 +4,21 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/** maximum number of rows a query can produce */
 #define MQI_QUERY_RESULT_MAX   8192
+/** the maximum number columns a table can have */
 #define MQI_COLUMN_MAX         ((int)(sizeof(mqi_bitfld_t) * 8))
+/** maximum length of a condition table (i.e. array of mqi_cond_entry_t) */
 #define MQI_COND_MAX           64
 #define MQL_PARAMETER_MAX      16
+/** maximum depth for nested transactions */
 #define MQI_TXDEPTH_MAX        16
 
+/**
+ * mqi_handle_t value for nonexisting handle. Zero is a valid handle
+ * thus casting a zero to mqi_handle_t will produce a valid handle
+ * (remeber this when using static mqi_handle_t).
+ */ 
 #define MQI_HANDLE_INVALID     (~((mqi_handle_t)0))
 
 #define MQI_DIMENSION(array)  \
