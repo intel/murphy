@@ -2,7 +2,7 @@
 \lyxformat 413
 \begin_document
 \begin_header
-\textclass docbook-book
+\textclass docbook-chapter
 \use_default_options true
 \maintain_unincluded_children false
 \language english
@@ -73,73 +73,47 @@
 \begin_body
 
 \begin_layout Title
-Plugin Developer Guide
-\end_layout
-
-\begin_layout Part
 Introduction
 \end_layout
 
-\begin_layout Chapter
-Murphy in Brief
+\begin_layout Standard
+blah blah
 \end_layout
 
 \begin_layout Standard
-blah blah bla ....
-\end_layout
+\begin_inset Float figure
+wide false
+sideways false
+status open
 
-\begin_layout Description
-This will be the first among description thing
-\end_layout
+\begin_layout Plain Layout
+\begin_inset Caption
 
-\begin_layout Description
-here we have the second
+\begin_layout Plain Layout
+Murphy DB components
 \end_layout
-
-\begin_layout Description
-and the third
-\end_layout
-
-\begin_layout Part
-Basic Infrastructure
-\end_layout
-
-\begin_layout Part
-Murphy Database
-\end_layout
-
-\begin_layout Standard
-\begin_inset CommandInset include
-LatexCommand input
-filename "murphy-db-introduction.xml"
 
 \end_inset
 
 
 \end_layout
 
-\begin_layout Standard
-\begin_inset CommandInset include
-LatexCommand input
-filename "murphy-db-high-level-api.xml"
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename ../../common/figures/db-layers.svg
 
 \end_inset
 
 
 \end_layout
 
-\begin_layout Standard
-\begin_inset CommandInset include
-LatexCommand input
-filename "murphy-db-query-language.xml"
+\begin_layout Plain Layout
+
+\end_layout
 
 \end_inset
 
 
-\end_layout
-
-\begin_layout Part
-Plugin writing conventions
 \end_layout
 
 \end_body
