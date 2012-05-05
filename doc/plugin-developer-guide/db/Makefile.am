@@ -1,6 +1,7 @@
 TOP_SRCDIR = $(abs_top_srcdir)/src
 
-vpath %.lyx ../lyx
+vpath %.lyx $(MRP_DOCDIR)/plugin-developer-guide/lyx
+vpath %.xml $(MRP_DOCDIR)/plugin-developer-guide/doxml
 
 include $(MRP_MAKE_DOCRULES)
 
@@ -11,47 +12,45 @@ FIGURES_PDF = $(FIGURES_SVG:.svg=.pdf)
 
 FIGURES = $(FIGURES_SVG) $(FIGURES_PNG) $(FIGURES_PDF)
 
-LYX_DOCS = murphy-db.lyx
-XML_DOCS = $(LYX_DOCS:.lyx=.xml)
 
-MQL_GRAMMAR = mql-grammar.xml
-GENERATED_GRAMMARS = $(MQL_GRAMMAR)
+high_level_api_definition_SRC = mql.h
+high_level_api_definition_DOXML = $(high_level_api_definition_SRC:.h=_8h.xml)
+
 
 TARGETS = $(FIGURES) plugin-developer-guide.xml
 
+
+xmldir = $(MRP_DOCDIR)
+nodist_xml_DATA = $(TARGETS)
+
+
 all-am: $(TARGETS)
 
-figures: $(FIGURES_SVG)
-	for svg in $^ ; do \
-	    pdf=`basename($${svg/.svg/.pdf})` ; \
-	    png=$${pdf/.pdf/.png} ; \
-	    cp $$svg . ; \
-	    $(MRP_INKSCAPE) --export-area-drawing --export-pdf=$$pdf $$svg ; \
-	    ${MRP_INKSCAPE) --export-area-drawing --export-png=$$png $$svg ; \
-	done
 
-$(MQL_GRAMMAR): $(TOP_SRCDIR)/murphy-db/mql/mql-scanner.l \
-                $(TOP_SRCDIR)/murphy-db/mql/mql-parser.y
+mql-grammar.xml: $(TOP_SRCDIR)/murphy-db/mql/mql-scanner.l \
+                 $(TOP_SRCDIR)/murphy-db/mql/mql-parser.y
 	$(MRP_ABNF) $+ > $@
 
-xml_docs: $(LYX_DOCS)
-	for lyx_file in $^ ; do \
-		lyxml_file=$${lyx_file/.lyx/.xml} ; \
-		xml_file=`basename $$lyxml_file` ; \
-		rm -f $$lyxml_file ; \
-		$(MRP_LYX) --export docbook-xml $$lyx_file && \
-		$(MRP_DBLYXFIX)  $$lyxml_file $$xml_file && \
-		rm -f $$lyxml_file ; \
-	done
+high-level-api-definition.xml: $(high_level_api_definition_DOXML)
+	$(MRP_DOXML2DB) ../doxml $^ $@
+
+murphy-db-introduction.xml: murphy-db-introduction.lyx
+
+murphy-db-high-level-api.xml: murphy-db-high-level-api.lyx \
+                              high-level-api-definition.xml
+
+murphy-db-query-language.xml: murphy-db-query-language.lyx \
+                              mql-grammar.xml
 
 
 plugin-developer-guide.xml: plugin-developer-guide.lyx \
-                            $(GENERATED_GRAMMARS) xml_docs
-	rm -f ../lyx/plugin-devloper-guide.xml ; \
-	$(MRP_LYX) --export docbook-xml ../lyx/plugin-developer-guide.lyx && \
-	$(MRP_DBLYXFIX) ../lyx/plugin-developer-guide.xml $@ && \
-	rm -f ../lyx/plugin-devloper-guide.xml
+                            murphy-db-introduction.xml \
+                            murphy-db-high-level-api.xml \
+                            murphy-db-query-language.xml
 
 clean-local:
-	rm -f $(TARGETS) $(FIGURES) $(GENERATED_GRAMMARS) $(XML_DOCS) \
-		../lyx/*.xml
+	rm -f *~ $(TARGETS) \
+                murphy-db-introduction.xml \
+                murphy-db-high-level-api.xml high-level-api-definition.xml \
+                murphy-db-query-language.xml mql-grammar.xml \
+		../lyx/*.xml ../lyx/*~

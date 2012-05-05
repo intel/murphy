@@ -1,4 +1,4 @@
-.SUFFIXES: .svg .pdf .png .lyx
+.SUFFIXES: .svg .pdf .png .lyx .xml
 
 vpath %.svg  $(MRP_FIGDIR)
 
@@ -9,4 +9,20 @@ vpath %.svg  $(MRP_FIGDIR)
 .svg.png:
 	$(MRP_INKSCAPE) --export-area-drawing --export-png=$@ $<
 
+.lyx.xml:
+	$(MRP_LYX) --export docbook-xml $< 2> /tmp/dblyx.log
+	lyx_file=$< ; lyxml_file=$${lyx_file/.lyx/.xml} ; \
+        if [ -f "$$lyxml_file" ] ; then \
+	   $(MRP_DBLYXFIX) $$lyxml_file $@ && rm -f $$lyxml_file ; \
+        else \
+           cat /tmp/dblyx.log ; \
+        fi ; \
+        rm -f /tmp/dblyx.log
 
+.xml.pdf:
+	echo "  DBPDF $@" 1>&2
+	rm -f $@
+	$(MRP_DBLATEX) --pdf -P figure.title.top=0 -P doc.section.depth=2 \
+                       -o $@ $< 2> /tmp/dblatex.log 1>&2
+	[ -f "$@" ] || cat /tmp/dblatex.log 1>&2
+	rm -f /tmp/dblatex.log

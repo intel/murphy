@@ -67,7 +67,7 @@ def _main():
     # store the result in variable 'sect'
     for name, doxml in _files:
         if name[0] != '<':
-            sys.stderr.write("      %s\n" % name)
+            sys.stderr.write("  DOXML %s\n" % name)
         ParseDoxmlFile(doxml, sect)
 
     # process 'sect' (eg. resolve typedefs, skip useless entries)

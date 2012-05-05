@@ -241,10 +241,11 @@ AC_SUBST(MRP_MAKE_DOCRULES, [$MRP_DOCDIR/Makefile.rules])
 AC_SUBST(MRP_DOCSCRIPT_DIR, [$MRP_DOCDIR/scripts])
 AC_SUBST(MRP_ABNF, [$MRP_DOCSCRIPT_DIR/abnf.py])
 AC_SUBST(MRP_DBLYXFIX, [$MRP_DOCSCRIPT_DIR/dblyxfix.py])
+AC_SUBST(MRP_DOXML2DB, [$MRP_DOCSCRIPT_DIR/doxml2db.py])
 
 
 # Shave by default.
-#SHAVE_INIT([build-aux], [enable])
+SHAVE_INIT([build-aux], [enable])
 
 # Create murphy symlink to src.
 if test ! -L murphy; then
@@ -269,7 +270,9 @@ AC_CONFIG_FILES([build-aux/shave
                  src/murphy-db/include/Makefile
                  src/murphy-db/tests/Makefile
 		 doc/Makefile
+                 doc/plugin-developer-guide/Makefile
                  doc/plugin-developer-guide/db/Makefile
+                 doc/plugin-developer-guide/doxml/Makefile
 		 ])
 AC_OUTPUT
 

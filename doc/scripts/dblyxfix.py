@@ -55,6 +55,8 @@ if len(sys.argv) >= 2:
 else:
     fnam = "<unknown>"
 
+sys.stderr.write("  DBLYX %s\n" % fnam)
+
 try:
     input  = open(path, "r")
     input_xml = input.read()
