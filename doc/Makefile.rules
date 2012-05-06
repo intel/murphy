@@ -26,3 +26,12 @@ vpath %.svg  $(MRP_FIGDIR)
                        -o $@ $< 2> /tmp/dblatex.log 1>&2
 	[ -f "$@" ] || cat /tmp/dblatex.log 1>&2
 	rm -f /tmp/dblatex.log
+
+$(DEPDIR)/Doxyfile.P: Doxyfile
+	$(MRP_DOXYDEPS) doxml_files $< $(DEPDIR)
+
+doxml_files: $(DEPDIR)/Doxyfile.P
+	echo "  DOXYG $@" 1>&2
+	$(MRP_DOXYGEN) Doxyfile
+	$(MRP_TOUCH) doxml_files
+

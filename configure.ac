@@ -207,21 +207,24 @@ AS_IF( [ test x$with_documentation = xno ],
          AC_PATH_TOOL([MRP_LYX], lyx)
          AC_PATH_TOOL([MRP_INKSCAPE], inkscape)
          AC_PATH_TOOL([MRP_PYTHON], python)
+         AC_PATH_TOOL([MRP_TOUCH], touch)
          AC_PATH_TOOL([MRP_DBLATEX], dblatex)
          AC_PATH_TOOL([MRP_XMLTO], xmlto)
 
          AS_IF( [ test x$MRP_DOXYGEN = x -o x$MRP_LYX = x -o \
-                       x$MRP_INKSCAPE = x -o x$MRP_PYTHON = x ],
+                       x$MRP_INKSCAPE = x -o x$MRP_PYTHON = x -o \
+                       x$MRP_TOUCH = x],
                 [ has_doc_tools="no";
                   AC_MSG_WARN([Some essential doc-tool is missing]) ],
-                [ has_doc_tools="yes" ]
+                [ has_doc_tools="yes";
+                  MRP_DOCINIT() ]
          ) ]
 )
 
-AS_IF([ test x$has_doc_tools == "xno" -o x$MRP_DBLATEX = x ],
-      [ can_make_pdfs="no";
-        AC_WARN([No PDF documentation will be generated]) ],
-      [ can_make_pdfs="yes"]
+AS_IF( [ test x$has_doc_tools == "xno" -o x$MRP_DBLATEX = x ],
+       [ can_make_pdfs="no";
+         AC_WARN([No PDF documentation will be generated]) ],
+       [ can_make_pdfs="yes"]
 )
 
 AS_IF([ test x$has_doc_tools == "xno" -o x$MRP_XMLTO = x ],
@@ -242,6 +245,7 @@ AC_SUBST(MRP_DOCSCRIPT_DIR, [$MRP_DOCDIR/scripts])
 AC_SUBST(MRP_ABNF, [$MRP_DOCSCRIPT_DIR/abnf.py])
 AC_SUBST(MRP_DBLYXFIX, [$MRP_DOCSCRIPT_DIR/dblyxfix.py])
 AC_SUBST(MRP_DOXML2DB, [$MRP_DOCSCRIPT_DIR/doxml2db.py])
+AC_SUBST(MRP_DOXYDEPS, [$MRP_DOCSCRIPT_DIR/doxydeps.py])
 
 
 # Shave by default.

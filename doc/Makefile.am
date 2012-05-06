@@ -26,13 +26,6 @@ doc_DATA = CODING-STYLE # $(DOCFILES)
 all-am: $(TARGETS)
 
 pdf_targets: plugin-developer-guide.pdf
-#	for name in $(MANUALS) ; do \
-#		xml=$${name}/db/$${name}.xml ; \
-#		pdf=$${name}.pdf ; \
-#		$(MRP_DBLATEX) --pdf \
-#	            -P figure.title.top=0 -P doc.section.depth=2 \
-#	            -o $${pdf} $${xml} ; \
-#	done
 
 plugin-developer-guide.pdf: plugin-developer-guide.xml
 
