@@ -5,8 +5,6 @@ dnl
 
 AC_DEFUN([MRP_DOCINIT],
 [
-  echo "### ch1"
-
   m4_ifset([$1], [depdir=$1], [depdir=.deps]) 
   m4_ifset([$2], [doxyfile=$1], [doxyfile=Doxyfile])
   m4_ifset([$3], [docdir=$2], [docdir=doc])

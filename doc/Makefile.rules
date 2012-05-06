@@ -2,12 +2,18 @@
 
 vpath %.svg  $(MRP_FIGDIR)
 
-.svg.pdf:
-	$(MRP_INKSCAPE) --export-area-drawing --export-pdf=$@ $<
+.svg:
+	echo "  CP    $@" 1>&2
 
+.svg.pdf:
+	echo "  INKSC $@" 1>&2
+	$(MRP_INKSCAPE) --export-area-drawing --export-pdf=$@ $< \
+	    > /dev/null 2>&1
 
 .svg.png:
-	$(MRP_INKSCAPE) --export-area-drawing --export-png=$@ $<
+	echo "  INKSC $@" 1>&2
+	$(MRP_INKSCAPE) --export-area-drawing --export-png=$@ $< \
+	    > /dev/null 2>&1
 
 .lyx.xml:
 	$(MRP_LYX) --export docbook-xml $< 2> /tmp/dblyx.log
