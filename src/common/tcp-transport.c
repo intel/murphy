@@ -18,13 +18,11 @@
 typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
     int             sock;                /* TCP socket */
+    int             flags;               /* socket flags */
     mrp_io_watch_t *iow;                 /* socket I/O watch */
     void           *ibuf;                /* input buffer */
     size_t          isize;               /* input buffer size */
     size_t          idata;               /* amount of input data */
-    void           *obuf;                /* output buffer */
-    size_t          osize;               /* output buffer size */
-    size_t          odata;               /* amount of output data */
 } tcp_t;
 
 
@@ -68,13 +66,50 @@ static socklen_t tcp_resolve(const char *str, void *addr, socklen_t size)
 }
 
 
-static int tcp_open(mrp_transport_t *mt)
+static int tcp_open(mrp_transport_t *mt, int flags)
 {
     tcp_t *t = (tcp_t *)mt;
     
-    t->sock = -1;
+    t->sock  = -1;
+    t->flags = flags;
 
     return TRUE;
+}
+
+
+static int tcp_create(mrp_transport_t *mt, void *conn, int flags)
+{
+    tcp_t           *t = (tcp_t *)mt;
+    mrp_io_event_t   events;    
+    int              on;
+    long             nb;
+
+    t->sock  = *(int *)conn;
+    t->flags = flags;
+
+    if (t->sock >= 0) {
+	if (t->flags & MRP_TRANSPORT_REUSEADDR) {
+	    on = 1;
+	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	}
+	if (t->flags & MRP_TRANSPORT_NONBLOCK) {
+	    nb = 1;
+	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+	}
+
+	if (t->connected) {
+	    events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+	    t->iow = mrp_add_io_watch(t->ml, t->sock, events, tcp_recv_cb, t);
+	    
+	    if (t->iow != NULL) {
+		t->connected = TRUE;
+
+		return TRUE;
+	    }
+	}
+    }
+    
+    return FALSE;
 }
 
 
@@ -91,39 +126,65 @@ static int tcp_bind(mrp_transport_t *mt, void *addr, socklen_t addrlen)
 }
 
 
-static int tcp_accept(mrp_transport_t *mt, void *conn)
+static int tcp_listen(mrp_transport_t *mt, int backlog)
 {
-    tcp_t           *t = (tcp_t *)mt;
+    tcp_t *t = (tcp_t *)mt;
+
+    if (t->sock != -1 && t->iow != NULL && t->evt.connection != NULL) {
+	if (listen(t->sock, backlog) == 0) {
+	    t->listened = TRUE;
+	    return TRUE;
+	}
+    }
+
+    return FALSE;
+}
+
+
+static int tcp_accept(mrp_transport_t *mt, mrp_transport_t *mlt, int flags)
+{
+    tcp_t           *t, *lt;
     struct sockaddr  addr;
     socklen_t        addrlen;
-    int              reuse;
-    long             nonblk;
-    mrp_io_event_t   events;    
+    mrp_io_event_t   events;
+    int              on;
+    long             nb;
+
+
+    t  = (tcp_t *)mt;
+    lt = (tcp_t *)mlt;
 
     addrlen = sizeof(addr);
-    t->sock = accept(*(int *)conn, &addr, &addrlen);
+    t->sock = accept(lt->sock, &addr, &addrlen);
 
     if (t->sock >= 0) {
-	reuse = 1;
-	setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-	nonblk = 1;
-	fcntl(t->sock, F_SETFL, O_NONBLOCK, nonblk);
+	if (flags & MRP_TRANSPORT_REUSEADDR) {
+	    on = 1;
+	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	}
+	if (flags & MRP_TRANSPORT_NONBLOCK) {
+	    nb = 1;
+	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+	}
+	if (flags & MRP_TRANSPORT_CLOEXEC) {
+	    on = 1;
+	    fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
+	}
 
 	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
 	t->iow = mrp_add_io_watch(t->ml, t->sock, events, tcp_recv_cb, t);
 	    
 	if (t->iow != NULL) {
 	    t->connected = TRUE;
-
+	    
 	    return TRUE;
+	}
+	else {
+	    close(t->sock);
+	    t->sock = -1;
 	}
     }
     
-    if (t->sock != -1) {
-	close(t->sock);
-	t->sock = -1;
-    }
-
     return FALSE;
 }
 
@@ -162,6 +223,15 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     MRP_UNUSED(w);
 
     if (events & MRP_IO_EVENT_IN) {
+	if (MRP_UNLIKELY(mt->listened != 0)) {
+	    MRP_TRANSPORT_BUSY(mt, {
+		    mt->evt.connection(mt, mt->user_data);
+		});
+
+	    t->check_destroy(mt);
+	    return;
+	}
+
 	/*
 	 * enlarge the buffer if we're out of space
 	 */
@@ -254,10 +324,25 @@ static void tcp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 static int open_socket(tcp_t *t, int family)
 {
     mrp_io_event_t events;
+    int            on;
+    long           nb;
 
     t->sock = socket(family, SOCK_STREAM, 0);
     
     if (t->sock != -1) {
+	if (t->flags & MRP_TRANSPORT_REUSEADDR) {
+	    on = 1;
+	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	}
+	if (t->flags & MRP_TRANSPORT_NONBLOCK) {
+	    nb = 1;
+	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+	}
+	if (t->flags & MRP_TRANSPORT_CLOEXEC) {
+	    on = 1;
+	    fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
+	}
+	
 	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
 	t->iow = mrp_add_io_watch(t->ml, t->sock, events, tcp_recv_cb, t);
     
@@ -273,38 +358,32 @@ static int open_socket(tcp_t *t, int family)
 }
 
 
-static int tcp_connect(mrp_transport_t *mt, void *addrstr)
+static int tcp_connect(mrp_transport_t *mt, void *addrptr, socklen_t addrlen)
 {
-    tcp_t           *t = (tcp_t *)mt;
-    struct sockaddr  addr;
-    int              addrlen;
-    int              reuse;
-    long             nonblk;
+    tcp_t           *t    = (tcp_t *)mt;
+    struct sockaddr *addr = (struct sockaddr *)addrptr;
+    int              on;
+    long             nb;
     mrp_io_event_t   events;
 
-    addrlen = mrp_transport_resolve(mt, addrstr, &addr, sizeof(addr));
-    
-    if (addrlen > 0) {
-	t->sock = socket(addr.sa_family, SOCK_STREAM, 0);
+    t->sock = socket(addr->sa_family, SOCK_STREAM, 0);
 
-	if (t->sock < 0)
-	    return FALSE;
+    if (t->sock < 0)
+	return FALSE;
 
-	if (connect(t->sock, &addr, addrlen) == 0) {
-	    events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	    t->iow = mrp_add_io_watch(t->ml, t->sock, events, tcp_recv_cb, t);
+    if (connect(t->sock, addr, addrlen) == 0) {
+	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+	t->iow = mrp_add_io_watch(t->ml, t->sock, events, tcp_recv_cb, t);
 	    
-	    if (t->iow != NULL) {
-		reuse = 1;
-		setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR,
-			   &reuse, sizeof(reuse));
-		nonblk = 1;
-		fcntl(t->sock, F_SETFL, O_NONBLOCK, nonblk);
+	if (t->iow != NULL) {
+	    on = 1;
+	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	    nb = 1;
+	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
 
-		t->connected = TRUE;
-
-		return TRUE;
-	    }
+	    t->connected = TRUE;
+	    
+	    return TRUE;
 	}
     }
     
@@ -373,6 +452,7 @@ static int tcp_send(mrp_transport_t *mt, mrp_msg_t *msg)
 
 
 MRP_REGISTER_TRANSPORT("tcp", tcp_t, tcp_resolve,
-		       tcp_open, tcp_bind, tcp_accept, tcp_close,
+		       tcp_open, tcp_create, tcp_close,
+		       tcp_bind, tcp_listen, tcp_accept,
 		       tcp_connect, tcp_disconnect,
 		       tcp_send, NULL);

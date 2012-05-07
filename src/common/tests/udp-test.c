@@ -97,7 +97,7 @@ void server_init(context_t *c)
     struct sockaddr addr;
     socklen_t       addrlen;
 
-    c->t = mrp_transport_create(c->ml, "udp", &evt, c);
+    c->t = mrp_transport_create(c->ml, "udp", &evt, c, 0);
     
     if (c->t == NULL) {
 	mrp_log_error("Failed to create new transport.");
@@ -166,14 +166,24 @@ void client_init(context_t *c)
 	.recvfrom = NULL,
     };
 
-    c->t = mrp_transport_create(c->ml, "udp", &evt, c);
+    struct sockaddr addr;
+    socklen_t       addrlen;
+
+    addrlen = mrp_transport_resolve(NULL, c->addr, &addr, sizeof(addr));
+
+    if (addrlen <= 0) {
+	mrp_log_error("Failed resolve transport address '%s'.", c->addr);
+	exit(1);
+    }
+
+    c->t = mrp_transport_create(c->ml, "udp", &evt, c, 0);
     
     if (c->t == NULL) {
 	mrp_log_error("Failed to create new transport.");
 	exit(1);
     }
 
-    if (!mrp_transport_connect(c->t, c->addr)) {
+    if (!mrp_transport_connect(c->t, &addr, addrlen)) {
 	mrp_log_error("Failed to connect to %s.", c->addr);
 	exit(1);
     }

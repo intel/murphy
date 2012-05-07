@@ -9,6 +9,8 @@ static int check_destroy(mrp_transport_t *t);
 
 static MRP_LIST_HOOK(transports);
 
+static inline int purge_destroyed(mrp_transport_t *t);
+
 
 int mrp_transport_register(mrp_transport_descr_t *d)
 {
@@ -45,7 +47,38 @@ static mrp_transport_descr_t *find_transport(const char *type)
 
 
 mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
-				      mrp_transport_evt_t *evt, void *user_data)
+				      mrp_transport_evt_t *evt, void *user_data,
+				      int flags)
+{
+    mrp_transport_descr_t *d;
+    mrp_transport_t       *t;
+
+    if ((d = find_transport(type)) != NULL) {
+	if ((t = mrp_allocz(d->size)) != NULL) {
+	    t->descr     = d;
+	    t->ml        = ml;
+	    t->evt       = *evt;
+	    t->user_data = user_data;
+	    
+	    t->check_destroy = check_destroy;
+
+	    if (!t->descr->req.open(t, flags)) {
+		mrp_free(t);
+		t = NULL;
+	    }
+	}
+    }
+    else
+	t = NULL;
+       
+    return t;
+}
+
+
+mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
+					   void *conn, mrp_transport_evt_t *evt,
+					   void *user_data, int flags,
+					   int connected)
 {
     mrp_transport_descr_t *d;
     mrp_transport_t       *t;
@@ -53,13 +86,13 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
     if ((d = find_transport(type)) != NULL) {
 	if ((t = mrp_allocz(d->size)) != NULL) {
 	    t->ml        = ml;
-	    t->req       = d->req;
 	    t->evt       = *evt;
 	    t->user_data = user_data;
+	    t->connected = connected;
 	    
 	    t->check_destroy = check_destroy;
 
-	    if (!t->req.open(t)) {
+	    if (!t->descr->req.create(t, conn, flags)) {
 		mrp_free(t);
 		t = NULL;
 	    }
@@ -79,18 +112,16 @@ socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
     char                  *p, type[32];
     int                    n;
 
-    if (t != NULL) {
-	mrp_log_warning("%s@%s:%d: t != NULL but transport-relative resolving",
-			__FUNCTION__, __FILE__, __LINE__);
-	mrp_log_warning("is not implemented! Ignoring t (%p)...", t);
-    }
-
     if ((p = strchr(str, ':')) != NULL && (n = p - str) < (int)sizeof(type)) {
 	strncpy(type, str, n);
 	type[n] = '\0';
 
-	if ((d = find_transport(type)) != NULL)
-	    return d->resolve(p + 1, addr, size);
+	if (t != NULL)
+	    return t->descr->resolve(p + 1, addr, size);
+	else {
+	    if ((d = find_transport(type)) != NULL)
+		return d->resolve(p + 1, addr, size);
+	}
     }
 
     return 0;
@@ -100,8 +131,8 @@ socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
 int mrp_transport_bind(mrp_transport_t *t, void *addr, socklen_t addrlen)
 {
     if (t != NULL) {
-	if (t->req.bind != NULL)
-	    return t->req.bind(t, addr, addrlen);
+	if (t->descr->req.bind != NULL)
+	    return t->descr->req.bind(t, addr, addrlen);
 	else
 	    return TRUE;                  /* assume no binding is needed */
     }
@@ -110,31 +141,48 @@ int mrp_transport_bind(mrp_transport_t *t, void *addr, socklen_t addrlen)
 }
 
 
-mrp_transport_t *mrp_transport_accept(mrp_mainloop_t *ml, const char *type,
-				      void *conn, mrp_transport_evt_t *evt,
-				      void *user_data)
+int mrp_transport_listen(mrp_transport_t *t, int backlog)
 {
-    mrp_transport_descr_t *d;
-    mrp_transport_t       *t;
+    int result;
+    
+    if (t != NULL) {
+	if (t->descr->req.listen != NULL) {
+	    MRP_TRANSPORT_BUSY(t, {
+		    result = t->descr->req.listen(t, backlog);
+		});
 
-    if ((d = find_transport(type)) != NULL) {
-	if ((t = mrp_allocz(d->size)) != NULL) {
-	    t->ml        = ml;
-	    t->req       = d->req;
-	    t->evt       = *evt;
-	    t->user_data = user_data;
+	    purge_destroyed(t);
 	    
-	    t->check_destroy = check_destroy;
-
-	    if (!t->req.accept(t, conn)) {
-		mrp_free(t);
-		t = NULL;
-	    }
+	    return result;
 	}
     }
-    else
-	t = NULL;
-       
+
+    return FALSE;
+}
+
+
+mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
+				      mrp_transport_evt_t *evt,
+				      void *user_data, int flags)
+{
+    mrp_transport_t *t;
+
+    if ((t = mrp_allocz(lt->descr->size)) != NULL) {
+	t->descr     = lt->descr;
+	t->ml        = lt->ml;
+	t->evt       = *evt;
+	t->user_data = user_data;
+
+	t->check_destroy = check_destroy;
+
+	MRP_TRANSPORT_BUSY(t, {
+		if (!t->descr->req.accept(t, lt, flags)) {
+		    mrp_free(t);
+		    t = NULL;
+		}
+	    });
+    }
+
     return t;
 }
 
@@ -157,8 +205,8 @@ void mrp_transport_destroy(mrp_transport_t *t)
 	t->destroyed = TRUE;
 	
 	MRP_TRANSPORT_BUSY(t, {
-		t->req.disconnect(t);
-		t->req.close(t);
+		t->descr->req.disconnect(t);
+		t->descr->req.close(t);
 	    });
 
 	purge_destroyed(t);
@@ -172,13 +220,13 @@ static int check_destroy(mrp_transport_t *t)
 }
 
 
-int mrp_transport_connect(mrp_transport_t *t, void *addr)
+int mrp_transport_connect(mrp_transport_t *t, void *addr, socklen_t addrlen)
 {
     int result;
     
     if (!t->connected) {
 	MRP_TRANSPORT_BUSY(t, {
-		if (t->req.connect(t, addr))  {
+		if (t->descr->req.connect(t, addr, addrlen))  {
 		    t->connected = TRUE;
 		    result       = TRUE;
 		}
@@ -201,7 +249,7 @@ int mrp_transport_disconnect(mrp_transport_t *t)
     
     if (t->connected) {
 	MRP_TRANSPORT_BUSY(t, {
-		if (t->req.disconnect(t)) {
+		if (t->descr->req.disconnect(t)) {
 		    t->connected = FALSE;
 		    result       = TRUE;
 		}
@@ -222,9 +270,9 @@ int mrp_transport_send(mrp_transport_t *t, mrp_msg_t *msg)
 {
     int result;
     
-    if (t->connected && t->req.send) {
+    if (t->connected && t->descr->req.send) {
 	MRP_TRANSPORT_BUSY(t, {
-		result = t->req.send(t, msg);
+		result = t->descr->req.send(t, msg);
 	    });
 
 	purge_destroyed(t);
@@ -241,9 +289,9 @@ int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
 {
     int result;
     
-    if (!t->connected && t->req.sendto) {
+    if (/*!t->connected && */t->descr->req.sendto) {
 	MRP_TRANSPORT_BUSY(t, {
-		result = t->req.sendto(t, msg, addr, addrlen);
+		result = t->descr->req.sendto(t, msg, addr, addrlen);
 	    });
 
 	purge_destroyed(t);

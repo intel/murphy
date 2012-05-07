@@ -11,13 +11,32 @@
 
 typedef struct {
     mrp_mainloop_t  *ml;
-    mrp_transport_t *t;
+    mrp_transport_t *lt, *t;
     char            *addr;
     int              server;
     int              sock;
     mrp_io_watch_t  *iow;
     mrp_timer_t     *timer;
 } context_t;
+
+
+void closed_evt(mrp_transport_t *t, int error, void *user_data)
+{
+    context_t *c = (context_t *)user_data;
+
+    MRP_UNUSED(t);
+    MRP_UNUSED(c);
+
+    if (error) {
+	mrp_log_error("Connection closed with error %d (%s).", error,
+		      strerror(error));
+	exit(1);
+    }
+    else {
+	mrp_log_info("Peer has closed the connection.");
+	exit(0);
+    }
+}
 
 
 void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
@@ -42,99 +61,62 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 	else
 	    mrp_log_error("Failed to send reply.");
     }
-
-#if 0 /* done by the tranport layer... */
-    mrp_msg_destroy(msg);
-#endif
 }
 
 
-void closed_evt(mrp_transport_t *t, int error, void *user_data)
-{
-    context_t *c = (context_t *)user_data;
-
-    MRP_UNUSED(t);
-    MRP_UNUSED(c);
-
-    if (error) {
-	mrp_log_error("Connection closed with error %d (%s).", error,
-		      strerror(error));
-	exit(1);
-    }
-    else {
-	mrp_log_info("Peer has closed the connection.");
-	exit(0);
-    }
-}
-
-
-static void accept_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-		      mrp_io_event_t events, void *user_data)
+void connection_evt(mrp_transport_t *lt, void *user_data)
 {
     static mrp_transport_evt_t evt = {
 	.closed   = closed_evt,
 	.recv     = recv_evt,
 	.recvfrom = NULL,
     };
-    
+
     context_t *c = (context_t *)user_data;
+    int        flags;
 
-    MRP_UNUSED(w);
+    flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_NONBLOCK;
+    c->t = mrp_transport_accept(lt, &evt, c, flags);
 
-    if (events & MRP_IO_EVENT_IN) {
-	c->t = mrp_transport_accept(ml, "tcp", &fd, &evt, c);
-
-	if (c->t == NULL) {
-	    mrp_log_error("Failed to accept new transport.");
-	    exit(1);
-	}
+    if (c->t == NULL) {
+	mrp_log_error("Failed to accept new connection.");
+	exit(1);
     }
 }
 
 
 void server_init(context_t *c)
 {
+    static mrp_transport_evt_t evt = {
+	.closed     = NULL,
+	.recv       = NULL,
+	.recvfrom   = NULL,
+	.connection = connection_evt,
+    };
+
     struct sockaddr addr;
     socklen_t       addrlen;
-    mrp_io_event_t  events;
-    int             reuse;
-    long            nonblk;
 
     addrlen = mrp_transport_resolve(NULL, c->addr, &addr, sizeof(addr));
 
     if (addrlen > 0) {
-	c->sock = socket(addr.sa_family, SOCK_STREAM, 0);
-	
-	if (c->sock < 0) {
-	    mrp_log_error("Failed to create socket.");
+	c->lt = mrp_transport_create(c->ml, "tcp", &evt, c, 0);
+
+	if (c->lt == NULL) {
+	    mrp_log_error("Failed to create listening server transport.");
 	    exit(1);
 	}
 
-	reuse = 1;
-	setsockopt(c->sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-	nonblk = 1;
-	fcntl(c->sock, F_SETFL, O_NONBLOCK, nonblk);
-
-	if (bind(c->sock, &addr, addrlen) < 0) {
-	    mrp_log_error("Failed to bind socket to %s (%d: %s).", c->addr,
-			  errno, strerror(errno));
+	if (!mrp_transport_bind(c->lt, &addr, addrlen)) {
+	    mrp_log_error("Failed to bind transport to address %s.", c->addr);
 	    exit(1);
 	}
 
-	if (listen(c->sock, 4) < 0) {
-	    mrp_log_error("Failed to listen on socket (%d: %s).", errno,
-			  strerror(errno));
+	if (!mrp_transport_listen(c->lt, 0)) {
+	    mrp_log_error("Failed to listen on server transport.");
 	    exit(1);
 	}
-	
-	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	c->iow = mrp_add_io_watch(c->ml, c->sock, events, accept_cb, c);
-
-	if (c->iow == NULL) {
-	    mrp_log_error("Failed to create I/O watch for socket.");
-	    exit(1);
-	}
-    }
+    }    
     else {
 	mrp_log_error("Failed to resolve address %s.", c->addr);
 	exit(1);
@@ -192,20 +174,30 @@ void client_init(context_t *c)
 	.recvfrom = NULL,
     };
 
-    c->t = mrp_transport_create(c->ml, "tcp", &evt, c);
+    struct sockaddr addr;
+    socklen_t       addrlen;
+
+    addrlen = mrp_transport_resolve(NULL, c->addr, &addr, sizeof(addr));
+    
+    if (addrlen <= 0) {
+	mrp_log_error("Failed resolve transport address '%s'.", c->addr);
+	exit(1);
+    }
+    
+    c->t = mrp_transport_create(c->ml, "tcp", &evt, c, 0);
     
     if (c->t == NULL) {
 	mrp_log_error("Failed to create new transport.");
 	exit(1);
     }
-
-    if (!mrp_transport_connect(c->t, c->addr)) {
+    
+    if (!mrp_transport_connect(c->t, &addr, addrlen)) {
 	mrp_log_error("Failed to connect to %s.", c->addr);
 	exit(1);
     }
-
+    
     c->timer = mrp_add_timer(c->ml, 1000, send_cb, c);
-
+    
     if (c->timer == NULL) {
 	mrp_log_error("Failed to create send timer.");
 	exit(1);

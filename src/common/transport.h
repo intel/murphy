@@ -53,6 +53,16 @@ typedef struct mrp_transport_s mrp_transport_t;
  */
 
 
+/*
+ * various transport flags
+ */
+
+typedef enum {
+    MRP_TRANSPORT_REUSEADDR = 0x1,
+    MRP_TRANSPORT_NONBLOCK  = 0x2,
+    MRP_TRANSPORT_CLOEXEC   = 0x4,
+} mrp_transport_flag_t;
+
 
 /*
  * transport requests
@@ -66,13 +76,17 @@ typedef struct mrp_transport_s mrp_transport_t;
 
 typedef struct {
     /** Open a new transport. */
-    int  (*open)(mrp_transport_t *t);
+    int  (*open)(mrp_transport_t *t, int flags);
+    /** Create a new transport from an existing backend object. */
+    int  (*create)(mrp_transport_t *t, void *obj, int flags);
     /** Bind a transport to a given transport-specific address. */
     int  (*bind)(mrp_transport_t *t, void *addr, socklen_t addrlen);
-    /** Accept a new transport connection. */
-    int  (*accept)(mrp_transport_t *t, void *conn);
+    /** Listen on a transport for incoming connections. */
+    int  (*listen)(mrp_transport_t *t, int backlog);
+    /** Accept a new transport connection over an existing transport. */
+    int  (*accept)(mrp_transport_t *t, mrp_transport_t *lt, int flags);
     /** Connect a transport to an endpoint. */
-    int  (*connect)(mrp_transport_t *t, void *addr);
+    int  (*connect)(mrp_transport_t *t, void *addr, socklen_t addrlen);
     /** Disconnect a transport, if it is connection-oriented. */
     int  (*disconnect)(mrp_transport_t *t);
     /** Close a transport, free all resources from open/accept/connect. */
@@ -96,10 +110,15 @@ typedef struct {
  */
 
 typedef struct {
+    /** Message received on a connected transport. */
     void (*recv)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
+    /** Message received on an unconnected transport. */
     void (*recvfrom)(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
 		     socklen_t addrlen, void *user_data);
+    /** Connection closed by peer. */
     void (*closed)(mrp_transport_t *t, int error, void *user_data);
+    /** Connection attempt on a socket being listened on. */
+    void (*connection)(mrp_transport_t *t, void *user_data);
 } mrp_transport_evt_t;
 
 
@@ -122,12 +141,13 @@ typedef struct {
 
 #define MRP_TRANSPORT_PUBLIC_FIELDS					\
     mrp_mainloop_t          *ml;					\
-    mrp_transport_req_t      req;					\
+    mrp_transport_descr_t   *descr;					\
     mrp_transport_evt_t      evt;					\
     int                    (*check_destroy)(mrp_transport_t *t);	\
     void                    *user_data;					\
     int                      busy;					\
     int                      connected : 1;				\
+    int                      listened : 1;				\
     int                      destroyed : 1				\
     
 
@@ -211,7 +231,8 @@ struct mrp_transport_s {
 
 /** Automatically register a transport on startup. */
 #define MRP_REGISTER_TRANSPORT(_typename, _structtype, _resolve,	\
-			       _open, _bind, _accept, _close,		\
+			       _open, _create, _close,			\
+			       _bind, _listen, _accept,			\
 			       _connect, _disconnect,			\
 			       _send, _sendto)				\
     static void register_transport(void) __attribute__((constructor));	\
@@ -223,7 +244,9 @@ struct mrp_transport_s {
 	    .resolve = _resolve,					\
 	    .req     = {						\
 		.open       = _open,					\
+	        .create     = _create,					\
 		.bind       = _bind,					\
+		.listen     = _listen,					\
 		.accept     = _accept,					\
 		.close      = _close,					\
 		.connect    = _connect,					\
@@ -252,7 +275,13 @@ void mrp_transport_unregister(mrp_transport_descr_t *d);
 /** Create a new transport. */
 mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 				      mrp_transport_evt_t *evt,
-				      void *user_data);
+				      void *user_data, int flags);
+
+/** Create a new transport from a backend object. */
+mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
+					   void *conn, mrp_transport_evt_t *evt,
+					   void *user_data, int flags,
+					   int connected);
 
 /** Resolve an address string to a transport-specific address. */
 socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
@@ -261,16 +290,19 @@ socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
 /** Bind a given transport to a transport-specific address. */
 int mrp_transport_bind(mrp_transport_t *t, void *addr, socklen_t addrlen);
 
-/** Accept a new transport connection. */
-mrp_transport_t *mrp_transport_accept(mrp_mainloop_t *ml, const char *type,
-				      void *conn, mrp_transport_evt_t *evt,
-				      void *user_data);
+/** Listen for incoming connection on the given transport. */
+int  mrp_transport_listen(mrp_transport_t *t, int backlog);
+
+/** Accept and create a new transport connection. */
+mrp_transport_t *mrp_transport_accept(mrp_transport_t *t,
+				      mrp_transport_evt_t *evt,
+				      void *user_data, int flags);
 
 /** Destroy a transport. */
 void mrp_transport_destroy(mrp_transport_t *t);
 
 /** Connect a transport to the given address. */
-int mrp_transport_connect(mrp_transport_t *t, void *addr);
+int mrp_transport_connect(mrp_transport_t *t, void *addr, socklen_t addrlen);
 
 /** Disconnect a transport. */
 int mrp_transport_disconnect(mrp_transport_t *t);

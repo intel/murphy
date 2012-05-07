@@ -18,6 +18,7 @@
 typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
     int             sock;                /* UDP socket */
+    int             flags;               /* socket flags */
     int             family;              /* socket family */
     mrp_io_watch_t *iow;                 /* socket I/O watch */
     void           *ibuf;                /* input buffer */
@@ -67,14 +68,45 @@ static socklen_t udp_resolve(const char *str, void *addr, socklen_t size)
 }
 
 
-static int udp_open(mrp_transport_t *mu)
+static int udp_open(mrp_transport_t *mu, int flags)
 {
     udp_t *u = (udp_t *)mu;
     
     u->sock   = -1;
     u->family = -1;
+    u->flags  = flags;
 
     return TRUE;
+}
+
+
+static int udp_create(mrp_transport_t *mu, void *conn, int flags)
+{
+    udp_t           *u = (udp_t *)mu;
+    int              on;
+    mrp_io_event_t   events;    
+
+    u->sock  = *(int *)conn;
+    u->flags = flags;
+
+    if (u->sock >= 0) {
+	if (u->flags & MRP_TRANSPORT_REUSEADDR) {
+	    on = 1;
+	    setsockopt(u->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	}
+	if (u->flags & MRP_TRANSPORT_NONBLOCK) {
+	    on = 1;
+	    fcntl(u->sock, F_SETFL, O_NONBLOCK, on);
+	}
+
+	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+	u->iow = mrp_add_io_watch(u->ml, u->sock, events, udp_recv_cb, u);
+	    
+	if (u->iow != NULL)
+	    return TRUE;
+    }
+    
+    return FALSE;
 }
 
 
@@ -89,6 +121,15 @@ static int udp_bind(mrp_transport_t *mu, void *addr, socklen_t addrlen)
     }
 
     return FALSE;
+}
+
+
+static int udp_listen(mrp_transport_t *mt, int backlog)
+{
+    MRP_UNUSED(mt);
+    MRP_UNUSED(backlog);
+    
+    return TRUE;            /* can be connected to without listening */
 }
 
 
@@ -215,10 +256,25 @@ static void udp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 static int open_socket(udp_t *u, int family)
 {
     mrp_io_event_t events;
+    int            on;
+    long           nb;
 
     u->sock = socket(family, SOCK_DGRAM, 0);
     
     if (u->sock != -1) {
+	if (u->flags & MRP_TRANSPORT_REUSEADDR) {
+	    on = 1;
+	    setsockopt(u->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	}
+	if (u->flags & MRP_TRANSPORT_NONBLOCK) {
+	    nb = 1;
+	    fcntl(u->sock, F_SETFL, O_NONBLOCK, nb);
+	}
+	if (u->flags & MRP_TRANSPORT_CLOEXEC) {
+	    on = 1;
+	    fcntl(u->sock, F_SETFL, O_CLOEXEC, on);
+	}
+
 	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
 	u->iow = mrp_add_io_watch(u->ml, u->sock, events, udp_recv_cb, u);
     
@@ -234,36 +290,30 @@ static int open_socket(udp_t *u, int family)
 }
 
 
-static int udp_connect(mrp_transport_t *mu, void *addrstr)
+static int udp_connect(mrp_transport_t *mu, void *addrptr, socklen_t addrlen)
 {
     udp_t           *u = (udp_t *)mu;
-    struct sockaddr  addr;
-    int              addrlen;
-    int              reuse;
-    long             nonblk;
+    struct sockaddr *addr = (struct sockaddr *)addrptr;
+    int              on;
+    long             nb;
 
-    addrlen = mrp_transport_resolve(mu, addrstr, &addr, sizeof(addr));
-    
-    if (addrlen > 0) {
-	if (MRP_UNLIKELY(u->family != -1 && u->family != addr.sa_family))
+    if (MRP_UNLIKELY(u->family != -1 && u->family != addr->sa_family))
+	return FALSE;
+
+    if (MRP_UNLIKELY(u->sock == -1)) {
+	if (!open_socket(u, addr->sa_family))
 	    return FALSE;
+    }
 
-	if (MRP_UNLIKELY(u->sock == -1)) {
-	    if (!open_socket(u, addr.sa_family))
-		return FALSE;
-	}
+    if (connect(u->sock, addr, addrlen) == 0) {
+	on = 1;
+	setsockopt(u->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	nb = 1;
+	fcntl(u->sock, F_SETFL, O_NONBLOCK, nb);
 
-	if (connect(u->sock, &addr, addrlen) == 0) {
-	    reuse = 1;
-	    setsockopt(u->sock, SOL_SOCKET, SO_REUSEADDR,
-		       &reuse, sizeof(reuse));
-	    nonblk = 1;
-	    fcntl(u->sock, F_SETFL, O_NONBLOCK, nonblk);
+	u->connected = TRUE;
 
-	    u->connected = TRUE;
-
-	    return TRUE;
-	}
+	return TRUE;
     }
     
     return FALSE;
@@ -272,15 +322,14 @@ static int udp_connect(mrp_transport_t *mu, void *addrstr)
 
 static int udp_disconnect(mrp_transport_t *mu)
 {
-    udp_t *u = (udp_t *)mu;
+    udp_t           *u    = (udp_t *)mu;
+    struct sockaddr  none = { .sa_family = AF_UNSPEC, };
+
 
     if (u->connected) {
-	mrp_del_io_watch(u->iow);
-	u->iow = NULL;
-
-	shutdown(u->sock, SHUT_RDWR);
+	connect(u->sock, &none, sizeof(none));
 	u->connected = FALSE;
-
+	
 	return TRUE;
     }
     else
@@ -376,6 +425,7 @@ static int udp_sendto(mrp_transport_t *mu, mrp_msg_t *msg, void *addr,
 
 
 MRP_REGISTER_TRANSPORT("udp", udp_t, udp_resolve,
-		       udp_open, udp_bind, NULL, udp_close,
+		       udp_open, udp_create, udp_close,
+		       udp_bind, udp_listen, NULL,
 		       udp_connect, udp_disconnect,
 		       udp_send, udp_sendto);
