@@ -178,8 +178,9 @@ void mrp_destroy_console(mrp_console_t *mc)
 	    fflush(mc->stdout);
 	if (mc->stderr != NULL)
 	    fflush(mc->stderr);
-	
-	mc->destroyed = TRUE;
+
+	if (!mc->preserve)            /* the Kludge of Death... */
+	    mc->destroyed = TRUE;
 
 	if (mc->backend_data != NULL) {
 	    MRP_CONSOLE_BUSY(mc, {

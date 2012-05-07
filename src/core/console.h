@@ -60,7 +60,8 @@ typedef struct {
     FILE                  *stderr;					\
     void                  *backend_data;				\
     int                    busy;					\
-    int                    destroyed : 1
+    int                    destroyed : 1;				\
+    int                    preserve : 1 /* the Kludge of Death, Sir Robin... */
 
 struct mrp_console_s {
     MRP_CONSOLE_PUBLIC_FIELDS;

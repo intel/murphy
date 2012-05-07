@@ -17,7 +17,7 @@
 #define client_error mrp_log_error
 
 #define DEFAULT_PROMPT  "murphy> "
-#define DEFAULT_CONSOLE "tcp:127.0.0.1:3000"
+#define DEFAULT_ADDRESS "tcp:127.0.0.1:3000"
 
 static void input_process_cb(char *input);
 
@@ -178,7 +178,7 @@ static void input_cleanup(client_t *c)
 void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
     client_t *c = (client_t *)user_data;
-    char     *prompt, *output, buf[128];
+    char     *prompt, *output, buf[128], *dummy;
     size_t    size;
     
     MRP_UNUSED(t);
@@ -192,11 +192,11 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 	snprintf(buf, sizeof(buf), "%.*s> ", (int)size, prompt);
 	prompt_set(c, buf);
     }
+    else if ((dummy = mrp_msg_find(msg, "bye", &size)) != NULL) {
+	mrp_mainloop_quit(c->ml, 0);
+	return;
+    }
     
-#if 0 /* done by the transport layer... */
-    mrp_msg_destroy(msg);
-#endif
-
     prompt_display(c);
 }
 
@@ -220,7 +220,7 @@ void closed_evt(mrp_transport_t *t, int error, void *user_data)
 }
 
 
-int client_setup(client_t *c, char *addr)
+int client_setup(client_t *c, const char *addrstr)
 {
     static mrp_transport_evt_t evt = {
 	.closed   = closed_evt,
@@ -228,20 +228,37 @@ int client_setup(client_t *c, char *addr)
 	.recvfrom = NULL,
     };
 
-    c->t = mrp_transport_create(c->ml, "tcp", &evt, c);
+    struct sockaddr  addr;
+    socklen_t        addrlen;
+    const char      *type;
+
+    if (!strncmp(addrstr, "udp:", 4))
+	type = "udp";
+    else
+	type = "tcp";
+
+    addrlen = mrp_transport_resolve(NULL, addrstr, &addr, sizeof(addr));
     
-    if (c->t == NULL) {
-	mrp_log_error("Failed to create new transport.");
-	return FALSE;
-    }
+    if (addrlen > 0) {
+	c->t = mrp_transport_create(c->ml, type, &evt, c, 0);
+    
+	if (c->t == NULL) {
+	    mrp_log_error("Failed to create new transport.");
+	    return FALSE;
+	}
 
-    if (!mrp_transport_connect(c->t, addr)) {
-	mrp_log_error("Failed to connect to %s.", addr);
-	mrp_transport_destroy(c->t);
-	return FALSE;
-    }
+	if (!mrp_transport_connect(c->t, &addr, addrlen)) {
+	    mrp_log_error("Failed to connect to %s.", addrstr);
+	    mrp_transport_destroy(c->t);
+	    return FALSE;
+	}
 
-    return TRUE;
+	return TRUE;
+    }
+    else
+	mrp_log_error("Failed to resolve address '%s'.", addrstr);
+    
+    return FALSE;
 }
 
 
@@ -269,7 +286,8 @@ static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
 
 int main(int argc, char *argv[])
 {
-    client_t c;
+    client_t    c;
+    const char *addr;
 
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
@@ -288,7 +306,12 @@ int main(int argc, char *argv[])
 
     mrp_add_sighandler(c.ml, SIGINT, signal_handler, &c);
 
-    if (!input_setup(&c) || !client_setup(&c, DEFAULT_CONSOLE))
+    if (argc == 2)
+	addr = argv[1];
+    else
+	addr = DEFAULT_ADDRESS;
+
+    if (!input_setup(&c) || !client_setup(&c, addr))
 	exit(1);
     
     rl_client = &c;                      /* readline has not user_data */

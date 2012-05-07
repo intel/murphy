@@ -144,8 +144,6 @@ static void cmd_exit(mrp_console_t *mc, void *user_data, int argc, char **argv)
     console_t *c = (console_t *)mc;
     char      *ha[2];
 
-    MRP_UNUSED(c);
-
     switch (argc) {
     case 1:
 	if (c->grp != NULL)
