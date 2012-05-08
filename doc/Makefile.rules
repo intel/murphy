@@ -1,0 +1,43 @@
+.SUFFIXES: .svg .pdf .png .lyx .xml
+
+vpath %.svg  $(MRP_FIGDIR)
+
+.svg:
+	echo "  CP    $@" 1>&2
+
+.svg.pdf:
+	echo "  INKSC $@" 1>&2
+	$(MRP_INKSCAPE) --export-area-drawing --export-pdf=$@ $< \
+	    > /dev/null 2>&1
+
+.svg.png:
+	echo "  INKSC $@" 1>&2
+	$(MRP_INKSCAPE) --export-area-drawing --export-png=$@ $< \
+	    > /dev/null 2>&1
+
+.lyx.xml:
+	$(MRP_LYX) --export docbook-xml $< 2> /tmp/dblyx.log
+	lyx_file=$< ; lyxml_file=$${lyx_file/.lyx/.xml} ; \
+        if [ -f "$$lyxml_file" ] ; then \
+	   $(MRP_DBLYXFIX) $$lyxml_file $@ && rm -f $$lyxml_file ; \
+        else \
+           cat /tmp/dblyx.log ; \
+        fi ; \
+        rm -f /tmp/dblyx.log
+
+.xml.pdf:
+	echo "  DBPDF $@" 1>&2
+	rm -f $@
+	$(MRP_DBLATEX) --pdf -P figure.title.top=0 -P doc.section.depth=2 \
+                       -o $@ $< 2> /tmp/dblatex.log 1>&2
+	[ -f "$@" ] || cat /tmp/dblatex.log 1>&2
+	rm -f /tmp/dblatex.log
+
+$(DEPDIR)/Doxyfile.P: Doxyfile
+	$(MRP_DOXYDEPS) doxml_files $< $(DEPDIR)
+
+doxml_files: $(DEPDIR)/Doxyfile.P
+	echo "  DOXYG $@" 1>&2
+	$(MRP_DOXYGEN) Doxyfile
+	$(MRP_TOUCH) doxml_files
+

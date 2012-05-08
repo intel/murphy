@@ -153,10 +153,13 @@ GREATER_OR_EQUAL  >=
 GREATER           >
 NOT               \!
 
+NOT_SQUOTE        [^\n'\;]
+NOT_DQUOTE        [^\n\"\;]
+
 NUMBER            [0-9]+
 FLOATING          [0-9]\.[0-9]*
 IDENTIFIER        [a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])*
-QUOTED_STRING     (('[^\n'\;]*')|(\"[^\n\"\;]*\"))
+QUOTED_STRING     (('{NOT_SQUOTE}*')|(\"{NOT_DQUOTE}*\"))
 
 LEFT_PAREN        \(
 RIGHT_PAREN       \)

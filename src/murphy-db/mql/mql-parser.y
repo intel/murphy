@@ -1325,7 +1325,7 @@ int mql_exec_file(const char *path)
     mode   = mql_mode_parser;
     rtype  = mql_result_unknown;
     mqlbuf = NULL;
-    mqlout = stdout;
+    mqlout = stderr;
     
     if (!path) {
         mqlin = fileno(stdin);
