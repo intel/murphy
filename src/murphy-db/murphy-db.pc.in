@@ -8,5 +8,5 @@ Description: Database for the Murphy policy engine
 URL: github/otcshare/murphy
 Version: @PACKAGE_VERSION@
 Cflags: -I${includedir}
-Libs: -L${libdir} -lmqi -lmql
+Libs: -L${libdir} -lmqi -lmql -lmdb
 Libs.private:

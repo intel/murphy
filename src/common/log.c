@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include <common/log.h>
+#include <murphy/common/log.h>
 
 static int log_mask = MRP_LOG_MASK_ERROR;
 static const char *log_target = MRP_LOG_TO_STDERR;
