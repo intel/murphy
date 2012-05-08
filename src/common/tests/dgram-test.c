@@ -12,8 +12,9 @@
 typedef struct {
     mrp_mainloop_t  *ml;
     mrp_transport_t *t;
-    char            *addr;
     int              server;
+    char            *saddr;
+    char            *caddr;
     int              sock;
     mrp_io_watch_t  *iow;
     mrp_timer_t     *timer;
@@ -36,10 +37,6 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 	else
 	    mrp_log_error("Failed to send reply.");
     }
-
-#if 0 /* done by the tranport layer... */
-    mrp_msg_destroy(msg);
-#endif
 }
 
 
@@ -57,14 +54,10 @@ void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
     if (c->server) {
 	mrp_msg_append(msg, "type", "reply", strlen("reply")+1);
 	if (mrp_transport_sendto(t, msg, addr, addrlen))
-	    mrp_log_info("Reply successfully sent.");
+	    mrp_log_info("Reply successfully sent(to).");
 	else
-	    mrp_log_error("Failed to send reply.");
+	    mrp_log_error("Failed to send(to) reply.");
     }
-
-#if 0 /* done by the tranport layer... */
-    mrp_msg_destroy(msg);
-#endif
 }
 
 
@@ -94,29 +87,32 @@ void server_init(context_t *c)
 	.recv     = NULL,
 	.recvfrom = recvfrom_evt,
     };
-    mrp_sockaddr_t addr;
-    socklen_t      addrlen;
+    mrp_sockaddr_t  addr;
+    socklen_t       len;
+    const char     *type;
 
-    c->t = mrp_transport_create(c->ml, "udp", &evt, c, 0);
+    len = sizeof(addr);
+    len = mrp_transport_resolve(c->t, c->saddr, &addr, len, &type);
+
+    if (len > 0) {
+	c->t = mrp_transport_create(c->ml, type, &evt, c, 0);
     
-    if (c->t == NULL) {
-	mrp_log_error("Failed to create new transport.");
+	if (c->t == NULL) {
+	    mrp_log_error("Failed to create new transport.");
+	    exit(1);
+	}
+
+	if (!mrp_transport_bind(c->t, &addr, len)) {
+	    mrp_log_error("Failed to bind to %s.", c->saddr);
+	    exit(1);
+	}
+
+	mrp_log_info("Waiting for messages on %s...", c->saddr);
+    }
+    else {
+	mrp_log_error("Failed to resolve address '%s'.", c->saddr);
 	exit(1);
     }
-
-    addrlen = mrp_transport_resolve(c->t, c->addr, &addr, sizeof(addr), NULL);
-    
-    if (!addrlen) {
-	mrp_log_error("Failed to resolve address '%s'.", c->addr);
-	exit(1);
-    }
-
-    if (!mrp_transport_bind(c->t, &addr, addrlen)) {
-	mrp_log_error("Failed to bind to %s.", c->addr);
-	exit(1);
-    }
-
-    mrp_log_info("Waiting for messages on %s...", c->addr);
 }
 
 
@@ -166,14 +162,14 @@ void client_init(context_t *c)
 	.recvfrom = NULL,
     };
 
-    mrp_sockaddr_t  addr;
-    socklen_t       addrlen;
+    mrp_sockaddr_t  sa, ca;
+    socklen_t       sl, cl;
     const char     *type;
 
-    addrlen = mrp_transport_resolve(NULL, c->addr, &addr, sizeof(addr), &type);
+    sl = mrp_transport_resolve(NULL, c->saddr, &sa, sizeof(sa), &type);
 
-    if (addrlen <= 0) {
-	mrp_log_error("Failed resolve transport address '%s'.", c->addr);
+    if (sl <= 0) {
+	mrp_log_error("Failed resolve transport address '%s'.", c->saddr);
 	exit(1);
     }
 
@@ -184,8 +180,24 @@ void client_init(context_t *c)
 	exit(1);
     }
 
-    if (!mrp_transport_connect(c->t, &addr, addrlen)) {
-	mrp_log_error("Failed to connect to %s.", c->addr);
+    if (c->caddr) {
+	cl = mrp_transport_resolve(NULL, c->caddr, &ca, sizeof(ca), &type);
+	
+	if (cl <= 0) {
+	    mrp_log_error("Failed resolve transport address '%s'.", c->caddr);
+	    exit(1);
+	}
+
+	if (!mrp_transport_bind(c->t, &ca, cl)) {
+	    mrp_log_error("Failed to bind to %s.", c->caddr);
+	    exit(1);
+	}
+	else
+	    mrp_log_info("Bound local endpoint to '%s'...", c->caddr);
+    }
+    
+    if (!mrp_transport_connect(c->t, &sa, sl)) {
+	mrp_log_error("Failed to connect to %s.", c->saddr);
 	exit(1);
     }
 
@@ -201,25 +213,38 @@ void client_init(context_t *c)
 int main(int argc, char *argv[])
 {
     context_t c;
+    int       i;
 
     mrp_clear(&c);
+
     mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_DEBUG));
     mrp_log_set_target(MRP_LOG_TO_STDOUT);
 
-    if (argc == 3 && (!strcmp(argv[1], "-s") || !strcmp(argv[1], "--server"))) {
-	c.server = TRUE;
-	c.addr  = argv[2];
-	mrp_log_info("Running as server, using address '%s'...", c.addr);
+    for (i = 1; i < argc; i++) {
+	if (!strcmp(argv[i], "-s") || !strcmp(argv[i], "--server"))
+	    c.server = TRUE;
+	else if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--client"))
+	    c.server = FALSE;
+	else {
+	    if (c.saddr == NULL)
+		c.saddr = argv[i];
+	    else if (c.caddr == NULL)
+		c.caddr = argv[i];
+	    else {
+		mrp_log_error("Unrecognized argument '%s'.", argv[i]);
+		goto invalid_cmdline;
+	    }
+	}
     }
-    else if (argc == 2) {
-	c.addr = argv[1];
-	mrp_log_info("Running as client, using address '%s'...", c.addr);
-    }
-    else {
-	mrp_log_error("invalid command line arguments");
-	mrp_log_error("usage: %s [-s] address:port", argv[0]);
-	exit(1);
-    }
+
+    if (c.server)
+	mrp_log_info("Running as server, using address '%s'...", c.saddr);
+    else
+	mrp_log_info("Running as client, server is at '%s'...", c.saddr);
+    
+    if (c.caddr)
+	mrp_log_info("Going to bind client side-socket to '%s'...", c.caddr);
+    
 
     c.ml = mrp_mainloop_create();
 
@@ -231,4 +256,9 @@ int main(int argc, char *argv[])
     mrp_mainloop_run(c.ml);
 
     return 0;
+
+ invalid_cmdline:
+    mrp_log_error("invalid command line arguments");
+    mrp_log_error("usage: %s [-s|-c] <server> [<client>]", argv[0]);
+    exit(1);
 }

@@ -50,8 +50,8 @@ libmurphy_common_la_SOURCES =		\
 		common/file-utils.c	\
 		common/msg.c		\
 		common/transport.c	\
-		common/tcp-transport.c  \
-		common/udp-transport.c
+		common/stream-transport.c \
+		common/dgram-transport.c
 
 libmurphy_common_la_CFLAGS  =		\
 		$(AM_CFLAGS)

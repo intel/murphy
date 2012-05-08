@@ -24,54 +24,177 @@ typedef struct {
     void           *ibuf;                /* input buffer */
     size_t          isize;               /* input buffer size */
     size_t          idata;               /* amount of input data */
-} udp_t;
+} dgrm_t;
 
 
-static void udp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
+static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 			mrp_io_event_t events, void *user_data);
-static int udp_disconnect(mrp_transport_t *mu);
-static int open_socket(udp_t *u, int family);
+static int dgrm_disconnect(mrp_transport_t *mu);
+static int open_socket(dgrm_t *u, int family);
 
 
-static socklen_t udp_resolve(const char *str, mrp_sockaddr_t *addr,
-			     socklen_t size)
+/*
+ * XXX TODO:
+ *
+ *     There is an almost verbatim copy of this in stream-transport.c
+ *     The only differences are the actual address type specifier
+ *     prefixes... Combine these and separate the result out to a
+ *     new transport-priv.[hc].
+ */
+
+
+static int parse_address(const char *str, int *familyp, char *nodep,
+			 size_t nsize, char **servicep)
 {
-    struct addrinfo *ai, hints;
-    char             node[512], *port;
-    
-    mrp_clear(&hints);    
-    hints.ai_family = AF_UNSPEC;
-    ai              = NULL;
+    char   *node, *service;
+    int     family;
+    size_t  l, nl;
 
-    if      (!strncmp(str, "udp:" , 4)) str += 4;
-    else if (!strncmp(str, "udp4:", 5)) str += 5, hints.ai_family = AF_INET;
-    else if (!strncmp(str, "udp6:", 5)) str += 5, hints.ai_family = AF_INET6;
-    
-    strncpy(node, str, sizeof(node) - 1);
-    node[sizeof(node) - 1] = '\0';
-    if ((port = strrchr(node, ':')) == NULL)
-	return FALSE;
-    *port++ = '\0';
+    node = (char *)str;
 
-    if (getaddrinfo(node, port, &hints, &ai) == 0) {
-	if (size >= ai->ai_addrlen) {
-	    memcpy(addr, ai->ai_addr, ai->ai_addrlen);
-	    size = ai->ai_addrlen;
+    if      (!strncmp(node, "udp4:"   , l=5)) family = AF_INET,  node += l;
+    else if (!strncmp(node, "udp6:"   , l=5)) family = AF_INET6, node += l; 
+    else if (!strncmp(node, "unxdgrm:", l=8)) family = AF_UNIX , node += l;
+    else {
+	if      (node[0] == '[') family = AF_INET6;
+	else if (node[0] == '/') family = AF_UNIX;
+	else if (node[0] == '@') family = AF_UNIX;
+	else                     family = AF_UNSPEC;
+    }
+
+    switch (family) {
+    case AF_INET:
+	service = strrchr(node, ':');
+	if (service == NULL) {
+	    errno = EINVAL;
+	    return -1;
+	}
+	
+	nl = service - node;
+	service++;
+
+    case AF_INET6:
+	service = strrchr(node, ':');
+
+	if (service == NULL || service == node) {
+	    errno = EINVAL;
+	    return -1;
+	}
+	
+	if (node[0] == '[') {
+	    node++;
+
+	    if (service[-1] != ']') {
+		errno = EINVAL;
+		return -1;
+	    }
+	    
+	    nl = service - node - 1;
 	}
 	else
-	    size = 0;
-	freeaddrinfo(ai);
+	    nl = service - node;
+	service++;
+	break;
 
-	return size;
+    case AF_UNSPEC:
+	if (!strncmp(node, "tcp:", l=4))
+	    node += l;
+	service = strrchr(node, ':');
+
+	if (service == NULL || service == node) {
+	    errno = EINVAL;
+	    return -1;
+	}
+
+	if (node[0] == '[') {
+	    node++;
+	    family = AF_INET6;
+	    
+	    if (service[-1] != ']') {
+		errno = EINVAL;
+		return -1;
+	    }
+
+	    nl = service - node - 1;
+	}
+	else {
+	    family = AF_INET;
+	    nl = service - node;
+	}
+	service++;
+	break;
+
+    case AF_UNIX:
+	service = NULL;
+	nl      = strlen(node);
     }
-    else
-	return 0;
+    
+    if (nl > nsize) {
+	errno = ENOMEM;
+	return -1;
+    }
+    
+    strncpy(nodep, node, nl);
+    nodep[nl] = '\0';
+    *servicep = service;
+    *familyp  = family;
+    
+    return 0;
 }
 
 
-static int udp_open(mrp_transport_t *mu, int flags)
+static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
+			      socklen_t size)
 {
-    udp_t *u = (udp_t *)mu;
+    struct addrinfo    *ai, hints;
+    struct sockaddr_un *un;
+    char                node[512], *port;
+    socklen_t           len;
+    
+    mrp_clear(&hints);    
+    
+    if (parse_address(str, &hints.ai_family, node, sizeof(node), &port) < 0)
+	return 0;
+
+    switch (hints.ai_family) {
+    case AF_UNIX:
+	un  = &addr->unx;
+	len = MRP_OFFSET(typeof(*un), sun_path) + strlen(node);
+
+	if (size < len)
+	    errno = ENOMEM;
+	else {
+	    un->sun_family = AF_UNIX;
+	    strcpy(un->sun_path, node);
+	    if (un->sun_path[0] == '@')
+		un->sun_path[0] = '\0';
+	}
+	break;
+	
+    case AF_INET:
+    case AF_INET6:
+    default:
+	if (getaddrinfo(node, port, &hints, &ai) == 0) {
+	    if (ai->ai_addrlen <= size) {
+		memcpy(addr, ai->ai_addr, ai->ai_addrlen);
+		len = ai->ai_addrlen;
+	    }
+	    else
+		len = 0;
+	    
+	    freeaddrinfo(ai);
+	}
+	else
+	    len = 0;
+    }
+
+    return len;
+}
+
+
+static int dgrm_open(mrp_transport_t *mu, int flags)
+{
+    dgrm_t *u = (dgrm_t *)mu;
     
     u->sock   = -1;
     u->family = -1;
@@ -81,11 +204,11 @@ static int udp_open(mrp_transport_t *mu, int flags)
 }
 
 
-static int udp_create(mrp_transport_t *mu, void *conn, int flags)
+static int dgrm_create(mrp_transport_t *mu, void *conn, int flags)
 {
-    udp_t           *u = (udp_t *)mu;
-    int              on;
-    mrp_io_event_t   events;    
+    dgrm_t         *u = (dgrm_t *)mu;
+    int             on;
+    mrp_io_event_t  events;    
 
     u->sock  = *(int *)conn;
     u->flags = flags;
@@ -101,7 +224,7 @@ static int udp_create(mrp_transport_t *mu, void *conn, int flags)
 	}
 
 	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	u->iow = mrp_add_io_watch(u->ml, u->sock, events, udp_recv_cb, u);
+	u->iow = mrp_add_io_watch(u->ml, u->sock, events, dgrm_recv_cb, u);
 	    
 	if (u->iow != NULL)
 	    return TRUE;
@@ -111,13 +234,14 @@ static int udp_create(mrp_transport_t *mu, void *conn, int flags)
 }
 
 
-static int udp_bind(mrp_transport_t *mu, void *addr, socklen_t addrlen)
+static int dgrm_bind(mrp_transport_t *mu, mrp_sockaddr_t *addr,
+		     socklen_t addrlen)
 {
-    udp_t *u = (udp_t *)mu;
+    dgrm_t *u = (dgrm_t *)mu;
     
     if (u->sock != -1 || !u->connected) {
-	if (open_socket(u, ((struct sockaddr *)addr)->sa_family))
-	    if (bind(u->sock, (struct sockaddr *)addr, addrlen) == 0)
+	if (open_socket(u, addr->any.sa_family))
+	    if (bind(u->sock, &addr->any, addrlen) == 0)
 		return TRUE;
     }
 
@@ -125,7 +249,7 @@ static int udp_bind(mrp_transport_t *mu, void *addr, socklen_t addrlen)
 }
 
 
-static int udp_listen(mrp_transport_t *mt, int backlog)
+static int dgrm_listen(mrp_transport_t *mt, int backlog)
 {
     MRP_UNUSED(mt);
     MRP_UNUSED(backlog);
@@ -134,9 +258,9 @@ static int udp_listen(mrp_transport_t *mt, int backlog)
 }
 
 
-static void udp_close(mrp_transport_t *mu)
+static void dgrm_close(mrp_transport_t *mu)
 {
-    udp_t *u = (udp_t *)mu;
+    dgrm_t *u = (dgrm_t *)mu;
 
     mrp_del_io_watch(u->iow);
     u->iow = NULL;
@@ -153,10 +277,10 @@ static void udp_close(mrp_transport_t *mu)
 }
 
 
-static void udp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
+static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 			 mrp_io_event_t events, void *user_data)
 {
-    udp_t           *u  = (udp_t *)user_data;
+    dgrm_t          *u  = (dgrm_t *)user_data;
     mrp_transport_t *mu = (mrp_transport_t *)u;
     mrp_sockaddr_t   addr;
     socklen_t        addrlen;
@@ -183,7 +307,7 @@ static void udp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 		error = ENOMEM;
 	    fatal_error:
 	    closed:
-		udp_disconnect(mu);
+		dgrm_disconnect(mu);
 		
 		if (u->evt.closed != NULL)
 		    MRP_TRANSPORT_BUSY(mu, {
@@ -213,8 +337,7 @@ static void udp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 	}
 
 	addrlen = sizeof(addr);
-	n = recvfrom(fd, u->ibuf, size + sizeof(size), 0,
-		     (void *)&addr, &addrlen);
+	n = recvfrom(fd, u->ibuf, size + sizeof(size), 0, &addr.any, &addrlen);
 	
 	if (n != (ssize_t)(size + sizeof(size))) {
 	    error = n < 0 ? EIO : EPROTO;
@@ -255,7 +378,7 @@ static void udp_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 }
 
 
-static int open_socket(udp_t *u, int family)
+static int open_socket(dgrm_t *u, int family)
 {
     mrp_io_event_t events;
     int            on;
@@ -278,7 +401,7 @@ static int open_socket(udp_t *u, int family)
 	}
 
 	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	u->iow = mrp_add_io_watch(u->ml, u->sock, events, udp_recv_cb, u);
+	u->iow = mrp_add_io_watch(u->ml, u->sock, events, dgrm_recv_cb, u);
     
 	if (u->iow != NULL)
 	    return TRUE;
@@ -292,22 +415,22 @@ static int open_socket(udp_t *u, int family)
 }
 
 
-static int udp_connect(mrp_transport_t *mu, void *addrptr, socklen_t addrlen)
+static int dgrm_connect(mrp_transport_t *mu, mrp_sockaddr_t *addr,
+			socklen_t addrlen)
 {
-    udp_t           *u = (udp_t *)mu;
-    struct sockaddr *addr = (struct sockaddr *)addrptr;
-    int              on;
-    long             nb;
+    dgrm_t *u = (dgrm_t *)mu;
+    int     on;
+    long    nb;
 
-    if (MRP_UNLIKELY(u->family != -1 && u->family != addr->sa_family))
+    if (MRP_UNLIKELY(u->family != -1 && u->family != addr->any.sa_family))
 	return FALSE;
 
     if (MRP_UNLIKELY(u->sock == -1)) {
-	if (!open_socket(u, addr->sa_family))
+	if (!open_socket(u, addr->any.sa_family))
 	    return FALSE;
     }
 
-    if (connect(u->sock, addr, addrlen) == 0) {
+    if (connect(u->sock, &addr->any, addrlen) == 0) {
 	on = 1;
 	setsockopt(u->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 	nb = 1;
@@ -322,9 +445,9 @@ static int udp_connect(mrp_transport_t *mu, void *addrptr, socklen_t addrlen)
 }
 
 
-static int udp_disconnect(mrp_transport_t *mu)
+static int dgrm_disconnect(mrp_transport_t *mu)
 {
-    udp_t           *u    = (udp_t *)mu;
+    dgrm_t          *u    = (dgrm_t *)mu;
     struct sockaddr  none = { .sa_family = AF_UNSPEC, };
 
 
@@ -339,9 +462,9 @@ static int udp_disconnect(mrp_transport_t *mu)
 }
 
 
-static int udp_send(mrp_transport_t *mu, mrp_msg_t *msg)
+static int dgrm_send(mrp_transport_t *mu, mrp_msg_t *msg)
 {
-    udp_t        *u = (udp_t *)mu;
+    dgrm_t       *u = (dgrm_t *)mu;
     struct iovec  iov[2];
     void         *buf;
     ssize_t       size, n;
@@ -365,7 +488,7 @@ static int udp_send(mrp_transport_t *mu, mrp_msg_t *msg)
 	    else {
 		if (n == -1 && errno == EAGAIN) {
 		    mrp_log_error("%s(): XXX TODO: this sucks, need to add "
-				  "output queuing for udp-transport.",
+				  "output queuing for dgrm-transport.",
 				  __FUNCTION__);
 		}
 	    }
@@ -376,10 +499,10 @@ static int udp_send(mrp_transport_t *mu, mrp_msg_t *msg)
 }
 
 
-static int udp_sendto(mrp_transport_t *mu, mrp_msg_t *msg, void *addr,
-		      socklen_t addrlen)
+static int dgrm_sendto(mrp_transport_t *mu, mrp_msg_t *msg,
+		       mrp_sockaddr_t *addr, socklen_t addrlen)
 {
-    udp_t           *u = (udp_t *)mu;
+    dgrm_t          *u = (dgrm_t *)mu;
     struct iovec     iov[2];
     void            *buf;
     ssize_t          size, n;
@@ -416,7 +539,7 @@ static int udp_sendto(mrp_transport_t *mu, mrp_msg_t *msg, void *addr,
 	    return TRUE;
 	else {
 	    if (n == -1 && errno == EAGAIN) {
-		mrp_log_error("%s(): XXX TODO: udp-transport send failed",
+		mrp_log_error("%s(): XXX TODO: dgrm-transport send failed",
 			      __FUNCTION__);
 	    }
 	}
@@ -426,8 +549,20 @@ static int udp_sendto(mrp_transport_t *mu, mrp_msg_t *msg, void *addr,
 }
 
 
-MRP_REGISTER_TRANSPORT(udp, "udp", udp_t, udp_resolve,
-		       udp_open, udp_create, udp_close,
-		       udp_bind, udp_listen, NULL,
-		       udp_connect, udp_disconnect,
-		       udp_send, udp_sendto);
+MRP_REGISTER_TRANSPORT(udp4, "udp4", dgrm_t, dgrm_resolve,
+		       dgrm_open, dgrm_create, dgrm_close,
+		       dgrm_bind, dgrm_listen, NULL,
+		       dgrm_connect, dgrm_disconnect,
+		       dgrm_send, dgrm_sendto);
+
+MRP_REGISTER_TRANSPORT(udp6, "udp6", dgrm_t, dgrm_resolve,
+		       dgrm_open, dgrm_create, dgrm_close,
+		       dgrm_bind, dgrm_listen, NULL,
+		       dgrm_connect, dgrm_disconnect,
+		       dgrm_send, dgrm_sendto);
+
+MRP_REGISTER_TRANSPORT(unxdgrm, "unxdgrm", dgrm_t, dgrm_resolve,
+		       dgrm_open, dgrm_create, dgrm_close,
+		       dgrm_bind, dgrm_listen, NULL,
+		       dgrm_connect, dgrm_disconnect,
+		       dgrm_send, dgrm_sendto);

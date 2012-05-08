@@ -105,13 +105,45 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
 }
 
 
-socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
-				void *addr, socklen_t size)
+static inline int type_matches(const char *type, const char *addr)
 {
+    while (*type == *addr)
+	type++, addr++;
+    
+    return (*type == '\0' && *addr == ':');
+}
+
+
+socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
+				mrp_sockaddr_t *addr, socklen_t size,
+				const char **type)
+{
+#if 1
+    mrp_transport_descr_t *d;
+    mrp_list_hook_t       *p, *n;
+    socklen_t              l;
+    
+    if (t != NULL)
+	return t->descr->resolve(str, addr, size);
+    else {
+	mrp_list_foreach(&transports, p, n) {
+	    d = mrp_list_entry(p, typeof(*d), hook);
+	    l = d->resolve(str, addr, size);
+	    
+	    if (l > 0) {
+		if (type != NULL)
+		    *type = d->type;
+		return l;
+	    }
+	}
+    }
+    
+    return 0;
+#else
     mrp_transport_descr_t *d;
     char                  *p, type[32];
     int                    n;
-
+    
     if ((p = strchr(str, ':')) != NULL && (n = p - str) < (int)sizeof(type)) {
 	strncpy(type, str, n);
 	type[n] = '\0';
@@ -125,10 +157,12 @@ socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
     }
 
     return 0;
+#endif
 }
 
 
-int mrp_transport_bind(mrp_transport_t *t, void *addr, socklen_t addrlen)
+int mrp_transport_bind(mrp_transport_t *t, mrp_sockaddr_t *addr,
+		       socklen_t addrlen)
 {
     if (t != NULL) {
 	if (t->descr->req.bind != NULL)
@@ -220,7 +254,8 @@ static int check_destroy(mrp_transport_t *t)
 }
 
 
-int mrp_transport_connect(mrp_transport_t *t, void *addr, socklen_t addrlen)
+int mrp_transport_connect(mrp_transport_t *t, mrp_sockaddr_t *addr,
+			  socklen_t addrlen)
 {
     int result;
     
@@ -284,8 +319,8 @@ int mrp_transport_send(mrp_transport_t *t, mrp_msg_t *msg)
 }
 
 
-int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg, void *addr,
-			 socklen_t addrlen)
+int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg,
+			 mrp_sockaddr_t *addr, socklen_t addrlen)
 {
     int result;
     

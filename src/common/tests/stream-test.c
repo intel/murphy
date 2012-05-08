@@ -94,9 +94,9 @@ void server_init(context_t *c)
 	.connection = connection_evt,
     };
 
-    mrp_sockaddr_t  addr;
-    socklen_t       addrlen;
-    const char     *type;
+    mrp_sockaddr_t addr;
+    socklen_t      addrlen;
+    const char    *type;
 
     addrlen = mrp_transport_resolve(NULL, c->addr, &addr, sizeof(addr), &type);
 

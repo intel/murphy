@@ -17,7 +17,7 @@
 #define client_error mrp_log_error
 
 #define DEFAULT_PROMPT  "murphy> "
-#define DEFAULT_ADDRESS "tcp:127.0.0.1:3000"
+#define DEFAULT_ADDRESS "tcp4:127.0.0.1:3000"
 
 static void input_process_cb(char *input);
 
@@ -228,16 +228,18 @@ int client_setup(client_t *c, const char *addrstr)
 	.recvfrom = NULL,
     };
 
-    struct sockaddr  addr;
-    socklen_t        addrlen;
-    const char      *type;
+    mrp_sockaddr_t  addr;
+    socklen_t       addrlen;
+    const char     *type;
 
+#if 0
     if (!strncmp(addrstr, "udp:", 4))
 	type = "udp";
     else
 	type = "tcp";
+#endif
 
-    addrlen = mrp_transport_resolve(NULL, addrstr, &addr, sizeof(addr));
+    addrlen = mrp_transport_resolve(NULL, addrstr, &addr, sizeof(addr), &type);
     
     if (addrlen > 0) {
 	c->t = mrp_transport_create(c->ml, type, &evt, c, 0);

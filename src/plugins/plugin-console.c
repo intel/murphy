@@ -29,7 +29,7 @@ typedef struct {
     mrp_io_watch_t  *iow;                /* main socket I/O watch */
     mrp_context_t   *ctx;                /* murphy context */
     mrp_list_hook_t  consoles;           /* active consoles */
-    struct sockaddr  addr;
+    mrp_sockaddr_t   addr;
     socklen_t        addrlen;
     console_t       *c;
 } data_t;
@@ -42,7 +42,7 @@ typedef struct {
 struct console_s {
     mrp_console_t   *mc;                 /* associated murphy console */
     mrp_transport_t *t;                  /* associated transport */
-    struct sockaddr  addr;
+    mrp_sockaddr_t   addr;
     socklen_t        addrlen;
 };
 
@@ -130,12 +130,12 @@ static void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 
 
 static void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
-			 void *addrptr, socklen_t addrlen, void *user_data)
+			 mrp_sockaddr_t *addr, socklen_t addrlen,
+			 void *user_data)
 {
-    console_t       *c    = (console_t *)user_data;
-    struct sockaddr *addr = (struct sockaddr *)addrptr;
-    char            *input;
-    size_t           size;
+    console_t *c = (console_t *)user_data;
+    char      *input;
+    size_t     size;
 
     MRP_UNUSED(t);
     
@@ -144,11 +144,11 @@ static void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
     input = mrp_msg_find(msg, "input", &size);
 
     if (input != NULL) {
-	struct sockaddr  a = c->addr;
-	socklen_t        l = c->addrlen;
+	mrp_sockaddr_t   a;
+	socklen_t        l;
 
-	c->addr    = *addr;
-	c->addrlen = addrlen;
+	mrp_sockaddr_cpy(&a, &c->addr, l=c->addrlen);
+	mrp_sockaddr_cpy(&c->addr, addr, c->addrlen=addrlen);
 	
 	mrp_transport_connect(t, addr, addrlen);
 	MRP_CONSOLE_BUSY(c->mc, {
@@ -159,8 +159,7 @@ static void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
 
 	mrp_transport_disconnect(t);
 
-	c->addr    = a;
-	c->addrlen = l;
+	mrp_sockaddr_cpy(&c->addr, &a, c->addrlen=l);
 
 	if (l)
 	    mrp_transport_connect(t, &a, l);
@@ -229,7 +228,7 @@ enum {
 };
 
 
-static int tcp_setup(data_t *data)
+static int strm_setup(data_t *data)
 {
     static mrp_transport_evt_t evt = {
 	.closed     = NULL,
@@ -239,16 +238,18 @@ static int tcp_setup(data_t *data)
     };
 
     mrp_transport_t *t;
-    struct sockaddr  addr;
+    mrp_sockaddr_t   addr;
     socklen_t        addrlen;
     int              flags;
+    const char      *type;
     
     t       = NULL;
-    addrlen = mrp_transport_resolve(NULL, data->address, &addr, sizeof(addr));
+    addrlen = mrp_transport_resolve(NULL, data->address,
+				    &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
 	flags = MRP_TRANSPORT_REUSEADDR;
-	t     = mrp_transport_create(data->ctx->ml, "tcp", &evt, data, flags);
+	t     = mrp_transport_create(data->ctx->ml, type, &evt, data, flags);
 	
 	if (t != NULL) {
 	    if (mrp_transport_bind(t, &addr, addrlen)) {
@@ -274,7 +275,7 @@ static int tcp_setup(data_t *data)
 }
 
 
-static int udp_setup(data_t *data)
+static int dgrm_setup(data_t *data)
 {
     static mrp_transport_evt_t evt = {
 	.recv     = recv_evt,
@@ -291,17 +292,19 @@ static int udp_setup(data_t *data)
 
     console_t       *c;
     mrp_transport_t *t;
-    struct sockaddr  addr;
+    mrp_sockaddr_t   addr;
     socklen_t        addrlen;
     int              f;
-    
+    const char      *type;
+
     t       = NULL;
-    addrlen = mrp_transport_resolve(NULL, data->address, &addr, sizeof(addr));
+    addrlen = mrp_transport_resolve(NULL, data->address,
+				    &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
 	if ((c = mrp_allocz(sizeof(*c))) != NULL) {
 	    f = MRP_TRANSPORT_REUSEADDR;
-	    t = mrp_transport_create(data->ctx->ml, "udp", &evt, c, f);
+	    t = mrp_transport_create(data->ctx->ml, type, &evt, c, f);
 
 	    if (t != NULL) {
 		if (mrp_transport_bind(t, &addr, addrlen)) {
@@ -339,10 +342,12 @@ static int console_init(mrp_plugin_t *plugin)
 	data->ctx     = plugin->ctx;
 	data->address = plugin->args[ARG_ADDRESS].str;
 	
-	if (!strncmp(data->address, "tcp:", 4))
-	    ok = tcp_setup(data);
+	if (!strncmp(data->address, "tcp4:", 5) ||
+	    !strncmp(data->address, "tcp6:", 5) ||
+	    !strncmp(data->address, "unxstrm:", 8))
+	    ok = strm_setup(data);
 	else
-	    ok = udp_setup(data);
+	    ok = dgrm_setup(data);
 
 	if (ok) {
 	    plugin->data = data;
@@ -380,7 +385,7 @@ static void console_exit(mrp_plugin_t *plugin)
 
 
 static mrp_plugin_arg_t console_args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "tcp:127.0.0.1:3000"),
+    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "tcp4:127.0.0.1:3000"),
 };
 
 MURPHY_REGISTER_CORE_PLUGIN("console",
