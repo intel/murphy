@@ -7,21 +7,37 @@
 typedef enum mql_result_type_e  mql_result_type_t;
 typedef struct mql_result_s     mql_result_t;
 
+/** types of mql_result_t structure */
 enum mql_result_type_e {
-    mql_result_error = -1,
+    mql_result_error = -1, /**< error code + error message */
     mql_result_unknown = 0,
-    mql_result_dontcare = mql_result_unknown,
+    mql_result_dontcare = mql_result_unknown, /**< will default */
     mql_result_event,
-    mql_result_columns,
-    mql_result_rows,
-    mql_result_string,
-    mql_result_list,
+    mql_result_columns,    /**< column description of a table */
+    mql_result_rows,       /**< select'ed rows */
+    mql_result_string,     /**< zero terminated ASCII string  */
+    mql_result_list,       /**< array of basic types, (integer, string, etc) */
 };
 
+
+/**
+ * @brief generic return type of MQL opertaions.
+ *
+ * mql_result_type_t is the generic return type  of mql_exec_string()
+ * and mql_exec_statement(). It is either the return status of the
+ * MQL operation or the resulting data. For instance, executing an
+ * insert statement will return a status (ie. mql_result_error type),
+ * while the execution of a select statement will return the selected
+ * rows (ie. mql_result_rows or mql_result_string depending on what
+ * type was requested by mql_exec_string() or mql_exec_statement())
+ *
+ * To access the opaque data use the mql_result_xxx() functions
+ */
 struct mql_result_s {
-    mql_result_type_t  type;
-    uint8_t            data[0];
+    mql_result_type_t  type;       /**< type of the result */
+    uint8_t            data[0];    /**< opaque result data */
 };
+
 
 int              mql_result_is_success(mql_result_t *);
 
