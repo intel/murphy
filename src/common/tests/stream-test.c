@@ -8,6 +8,13 @@
 
 #include <murphy/common.h>
 
+#define TAG_END     ((uint16_t)0x0)
+#define TAG_SEQ     ((uint16_t)0x1)
+#define TAG_FOO     ((uint16_t)0x2)
+#define TAG_BAR     ((uint16_t)0x3)
+#define TAG_MSG     ((uint16_t)0x4)
+#define TAG_RPL     ((uint16_t)0x5)
+
 
 typedef struct {
     mrp_mainloop_t  *ml;
@@ -41,25 +48,35 @@ void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
-    context_t *c = (context_t *)user_data;
-
-    MRP_UNUSED(t);    
-    MRP_UNUSED(c);
+    context_t       *c = (context_t *)user_data;
+    mrp_msg_field_t *f;
+    uint32_t         seq;
+    char             buf[256];
     
-    mrp_log_info("Received a message.");
+    mrp_log_info("received a message");
     mrp_msg_dump(msg, stdout);
     
     if (c->server) {
-
-#define REPLY_KEY "this_is_a_rather_long_reply_field_name_that_I_hope_will_cause_reallocation_of_the_message_receiving_buffer_on_the_server_side_and_we_will_see_if_it_can_automatically_readjust_its_buffers"
-#define REPLY_VAL "and_this_is_the_rather_long_value_of_the_rather_long_field_name_that_we_hope_might_break_something_if_the_allocation_algorithm_has_horrible_easy_to_exploit_holes"
-
-	mrp_msg_append(msg, REPLY_KEY, REPLY_VAL, strlen(REPLY_VAL) + 1);
-
+	seq = 0;
+	if ((f = mrp_msg_find(msg, TAG_SEQ)) != NULL) {
+	    if (f->type == MRP_MSG_FIELD_UINT32)
+		seq = f->u32;
+	}
+	    
+	snprintf(buf, sizeof(buf), "reply to message #%u", seq);
+	
+	if (!mrp_msg_append(msg, TAG_RPL, MRP_MSG_FIELD_STRING, buf,
+			    TAG_END)) {
+	    mrp_log_info("failed to append to received message");
+	    exit(1);
+	}
+			   
 	if (mrp_transport_send(t, msg))
-	    mrp_log_info("Reply successfully sent.");
+	    mrp_log_info("reply successfully sent");
 	else
-	    mrp_log_error("Failed to send reply.");
+	    mrp_log_error("failed to send reply");
+
+	/* message unreffed by transport layer */
     }
 }
 
@@ -127,43 +144,37 @@ void server_init(context_t *c)
 
 void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 {
-    static int seqno = 1;
-
+    static uint32_t seqno = 1;
+    
     context_t *c = (context_t *)user_data;
     mrp_msg_t *msg;
-    char       seq[32];
-    int        len;
+    uint32_t   seq;
+    char       buf[256];
+    uint32_t   len;
 
     MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
-    if ((msg = mrp_msg_create(NULL)) == NULL) {
+    
+    seq = seqno++;
+    len = snprintf(buf, sizeof(buf), "This is message %u.", (unsigned int)seq);
+    if ((msg = mrp_msg_create(TAG_SEQ, MRP_MSG_FIELD_UINT32, seq,
+			      TAG_FOO, MRP_MSG_FIELD_STRING, "foo",
+			      TAG_BAR, MRP_MSG_FIELD_STRING, "bar",
+			      TAG_MSG, MRP_MSG_FIELD_BLOB  , len, buf,
+			      TAG_END)) == NULL) {
 	mrp_log_error("Failed to create new message.");
 	exit(1);
     }
 
-    len = snprintf(seq, sizeof(seq), "%d", seqno);
-    
-#define LONG_KEY "aaaaaaaaaaaallllllllllllloooooooooooonnnnnnnnnnngggggggggffffffffffffiiiiiiiiiiiiieeeeeeeeeeeelllllllllllllddddddddddddnnnnnnnnnnnnnnnaaaaaaaaaaaaaaaammmmmmmmmmmmmmmeeeeeeeeeeeeeeeeeeeeee"
-#define LONG_VAL "aaaaaaaaaaallllllllllllllllloooooooooooonnnnnnnnngggggggggggvvvvvvvvvvvvaaaaaaaaaaaaaalllllllllluuuuuuuuuuuuuueeeeee"
-
-    if (!mrp_msg_append(msg, "seq", seq, len + 1) ||
-	!mrp_msg_append(msg, "foo", "bar", sizeof("bar")) ||
-	!mrp_msg_append(msg, "bar", "foo", sizeof("foo")) ||
-	!mrp_msg_append(msg, "foobar", "barfoo", sizeof("barfoo")) ||
-	!mrp_msg_append(msg, "barfoo", "foobar", sizeof("foobar")) ||
-	!mrp_msg_append(msg, LONG_KEY, LONG_VAL, strlen(LONG_VAL) + 1)) {
-	mrp_log_error("Failed to construct message #%d.", seqno);
-	exit(1);
-    }
-
     if (!mrp_transport_send(c->t, msg)) {
-	mrp_log_error("Failed to send message #%d.", seqno);
+	mrp_log_error("Failed to send message #%d.", seq);
 	exit(1);
     }
-    else {
-	mrp_log_info("Message #%d succesfully sent.", seqno++);
-    }
+    else
+	mrp_log_info("Message #%d succesfully sent.", seq);
+    
+    mrp_msg_unref(msg);
 }
 
 

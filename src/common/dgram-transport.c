@@ -13,7 +13,7 @@
 #include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
 
-#define DEFAULT_SIZE 1024                   /* default input buffer size */
+#define DEFAULT_SIZE 1024                /* default input buffer size */
 
 typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */

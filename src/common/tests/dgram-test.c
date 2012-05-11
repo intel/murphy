@@ -8,6 +8,13 @@
 
 #include <murphy/common.h>
 
+#define TAG_END     ((uint16_t)0x0)
+#define TAG_SEQ     ((uint16_t)0x1)
+#define TAG_FOO     ((uint16_t)0x2)
+#define TAG_BAR     ((uint16_t)0x3)
+#define TAG_MSG     ((uint16_t)0x4)
+#define TAG_RPL     ((uint16_t)0x5)
+
 
 typedef struct {
     mrp_mainloop_t  *ml;
@@ -23,19 +30,35 @@ typedef struct {
 
 void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
-    context_t *c = (context_t *)user_data;
-
-    MRP_UNUSED(t);    
-    MRP_UNUSED(c);
+    context_t       *c = (context_t *)user_data;
+    mrp_msg_field_t *f;
+    uint32_t         seq;
+    char             buf[256];
     
-    mrp_log_info("Received a message.");
+    mrp_log_info("received a message");
     mrp_msg_dump(msg, stdout);
     
     if (c->server) {
+	seq = 0;
+	if ((f = mrp_msg_find(msg, TAG_SEQ)) != NULL) {
+	    if (f->type == MRP_MSG_FIELD_UINT32)
+		seq = f->u32;
+	}
+	    
+	snprintf(buf, sizeof(buf), "reply to message #%u", seq);
+	
+	if (!mrp_msg_append(msg, TAG_RPL, MRP_MSG_FIELD_STRING, buf,
+			    TAG_END)) {
+	    mrp_log_info("failed to append to received message");
+	    exit(1);
+	}
+			   
 	if (mrp_transport_send(t, msg))
-	    mrp_log_info("Reply successfully sent.");
+	    mrp_log_info("reply successfully sent");
 	else
-	    mrp_log_error("Failed to send reply.");
+	    mrp_log_error("failed to send reply");
+
+	/* message unreffed by transport layer */
     }
 }
 
@@ -43,20 +66,35 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
 		  socklen_t addrlen, void *user_data)
 {
-    context_t *c = (context_t *)user_data;
-
-    MRP_UNUSED(t);    
-    MRP_UNUSED(c);
+    context_t       *c = (context_t *)user_data;
+    mrp_msg_field_t *f;
+    uint32_t         seq;
+    char             buf[256];
     
-    mrp_log_info("Received a message.");
+    mrp_log_info("received a message");
     mrp_msg_dump(msg, stdout);
     
     if (c->server) {
-	mrp_msg_append(msg, "type", "reply", strlen("reply")+1);
+	seq = 0;
+	if ((f = mrp_msg_find(msg, TAG_SEQ)) != NULL) {
+	    if (f->type == MRP_MSG_FIELD_UINT32)
+		seq = f->u32;
+	}
+	    
+	snprintf(buf, sizeof(buf), "reply to message #%u", seq);
+	
+	if (!mrp_msg_append(msg, TAG_RPL, MRP_MSG_FIELD_STRING, buf,
+			    TAG_END)) {
+	    mrp_log_info("failed to append to received message");
+	    exit(1);
+	}
+			   
 	if (mrp_transport_sendto(t, msg, addr, addrlen))
-	    mrp_log_info("Reply successfully sent(to).");
+	    mrp_log_info("reply successfully sent");
 	else
-	    mrp_log_error("Failed to send(to) reply.");
+	    mrp_log_error("failed to send reply");
+
+	/* message unreffed by transport layer */
     }
 }
 
@@ -118,39 +156,37 @@ void server_init(context_t *c)
 
 void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 {
-    static int seqno = 1;
-
+    static uint32_t seqno = 1;
+    
     context_t *c = (context_t *)user_data;
     mrp_msg_t *msg;
-    char       seq[32];
-    int        len;
+    uint32_t   seq;
+    char       buf[256];
+    uint32_t   len;
 
     MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
-    if ((msg = mrp_msg_create(NULL)) == NULL) {
+    
+    seq = seqno++;
+    len = snprintf(buf, sizeof(buf), "This is message %u.", (unsigned int)seq);
+    if ((msg = mrp_msg_create(TAG_SEQ, MRP_MSG_FIELD_UINT32, seq,
+			      TAG_FOO, MRP_MSG_FIELD_STRING, "foo",
+			      TAG_BAR, MRP_MSG_FIELD_STRING, "bar",
+			      TAG_MSG, MRP_MSG_FIELD_BLOB  , len, buf,
+			      TAG_END)) == NULL) {
 	mrp_log_error("Failed to create new message.");
 	exit(1);
     }
 
-    len = snprintf(seq, sizeof(seq), "%d", seqno);
-    
-    if (!mrp_msg_append(msg, "seq", seq, len + 1) ||
-	!mrp_msg_append(msg, "foo", "bar", sizeof("bar")) ||
-	!mrp_msg_append(msg, "bar", "foo", sizeof("foo")) ||
-	!mrp_msg_append(msg, "foobar", "barfoo", sizeof("barfoo")) ||
-	!mrp_msg_append(msg, "barfoo", "foobar", sizeof("foobar"))) {
-	mrp_log_error("Failed to construct message #%d.", seqno);
-	exit(1);
-    }
-
     if (!mrp_transport_send(c->t, msg)) {
-	mrp_log_error("Failed to send message #%d.", seqno);
+	mrp_log_error("Failed to send message #%d.", seq);
 	exit(1);
     }
-    else {
-	mrp_log_info("Message #%d succesfully sent.", seqno++);
-    }
+    else
+	mrp_log_info("Message #%d succesfully sent.", seq);
+    
+    mrp_msg_unref(msg);
 }
 
 

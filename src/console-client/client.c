@@ -11,6 +11,7 @@
 #include <readline/history.h>
 
 #include <murphy/common.h>
+#include <murphy/plugins/console-protocol.h>
 
 #define client_info  mrp_log_info
 #define client_warn  mrp_log_warning
@@ -106,22 +107,29 @@ void prompt_display(client_t *c)
 void prompt_process_input(client_t *c, char *input)
 {
     mrp_msg_t *msg;
-    int        len;
-    
+    uint16_t   tag, type;
+    uint32_t   len;
+
     len = input ? strlen(input) + 1: 0;
 
     if (len > 1) {
 	add_history(input);
 	prompt_erase(c);
 	
-	if ((msg = mrp_msg_create("input", input, len, NULL)) != NULL) {
+	tag  = MRP_CONSOLE_INPUT;
+	type = MRP_MSG_FIELD_BLOB;
+	msg  = mrp_msg_create(tag, type, len, input, MRP_MSG_FIELD_INVALID);
+
+	if (msg != NULL) {
 	    mrp_transport_send(c->t, msg);
 	    mrp_msg_unref(msg);
-	    prompt_display(c);
 	}
-	else
-	    client_error("failed to send request to server.");
+	
+	prompt_display(c);
+	return;
     }
+
+    client_error("failed to send request to server.");
 }
 
 
@@ -177,22 +185,26 @@ static void input_cleanup(client_t *c)
 
 void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
-    client_t *c = (client_t *)user_data;
-    char     *prompt, *output, buf[128], *dummy;
-    size_t    size;
+    client_t        *c = (client_t *)user_data;
+    mrp_msg_field_t *f;
+    char           *prompt, *output, buf[128];
+    size_t          size;
     
     MRP_UNUSED(t);
     
     prompt_erase(c);
 
-    if ((output = mrp_msg_find(msg, "output", &size)) != NULL) {
+    if ((f = mrp_msg_find(msg, MRP_CONSOLE_OUTPUT)) != NULL) {
+	output = f->str;
+	size   = f->size[0];
 	printf("%.*s", (int)size, output);
     }
-    else if ((prompt = mrp_msg_find(msg, "prompt", &size)) != NULL) {
-	snprintf(buf, sizeof(buf), "%.*s> ", (int)size, prompt);
+    else if ((f = mrp_msg_find(msg, MRP_CONSOLE_PROMPT)) != NULL) {
+	prompt = f->str;
+	snprintf(buf, sizeof(buf), "%s> ", prompt);
 	prompt_set(c, buf);
     }
-    else if ((dummy = mrp_msg_find(msg, "bye", &size)) != NULL) {
+    else if ((f = mrp_msg_find(msg, MRP_CONSOLE_BYE)) != NULL) {
 	mrp_mainloop_quit(c->ml, 0);
 	return;
     }

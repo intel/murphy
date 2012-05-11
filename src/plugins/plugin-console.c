@@ -9,6 +9,7 @@
 
 #include <murphy/common.h>
 #include <murphy/core.h>
+#include <murphy/plugins/console-protocol.h>
 
 #define console_info(fmt, args...)  mrp_log_info("console: "fmt , ## args)
 #define console_warn(fmt, args...)  mrp_log_warning("console: "fmt , ## args)
@@ -52,8 +53,15 @@ static ssize_t write_req(mrp_console_t *mc, void *buf, size_t size)
 {
     console_t *c = (console_t *)mc->backend_data;
     mrp_msg_t *msg;
+    uint16_t   tag, type;
+    uint32_t   len;
 
-    if ((msg = mrp_msg_create("output", buf, size, NULL)) != NULL) {
+    tag  = MRP_CONSOLE_OUTPUT;
+    type = MRP_MSG_FIELD_BLOB;
+    len  = size;
+    msg  = mrp_msg_create(tag, type, len, buf, MRP_MSG_FIELD_INVALID);
+
+    if (msg != NULL) {
 	mrp_transport_send(c->t, msg);
 	mrp_msg_unref(msg);
 	
@@ -67,7 +75,7 @@ static ssize_t write_req(mrp_console_t *mc, void *buf, size_t size)
 static void tcp_close_req(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc->backend_data;
-    
+
     mrp_transport_disconnect(c->t);
     mrp_transport_destroy(c->t);
     c->t = NULL;
@@ -78,10 +86,16 @@ static void udp_close_req(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc->backend_data;
     mrp_msg_t *msg;
-    int        dummy = TRUE;
+    uint16_t   tag, type;
 
-    if ((msg = mrp_msg_create("bye", &dummy, sizeof(dummy), NULL)) != NULL)
+    tag  = MRP_CONSOLE_BYE;
+    type = MRP_MSG_FIELD_BOOL;
+    msg  = mrp_msg_create(tag, type, TRUE, MRP_MSG_FIELD_INVALID);
+
+    if (msg != NULL) {
 	mrp_transport_send(c->t, msg);
+	mrp_msg_unref(msg);
+    }
     
     mrp_transport_disconnect(c->t);
 }
@@ -91,9 +105,12 @@ static void set_prompt_req(mrp_console_t *mc, const char *prompt)
 {
     console_t *c = (console_t *)mc->backend_data;
     mrp_msg_t *msg;
+    uint16_t   tag, type;
 
-    msg = mrp_msg_create("prompt", prompt, strlen(prompt) + 1, NULL);
-    
+    tag  = MRP_CONSOLE_PROMPT;
+    type = MRP_MSG_FIELD_STRING;
+    msg  = mrp_msg_create(tag, type, prompt, MRP_MSG_FIELD_INVALID);
+
     if (msg != NULL) {
 	mrp_transport_send(c->t, msg);
 	mrp_msg_unref(msg);
@@ -109,23 +126,27 @@ static void free_req(void *backend_data)
 
 static void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
-    console_t *c = (console_t *)user_data;
-    char      *input;
-    size_t     size;
+    console_t       *c = (console_t *)user_data;
+    mrp_msg_field_t *f;
+    char            *input;
+    size_t           size;
 
     MRP_UNUSED(t);
     
-    input = mrp_msg_find(msg, "input", &size);
-
-    if (input != NULL) {
-	MRP_CONSOLE_BUSY(c->mc, {
-		c->mc->evt.input(c->mc, input, size);
-	    });
+    if ((f = mrp_msg_find(msg, MRP_CONSOLE_INPUT)) != NULL) {
+	if (f->type == MRP_MSG_FIELD_BLOB) {
+	    input = f->str;
+	    size  = f->size[0];
+	    MRP_CONSOLE_BUSY(c->mc, {
+		    c->mc->evt.input(c->mc, input, size);
+		});
 	
-	c->mc->check_destroy(c->mc);
+	    c->mc->check_destroy(c->mc);
+	    return;
+	}
     }
-    else
-	mrp_log_error("Received malformed console message.");
+
+    mrp_log_error("Received malformed console message.");
 }
 
 
@@ -133,39 +154,48 @@ static void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
 			 mrp_sockaddr_t *addr, socklen_t addrlen,
 			 void *user_data)
 {
-    console_t *c = (console_t *)user_data;
-    char      *input;
-    size_t     size;
+    console_t       *c = (console_t *)user_data;
+    mrp_msg_field_t *f;
+    char            *input;
+    size_t           size;
 
     MRP_UNUSED(t);
     
     mrp_debug("got new message...");
 
-    input = mrp_msg_find(msg, "input", &size);
+    if ((f = mrp_msg_find(msg, MRP_CONSOLE_INPUT)) != NULL) {
+	if (f->type == MRP_MSG_FIELD_STRING) {
+	    input = f->str;
+	    size  = f->size[0];
+	    
+	    if (input != NULL) {
+		mrp_sockaddr_t   a;
+		socklen_t        l;
 
-    if (input != NULL) {
-	mrp_sockaddr_t   a;
-	socklen_t        l;
-
-	mrp_sockaddr_cpy(&a, &c->addr, l=c->addrlen);
-	mrp_sockaddr_cpy(&c->addr, addr, c->addrlen=addrlen);
+		mrp_sockaddr_cpy(&a, &c->addr, l=c->addrlen);
+		mrp_sockaddr_cpy(&c->addr, addr, c->addrlen=addrlen);
 	
-	mrp_transport_connect(t, addr, addrlen);
-	MRP_CONSOLE_BUSY(c->mc, {
-		c->mc->evt.input(c->mc, input, size);
-	    });
+		mrp_transport_connect(t, addr, addrlen);
+		MRP_CONSOLE_BUSY(c->mc, {
+			c->mc->evt.input(c->mc, input, size);
+		    });
 
-	c->mc->check_destroy(c->mc);
+		c->mc->check_destroy(c->mc);
 
-	mrp_transport_disconnect(t);
+		mrp_transport_disconnect(t);
 
-	mrp_sockaddr_cpy(&c->addr, &a, c->addrlen=l);
+		mrp_sockaddr_cpy(&c->addr, &a, c->addrlen=l);
 
-	if (l)
-	    mrp_transport_connect(t, &a, l);
+
+		if (l)
+		    mrp_transport_connect(t, &a, l);
+
+		return;
+	    }
+	}
     }
-    else
-	mrp_log_error("Received malformed console message.");
+
+    mrp_log_error("Received malformed console message.");
 }
 
 

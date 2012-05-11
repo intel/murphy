@@ -118,7 +118,6 @@ socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
 				mrp_sockaddr_t *addr, socklen_t size,
 				const char **type)
 {
-#if 1
     mrp_transport_descr_t *d;
     mrp_list_hook_t       *p, *n;
     socklen_t              l;
@@ -139,25 +138,6 @@ socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
     }
     
     return 0;
-#else
-    mrp_transport_descr_t *d;
-    char                  *p, type[32];
-    int                    n;
-    
-    if ((p = strchr(str, ':')) != NULL && (n = p - str) < (int)sizeof(type)) {
-	strncpy(type, str, n);
-	type[n] = '\0';
-
-	if (t != NULL)
-	    return t->descr->resolve(p + 1, addr, size);
-	else {
-	    if ((d = find_transport(type)) != NULL)
-		return d->resolve(p + 1, addr, size);
-	}
-    }
-
-    return 0;
-#endif
 }
 
 
