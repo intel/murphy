@@ -28,7 +28,7 @@ emit () {
 
 # set up defaults
 PATTERN="^mrp_"                       # export everything prefixed with mrp_
-IGNORE="MRP_PRINTF_LIKE"              # ignore these symbols/macros
+IGNORE="MRP_PRINTF_LIKE,MRP_NULLTERM" # ignore these symbols/macros
 IT=","                                # ignore-list is comma-separated
 SOURCES=""                            # no default input, must be specified
 OUTPUT=""                             # no default output, must be specified

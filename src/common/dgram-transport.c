@@ -18,7 +18,6 @@
 typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
     int             sock;                /* UDP socket */
-    int             flags;               /* socket flags */
     int             family;              /* socket family */
     mrp_io_watch_t *iow;                 /* socket I/O watch */
     void           *ibuf;                /* input buffer */
@@ -192,33 +191,31 @@ static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
 }
 
 
-static int dgrm_open(mrp_transport_t *mu, int flags)
+static int dgrm_open(mrp_transport_t *mu)
 {
     dgrm_t *u = (dgrm_t *)mu;
     
     u->sock   = -1;
     u->family = -1;
-    u->flags  = flags;
 
     return TRUE;
 }
 
 
-static int dgrm_create(mrp_transport_t *mu, void *conn, int flags)
+static int dgrm_create(mrp_transport_t *mu, void *conn)
 {
     dgrm_t         *u = (dgrm_t *)mu;
     int             on;
     mrp_io_event_t  events;    
 
-    u->sock  = *(int *)conn;
-    u->flags = flags;
+    u->sock = *(int *)conn;
 
     if (u->sock >= 0) {
-	if (u->flags & MRP_TRANSPORT_REUSEADDR) {
+	if (mu->flags & MRP_TRANSPORT_REUSEADDR) {
 	    on = 1;
 	    setsockopt(u->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 	}
-	if (u->flags & MRP_TRANSPORT_NONBLOCK) {
+	if (mu->flags & MRP_TRANSPORT_NONBLOCK) {
 	    on = 1;
 	    fcntl(u->sock, F_SETFL, O_NONBLOCK, on);
 	}
@@ -288,7 +285,6 @@ static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     ssize_t          n;
     void            *data;
     int              old, error;
-    mrp_msg_t       *msg;
 
     MRP_UNUSED(ml);
     MRP_UNUSED(w);
@@ -344,31 +340,14 @@ static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 	    goto fatal_error;
 	}
 	
-	data = u->ibuf + sizeof(size);
-	msg  = mrp_msg_default_decode(data, size);
-	
-	if (msg != NULL) {
-	    if (mu->connected) {
-		MRP_TRANSPORT_BUSY(mu, {
-			mu->evt.recv(mu, msg, mu->user_data);
-		    });
-	    }
-	    else {
-		MRP_TRANSPORT_BUSY(mu, {
-			mu->evt.recvfrom(mu, msg, &addr, addrlen,
-					 mu->user_data);
-		    });
-	    }
+	data  = u->ibuf + sizeof(size);
+	error = mu->recv_data(mu, data, size, &addr, addrlen);
 
-	    mrp_msg_unref(msg);
-
-	    if (u->check_destroy(mu))
-		return;
-	}
-	else {
-	    error = EPROTO;
+	if (error)
 	    goto fatal_error;
-	}
+	
+	if (u->check_destroy(mu))
+	    return;
     }
 
     if (events & MRP_IO_EVENT_HUP) {
@@ -549,20 +528,142 @@ static int dgrm_sendto(mrp_transport_t *mu, mrp_msg_t *msg,
 }
 
 
+static int dgrm_sendraw(mrp_transport_t *mu, void *data, size_t size)
+{
+    dgrm_t  *u = (dgrm_t *)mu;
+    ssize_t  n;
+
+    if (u->connected) {
+	n = write(u->sock, data, size);
+
+	if (n == (ssize_t)size)
+	    return TRUE;
+	else {
+	    if (n == -1 && errno == EAGAIN) {
+		mrp_log_error("%s(): XXX TODO: this sucks, need to add "
+			      "output queuing for dgrm-transport.",
+			      __FUNCTION__);
+	    }
+	}
+    }
+    
+    return FALSE;
+}
+
+
+static int dgrm_sendrawto(mrp_transport_t *mu, void *data, size_t size,
+			  mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    dgrm_t  *u = (dgrm_t *)mu;
+    ssize_t  n;
+    
+    if (MRP_UNLIKELY(u->sock == -1)) {
+	if (!open_socket(u, ((struct sockaddr *)addr)->sa_family))
+	    return FALSE;
+    }
+	
+    n = sendto(u->sock, data, size, 0, &addr->any, addrlen);
+    
+    if (n == (ssize_t)size)
+	return TRUE;
+    else {
+	if (n == -1 && errno == EAGAIN) {
+	    mrp_log_error("%s(): XXX TODO: dgrm-transport send failed",
+			  __FUNCTION__);
+	}
+    }
+    
+    return FALSE;
+}
+
+
+static int senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
+		      mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    dgrm_t           *u = (dgrm_t *)mu;
+    mrp_data_descr_t *type;
+    ssize_t           n;
+    void             *buf;
+    size_t            size, reserve, len;
+    uint32_t         *lenp;
+    uint16_t         *tagp;
+    
+    if (MRP_UNLIKELY(u->sock == -1)) {
+	if (!open_socket(u, ((struct sockaddr *)addr)->sa_family))
+	    return FALSE;
+    }
+    
+    type = mrp_msg_find_type(tag);
+	
+    if (type != NULL) {
+	reserve = sizeof(*lenp) + sizeof(*tagp);
+	size    = mrp_data_encode(&buf, data, type, reserve);
+	
+	if (size > 0) {
+	    lenp  = buf;
+	    len   = size - sizeof(*lenp);
+	    tagp  = buf + sizeof(*lenp);
+	    *lenp = htobe32(len);
+	    *tagp = htobe16(tag);
+	    
+	    if (u->connected)
+		n = send(u->sock, buf, len + sizeof(*lenp), 0);
+	    else
+		n = sendto(u->sock, buf, len + sizeof(*lenp), 0, &addr->any, addrlen);
+	    
+	    mrp_free(buf);
+		
+	    if (n == (ssize_t)(len + sizeof(*lenp)))
+		return TRUE;
+	    else {
+		if (n == -1 && errno == EAGAIN) {
+		    mrp_log_error("%s(): XXX TODO: dgrm-transport send"
+				  " needs queuing", __FUNCTION__);
+		}
+	    }
+	}
+    }
+    
+    return FALSE;
+}
+
+
+static int dgrm_senddata(mrp_transport_t *mu, void *data, uint16_t tag)
+{
+    if (mu->connected)
+	return senddatato(mu, data, tag, NULL, 0);
+    else
+	return FALSE;
+}
+
+
+static int dgrm_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
+			   mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    return senddatato(mu, data, tag, addr, addrlen);
+}
+
+
 MRP_REGISTER_TRANSPORT(udp4, "udp4", dgrm_t, dgrm_resolve,
 		       dgrm_open, dgrm_create, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
-		       dgrm_send, dgrm_sendto);
+		       dgrm_send, dgrm_sendto,
+		       dgrm_sendraw, dgrm_sendrawto,
+		       dgrm_senddata, dgrm_senddatato);
 
 MRP_REGISTER_TRANSPORT(udp6, "udp6", dgrm_t, dgrm_resolve,
 		       dgrm_open, dgrm_create, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
-		       dgrm_send, dgrm_sendto);
+		       dgrm_send, dgrm_sendto,
+		       dgrm_sendraw, dgrm_sendrawto,
+		       dgrm_senddata, dgrm_senddatato);
 
 MRP_REGISTER_TRANSPORT(unxdgrm, "unxdgrm", dgrm_t, dgrm_resolve,
 		       dgrm_open, dgrm_create, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
-		       dgrm_send, dgrm_sendto);
+		       dgrm_send, dgrm_sendto,
+		       dgrm_sendraw, dgrm_sendrawto,
+		       dgrm_senddata, dgrm_senddatato);

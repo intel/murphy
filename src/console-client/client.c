@@ -118,7 +118,7 @@ void prompt_process_input(client_t *c, char *input)
 	
 	tag  = MRP_CONSOLE_INPUT;
 	type = MRP_MSG_FIELD_BLOB;
-	msg  = mrp_msg_create(tag, type, len, input, MRP_MSG_FIELD_INVALID);
+	msg  = mrp_msg_create(tag, type, len, input, NULL);
 
 	if (msg != NULL) {
 	    mrp_transport_send(c->t, msg);

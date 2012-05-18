@@ -59,7 +59,7 @@ static ssize_t write_req(mrp_console_t *mc, void *buf, size_t size)
     tag  = MRP_CONSOLE_OUTPUT;
     type = MRP_MSG_FIELD_BLOB;
     len  = size;
-    msg  = mrp_msg_create(tag, type, len, buf, MRP_MSG_FIELD_INVALID);
+    msg  = mrp_msg_create(tag, type, len, buf, NULL);
 
     if (msg != NULL) {
 	mrp_transport_send(c->t, msg);
@@ -90,7 +90,7 @@ static void udp_close_req(mrp_console_t *mc)
 
     tag  = MRP_CONSOLE_BYE;
     type = MRP_MSG_FIELD_BOOL;
-    msg  = mrp_msg_create(tag, type, TRUE, MRP_MSG_FIELD_INVALID);
+    msg  = mrp_msg_create(tag, type, TRUE, NULL);
 
     if (msg != NULL) {
 	mrp_transport_send(c->t, msg);
@@ -109,7 +109,7 @@ static void set_prompt_req(mrp_console_t *mc, const char *prompt)
 
     tag  = MRP_CONSOLE_PROMPT;
     type = MRP_MSG_FIELD_STRING;
-    msg  = mrp_msg_create(tag, type, prompt, MRP_MSG_FIELD_INVALID);
+    msg  = mrp_msg_create(tag, type, prompt, NULL);
 
     if (msg != NULL) {
 	mrp_transport_send(c->t, msg);

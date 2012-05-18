@@ -32,18 +32,33 @@ typedef enum {
     MRP_MSG_FIELD_INT64   = A(SINT64),   /* alias for SINT64 */
     MRP_MSG_FIELD_DOUBLE  = 0x0b,        /* double-prec. floating point */
     MRP_MSG_FIELD_BLOB    = 0x0c,        /* a blob (not allowed in arrays) */
+    MRP_MSG_FIELD_MAX     = 0x0c,
     MRP_MSG_FIELD_ARRAY   = 0x80,        /* bit-mask to mark arrays */
 } mrp_msg_field_type_t;
 #undef A
 
+#define MRP_MSG_FIELD_ARRAY_OF(t) (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##t)
 
-/** Tag to terminate a */
-#define MRP_MSG_INVALID_TAG MRP_MSG_FIELD_INVALID
-
+/** Sentinel to pass in as the last argument to mrp_msg_create. */
+#define MRP_MSG_FIELD_END NULL
 
 
 /*
- * a message field
+ * generic messages
+ *
+ * A generic message is just a collection of message fields. By default
+ * transports are in generic messaging mode in which case they take messages
+ * as input (for transmission) and provide messages as events (for receiption).
+ * A generic message field consists of a field tag, a field type, the actual
+ * type-specific field value, and for certain types a size.
+ *
+ * The field tag is used by the communicating parties to attach semantic
+ * meaning to the field data. One can think of it as the 'name' of the field
+ * within a message. It is not interpreted by the messaging layer in any way.
+ * The field type defines what kind of data the field contains contains and
+ * it must be one of the predefined MRP_MSG_FIELD_* types. The actual field
+ * data then depends on the type. size is only used for those data types that
+ * require a size (blobs and arrays).
  */
 
 #define MRP_MSG_VALUE_UNION union {		\
@@ -59,6 +74,7 @@ typedef enum {
 	int64_t    s64;				\
 	double     dbl;				\
 	void      *blb;				\
+	void      *aany;			\
 	char     **astr;			\
 	bool      *abln;			\
 	uint8_t   *au8;				\
@@ -69,22 +85,19 @@ typedef enum {
 	int32_t   *as32;			\
 	uint64_t  *au64;			\
 	int64_t   *as64;			\
+	double    *adbl;			\
     }
 
 typedef MRP_MSG_VALUE_UNION mrp_msg_value_t;
 
 typedef struct {
-    mrp_list_hook_t hook;                /* to message */
+    mrp_list_hook_t hook;                /* hook to list of fields */
     uint16_t        tag;                 /* message field tag */
     uint16_t        type;                /* message field type */
     MRP_MSG_VALUE_UNION;                 /* message field value */
     uint32_t        size[0];             /* size, if an array or a blob */
 } mrp_msg_field_t;
 
-
-/*
- * a message
- */
 
 typedef struct {
     mrp_list_hook_t fields;              /* list of message fields */
@@ -93,24 +106,16 @@ typedef struct {
 } mrp_msg_t;
 
 
-/*
- * a message buffer to help encoding / decoding
- */
-
-typedef struct {
-    void   *buf;                         /* message buffer */
-    size_t  size;                        /* allocated size */
-    void   *p;                           /* fill pointer */
-    size_t  l;                           /* space left in buffer */
-} mrp_msgbuf_t;
-
 /** Create a new message. */
-mrp_msg_t *mrp_msg_create(uint16_t tag, ...);
+mrp_msg_t *mrp_msg_create(uint16_t tag, ...) MRP_NULLTERM;
 
-/** Add a new reference to a message (ie. increase refcount). */
+/** Macro to create an empty message. */
+#define mrp_msg_create_empty() mrp_msg_create(MRP_MSG_FIELD_INVALID, NULL)
+
+/** Increase refcount of the given message. */
 mrp_msg_t *mrp_msg_ref(mrp_msg_t *msg);
 
-/** Delete a reference from a message, freeing it if refcount drops to zero. */
+/** Decrease the refcount, free the message if refcount drops to zero. */
 void mrp_msg_unref(mrp_msg_t *msg);
 
 /** Append a field to a message. */
@@ -125,11 +130,139 @@ mrp_msg_field_t *mrp_msg_find(mrp_msg_t *msg, uint16_t tag);
 /** Dump a message. */
 int mrp_msg_dump(mrp_msg_t *msg, FILE *fp);
 
-/** Default message encoding. */
+/** Encode the given message using the default message encoder. */
 ssize_t mrp_msg_default_encode(mrp_msg_t *msg, void **bufp);
 
-/** Default message decoding. */
+/** Decode the given message using the default message decoder. */
 mrp_msg_t *mrp_msg_default_decode(void *buf, size_t size);
+
+
+/*
+ * custom data types
+ *
+ * In addition to generic messages, you can instruct the messaging and
+ * transport layers to encode/decode messages directly from/to custom data
+ * structures. To do so you need to describe your data structures and register
+ * them using data descriptors. A descriptor basically consists of a type
+ * tag, structure size, number of members and and array of structure member
+ * descriptors.
+ *
+ * The data type tag is used to identify the descriptor and consequently
+ * the custom data type both during sending and receiving (ie. encoding and
+ * decoding). It is assigned by the registering entity, it must be unique,
+ * and it cannot be MRP_MSG_TAG_DEFAULT (0x0), or else registration will
+ * fail. The size is used to allocate necessary memory for the data on the
+ * receiving end. The member descriptors are used to describe the offset
+ * and types of the members within the custom data type.
+ */
+
+#define MRP_MSG_TAG_DEFAULT 0x0          /* tag for default encode/decoder */
+
+typedef struct {
+    uint16_t        offs;                /* offset within structure */
+    uint16_t        tag;                 /* tag for this member */
+    uint16_t        type;                /* type of this member */
+    bool            guard;               /* whether sentinel-terminated */
+    MRP_MSG_VALUE_UNION;                 /* sentinel or offset of count field */
+    mrp_list_hook_t hook;                /* hook to list of extra allocations */
+} mrp_data_member_t;
+
+
+typedef struct {
+    mrp_refcnt_t       refcnt;           /* reference count */
+    uint16_t           tag;              /* structure tag */
+    size_t             size;             /* size of this structure */
+    int                nfield;           /* number of members */
+    mrp_data_member_t *fields;           /* member descriptors */
+    mrp_list_hook_t    allocated;        /* fields needing extra allocation */
+} mrp_data_descr_t;
+
+
+/** Convenience macro to declare a custom data type (and its members). */
+#define MRP_DATA_DESCRIPTOR(_var, _tag, _type, ...)		\
+    static mrp_data_member_t _var##_members[] = {		\
+	__VA_ARGS__						\
+    };								\
+								\
+    static mrp_data_descr_t _var = {				\
+	.size   = sizeof(_type),				\
+	.tag    = _tag,						\
+	.fields = _var##_members,				\
+	.nfield = MRP_ARRAY_SIZE(_var##_members)		\
+ }
+
+/** Convenience macro to declare a data member. */
+#define MRP_DATA_MEMBER(_data_type, _member, _member_type) {	\
+        .offs  = MRP_OFFSET(_data_type, _member),		\
+	.type  = _member_type,					\
+	.guard = FALSE						\
+ }
+
+/** Convenience macro to declare an array data member with a count field. */
+#define MRP_DATA_ARRAY_COUNT(_data_type, _array, _count, _base_type) {	\
+        .offs  = MRP_OFFSET(_data_type, _array),			\
+	.type  = MRP_MSG_FIELD_ARRAY | _base_type,		        \
+	.guard = FALSE,						        \
+	.u32   = MRP_OFFSET(_data_type, _count)			        \
+    }
+
+/** Convenience macro to declare an array data member with a sentinel value. */
+#define MRP_DATA_ARRAY_GUARD(_data_type, _array, _guard_member, _guard_val, \
+			     _base_type) {				\
+        .offs          = MRP_OFFSET(_data_type, _array),		\
+	.type          = MRP_MSG_FIELD_ARRAY | _base_type,	        \
+	.guard         = TRUE,						\
+	._guard_member = _guard_val					\
+    }
+
+/** Encode a structure using the given message descriptor. */
+size_t mrp_data_encode(void **bufp, void *data, mrp_data_descr_t *descr,
+		       size_t reserve);
+
+/** Decode a structure using the given message descriptor. */
+void *mrp_data_decode(void **bufp, size_t *sizep, mrp_data_descr_t *descr);
+
+/** Dump the given data buffer. */
+int mrp_data_dump(void *data, mrp_data_descr_t *descr, FILE *fp);
+
+/** Register a new custom data type with the messaging/transport layer. */
+int mrp_msg_register_type(mrp_data_descr_t *type);
+
+/** Look up the data type descriptor corresponding to the given tag. */
+mrp_data_descr_t *mrp_msg_find_type(uint16_t tag);
+
+/** Free the given custom data allocated by the messaging layer. */
+int mrp_data_free(void *data, uint16_t tag);
+
+/*
+ * message encoding/decoding buffer
+ *
+ * This message buffer and the associated functions and macros can be
+ * used to write message encoding/decoding functions for bitpipe-type
+ * transports, ie. for transports where the underlying IPC just provides
+ * a raw data connection between the communication endpoints and does not
+ * impose/expect any structure on/from the data being transmitted.
+ *
+ * Practically all the basic stream and datagram socket transports are
+ * such. They use the default encoding/decoding functions provided by
+ * the messaging layer together with a very simple transport frame scheme,
+ * where each frame consists of the amount a size indicating the size of
+ * the encoded message in the bitpipe and the actual encoded message data.
+ *
+ * Note that at the moment this framing scheme is rather implicit in the
+ * sense that you won't find a data type representing a frame. Rather the
+ * framing is simply done in the sending/receiving code of the individual
+ * transports.
+ */
+
+typedef struct {
+    void   *buf;                         /* buffer to encode to/decode from */
+    size_t  size;                        /* size of the buffer */
+    void   *p;                           /* encoding/decoding pointer */
+    size_t  l;                           /* space left in the buffer */
+} mrp_msgbuf_t;
+
+
 
 /** Initialize the given message buffer for writing. */
 void *mrp_msgbuf_write(mrp_msgbuf_t *mb, size_t size);
@@ -149,7 +282,7 @@ void *mrp_msgbuf_reserve(mrp_msgbuf_t *mb, size_t size, size_t align);
 /** Pull the given amount of data from the buffer. */
 void *mrp_msgbuf_pull(mrp_msgbuf_t *mb, size_t size, size_t align);
 
-
+/** Push data with alignment to the buffer, jumping to errlbl on errors. */
 #define MRP_MSGBUF_PUSH(mb, data, align, errlbl) do {		\
 	size_t        _size = sizeof(data);			\
 	typeof(data) *_ptr;					\
@@ -162,6 +295,7 @@ void *mrp_msgbuf_pull(mrp_msgbuf_t *mb, size_t size, size_t align);
 	    goto errlbl;					\
     } while (0)
 
+/** Push aligned data to the buffer, jumping to errlbl on errors. */
 #define MRP_MSGBUF_PUSH_DATA(mb, data, size, align, errlbl) do {	\
 	size_t _size = (size);						\
 	void   *_ptr;							\
@@ -174,6 +308,7 @@ void *mrp_msgbuf_pull(mrp_msgbuf_t *mb, size_t size, size_t align);
 	    goto errlbl;						\
     } while (0)
 
+/** Pull aligned data of type from the buffer, jump to errlbl on errors. */
 #define MRP_MSGBUF_PULL(mb, type, align, errlbl) ({			\
 	    size_t  _size = sizeof(type);				\
 	    type   *_ptr;						\
@@ -186,7 +321,7 @@ void *mrp_msgbuf_pull(mrp_msgbuf_t *mb, size_t size, size_t align);
 	    *_ptr;							\
 	})
 
-
+/** Pull aligned data of type from the buffer, jump to errlbl on errors. */
 #define MRP_MSGBUF_PULL_DATA(mb, size, align, errlbl) ({	\
 	    size_t  _size = size;				\
 	    void   *_ptr;					\

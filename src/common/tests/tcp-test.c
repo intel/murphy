@@ -8,7 +8,7 @@
 
 #include <murphy/common.h>
 
-#define TAG_END     ((uint16_t)0x0)
+#define TAG_END     MRP_MSG_FIELD_END
 #define TAG_SEQ     ((uint16_t)0x1)
 #define TAG_FOO     ((uint16_t)0x2)
 #define TAG_BAR     ((uint16_t)0x3)
@@ -157,7 +157,7 @@ void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 
     
     seq = seqno++;
-    len = snprintf(buf, sizeof(buf), "This is message %u.", (unsigned int)seq);
+    len = snprintf(buf, sizeof(buf), "this is message #%u", (unsigned int)seq);
     if ((msg = mrp_msg_create(TAG_SEQ, MRP_MSG_FIELD_UINT32, seq,
 			      TAG_FOO, MRP_MSG_FIELD_STRING, "foo",
 			      TAG_BAR, MRP_MSG_FIELD_STRING, "bar",

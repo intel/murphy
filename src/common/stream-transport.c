@@ -20,7 +20,6 @@
 typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
     int             sock;                /* TCP socket */
-    int             flags;               /* socket flags */
     mrp_io_watch_t *iow;                 /* socket I/O watch */
     void           *ibuf;                /* input buffer */
     size_t          isize;               /* input buffer size */
@@ -185,33 +184,31 @@ static socklen_t strm_resolve(const char *str, mrp_sockaddr_t *addr,
 }
 
 
-static int strm_open(mrp_transport_t *mt, int flags)
+static int strm_open(mrp_transport_t *mt)
 {
     strm_t *t = (strm_t *)mt;
     
-    t->sock  = -1;
-    t->flags = flags;
+    t->sock = -1;
 
     return TRUE;
 }
 
 
-static int strm_create(mrp_transport_t *mt, void *conn, int flags)
+static int strm_create(mrp_transport_t *mt, void *conn)
 {
     strm_t           *t = (strm_t *)mt;
     mrp_io_event_t   events;    
     int              on;
     long             nb;
 
-    t->sock  = *(int *)conn;
-    t->flags = flags;
+    t->sock   = *(int *)conn;
 
     if (t->sock >= 0) {
-	if (t->flags & MRP_TRANSPORT_REUSEADDR) {
+	if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
 	    on = 1;
 	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 	}
-	if (t->flags & MRP_TRANSPORT_NONBLOCK) {
+	if (mt->flags & MRP_TRANSPORT_NONBLOCK) {
 	    nb = 1;
 	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
 	}
@@ -261,7 +258,7 @@ static int strm_listen(mrp_transport_t *mt, int backlog)
 }
 
 
-static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt, int flags)
+static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 {
     strm_t         *t, *lt;
     mrp_sockaddr_t  addr;
@@ -270,7 +267,6 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt, int flags)
     int             on;
     long            nb;
 
-
     t  = (strm_t *)mt;
     lt = (strm_t *)mlt;
 
@@ -278,15 +274,15 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt, int flags)
     t->sock = accept(lt->sock, &addr.any, &addrlen);
 
     if (t->sock >= 0) {
-	if (flags & MRP_TRANSPORT_REUSEADDR) {
+	if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
 	    on = 1;
 	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 	}
-	if (flags & MRP_TRANSPORT_NONBLOCK) {
+	if (mt->flags & MRP_TRANSPORT_NONBLOCK) {
 	    nb = 1;
 	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
 	}
-	if (flags & MRP_TRANSPORT_CLOEXEC) {
+	if (mt->flags & MRP_TRANSPORT_CLOEXEC) {
 	    on = 1;
 	    fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
 	}
@@ -337,7 +333,6 @@ static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     ssize_t          n, space, left;
     void            *data;
     int              old, error;
-    mrp_msg_t       *msg;
 
     MRP_UNUSED(ml);
     MRP_UNUSED(w);
@@ -393,24 +388,15 @@ static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 		size  = ntohl(*sizep);
 		
 		while (t->idata >= sizeof(size) + size) {
-		    data = t->ibuf + sizeof(size);
-		    msg  = mrp_msg_default_decode(data, size);
-
-		    if (msg != NULL) {
-			MRP_TRANSPORT_BUSY(mt, {
-				mt->evt.recv(mt, msg, mt->user_data);
-			    });
-
-			mrp_msg_unref(msg);
-
-			if (t->check_destroy(mt))
-			    return;
-		    }
-		    else {
-			error = EPROTO;
+		    data  = t->ibuf + sizeof(size);
+		    error = t->recv_data(mt, data, size, NULL, 0);
+		    
+		    if (error)
 			goto fatal_error;
-		    }
 
+		    if (t->check_destroy(mt))
+			return;
+		    
 		    left = t->idata - (sizeof(size) + size);
 		    memmove(t->ibuf, t->ibuf + sizeof(size) + size, left);
 		    t->idata = left;
@@ -560,7 +546,7 @@ static int strm_send(mrp_transport_t *mt, mrp_msg_t *msg)
 	    else {
 		if (n == -1 && errno == EAGAIN) {
 		    mrp_log_error("%s(): XXX TODO: this sucks, need to add "
-				  "output queuing for tcp-transport.",
+				  "output queuing for strm-transport.",
 				  __FUNCTION__);
 		}
 	    }
@@ -571,20 +557,94 @@ static int strm_send(mrp_transport_t *mt, mrp_msg_t *msg)
 }
 
 
+static int strm_sendraw(mrp_transport_t *mt, void *data, size_t size)
+{
+    strm_t  *t = (strm_t *)mt;
+    ssize_t  n;
+
+    if (t->connected) {
+	n = write(t->sock, data, size);
+
+	if (n == (ssize_t)size)
+	    return TRUE;
+	else {
+	    if (n == -1 && errno == EAGAIN) {
+		mrp_log_error("%s(): XXX TODO: this sucks, need to add "
+			      "output queuing for strm-transport.",
+			      __FUNCTION__);
+	    }
+	}
+    }
+    
+    return FALSE;
+}
+
+
+static int strm_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
+{
+    strm_t           *t = (strm_t *)mt;
+    mrp_data_descr_t *type;
+    ssize_t           n;
+    void             *buf;
+    size_t            size, reserve, len;
+    uint32_t         *lenp;
+    uint16_t         *tagp;
+    
+    if (t->connected) {
+	type = mrp_msg_find_type(tag);
+	
+	if (type != NULL) {
+	    reserve = sizeof(*lenp) + sizeof(*tagp);
+	    size    = mrp_data_encode(&buf, data, type, reserve);
+	    
+	    if (size > 0) {
+		lenp  = buf;
+		len   = size - sizeof(*lenp);
+		tagp  = buf + sizeof(*lenp);
+		*lenp = htobe32(len);
+		*tagp = htobe16(tag);
+		
+		n = write(t->sock, buf, len + sizeof(*lenp));
+	    
+		mrp_free(buf);
+		
+		if (n == (ssize_t)(len + sizeof(*lenp)))
+		    return TRUE;
+		else {
+		    if (n == -1 && errno == EAGAIN) {
+			mrp_log_error("%s(): XXX TODO: this sucks, need to add"
+				      " output queueing for strm-transport.",
+				      __FUNCTION__);
+		    }
+		}
+	    }
+	}
+    }
+    
+    return FALSE;
+}
+
+
 MRP_REGISTER_TRANSPORT(tcp4, "tcp4", strm_t, strm_resolve,
 		       strm_open, strm_create, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
-		       strm_send, NULL);
+		       strm_send, NULL,
+		       strm_sendraw, NULL,
+		       strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, "tcp6", strm_t, strm_resolve,
 		       strm_open, strm_create, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
-		       strm_send, NULL);
+		       strm_send, NULL,
+		       strm_sendraw, NULL,
+		       strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(unxstrm, "unxstrm", strm_t, strm_resolve,
 		       strm_open, strm_create, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
-		       strm_send, NULL);
+		       strm_send, NULL,
+		       strm_sendraw, NULL,
+		       strm_senddata, NULL);
