@@ -1,7 +1,6 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
-noinst_PROGRAMS = mm-test hash-test mainloop-test msg-test transport-test \
-                  tcp-test udp-test stream-test dgram-test
+noinst_PROGRAMS = mm-test hash-test mainloop-test msg-test transport-test
 
 # memory management test
 mm_test_SOURCES = mm-test.c
@@ -28,22 +27,3 @@ transport_test_SOURCES = transport-test.c
 transport_test_CFLAGS  = $(AM_CFLAGS)
 transport_test_LDADD   = ../../libmurphy-common.la
 
-# TCP transport test
-tcp_test_SOURCES = tcp-test.c
-tcp_test_CFLAGS  = $(AM_CFLAGS)
-tcp_test_LDADD   = ../../libmurphy-common.la
-
-# UDP transport test
-udp_test_SOURCES = udp-test.c
-udp_test_CFLAGS  = $(AM_CFLAGS)
-udp_test_LDADD   = ../../libmurphy-common.la
-
-# stream transport test
-stream_test_SOURCES = stream-test.c
-stream_test_CFLAGS  = $(AM_CFLAGS)
-stream_test_LDADD   = ../../libmurphy-common.la
-
-# dgram transport test
-dgram_test_SOURCES = dgram-test.c
-dgram_test_CFLAGS  = $(AM_CFLAGS)
-dgram_test_LDADD   = ../../libmurphy-common.la
