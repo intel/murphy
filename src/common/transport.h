@@ -195,7 +195,7 @@ typedef struct {
     size_t               size;           /* full transport struct size */
     mrp_transport_req_t  req;            /* transport requests */
     socklen_t          (*resolve)(const char *str, mrp_sockaddr_t *addr,
-				  socklen_t addrlen);
+				  socklen_t addrlen, const char **typep);
     mrp_list_hook_t      hook;           /* to list of registered transports */
 } mrp_transport_descr_t;
 

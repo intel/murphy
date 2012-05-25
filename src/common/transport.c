@@ -123,24 +123,21 @@ static inline int type_matches(const char *type, const char *addr)
 
 socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
 				mrp_sockaddr_t *addr, socklen_t size,
-				const char **type)
+				const char **typep)
 {
     mrp_transport_descr_t *d;
     mrp_list_hook_t       *p, *n;
     socklen_t              l;
     
     if (t != NULL)
-	return t->descr->resolve(str, addr, size);
+	return t->descr->resolve(str, addr, size, typep);
     else {
 	mrp_list_foreach(&transports, p, n) {
 	    d = mrp_list_entry(p, typeof(*d), hook);
-	    l = d->resolve(str, addr, size);
+	    l = d->resolve(str, addr, size, typep);
 	    
-	    if (l > 0) {
-		if (type != NULL)
-		    *type = d->type;
+	    if (l > 0)
 		return l;
-	    }
 	}
     }
     

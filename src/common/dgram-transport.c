@@ -13,6 +13,14 @@
 #include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
 
+#define UDP4  "udp4"
+#define UDP4L 4
+#define UDP6  "udp6"
+#define UDP6L 4
+#define UNXD  "unxd"
+#define UNXDL 4
+
+
 #define DEFAULT_SIZE 1024                /* default input buffer size */
 
 typedef struct {
@@ -43,22 +51,37 @@ static int open_socket(dgrm_t *u, int family);
 
 
 static int parse_address(const char *str, int *familyp, char *nodep,
-			 size_t nsize, char **servicep)
+			 size_t nsize, char **servicep, const char **typep)
 {
-    char   *node, *service;
-    int     family;
-    size_t  l, nl;
+    char       *node, *service;
+    const char *type;
+    int         family;
+    size_t      l, nl;
 
     node = (char *)str;
 
-    if      (!strncmp(node, "udp4:"   , l=5)) family = AF_INET,  node += l;
-    else if (!strncmp(node, "udp6:"   , l=5)) family = AF_INET6, node += l; 
-    else if (!strncmp(node, "unxdgrm:", l=8)) family = AF_UNIX , node += l;
+    if (!strncmp(node, UDP4, l=UDP4L+1)) {
+	family = AF_INET;
+	type   = UDP4;
+	node  += l;
+    }
+    else if (!strncmp(node, UDP6":", l=UDP6L+1)) {
+	family = AF_INET6;
+	type   = UDP6;
+	node  += l; 
+    }
+    else if (!strncmp(node, UNXD":", l=UNXDL+1)) {
+	family = AF_UNIX;
+	type   = UNXD;
+	node  += l;
+    }
     else {
 	if      (node[0] == '[') family = AF_INET6;
 	else if (node[0] == '/') family = AF_UNIX;
 	else if (node[0] == '@') family = AF_UNIX;
 	else                     family = AF_UNSPEC;
+
+	type = NULL;
     }
 
     switch (family) {
@@ -137,13 +160,15 @@ static int parse_address(const char *str, int *familyp, char *nodep,
     nodep[nl] = '\0';
     *servicep = service;
     *familyp  = family;
+    if (typep != NULL)
+	*typep = type;
     
     return 0;
 }
 
 
 static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
-			      socklen_t size)
+			      socklen_t size, const char **typep)
 {
     struct addrinfo    *ai, hints;
     struct sockaddr_un *un;
@@ -152,7 +177,8 @@ static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
     
     mrp_clear(&hints);    
     
-    if (parse_address(str, &hints.ai_family, node, sizeof(node), &port) < 0)
+    if (parse_address(str, &hints.ai_family, node, sizeof(node),
+		      &port, typep) < 0)
 	return 0;
 
     switch (hints.ai_family) {
