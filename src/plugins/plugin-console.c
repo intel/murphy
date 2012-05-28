@@ -218,11 +218,13 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 void connection_evt(mrp_transport_t *lt, void *user_data)
 {
+#if 0
     static mrp_transport_evt_t evt = {
-	.recv     = recv_evt,
-	.recvfrom = NULL,
-	.closed   = closed_evt,
+	.recvmsg     = recv_evt,
+	.recvmsgfrom = NULL,
+	.closed      = closed_evt,
     };
+#endif
     
     static mrp_console_req_t req = {
 	.write      = write_req,
@@ -238,7 +240,7 @@ void connection_evt(mrp_transport_t *lt, void *user_data)
 
     if ((c = mrp_allocz(sizeof(*c))) != NULL) {
 	flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_NONBLOCK;
-	c->t  = mrp_transport_accept(lt, &evt, c, flags);
+	c->t  = mrp_transport_accept(lt, c, flags);
 	
 	if (c->t != NULL) {
 	    c->mc = mrp_create_console(data->ctx, &req, c);
@@ -261,10 +263,10 @@ enum {
 static int strm_setup(data_t *data)
 {
     static mrp_transport_evt_t evt = {
-	.closed     = NULL,
-	.recv       = NULL,
-	.recvfrom   = NULL,
-	.connection = connection_evt,
+	.closed      = closed_evt,
+	.recvmsg     = recv_evt,
+	.recvmsgfrom = NULL,
+	.connection  = connection_evt,
     };
 
     mrp_transport_t *t;
@@ -308,9 +310,9 @@ static int strm_setup(data_t *data)
 static int dgrm_setup(data_t *data)
 {
     static mrp_transport_evt_t evt = {
-	.recv     = recv_evt,
-	.recvfrom = recvfrom_evt,
-	.closed   = NULL,
+	.recvmsg     = recv_evt,
+	.recvmsgfrom = recvfrom_evt,
+	.closed      = NULL,
     };
 
     static mrp_console_req_t req = {

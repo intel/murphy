@@ -9,14 +9,41 @@
 static int check_destroy(mrp_transport_t *t);
 static int recv_data(mrp_transport_t *t, void *data, size_t size,
 		     mrp_sockaddr_t *addr, socklen_t addrlen);
+static inline int purge_destroyed(mrp_transport_t *t);
 
 
 static MRP_LIST_HOOK(transports);
 
-static inline int purge_destroyed(mrp_transport_t *t);
+
+static int check_request_callbacks(mrp_transport_req_t *req)
+{
+    /* XXX TODO: hmm... this probably needs more thought/work */
+    
+    if (!req->open || !req->close)
+	return FALSE;
+
+    if (req->accept) {
+	if (!req->sendmsg || !req->sendraw || !req->senddata)
+	    return FALSE;
+    }
+    else {
+	if (!req->sendmsgto || !req->sendrawto || !req->senddatato)
+	    return FALSE;
+    }
+
+    if (( req->connect && !req->disconnect) ||
+	(!req->connect &&  req->disconnect))
+	return FALSE;
+    
+    return TRUE;
+}
+
 
 int mrp_transport_register(mrp_transport_descr_t *d)
 {
+    if (!check_request_callbacks(&d->req))
+	return FALSE;
+
     if (d->size >= sizeof(mrp_transport_t)) {
 	mrp_list_init(&d->hook);
 	mrp_list_append(&transports, &d->hook);
@@ -49,14 +76,44 @@ static mrp_transport_descr_t *find_transport(const char *type)
 }
 
 
+static int check_event_callbacks(mrp_transport_evt_t *evt)
+{
+    /*
+     * For connection-oriented transports we require a recv* callback
+     * and a closed callback.
+     *
+     * For connectionless transports we only require a recvfrom* callback.
+     * A recv* callback is optional, however the transport cannot be put
+     * to connected mode (usually for doing sender-based filtering) if
+     * recv* is omitted.
+     */
+    
+    if (evt->connection != NULL) {
+	if (evt->recvmsg == NULL || evt->closed == NULL)
+	    return FALSE;
+    }
+    else {
+	if (evt->recvmsgfrom == NULL)
+	    return FALSE;
+    }
+
+    return TRUE;
+}
+
+
 mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 				      mrp_transport_evt_t *evt, void *user_data,
 				      int flags)
 {
     mrp_transport_descr_t *d;
     mrp_transport_t       *t;
+    
+    if (!check_event_callbacks(evt)) {
+	errno = EINVAL;
+	return NULL;
+    }
 
-    if ((d = find_transport(type)) != NULL) {
+    if ((d = find_transport(type)) != NULL) {	
 	if ((t = mrp_allocz(d->size)) != NULL) {
 	    t->descr     = d;
 	    t->ml        = ml;
@@ -88,6 +145,11 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
     mrp_transport_descr_t *d;
     mrp_transport_t       *t;
 
+    if (!check_event_callbacks(evt)) {
+	errno = EINVAL;
+	return NULL;
+    }
+
     if ((d = find_transport(type)) != NULL) {
 	if ((t = mrp_allocz(d->size)) != NULL) {
 	    t->ml        = ml;
@@ -99,7 +161,7 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
 	    t->recv_data     = recv_data;
 	    t->flags         = flags;
 
-	    if (!t->descr->req.create(t, conn)) {
+	    if (!t->descr->req.createfrom(t, conn)) {
 		mrp_free(t);
 		t = NULL;
 	    }
@@ -180,7 +242,6 @@ int mrp_transport_listen(mrp_transport_t *t, int backlog)
 
 
 mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
-				      mrp_transport_evt_t *evt,
 				      void *user_data, int flags)
 {
     mrp_transport_t *t;
@@ -188,7 +249,7 @@ mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
     if ((t = mrp_allocz(lt->descr->size)) != NULL) {
 	t->descr     = lt->descr;
 	t->ml        = lt->ml;
-	t->evt       = *evt;
+	t->evt       = lt->evt;
 	t->user_data = user_data;
 	
 	t->check_destroy = check_destroy;
@@ -249,6 +310,13 @@ int mrp_transport_connect(mrp_transport_t *t, mrp_sockaddr_t *addr,
     int result;
     
     if (!t->connected) {
+	
+	/* make sure we can deliver reception noifications */
+	if (t->evt.recvmsg == NULL) {
+	    errno = EINVAL;
+	    return FALSE;
+	}
+
 	MRP_TRANSPORT_BUSY(t, {
 		if (t->descr->req.connect(t, addr, addrlen))  {
 		    t->connected = TRUE;
@@ -294,9 +362,9 @@ int mrp_transport_send(mrp_transport_t *t, mrp_msg_t *msg)
 {
     int result;
     
-    if (t->connected && t->descr->req.send) {
+    if (t->connected && t->descr->req.sendmsg) {
 	MRP_TRANSPORT_BUSY(t, {
-		result = t->descr->req.send(t, msg);
+		result = t->descr->req.sendmsg(t, msg);
 	    });
 
 	purge_destroyed(t);
@@ -313,9 +381,9 @@ int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg,
 {
     int result;
     
-    if (t->descr->req.sendto) {
+    if (t->descr->req.sendmsgto) {
 	MRP_TRANSPORT_BUSY(t, {
-		result = t->descr->req.sendto(t, msg, addr, addrlen);
+		result = t->descr->req.sendmsgto(t, msg, addr, addrlen);
 	    });
 
 	purge_destroyed(t);
@@ -473,13 +541,13 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
 	    else {
 		if (t->connected) {
 		    MRP_TRANSPORT_BUSY(t, {
-			    t->evt.recv(t, msg, t->user_data);
+			    t->evt.recvmsg(t, msg, t->user_data);
 			});
 		}
 		else {
 		    MRP_TRANSPORT_BUSY(t, {
-			    t->evt.recvfrom(t, msg, addr, addrlen,
-					    t->user_data);
+			    t->evt.recvmsgfrom(t, msg, addr, addrlen,
+					       t->user_data);
 			});
 		}
 

@@ -252,26 +252,11 @@ void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 void connection_evt(mrp_transport_t *lt, void *user_data)
 {
-    static mrp_transport_evt_t evt = {
-	.closed   = closed_evt,
-	.recv     = NULL,
-	.recvfrom = NULL,
-    };
-
     context_t *c = (context_t *)user_data;
     int        flags;
 
-    if (c->custom) {
-	evt.recvdata     = recv_custom;
-	evt.recvdatafrom = recvfrom_custom;
-    }
-    else {
-	evt.recv     = recv_msg;
-	evt.recvfrom = recvfrom_msg;
-    }
-
     flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_NONBLOCK;
-    c->t = mrp_transport_accept(lt, &evt, c, flags);
+    c->t = mrp_transport_accept(lt, c, flags);
 
     if (c->t == NULL) {
 	mrp_log_error("Failed to accept new connection.");
@@ -291,10 +276,10 @@ void type_init(void)
 void server_init(context_t *c)
 {
     static mrp_transport_evt_t evt = {
-	.closed     = NULL,
-	.recv       = NULL,
-	.recvfrom   = NULL,
-	.connection = NULL,
+	.closed      = NULL,
+	.recvmsg     = NULL,
+	.recvmsgfrom = NULL,
+	.connection  = NULL,
     };
 
     int flags;
@@ -307,14 +292,25 @@ void server_init(context_t *c)
 	    evt.recvdatafrom = recvfrom_custom;
 	}
 	else {
-	    evt.recv     = recv_msg;
-	    evt.recvfrom = recvfrom_msg;
+	    evt.recvmsg     = recv_msg;
+	    evt.recvmsgfrom = recvfrom_msg;
 	}
     }
-    else
+    else {
 	evt.connection = connection_evt;
-	
-    flags = MRP_TRANSPORT_REUSEADDR | c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0;
+	evt.closed     = closed_evt;
+	if (c->custom) {
+	    evt.recvdata     = recv_custom;
+	    evt.recvdatafrom = recvfrom_custom;
+	}
+	else {
+	    evt.recvmsg     = recv_msg;
+	    evt.recvmsgfrom = recvfrom_msg;
+	}
+    }
+
+    flags = MRP_TRANSPORT_REUSEADDR | 
+	(c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0);
     c->lt = mrp_transport_create(c->ml, c->atype, &evt, c, flags);
 
     if (c->lt == NULL) {
@@ -327,7 +323,7 @@ void server_init(context_t *c)
 	exit(1);
     }
 
-    if (!strncmp(c->addrstr, "tcp", 3) || !strncmp(c->addrstr, "unxstrm", 7)) {
+    if (c->stream) {
 	if (!mrp_transport_listen(c->lt, 0)) {
 	    mrp_log_error("Failed to listen on server transport.");
 	    exit(1);
@@ -441,19 +437,23 @@ void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 void client_init(context_t *c)
 {
     static mrp_transport_evt_t evt = {
-	.closed   = closed_evt,
-	.recv     = NULL,
-	.recvfrom = NULL,
+	.closed      = closed_evt,
+	.recvmsg     = NULL,
+	.recvmsgfrom = NULL,
     };
 
     int flags;
 
     type_init();
 
-    if (c->custom)
-	evt.recvdata = recv_custom;
-    else
-	evt.recv     = recv_msg;
+    if (c->custom) {
+	evt.recvdata     = recv_custom;
+	evt.recvdatafrom = recvfrom_custom;
+    }
+    else {
+	evt.recvmsg     = recv_msg;
+	evt.recvmsgfrom = recvfrom_msg;
+    }
 
     flags = c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0;
     c->t  = mrp_transport_create(c->ml, c->atype, &evt, c, flags);
@@ -463,8 +463,8 @@ void client_init(context_t *c)
 	exit(1);
     }
 
-    if (!strcmp(c->atype, "unxdgrm")) {
-	char           addrstr[] = "unxdgrm:@stream-test-client";
+    if (!strcmp(c->atype, "unxd")) {
+	char           addrstr[] = "unxd:@stream-test-client";
 	mrp_sockaddr_t addr;
 	socklen_t      alen;
 
@@ -645,7 +645,7 @@ int main(int argc, char *argv[])
     else
 	mrp_log_info("Using generic messages...");
 
-    if (!strncmp(c.addrstr, "tcp", 3) || !strncmp(c.addrstr, "unxstrm", 7)) {
+    if (!strncmp(c.addrstr, "tcp", 3) || !strncmp(c.addrstr, "unxs", 4)) {
 	c.stream  = TRUE;
 	c.connect = TRUE;
     }

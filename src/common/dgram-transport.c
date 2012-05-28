@@ -228,7 +228,7 @@ static int dgrm_open(mrp_transport_t *mu)
 }
 
 
-static int dgrm_create(mrp_transport_t *mu, void *conn)
+static int dgrm_createfrom(mrp_transport_t *mu, void *conn)
 {
     dgrm_t         *u = (dgrm_t *)mu;
     int             on;
@@ -671,7 +671,7 @@ static int dgrm_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
 
 
 MRP_REGISTER_TRANSPORT(udp4, "udp4", dgrm_t, dgrm_resolve,
-		       dgrm_open, dgrm_create, dgrm_close,
+		       dgrm_open, dgrm_createfrom, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
 		       dgrm_send, dgrm_sendto,
@@ -679,15 +679,15 @@ MRP_REGISTER_TRANSPORT(udp4, "udp4", dgrm_t, dgrm_resolve,
 		       dgrm_senddata, dgrm_senddatato);
 
 MRP_REGISTER_TRANSPORT(udp6, "udp6", dgrm_t, dgrm_resolve,
-		       dgrm_open, dgrm_create, dgrm_close,
+		       dgrm_open, dgrm_createfrom, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
 		       dgrm_send, dgrm_sendto,
 		       dgrm_sendraw, dgrm_sendrawto,
 		       dgrm_senddata, dgrm_senddatato);
 
-MRP_REGISTER_TRANSPORT(unxdgrm, "unxdgrm", dgrm_t, dgrm_resolve,
-		       dgrm_open, dgrm_create, dgrm_close,
+MRP_REGISTER_TRANSPORT(unxdgrm, "unxd", dgrm_t, dgrm_resolve,
+		       dgrm_open, dgrm_createfrom, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
 		       dgrm_send, dgrm_sendto,

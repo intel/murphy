@@ -108,7 +108,7 @@ typedef struct {
     /** Open a new transport. */
     int  (*open)(mrp_transport_t *t);
     /** Create a new transport from an existing backend object. */
-    int  (*create)(mrp_transport_t *t, void *obj);
+    int  (*createfrom)(mrp_transport_t *t, void *obj);
     /** Bind a transport to a given transport-specific address. */
     int  (*bind)(mrp_transport_t *t, mrp_sockaddr_t *addr, socklen_t addrlen);
     /** Listen on a transport for incoming connections. */
@@ -123,15 +123,15 @@ typedef struct {
     /** Close a transport, free all resources from open/accept/connect. */
     void (*close)(mrp_transport_t *t);
     /** Send a message over a (connected) transport. */
-    int (*send)(mrp_transport_t *t, mrp_msg_t *msg);
+    int (*sendmsg)(mrp_transport_t *t, mrp_msg_t *msg);
     /** Send raw data over a (connected) transport. */
     int (*sendraw)(mrp_transport_t *t, void *buf, size_t size);
     /** Send custom data over a (connected) transport. */
     int (*senddata)(mrp_transport_t *t, void *data, uint16_t tag);
 
     /** Send a message over a(n unconnected) transport. */
-    int (*sendto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
-		  socklen_t addrlen);
+    int (*sendmsgto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
+		     socklen_t addrlen);
     /** Send raw data over a(n unconnected) transport. */
     int (*sendrawto)(mrp_transport_t *t, void *buf, size_t size,
 		     mrp_sockaddr_t *addr, socklen_t addrlen);
@@ -155,7 +155,7 @@ typedef struct {
     /** Message received on a connected transport. */
     union {
 	/** Generic message callback for connected transports. */
-	void (*recv)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
+	void (*recvmsg)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
 	/** Raw data callback for connected transports. */
 	void (*recvraw)(mrp_transport_t *t, void *data, size_t size,
 			void *user_data);
@@ -167,9 +167,9 @@ typedef struct {
     /** Message received on an unconnected transport. */
     union {
 	/** Generic message callback for unconnected transports. */
-	void (*recvfrom)(mrp_transport_t *t, mrp_msg_t *msg,
-			 mrp_sockaddr_t *addr, socklen_t addrlen,
-			 void *user_data);
+	void (*recvmsgfrom)(mrp_transport_t *t, mrp_msg_t *msg,
+			    mrp_sockaddr_t *addr, socklen_t addrlen,
+			    void *user_data);
 	/** Raw data callback for unconnected transports. */
 	void (*recvrawfrom)(mrp_transport_t *t, void *data, size_t size,
 			    mrp_sockaddr_t *addr, socklen_t addrlen,
@@ -301,10 +301,10 @@ struct mrp_transport_s {
 
 /** Automatically register a transport on startup. */
 #define MRP_REGISTER_TRANSPORT(_prfx, _typename, _structtype, _resolve,	\
-			       _open, _create, _close,			\
+			       _open, _createfrom, _close,		\
 			       _bind, _listen, _accept,			\
 			       _connect, _disconnect,			\
-			       _send, _sendto,				\
+			       _sendmsg, _sendmsgto,			\
 			       _sendraw, _sendrawto,			\
 			       _senddata, _senddatato)			\
     static void _prfx##_register_transport(void)			\
@@ -317,15 +317,15 @@ struct mrp_transport_s {
 	    .resolve = _resolve,					\
 	    .req     = {						\
 		.open       = _open,					\
-	        .create     = _create,					\
+	        .createfrom = _createfrom,				\
 		.bind       = _bind,					\
 		.listen     = _listen,					\
 		.accept     = _accept,					\
 		.close      = _close,					\
 		.connect    = _connect,					\
 		.disconnect = _disconnect,				\
-		.send       = _send,					\
-		.sendto     = _sendto,					\
+		.sendmsg    = _sendmsg,					\
+		.sendmsgto  = _sendmsgto,				\
 		.sendraw    = _sendraw,					\
 		.sendrawto  = _sendrawto,				\
 		.senddata   = _senddata,				\
@@ -374,7 +374,6 @@ int  mrp_transport_listen(mrp_transport_t *t, int backlog);
 
 /** Accept and create a new transport connection. */
 mrp_transport_t *mrp_transport_accept(mrp_transport_t *t,
-				      mrp_transport_evt_t *evt,
 				      void *user_data, int flags);
 
 /** Destroy a transport. */

@@ -183,7 +183,8 @@ static void input_cleanup(client_t *c)
 }
 
 
-void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
+void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
+		  mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
 {
     client_t        *c = (client_t *)user_data;
     mrp_msg_field_t *f;
@@ -191,6 +192,8 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
     size_t          size;
     
     MRP_UNUSED(t);
+    MRP_UNUSED(addr);
+    MRP_UNUSED(addrlen);
     
     prompt_erase(c);
 
@@ -210,6 +213,13 @@ void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
     }
     
     prompt_display(c);
+}
+
+
+
+void recv_evt(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
+{
+    recvfrom_evt(t, msg, NULL, 0, user_data);
 }
 
 
@@ -235,21 +245,14 @@ void closed_evt(mrp_transport_t *t, int error, void *user_data)
 int client_setup(client_t *c, const char *addrstr)
 {
     static mrp_transport_evt_t evt = {
-	.closed   = closed_evt,
-	.recv     = recv_evt,
-	.recvfrom = NULL,
+	.closed      = closed_evt,
+	.recvmsg     = recv_evt,
+	.recvmsgfrom = recvfrom_evt,
     };
 
     mrp_sockaddr_t  addr;
     socklen_t       addrlen;
     const char     *type;
-
-#if 0
-    if (!strncmp(addrstr, "udp:", 4))
-	type = "udp";
-    else
-	type = "tcp";
-#endif
 
     addrlen = mrp_transport_resolve(NULL, addrstr, &addr, sizeof(addr), &type);
     
@@ -326,8 +329,8 @@ int main(int argc, char *argv[])
 	addr = DEFAULT_ADDRESS;
 
     if (!input_setup(&c) || !client_setup(&c, addr))
-	exit(1);
-    
+	goto fail;
+        
     rl_client = &c;                      /* readline has not user_data */
 
     mrp_mainloop_run(c.ml);
@@ -336,5 +339,10 @@ int main(int argc, char *argv[])
     input_cleanup(&c);
     
     return 0;
+
+ fail:
+    client_cleanup(&c);
+    input_cleanup(&c);
+    exit(1);
 }
 

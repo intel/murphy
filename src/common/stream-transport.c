@@ -15,9 +15,9 @@
 #include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
 
-#define TCP4  "udp4"
+#define TCP4  "tcp4"
 #define TCP4L 4
-#define TCP6  "udp6"
+#define TCP6  "tcp6"
 #define TCP6L 4
 #define UNXS  "unxs"
 #define UNXSL 4
@@ -219,14 +219,14 @@ static int strm_open(mrp_transport_t *mt)
 }
 
 
-static int strm_create(mrp_transport_t *mt, void *conn)
+static int strm_createfrom(mrp_transport_t *mt, void *conn)
 {
     strm_t           *t = (strm_t *)mt;
     mrp_io_event_t   events;    
     int              on;
     long             nb;
 
-    t->sock   = *(int *)conn;
+    t->sock = *(int *)conn;
 
     if (t->sock >= 0) {
 	if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
@@ -651,7 +651,7 @@ static int strm_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
 
 
 MRP_REGISTER_TRANSPORT(tcp4, "tcp4", strm_t, strm_resolve,
-		       strm_open, strm_create, strm_close,
+		       strm_open, strm_createfrom, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
 		       strm_send, NULL,
@@ -659,15 +659,15 @@ MRP_REGISTER_TRANSPORT(tcp4, "tcp4", strm_t, strm_resolve,
 		       strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, "tcp6", strm_t, strm_resolve,
-		       strm_open, strm_create, strm_close,
+		       strm_open, strm_createfrom, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
 		       strm_send, NULL,
 		       strm_sendraw, NULL,
 		       strm_senddata, NULL);
 
-MRP_REGISTER_TRANSPORT(unxstrm, "unxstrm", strm_t, strm_resolve,
-		       strm_open, strm_create, strm_close,
+MRP_REGISTER_TRANSPORT(unxstrm, "unxs", strm_t, strm_resolve,
+		       strm_open, strm_createfrom, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
 		       strm_send, NULL,
