@@ -83,8 +83,7 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
 	    uint16_t _base;						\
 	    uint32_t _i;						\
 									\
-	    (_f) = mrp_allocz(MRP_OFFSET(typeof(*_f), _fld) +		\
-			      sizeof(_f->size[0]));			\
+	    (_f) = mrp_allocz(MRP_OFFSET(typeof(*_f), size[1]));	\
 	    								\
 	    if ((_f) != NULL) {						\
 		(_f)->tag  = _tag;					\
