@@ -164,7 +164,7 @@ static void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
     mrp_debug("got new message...");
 
     if ((f = mrp_msg_find(msg, MRP_CONSOLE_INPUT)) != NULL) {
-	if (f->type == MRP_MSG_FIELD_STRING) {
+	if (f->type == MRP_MSG_FIELD_BLOB) {
 	    input = f->str;
 	    size  = f->size[0];
 	    
