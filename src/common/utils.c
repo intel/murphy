@@ -161,3 +161,22 @@ int mrp_daemonize(const char *dir, const char *new_out, const char *new_err)
     return TRUE;
 }
 
+
+int mrp_string_comp(const void *key1, const void *key2)
+{
+    return strcmp(key1, key2);
+}
+
+
+uint32_t mrp_string_hash(const void *key)
+{
+    uint32_t    h;
+    const char *p;
+
+    for (h = 0, p = key; *p; p++) {
+        h <<= 1;
+        h  ^= *p;
+    }
+    
+    return h;
+}
