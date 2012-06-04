@@ -1627,6 +1627,7 @@ int mrp_data_free(void *data, uint16_t tag)
     mrp_list_hook_t   *p, *n;
     mrp_data_member_t *f;
     void              *ptr;
+    int                i, idx, cnt;
 
     type = mrp_msg_find_type(tag);
 
@@ -1634,6 +1635,14 @@ int mrp_data_free(void *data, uint16_t tag)
 	mrp_list_foreach(&type->allocated, p, n) {
 	    f   = mrp_list_entry(p, typeof(*f), hook);
 	    ptr = *(void **)(data + f->offs);
+
+	    if (f->type == (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_STRING)) {
+		idx = f - type->fields;
+		cnt = get_array_size(data, type, idx);
+
+		for (i = 0; i < cnt; i++)
+		    mrp_free(((char **)ptr)[i]);
+	    }
 
 	    mrp_free(ptr);
 	}
@@ -1644,7 +1653,6 @@ int mrp_data_free(void *data, uint16_t tag)
     }
     else
 	return FALSE;
-    
 }
 
 
