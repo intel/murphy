@@ -262,7 +262,7 @@ mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
 		    t = NULL;
 		}
 		else {
-		    
+		    t->connected = TRUE;
 		}
 	    });
     }
@@ -328,8 +328,10 @@ int mrp_transport_connect(mrp_transport_t *t, mrp_sockaddr_t *addr,
 
 	purge_destroyed(t);
     }
-    else
+    else {
+	errno  = EISCONN;
 	result = FALSE;
+    }
 
     return result;
 }

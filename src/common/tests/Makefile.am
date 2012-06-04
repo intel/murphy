@@ -1,6 +1,9 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
-noinst_PROGRAMS = mm-test hash-test mainloop-test msg-test transport-test
+noinst_PROGRAMS  = mm-test hash-test msg-test transport-test
+if DBUS_ENABLED
+noinst_PROGRAMS += mainloop-test dbus-test
+endif
 
 # memory management test
 mm_test_SOURCES = mm-test.c
@@ -27,3 +30,11 @@ transport_test_SOURCES = transport-test.c
 transport_test_CFLAGS  = $(AM_CFLAGS)
 transport_test_LDADD   = ../../libmurphy-common.la
 
+if DBUS_ENABLED
+transport_test_LDADD  += ../../libmurphy-dbus.la
+
+# DBUS test
+dbus_test_SOURCES = dbus-test.c
+dbus_test_CFLAGS  = $(AM_CFLAGS) $(DBUS_CFLAGS)
+dbus_test_LDADD   = ../../libmurphy-dbus.la ../../libmurphy-common.la
+endif

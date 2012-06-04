@@ -85,15 +85,6 @@ PKG_CHECK_MODULES(GLIB, glib-2.0)
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 
-# Check for low-level DBUS libs.
-PKG_CHECK_MODULES(DBUS, dbus-1 >= 0.70)
-AC_SUBST(DBUS_CFLAGS)
-AC_SUBST(DBUS_LIBS)
-
-DBUS_SESSION_DIR="`pkg-config --variable session_bus_services_dir dbus-1`"
-AC_SUBST(DBUS_SESSION_DIR)
-
-
 # Check and enable extra compiler warnings if they are supported.
 AC_ARG_ENABLE(extra-warnings,
               [  --enable-extra-warnings         enable extra compiler warnings],
@@ -111,6 +102,27 @@ if test "$extra_warnings" != "no"; then
 fi
 
 AC_SUBST(WARNING_CFLAGS)
+
+
+# Check if DBUS was enabled.
+AC_ARG_ENABLE(dbus,
+              [  --enable-dbus         enable D-BUS support],
+	      [enable_dbus=$enableval], [enable_dbus=no])
+
+if test "$enable_dbus" = "yes"; then
+    PKG_CHECK_MODULES(DBUS, dbus-1 >= 0.70)
+
+    DBUS_SESSION_DIR="`pkg-config --variable session_bus_services_dir dbus-1`"
+    AC_SUBST(DBUS_SESSION_DIR)
+else
+    AC_MSG_NOTICE([D-Bus support is disabled.])
+fi
+
+AM_CONDITIONAL(DBUS_ENABLED, [test "$enable_dbus" = "yes"])
+AC_SUBST(DBUS_ENABLED)
+AC_SUBST(DBUS_CFLAGS)
+AC_SUBST(DBUS_LIBS)
+
 
 
 # Set up murphy CFLAGS and LIBS.

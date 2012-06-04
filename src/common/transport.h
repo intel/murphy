@@ -59,11 +59,14 @@ typedef struct mrp_transport_s mrp_transport_t;
  * transport socket address
  */
 
+#define MRP_SOCKADDR_SIZE 256
+
 typedef union {
     struct sockaddr     any;
     struct sockaddr_in  ipv4;
     struct sockaddr_in6 ipv6;
     struct sockaddr_un  unx;
+    char                data[MRP_SOCKADDR_SIZE];
 } mrp_sockaddr_t;
 
 
@@ -261,31 +264,35 @@ struct mrp_transport_s {
 
 
 #ifndef __MRP_TRANSPORT_DISABLE_CODE_CHECK__
-#  define __TRANSPORT_CHK_BLOCK(...) do {				\
-	static int __warned = 0;					\
-									\
-    if (MRP_UNLIKELY(__warned == 0 &&					\
-		     strstr(#__VA_ARGS__, "return") != NULL)) {		\
-	mrp_log_error("********************* WARNING *********************"); \
-	mrp_log_error("* You seem to directly do a return from a block   *"); \
-	mrp_log_error("* of code protected by MRP_TRANSPORT_BUSY. Are    *"); \
-	mrp_log_error("* you absolutely sure you know what you are doing *"); \
-	mrp_log_error("* and that you are also doing it correctly ?      *"); \
-	mrp_log_error("***************************************************"); \
-	mrp_log_error("The suspicious code block is located at: ");	     \
-	mrp_log_error("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);	     \
-	mrp_log_error("and it looks like this:");			     \
-	mrp_log_error("---------------------------------------------");	     \
-	mrp_log_error("%s", #__VA_ARGS__);				     \
-	mrp_log_error("---------------------------------------------");	     \
-	mrp_log_error("If you understand what MRP_TRANSPORT_BUSY does and"); \
-	mrp_log_error("how, and you are sure about the corretness of your"); \
-	mrp_log_error("code you can disable this error message by");	     \
-	mrp_log_error("#defining __MRP_TRANSPORT_DISABLE_CODE_CHECK__");     \
-	mrp_log_error("when compiling %s.", __FILE__);			     \
-	__warned = 1;							     \
-    }									     \
- } while (0)
+#  define W mrp_log_error
+#  define __TRANSPORT_CHK_BLOCK(...) do {				   \
+	static int __checked = FALSE, __warned = FALSE;			   \
+									   \
+	if (MRP_UNLIKELY(!__checked)) {					   \
+	    __checked = TRUE;						   \
+	    if (MRP_UNLIKELY(!__warned &&				   \
+			     strstr(#__VA_ARGS__, "return") != NULL)) {	   \
+		W("*********************** WARNING ********************"); \
+		W("* You seem to directly do a return from a block of *"); \
+		W("* code protected by MRP_TRANSPORT_BUSY. Are you    *"); \
+		W("* absolutely sure you know what you are doing and  *"); \
+		W("* that you are also doing it correctly ?           *"); \
+		W("****************************************************"); \
+		W("The suspicious code block is located at: ");		   \
+		W("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);	   \
+		W("and it looks like this:");				   \
+		W("---------------------------------------------");	   \
+		W("%s", #__VA_ARGS__);					   \
+		W("---------------------------------------------");	   \
+		W("If you understand what MRP_TRANSPORT_BUSY does and");   \
+		W("how, and you are sure about the corretness of your");   \
+		W("code you can disable this error message by");	   \
+		W("#defining __MRP_TRANSPORT_DISABLE_CODE_CHECK__");	   \
+		W("when compiling %s.", __FILE__);			   \
+		__warned = TRUE;					   \
+	    }								   \
+	}								   \
+    } while (0)
 #else
 #  define __TRANSPORT_CHK_BLOCK(...) do { } while (0)
 #endif

@@ -40,24 +40,23 @@ libmurphy_common_la_HEADERS =		\
 		common/msg.h		\
 		common/transport.h
 
-
-libmurphy_common_la_SOURCES =		\
-		common/log.c		\
-		common/mm.c		\
-		common/hashtbl.c	\
-		common/mainloop.c	\
-		common/utils.c		\
-		common/file-utils.c	\
-		common/msg.c		\
-		common/transport.c	\
-		common/stream-transport.c \
+libmurphy_common_la_SOURCES =			\
+		common/log.c			\
+		common/mm.c			\
+		common/hashtbl.c		\
+		common/mainloop.c		\
+		common/utils.c			\
+		common/file-utils.c		\
+		common/msg.c			\
+		common/transport.c		\
+		common/stream-transport.c	\
 		common/dgram-transport.c
 
 libmurphy_common_la_CFLAGS  =		\
 		$(AM_CFLAGS)
 
-libmurphy_common_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.common \
+libmurphy_common_la_LDFLAGS =					\
+		-Wl,-version-script=linker-script.common	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_common_la_LIBADD  = 		\
@@ -110,7 +109,7 @@ libmurphy_core_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.core \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_core_la_LIBADD  =	\
+libmurphy_core_la_LIBADD  =		\
 		libmurphy-common.la -ldl
 
 libmurphy_core_la_DEPENDENCIES = linker-script.core
@@ -121,6 +120,58 @@ linker-script.core: $(libmurphy_core_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.core
+
+###################################
+# murphy dbus library
+#
+
+if DBUS_ENABLED
+lib_LTLIBRARIES += libmurphy-dbus.la
+EXTRA_DIST      += common/murphy-dbus.pc
+pkgconfig_DATA  += common/murphy-dbus.pc
+
+libmurphy_dbush_ladir      =		\
+		$(includedir)/murphy
+
+libmurphy_dbush_la_HEADERS =		\
+		common/dbus.h		\
+		common/dbus-transport.h
+
+libmurphy_dbus_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_dbus_la_HEADERS =		\
+		common/dbus.h		\
+		common/dbus-transport.h
+
+libmurphy_dbus_la_SOURCES =		\
+		common/dbus.c		\
+		common/dbus-glue.c	\
+		common/dbus-transport.c
+
+libmurphy_dbus_la_CFLAGS  =		\
+		$(AM_CFLAGS)		\
+		$(DBUS_CFLAGS)
+
+libmurphy_dbus_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.dbus \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_dbus_la_LIBADD  = 		\
+		-lrt $(DBUS_LIBS)
+
+libmurphy_dbus_la_DEPENDENCIES = linker-script.dbus
+
+libdbusincludedir      = $(includedir)/murphy/dbus
+libdbusinclude_HEADERS = $(libmurphy_dbus_la_HEADERS)
+
+# linker script generation
+linker-script.dbus: $(libmurphy_dbus_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.dbus
+endif
 
 ###################################
 # murphy plugins
@@ -153,9 +204,10 @@ plugin_LTLIBRARIES    += plugin-test.la
 endif
 
 # dbus plugin
+if DBUS_ENABLED
 DBUS_PLUGIN_SOURCES = plugins/plugin-dbus.c
 DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
-DBUS_PLUGIN_LIBS    = $(DBUS_LIBS)
+DBUS_PLUGIN_LIBS    = libmurphy-dbus.la
 
 if BUILTIN_PLUGIN_DBUS
 BUILTIN_PLUGINS += $(DBUS_PLUGIN_SOURCES)
@@ -168,6 +220,7 @@ plugin_dbus_la_LDFLAGS = -module -avoid-version
 plugin_dbus_la_LIBADD  = $(DBUS_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-dbus.la
+endif
 endif
 
 # glib plugin
@@ -246,6 +299,10 @@ murphy_console_CFLAGS  =		\
 murphy_console_LDADD  =			\
 		libmurphy-common.la	\
 		$(BUILTIN_LIBS)
+
+if DBUS_ENABLED
+murphy_console_LDADD +=	libmurphy-dbus.la
+endif
 
 murphy_console_LDFLAGS = -rdynamic -lreadline
 
