@@ -242,11 +242,8 @@ static int strm_createfrom(mrp_transport_t *mt, void *conn)
 	    events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
 	    t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
 	    
-	    if (t->iow != NULL) {
-		t->connected = TRUE;
-
+	    if (t->iow != NULL)
 		return TRUE;
-	    }
 	}
     }
     
@@ -315,11 +312,8 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
 	t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
 	    
-	if (t->iow != NULL) {
-	    t->connected = TRUE;
-	    
+	if (t->iow != NULL)
 	    return TRUE;
-	}
 	else {
 	    close(t->sock);
 	    t->sock = -1;
@@ -511,8 +505,6 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
 	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 	    nb = 1;
 	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
-
-	    t->connected = TRUE;
 	    
 	    return TRUE;
 	}
@@ -536,7 +528,6 @@ static int strm_disconnect(mrp_transport_t *mt)
 	t->iow = NULL;
 
 	shutdown(t->sock, SHUT_RDWR);
-	t->connected = FALSE;
 
 	return TRUE;
     }
@@ -650,7 +641,7 @@ static int strm_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
 }
 
 
-MRP_REGISTER_TRANSPORT(tcp4, "tcp4", strm_t, strm_resolve,
+MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
 		       strm_open, strm_createfrom, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
@@ -658,7 +649,7 @@ MRP_REGISTER_TRANSPORT(tcp4, "tcp4", strm_t, strm_resolve,
 		       strm_sendraw, NULL,
 		       strm_senddata, NULL);
 
-MRP_REGISTER_TRANSPORT(tcp6, "tcp6", strm_t, strm_resolve,
+MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
 		       strm_open, strm_createfrom, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,
@@ -666,7 +657,7 @@ MRP_REGISTER_TRANSPORT(tcp6, "tcp6", strm_t, strm_resolve,
 		       strm_sendraw, NULL,
 		       strm_senddata, NULL);
 
-MRP_REGISTER_TRANSPORT(unxstrm, "unxs", strm_t, strm_resolve,
+MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
 		       strm_open, strm_createfrom, strm_close,
 		       strm_bind, strm_listen, strm_accept,
 		       strm_connect, strm_disconnect,

@@ -512,6 +512,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -s, --server                   run as test server (default)\n"
 	   "  -C, --connect                  connect transport\n"
 	   "      For connection-oriented transports, this is automatic.\n"
+	   "  -a, --address                  address to use\n"
 	   "  -c, --custom                   use custom messages\n"
 	   "  -m, --message                  use generic messages (default)\n"
            "  -t, --log-target=TARGET        log target to use\n"

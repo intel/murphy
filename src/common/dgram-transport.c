@@ -60,7 +60,7 @@ static int parse_address(const char *str, int *familyp, char *nodep,
 
     node = (char *)str;
 
-    if (!strncmp(node, UDP4, l=UDP4L+1)) {
+    if (!strncmp(node, UDP4":", l=UDP4L+1)) {
 	family = AF_INET;
 	type   = UDP4;
 	node  += l;
@@ -441,8 +441,6 @@ static int dgrm_connect(mrp_transport_t *mu, mrp_sockaddr_t *addr,
 	nb = 1;
 	fcntl(u->sock, F_SETFL, O_NONBLOCK, nb);
 
-	u->connected = TRUE;
-
 	return TRUE;
     }
     
@@ -458,7 +456,6 @@ static int dgrm_disconnect(mrp_transport_t *mu)
 
     if (u->connected) {
 	connect(u->sock, &none, sizeof(none));
-	u->connected = FALSE;
 	
 	return TRUE;
     }
@@ -670,7 +667,7 @@ static int dgrm_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
 }
 
 
-MRP_REGISTER_TRANSPORT(udp4, "udp4", dgrm_t, dgrm_resolve,
+MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
 		       dgrm_open, dgrm_createfrom, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
@@ -678,7 +675,7 @@ MRP_REGISTER_TRANSPORT(udp4, "udp4", dgrm_t, dgrm_resolve,
 		       dgrm_sendraw, dgrm_sendrawto,
 		       dgrm_senddata, dgrm_senddatato);
 
-MRP_REGISTER_TRANSPORT(udp6, "udp6", dgrm_t, dgrm_resolve,
+MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
 		       dgrm_open, dgrm_createfrom, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
@@ -686,7 +683,7 @@ MRP_REGISTER_TRANSPORT(udp6, "udp6", dgrm_t, dgrm_resolve,
 		       dgrm_sendraw, dgrm_sendrawto,
 		       dgrm_senddata, dgrm_senddatato);
 
-MRP_REGISTER_TRANSPORT(unxdgrm, "unxd", dgrm_t, dgrm_resolve,
+MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
 		       dgrm_open, dgrm_createfrom, dgrm_close,
 		       dgrm_bind, dgrm_listen, NULL,
 		       dgrm_connect, dgrm_disconnect,
