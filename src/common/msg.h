@@ -225,6 +225,9 @@ void *mrp_data_decode(void **bufp, size_t *sizep, mrp_data_descr_t *descr);
 /** Dump the given data buffer. */
 int mrp_data_dump(void *data, mrp_data_descr_t *descr, FILE *fp);
 
+/** Get the size of a data array member. */
+int mrp_data_get_array_size(void *data, mrp_data_descr_t *type, int idx);
+
 /** Register a new custom data type with the messaging/transport layer. */
 int mrp_msg_register_type(mrp_data_descr_t *type);
 

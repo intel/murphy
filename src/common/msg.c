@@ -10,12 +10,10 @@
 #include <murphy/common/list.h>
 #include <murphy/common/msg.h>
 
-/*
- * types below NDIRECT_TYPE are directly indexed
- */
-#define NDIRECT_TYPE      256
-static mrp_data_descr_t **direct_types;
-static mrp_data_descr_t **other_types;
+#define NDIRECT_TYPE      256            /* directly indexed types */
+
+static mrp_data_descr_t **direct_types;  /* directly indexed types */
+static mrp_data_descr_t **other_types;   /* linearly searched types */
 static int                nother_type;
 
 
@@ -239,6 +237,8 @@ static void msg_destroy(mrp_msg_t *msg)
 	    f = mrp_list_entry(p, typeof(*f), hook);
 	    destroy_field(f);
 	}
+
+	mrp_free(msg);
     }
 }
 
@@ -986,6 +986,12 @@ static int get_array_size(void *data, mrp_data_descr_t *type, int idx)
     }
     
     return -1;
+}
+
+
+int mrp_data_get_array_size(void *data, mrp_data_descr_t *type, int idx)
+{
+    return get_array_size(data, type, idx);
 }
 
 
