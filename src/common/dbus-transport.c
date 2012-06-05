@@ -39,10 +39,6 @@ static int dbus_msg_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 
-#if 0
-static int dbus_recv_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
-#endif
-
 static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg);
 static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id);
 
@@ -509,77 +505,6 @@ static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 
     return FALSE;
 }
-
-
-#if 0
-static int dbus_recv_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
-{
-    mrp_transport_t *mt = (mrp_transport_t *)user_data;
-    dbus_t          *t = (dbus_t *)mt;
-    mrp_sockaddr_t   addr;
-    socklen_t        alen;
-    const char      *sender_path;
-    uint16_t         tag;
-    void            *decoded;
-    mrp_msg_t       *msg;
-    
-    MRP_UNUSED(dbus);
-
-    if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
-	decoded = data_decode(dmsg, &tag, &sender_path);
-	
-	if (decoded != NULL) {
-	    if (mt->connected) {
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvdata(mt, decoded, tag, mt->user_data);
-		    });
-	    }
-	    else {
-		peer_address(&addr, dbus_message_get_sender(dmsg), sender_path);
-		alen = sizeof(addr);
-
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvdatafrom(mt, decoded, tag, &addr, alen,
-					     mt->user_data);
-		    });
-	    }
-
-	    mt->check_destroy(mt);
-	}
-    }
-    else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
-	mrp_log_error("%s(): XXX TODO: implement raw mode", __FUNCTION__);
-    }
-    else {
-	msg = msg_decode(dmsg, &sender_path);
-
-	if (msg != NULL) {
-	    if (mt->connected) {
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvmsg(mt, msg, mt->user_data);
-		    });
-	    }
-	    else {
-		peer_address(&addr, dbus_message_get_sender(dmsg), sender_path);
-		alen = sizeof(addr);
-
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvmsgfrom(mt, msg, &addr, alen,
-					    mt->user_data);
-		    });
-	    }
-	    
-	    mrp_msg_unref(msg);
-	    mt->check_destroy(mt);
-	}
-	else {
-	    mrp_log_error("Failed to decode message.");
-	}
-    }
-    
-    return TRUE;
-}
-#endif
 
 
 static int dbus_connect(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
@@ -1202,7 +1127,7 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
     mrp_msg_value_t   *v;
     void              *vptr;
     uint32_t           n, j;
-    int                i;
+    int                i, blblen;
     DBusMessageIter    im, ia;
     const char        *sig;
     uint16_t           u16;
@@ -1255,13 +1180,16 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
 	    BASIC_SIMPLE(DOUBLE, DOUBLE , v->dbl);
 
 	case MRP_MSG_FIELD_BLOB:
-#if 0
-	    if (dbus_message_iter_append_fixed_array(&im, DBUS_TYPE_BYTE,
-						     f->blb, (int)f->size[0]))
-#endif
+	    blblen = mrp_data_get_blob_size(data, descr, i);
+
+	    if (blblen == -1)
+		goto fail;
+
+	    if (!dbus_message_iter_append_fixed_array(&im, DBUS_TYPE_BYTE,
+						      f->blb, blblen))
 		goto fail;
 	    break;
-
+	    
 	default:
 	    if (!(f->type & MRP_MSG_FIELD_ARRAY))
 		goto fail;
@@ -1361,7 +1289,7 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
     uint16_t           tag, type, base;
     mrp_msg_value_t   *v;
     uint32_t           n, j, size;
-    int                i;
+    int                i, blblen;
     DBusMessageIter    im, ia;
     const char        *sender;
     uint32_t           u32;
@@ -1441,12 +1369,9 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
 	    HANDLE_SIMPLE(&im, DOUBLE, DOUBLE , v->dbl);
 
 	case MRP_MSG_FIELD_BLOB:
-#if 0
-	    dbus_message_iter_get_fixed_array(&im, v->blb, &asize);
-	    v.blb = mrp_datadup(v.blb, asize);
-	    
-	    if (v.blb == NULL)
-#endif
+	    dbus_message_iter_get_fixed_array(&im, v->blb, &blblen);
+	    v->blb = mrp_datadup(v->blb, blblen);
+	    if (v->blb == NULL)
 		goto fail;
 	    break;
 	    
