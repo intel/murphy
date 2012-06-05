@@ -215,6 +215,15 @@ typedef struct {
 	._guard_member = _guard_val					\
     }
 
+/** Convenience macro to declare a blob data member with a count field. */
+#define MRP_DATA_BLOB_MEMBER(_data_type, _blob, _count) {		\
+        .offs  = MRP_OFFSET(_data_type, _blob),			        \
+	.type  = MRP_MSG_FIELD_BLOB,				        \
+	.guard = FALSE,						        \
+	.u32   = MRP_OFFSET(_data_type, _count)			        \
+    }
+
+
 /** Encode a structure using the given message descriptor. */
 size_t mrp_data_encode(void **bufp, void *data, mrp_data_descr_t *descr,
 		       size_t reserve);
@@ -227,6 +236,9 @@ int mrp_data_dump(void *data, mrp_data_descr_t *descr, FILE *fp);
 
 /** Get the size of a data array member. */
 int mrp_data_get_array_size(void *data, mrp_data_descr_t *type, int idx);
+
+/** Get the size of a data blob member. */
+int mrp_data_get_blob_size(void *data, mrp_data_descr_t *type, int idx);
 
 /** Register a new custom data type with the messaging/transport layer. */
 int mrp_msg_register_type(mrp_data_descr_t *type);

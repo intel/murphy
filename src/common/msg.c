@@ -995,6 +995,39 @@ int mrp_data_get_array_size(void *data, mrp_data_descr_t *type, int idx)
 }
 
 
+static int get_blob_size(void *data, mrp_data_descr_t *type, int idx)
+{
+    mrp_data_member_t *blb, *cnt;
+    void              *val;
+    
+    if (0 < idx && idx < type->nfield) {
+	blb = type->fields + idx;
+
+	if ((int)blb->u32 < type->nfield) {
+	    cnt = type->fields + blb->u32;
+	    val = data + cnt->offs;
+	    
+	    switch (cnt->type) {
+	    case MRP_MSG_FIELD_UINT8:  return (int)*(uint8_t  *)val;
+	    case MRP_MSG_FIELD_SINT8:  return (int)*( int8_t  *)val;
+	    case MRP_MSG_FIELD_UINT16: return (int)*(uint16_t *)val;
+	    case MRP_MSG_FIELD_SINT16: return (int)*( int16_t *)val;
+	    case MRP_MSG_FIELD_UINT32: return (int)*(uint32_t *)val;
+	    case MRP_MSG_FIELD_SINT32: return (int)*( int32_t *)val;
+	    }
+	}
+    }
+    
+    return -1;
+}
+
+
+int mrp_data_get_blob_size(void *data, mrp_data_descr_t *type, int idx)
+{
+    return get_blob_size(data, type, idx);
+}
+
+
 static int check_and_init_array_descr(mrp_data_descr_t *type, int idx)
 {
     mrp_data_member_t *array, *cnt, *m;
@@ -1121,7 +1154,7 @@ size_t mrp_data_encode(void **bufp, void *data, mrp_data_descr_t *descr,
     uint16_t           type;
     mrp_msgbuf_t       mb;
     mrp_msg_value_t   *v;
-    uint32_t           len, asize, j;
+    uint32_t           len, asize, blblen, j;
     int                i, cnt;
     size_t             size;
     
@@ -1186,9 +1219,13 @@ size_t mrp_data_encode(void **bufp, void *data, mrp_data_descr_t *descr,
 		break;
 		
 	    case MRP_MSG_FIELD_BLOB:
-		errno = EOPNOTSUPP;
-		mrp_log_error("XXX TODO: MRP_MSG_FIELD_BLOB "
-			      "not implemented");
+		blblen = (uint32_t)get_blob_size(data, descr, i);
+
+		if (blblen == (uint32_t)-1)
+		    goto invalid_type;
+		
+		MRP_MSGBUF_PUSH(&mb, htobe32(v->u32), 1, nomem);
+		MRP_MSGBUF_PUSH_DATA(&mb, v->blb, blblen, 1, nomem);
 		break;
 		
 	    default:
