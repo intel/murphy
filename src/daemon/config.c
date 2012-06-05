@@ -852,7 +852,7 @@ static int get_next_line(input_t *in, char **args, size_t size)
 	if (token[0] != '\n')
 	    args[narg++] = token;
 	else {
-	    if (*args[0] != MRP_START_COMMENT && narg && *args[0] != '\n')
+	    if (narg && *args[0] != MRP_START_COMMENT && *args[0] != '\n')
 		return narg;
 	    else
 		narg = 0;
