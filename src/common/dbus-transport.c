@@ -776,6 +776,7 @@ static const char *get_array_signature(uint16_t type)
 	MAP(UINT64, UINT64);
 	MAP(SINT64, INT64);
 	MAP(DOUBLE, DOUBLE);
+	MAP(BLOB  , BYTE  );
     default:
 	return NULL;
     }
@@ -836,7 +837,8 @@ static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg)
     uint16_t         base;
     uint32_t         asize, i;
     DBusMessageIter  im, ia;
-    int              type;
+    const char      *sig;
+    int              type, len;
     void            *vptr;
     dbus_bool_t      bln;
     uint16_t         u16;
@@ -876,22 +878,30 @@ static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg)
 	    BASIC_SIMPLE(&im, DOUBLE, DOUBLE , f->dbl);
 	    
 	case MRP_MSG_FIELD_BLOB:
-	    mrp_log_error("%s(): XXX TODO: implement blob encoding...",
-			  __FUNCTION__);
-	    goto fail;
+	    vptr = f->blb;
+	    len  = (int)f->size[0];
+	    sig  = get_array_signature(f->type);
+
+	    if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
+						  sig, &ia) ||
+		!dbus_message_iter_append_fixed_array(&ia, sig[0],
+						      &vptr, len) ||
+		!dbus_message_iter_close_container(&im, &ia))
+		goto fail;
+	    break;
 	    
 	default:
 	    if (f->type & MRP_MSG_FIELD_ARRAY) {
 		base  = f->type & ~(MRP_MSG_FIELD_ARRAY);
 		asize = f->size[0];
-		
+		sig   = get_array_signature(base);
+
 		if (!dbus_message_iter_append_basic(&im,
 						    DBUS_TYPE_UINT32, &asize))
 		    goto fail;
 
 		if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
-						      get_array_signature(base),
-						      &ia))
+						      sig, &ia))
 		    goto fail;
 
 		for (i = 0; i < asize; i++) {
@@ -1000,6 +1010,7 @@ static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
     DBusMessageIter  im, ia;
     uint16_t         nfield, tag, type, base, i;
     uint32_t         n, j;
+    int              asize;
     const char      *sender;
 
     if (!dbus_message_iter_init(m, &im))
@@ -1049,9 +1060,12 @@ static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
 	    BASIC_SIMPLE(&im, DOUBLE, DOUBLE , v.dbl);
 	    
 	case MRP_MSG_FIELD_BLOB:
-	    mrp_log_error("%s(): XXX TODO: implement blob decoding...",
-			  __FUNCTION__);
-	    goto fail;
+	    dbus_message_iter_recurse(&im, &ia);
+	    dbus_message_iter_get_fixed_array(&ia, &v.blb, &asize);
+	    dbus_message_iter_next(&im);
+	    if (!mrp_msg_append(msg, tag, type, asize, v.blb))
+		goto fail;
+	    break;
 	    
 	default:
 	    if (!(type & MRP_MSG_FIELD_ARRAY))
@@ -1190,6 +1204,7 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
     uint32_t           n, j;
     int                i;
     DBusMessageIter    im, ia;
+    const char        *sig;
     uint16_t           u16;
     int16_t            s16;
     uint32_t           bln;
@@ -1239,19 +1254,27 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
 	    BASIC_SIMPLE(SINT64,  INT64 , v->s64);
 	    BASIC_SIMPLE(DOUBLE, DOUBLE , v->dbl);
 
+	case MRP_MSG_FIELD_BLOB:
+#if 0
+	    if (dbus_message_iter_append_fixed_array(&im, DBUS_TYPE_BYTE,
+						     f->blb, (int)f->size[0]))
+#endif
+		goto fail;
+	    break;
+
 	default:
 	    if (!(f->type & MRP_MSG_FIELD_ARRAY))
 		goto fail;
 	    
 	    base = f->type & ~(MRP_MSG_FIELD_ARRAY);
 	    n    = mrp_data_get_array_size(data, descr, i);
+	    sig  = get_array_signature(base);
 		
 	    if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT32, &n))
 		goto fail;
 	    
 	    if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
-						  get_array_signature(base),
-						  &ia))
+						  sig, &ia))
 		goto fail;
 	    
 	    for (j = 0; j < n; j++) {
@@ -1416,6 +1439,16 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
 	    HANDLE_SIMPLE(&im, UINT64, UINT64 , v->u64);
 	    HANDLE_SIMPLE(&im, SINT64,  INT64 , v->s64);
 	    HANDLE_SIMPLE(&im, DOUBLE, DOUBLE , v->dbl);
+
+	case MRP_MSG_FIELD_BLOB:
+#if 0
+	    dbus_message_iter_get_fixed_array(&im, v->blb, &asize);
+	    v.blb = mrp_datadup(v.blb, asize);
+	    
+	    if (v.blb == NULL)
+#endif
+		goto fail;
+	    break;
 	    
 	default:
 	    if (!(f->type & MRP_MSG_FIELD_ARRAY))
