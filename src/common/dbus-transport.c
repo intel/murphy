@@ -46,6 +46,8 @@ static DBusMessage *data_encode(const char *sender_id,
 				void *data, uint16_t tag);
 static void *data_decode(DBusMessage *m, uint16_t *tag, const char **sender_id);
 
+static DBusMessage *raw_encode(const char *sender_id, void *data, size_t size);
+static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id);
 
 
 
@@ -492,6 +494,9 @@ static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 
 	mt->check_destroy(mt);
     }
+    else {
+	mrp_log_error("Failed to decode custom data message.");
+    }
     
     return TRUE;
 }
@@ -499,11 +504,40 @@ static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 
 static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 {
+    mrp_transport_t *mt = (mrp_transport_t *)user_data;
+    mrp_sockaddr_t   addr;
+    socklen_t        alen;
+    const char      *sender_path;
+    void            *data;
+    size_t           size;
+    
     MRP_UNUSED(dbus);
-    MRP_UNUSED(dmsg);
-    MRP_UNUSED(user_data);
 
-    return FALSE;
+    data = raw_decode(dmsg, &size, &sender_path);
+
+    if (data != NULL) {
+	if (mt->connected) {
+	    MRP_TRANSPORT_BUSY(mt, {
+		    mt->evt.recvraw(mt, data, size, mt->user_data);
+		});
+	}
+	else {
+	    peer_address(&addr, dbus_message_get_sender(dmsg), sender_path);
+	    alen = sizeof(addr);
+
+	    MRP_TRANSPORT_BUSY(mt, {
+		    mt->evt.recvrawfrom(mt, data, size, &addr, alen,
+					mt->user_data);
+		});
+	}
+	
+	mt->check_destroy(mt);
+    }
+    else {
+	mrp_log_error("Failed to decode raw message.");
+    }
+    
+    return TRUE;
 }
 
 
@@ -565,17 +599,10 @@ static int dbus_sendmsgto(mrp_transport_t *mt, mrp_msg_t *msg,
 	m = msg_encode(t->local.db_path, msg);
 
 	if (m != NULL) {
-	    if (dbus_message_set_destination(m, addr->db_addr)     &&
-		dbus_message_set_path(m, addr->db_path)            &&
-		dbus_message_set_interface(m, TRANSPORT_INTERFACE) &&
-		dbus_message_set_member(m, TRANSPORT_MESSAGE)) {
-		if (mrp_dbus_send_msg(t->dbus, m))
-		    success = TRUE;
-		else {
-		    errno   = EIO;
-		    success = FALSE;
-		}
-	    }
+	    if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
+			      TRANSPORT_INTERFACE, TRANSPORT_MESSAGE,
+			      0, NULL, NULL, m))
+		success = TRUE;
 	    else {
 		errno   = ECOMM;
 		success = FALSE;
@@ -606,15 +633,47 @@ static int dbus_sendmsg(mrp_transport_t *mt, mrp_msg_t *msg)
 
 
 static int dbus_sendrawto(mrp_transport_t *mt, void *data, size_t size,
-			  mrp_sockaddr_t *addr, socklen_t addrlen)
+			  mrp_sockaddr_t *addrp, socklen_t addrlen)
 {
+    dbus_t         *t    = (dbus_t *)mt;
+    mrp_dbusaddr_t *addr = (mrp_dbusaddr_t *)addrp;
+    DBusMessage    *m;
+    int             success;
+
+    
     MRP_UNUSED(mt);
     MRP_UNUSED(data);
     MRP_UNUSED(size);
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
+    
+    if (check_address(addrp, addrlen)) {
+	if (t->dbus == NULL && !dbus_autobind(mt, addrp))
+	    return FALSE;
+	
+	m = raw_encode(t->local.db_path, data, size);
 
-    return FALSE;
+	if (m != NULL) {
+	    if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
+			      TRANSPORT_INTERFACE, TRANSPORT_RAW,
+			      0, NULL, NULL, m))
+		success = TRUE;
+	    else {
+		errno   = ECOMM;
+		success = FALSE;
+	    }
+
+	    dbus_message_unref(m);
+	}
+	else
+	    success = FALSE;
+    }
+    else {
+	errno   = EINVAL;
+	success = FALSE;
+    }
+    
+    return success;
 }
 
 
@@ -643,17 +702,10 @@ static int dbus_senddatato(mrp_transport_t *mt, void *data, uint16_t tag,
 	m = data_encode(t->local.db_path, data, tag);
 
 	if (m != NULL) {
-	    if (dbus_message_set_destination(m, addr->db_addr)     &&
-		dbus_message_set_path(m, addr->db_path)            &&
-		dbus_message_set_interface(m, TRANSPORT_INTERFACE) &&
-		dbus_message_set_member(m, TRANSPORT_CUSTOM)) {
-		if (mrp_dbus_send_msg(t->dbus, m))
-		    success = TRUE;
-		else {
-		    errno   = EIO;
-		    success = FALSE;
-		}
-	    }
+	    if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
+			      TRANSPORT_INTERFACE, TRANSPORT_CUSTOM,
+			      0, NULL, NULL, m))
+		success = TRUE;
 	    else {
 		errno   = ECOMM;
 		success = FALSE;
@@ -985,6 +1037,9 @@ static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
 	    BASIC_SIMPLE(&im, DOUBLE, DOUBLE , v.dbl);
 	    
 	case MRP_MSG_FIELD_BLOB:
+	    if (dbus_message_iter_get_element_type(&im) != DBUS_TYPE_BYTE)
+		goto fail;
+
 	    dbus_message_iter_recurse(&im, &ia);
 	    dbus_message_iter_get_fixed_array(&ia, &v.blb, &asize);
 	    dbus_message_iter_next(&im);
@@ -1180,13 +1235,17 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
 	    BASIC_SIMPLE(DOUBLE, DOUBLE , v->dbl);
 
 	case MRP_MSG_FIELD_BLOB:
+	    sig    = get_array_signature(f->type);
 	    blblen = mrp_data_get_blob_size(data, descr, i);
 
 	    if (blblen == -1)
 		goto fail;
 
-	    if (!dbus_message_iter_append_fixed_array(&im, DBUS_TYPE_BYTE,
-						      f->blb, blblen))
+	    if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
+						  sig, &ia) ||
+		!dbus_message_iter_append_fixed_array(&ia, sig[0],
+						      &f->blb, blblen) ||
+		!dbus_message_iter_close_container(&im, &ia))
 		goto fail;
 	    break;
 	    
@@ -1369,7 +1428,12 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
 	    HANDLE_SIMPLE(&im, DOUBLE, DOUBLE , v->dbl);
 
 	case MRP_MSG_FIELD_BLOB:
-	    dbus_message_iter_get_fixed_array(&im, v->blb, &blblen);
+	    if (dbus_message_iter_get_element_type(&ia) != DBUS_TYPE_BYTE)
+		goto fail;
+
+	    dbus_message_iter_recurse(&im, &ia);
+	    dbus_message_iter_get_fixed_array(&ia, &v->blb, &blblen);
+	    dbus_message_iter_next(&im);
 	    v->blb = mrp_datadup(v->blb, blblen);
 	    if (v->blb == NULL)
 		goto fail;
@@ -1462,6 +1526,87 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
 }
 
 
+static DBusMessage *raw_encode(const char *sender_id, void *data, size_t size)
+{
+    DBusMessage     *m;
+    DBusMessageIter  im, ia;
+    const char      *sig;
+    int              len;
+
+    m = dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL);
+    
+    if (m != NULL) {
+	dbus_message_iter_init_append(m, &im);
+	
+	if (!dbus_message_iter_append_basic(&im,
+					    DBUS_TYPE_OBJECT_PATH, &sender_id))
+	    goto fail;
+	
+	sig = DBUS_TYPE_BYTE_AS_STRING;
+	len = (int)size;
+
+	if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY, sig, &ia) ||
+	    !dbus_message_iter_append_fixed_array(&ia, sig[0], &data, len) ||
+	    !dbus_message_iter_close_container(&im, &ia))
+	    goto fail;
+	
+	return m;
+    }
+    else
+	return NULL;
+
+ fail:    
+    if (m != NULL)
+	dbus_message_unref(m);
+
+    errno = ECOMM;
+    
+    return NULL;
+}
+
+
+static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id)
+{
+    DBusMessageIter  im, ia;
+    const char      *sender;
+    void            *data;
+    int              len;
+    
+    data = NULL;
+
+    if (!dbus_message_iter_init(m, &im))
+	goto fail;
+
+    if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_OBJECT_PATH)
+	goto fail;
+
+    dbus_message_iter_get_basic(&im, &sender);
+    dbus_message_iter_next(&im);
+
+    if (dbus_message_iter_get_element_type(&ia) != DBUS_TYPE_BYTE)
+	goto fail;
+    
+    if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_ARRAY)
+	goto fail;
+
+    dbus_message_iter_recurse(&im, &ia);
+    dbus_message_iter_get_fixed_array(&ia, &data, &len);
+    
+    data = mrp_datadup(data, len);
+
+    if (sizep != NULL)
+	*sizep = (size_t)len;
+    
+    if (sender_id != NULL)
+	*sender_id = sender;
+    
+    return data;
+
+ fail:
+    errno = EBADMSG;
+
+    return NULL;
+}
 
 
 MRP_REGISTER_TRANSPORT(dbus, DBUS, dbus_t, dbus_resolve,
