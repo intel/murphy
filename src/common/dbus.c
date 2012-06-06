@@ -1161,8 +1161,6 @@ int32_t mrp_dbus_send(mrp_dbus_t *dbus, const char *dest, const char *path,
 	call->pend = pend;
     }
 
-    dbus_message_unref(msg);
-    
     return id;
 
  fail:
