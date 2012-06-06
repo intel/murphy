@@ -27,6 +27,7 @@ typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
     mrp_dbus_t     *dbus;                /* D-BUS connection */
     int             bound : 1;           /* whether bound to an address */
+    int             peer_resolved : 1;   /* connected and peer name known */
     mrp_dbusaddr_t  local;               /* address we're bound to */
     mrp_dbusaddr_t  remote;              /* address we're connected to */
 } dbus_t;
@@ -38,6 +39,9 @@ static uint32_t nauto;                   /* for autobinding */
 static int dbus_msg_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
+
+static void peer_state_cb(mrp_dbus_t *dbus, const char *name, int up,
+			  const char *owner, void *user_data);
 
 static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg);
 static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id);
@@ -418,6 +422,9 @@ static void dbus_close(mrp_transport_t *mt)
 			       method, cb, t);
     }
     
+    if (t->connected && t->remote.db_addr != NULL)
+	mrp_dbus_forget_name(t->dbus, t->remote.db_addr, peer_state_cb, t);
+    
     mrp_dbus_unref(t->dbus);
     t->dbus = NULL;
 }
@@ -426,9 +433,10 @@ static void dbus_close(mrp_transport_t *mt)
 static int dbus_msg_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 {
     mrp_transport_t *mt = (mrp_transport_t *)user_data;
+    dbus_t          *t  = (dbus_t *)mt;
     mrp_sockaddr_t   addr;
     socklen_t        alen;
-    const char      *sender_path;
+    const char      *sender, *sender_path;
     mrp_msg_t       *msg;
     
     MRP_UNUSED(dbus);
@@ -436,18 +444,20 @@ static int dbus_msg_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     msg = msg_decode(dmsg, &sender_path);
 
     if (msg != NULL) {
+	sender = dbus_message_get_sender(dmsg);
+	    
 	if (mt->connected) {
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvmsg(mt, msg, mt->user_data);
-		});
+	    if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
+		MRP_TRANSPORT_BUSY(mt, {
+			mt->evt.recvmsg(mt, msg, mt->user_data);
+		    });
 	}
 	else {
-	    peer_address(&addr, dbus_message_get_sender(dmsg), sender_path);
+	    peer_address(&addr, sender, sender_path);
 	    alen = sizeof(addr);
 
 	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvmsgfrom(mt, msg, &addr, alen,
-					mt->user_data);
+		    mt->evt.recvmsgfrom(mt, msg, &addr, alen, mt->user_data);
 		});
 	}
 	    
@@ -466,9 +476,10 @@ static int dbus_msg_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 {
     mrp_transport_t *mt = (mrp_transport_t *)user_data;
+    dbus_t          *t  = (dbus_t *)mt;
     mrp_sockaddr_t   addr;
     socklen_t        alen;
-    const char      *sender_path;
+    const char      *sender, *sender_path;
     uint16_t         tag;
     void            *decoded;
     
@@ -477,13 +488,16 @@ static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     decoded = data_decode(dmsg, &tag, &sender_path);
 	
     if (decoded != NULL) {
+	sender = dbus_message_get_sender(dmsg);
+	
 	if (mt->connected) {
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvdata(mt, decoded, tag, mt->user_data);
-		});
+	    if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
+		MRP_TRANSPORT_BUSY(mt, {
+			mt->evt.recvdata(mt, decoded, tag, mt->user_data);
+		    });
 	}
 	else {
-	    peer_address(&addr, dbus_message_get_sender(dmsg), sender_path);
+	    peer_address(&addr, sender, sender_path);
 	    alen = sizeof(addr);
 
 	    MRP_TRANSPORT_BUSY(mt, {
@@ -505,9 +519,10 @@ static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
 {
     mrp_transport_t *mt = (mrp_transport_t *)user_data;
+    dbus_t          *t  = (dbus_t *)mt;
     mrp_sockaddr_t   addr;
     socklen_t        alen;
-    const char      *sender_path;
+    const char      *sender, *sender_path;
     void            *data;
     size_t           size;
     
@@ -516,13 +531,16 @@ static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     data = raw_decode(dmsg, &size, &sender_path);
 
     if (data != NULL) {
+	sender = dbus_message_get_sender(dmsg);
+
 	if (mt->connected) {
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvraw(mt, data, size, mt->user_data);
-		});
+	    if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
+		MRP_TRANSPORT_BUSY(mt, {
+			mt->evt.recvraw(mt, data, size, mt->user_data);
+		    });
 	}
 	else {
-	    peer_address(&addr, dbus_message_get_sender(dmsg), sender_path);
+	    peer_address(&addr, sender, sender_path);
 	    alen = sizeof(addr);
 
 	    MRP_TRANSPORT_BUSY(mt, {
@@ -538,6 +556,40 @@ static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     }
     
     return TRUE;
+}
+
+
+static void peer_state_cb(mrp_dbus_t *dbus, const char *name, int up,
+			  const char *owner, void *user_data)
+{
+    dbus_t         *t = (dbus_t *)user_data;
+    mrp_sockaddr_t  addr;
+
+    MRP_UNUSED(dbus);
+    MRP_UNUSED(name);
+
+    if (up) {
+	peer_address(&addr, owner, t->remote.db_path);
+	copy_address(&t->remote, (mrp_dbusaddr_t *)&addr);
+	t->peer_resolved = TRUE;
+    }
+    else {
+	/*
+	 * XXX TODO:
+	 *     It would be really tempting here to call
+	 *         mt->evt.closed(mt, ECONNRESET, mt->user_data)
+	 *     to notify the user about the fact our peer went down.
+	 *     However, that would not be in line with the other
+	 *     transports which call the closed event handler only
+	 *     upon foricble transport closes upon errors.
+	 *
+	 *     The transport interface abstraction (especially the
+	 *     available set of events) anyway needs some eyeballing,
+	 *     so the right thing to do might be to define a new event
+	 *     for disconnection and call the handler for that here...
+	 */
+    }
+    
 }
 
 
@@ -568,9 +620,13 @@ static int dbus_connect(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
 	if (!dbus_autobind(mt, addrp))
 	    return FALSE;
     
-    copy_address(&t->remote, addr);
-    
-    return TRUE;
+    if (mrp_dbus_follow_name(t->dbus, addr->db_addr, peer_state_cb, t)) {
+	copy_address(&t->remote, addr);
+
+	return TRUE;
+    }
+    else
+	return FALSE;
 }
 
 
@@ -578,7 +634,11 @@ static int dbus_disconnect(mrp_transport_t *mt)
 {
     dbus_t *t = (dbus_t *)mt;
     
-    mrp_clear(&t->remote);
+    if (t->connected && t->remote.db_addr != NULL) {
+	mrp_dbus_forget_name(t->dbus, t->remote.db_addr, peer_state_cb, t);
+	mrp_clear(&t->remote);
+	t->peer_resolved = FALSE;
+    }
     
     return TRUE;
 }
