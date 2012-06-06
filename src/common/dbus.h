@@ -31,7 +31,8 @@ int mrp_dbus_acquire_name(mrp_dbus_t *dbus, const char *name, DBusError *error);
 /** Release the given name on the given bus (connection). */
 int mrp_dbus_release_name(mrp_dbus_t *dbus, const char *name, DBusError *error);
 
-typedef void (*mrp_dbus_name_cb_t)(mrp_dbus_t *, const char *, int, void *);
+typedef void (*mrp_dbus_name_cb_t)(mrp_dbus_t *, const char *, int,
+				   const char *, void *);
 int mrp_dbus_follow_name(mrp_dbus_t *dbus, const char *name,
 			 mrp_dbus_name_cb_t cb, void *user_data);
 int mrp_dbus_forget_name(mrp_dbus_t *dbus, const char *name,

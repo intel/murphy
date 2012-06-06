@@ -320,12 +320,19 @@ const char *mrp_dbus_get_unique_name(mrp_dbus_t *dbus)
 static void name_owner_query_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 {
     name_tracker_t *t = (name_tracker_t *)data;
+    const char     *owner;
     int             state;
 
     if (t->cb != NULL) {                /* tracker still active */
 	t->qid = 0;
 	state  = dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_RETURN;
-	t->cb(dbus, t->name, state, t->user_data);
+
+	if (!dbus_message_get_args(msg, NULL,
+				   DBUS_TYPE_STRING, &owner,
+				   DBUS_TYPE_INVALID))
+	    owner = "<unknown>";
+	
+	t->cb(dbus, t->name, state, owner, t->user_data);
     }
     else                                /* already requested to delete */ 
 	mrp_free(t);
@@ -370,7 +377,7 @@ static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 	t = mrp_list_entry(p, name_tracker_t, hook);
 	
 	if (!strcmp(name, t->name))
-	    t->cb(dbus, name, next && *next, t->user_data);
+	    t->cb(dbus, name, next && *next, next, t->user_data);
     }
     
     return TRUE;
