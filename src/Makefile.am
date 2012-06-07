@@ -130,13 +130,6 @@ lib_LTLIBRARIES += libmurphy-dbus.la
 EXTRA_DIST      += common/murphy-dbus.pc
 pkgconfig_DATA  += common/murphy-dbus.pc
 
-libmurphy_dbush_ladir      =		\
-		$(includedir)/murphy
-
-libmurphy_dbush_la_HEADERS =		\
-		common/dbus.h		\
-		common/dbus-transport.h
-
 libmurphy_dbus_ladir      =		\
 		$(includedir)/murphy/common
 

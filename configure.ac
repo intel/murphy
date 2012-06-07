@@ -103,7 +103,6 @@ fi
 
 AC_SUBST(WARNING_CFLAGS)
 
-
 # Check if DBUS was enabled.
 AC_ARG_ENABLE(dbus,
               [  --enable-dbus         enable D-BUS support],
@@ -122,8 +121,6 @@ AM_CONDITIONAL(DBUS_ENABLED, [test "$enable_dbus" = "yes"])
 AC_SUBST(DBUS_ENABLED)
 AC_SUBST(DBUS_CFLAGS)
 AC_SUBST(DBUS_LIBS)
-
-
 
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS="$GLIB_CFLAGS $DBUS_CFLAGS"
@@ -273,6 +270,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/core/tests/Makefile
 		 src/daemon/tests/Makefile
 		 src/common/murphy-common.pc
+		 src/common/murphy-dbus.pc
 		 src/core/murphy-core.pc
                  src/murphy-db/Makefile
                  src/murphy-db/mdb/Makefile
@@ -291,6 +289,7 @@ AC_OUTPUT
 # Display the configuration.
 echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
+echo "D-Bus support: $enable_dbus"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do
