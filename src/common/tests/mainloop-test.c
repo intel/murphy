@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <signal.h>
+#include <getopt.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -11,10 +14,15 @@
 #include <glib.h>
 #include <dbus/dbus.h>
 
+#include <murphy/config.h>
 #include <murphy/common/macros.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/mainloop.h>
 
+#ifdef PULSE_ENABLED
+#  include <pulse/mainloop.h>
+#  include <murphy/common/pulse-glue.h>
+#endif
 
 #define info(fmt, args...) do {				\
 	fprintf(stdout, "I: "fmt"\n" ,  ## args);	\
@@ -55,6 +63,14 @@ typedef struct {
 
     int ndbus_method;
     int ndbus_signal;
+
+    int         log_mask;
+    const char *log_target;
+
+#ifdef PULSE_ENABLED
+    pa_mainloop     *pa_main;
+    pa_mainloop_api *pa;
+#endif
 
     int nrunning;
     int runtime;
@@ -497,6 +513,13 @@ static void check_quit(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
 
     if (cfg.nrunning <= 0) {
 	mrp_del_timer(timer);
+#ifdef PULSE_ENABLED
+	MRP_UNUSED(ml);
+
+	if (cfg.pa_main != NULL)
+	    pa_mainloop_quit(cfg.pa_main, 0);
+	else
+#endif
 	mrp_mainloop_quit(ml, 0);
     }
 }
@@ -1144,29 +1167,216 @@ static void check_dbus(void)
 #include "glib-pump.c"
 #include "dbus-pump.c"
 
+
+
+static void config_set_defaults(test_config_t *cfg)
+{
+    mrp_clear(cfg);
+
+    cfg->nio     = 5;
+    cfg->ntimer  = 10;
+    cfg->nsignal = 5;
+    cfg->ngio    = 5;
+    cfg->ngtimer = 10;
+
+    cfg->ndbus_method = 10;
+    cfg->ndbus_signal = 10;
+
+    cfg->log_mask   = MRP_LOG_UPTO(MRP_LOG_DEBUG);
+    cfg->log_target = MRP_LOG_TO_STDERR;
+
+    cfg->runtime = DEFAULT_RUNTIME;
+}
+
+
+static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
+{
+    va_list ap;
+    
+    if (fmt && *fmt) {
+        va_start(ap, fmt);
+        vprintf(fmt, ap);
+        va_end(ap);
+    }
+    
+    printf("usage: %s [options]\n\n"
+           "The possible options are:\n"
+	   "  -r, --runtime                  how many seconds to run tests\n"
+           "  -i, --ios                      number of I/O watches\n"
+	   "  -t, --timers                   number of timers\n"
+	   "  -I, --glib-ios                 number of glib I/O watches\n"
+	   "  -T, --glib-timers              number of glib timers\n"
+	   "  -S, --dbus-signals             number of D-Bus signals\n"
+	   "  -M, --dbus-methods             number of D-Bus methods\n"
+           "  -o, --log-target=TARGET        log target to use\n"
+           "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
+           "  -l, --log-level=LEVELS         logging level to use\n"
+           "      LEVELS is a comma separated list of info, error and warning\n"
+           "  -v, --verbose                  increase logging verbosity\n"
+           "  -d, --debug                    enable debug messages\n"
+#ifdef PULSE_ENABLED
+	   "  -p, --pulse                    use pulse mainloop\n"
+#endif
+           "  -h, --help                     show help on usage\n",
+           argv0);
+    
+    if (exit_code < 0)
+	return;
+    else
+	exit(exit_code);
+}
+
+
+int parse_cmdline(test_config_t *cfg, int argc, char **argv)
+{
+#ifdef PULSE_ENABLED
+#   define PULSE_OPTION "p"
+#else
+#   define PULSE_OPTION ""
+#endif
+#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vdh"PULSE_OPTION
+    struct option options[] = {
+	{ "runtime"     , required_argument, NULL, 'r' },
+	{ "ios"         , required_argument, NULL, 'i' },
+	{ "timers"      , required_argument, NULL, 't' },
+	{ "signals"     , required_argument, NULL, 's' },
+	{ "glib-ios"    , required_argument, NULL, 'I' },
+	{ "glib-timers" , required_argument, NULL, 'T' },
+	{ "dbus-signals", required_argument, NULL, 'S' },
+	{ "dbus-methods", required_argument, NULL, 'M' },
+#ifdef PULSE_ENABLED
+	{ "pulse-main"  , no_argument      , NULL, 'p' },
+#endif
+	{ "log-level"   , required_argument, NULL, 'l' },
+	{ "log-target"  , required_argument, NULL, 'o' },
+	{ "verbose"     , optional_argument, NULL, 'v' },
+	{ "debug"       , no_argument      , NULL, 'd' },
+	{ "help"        , no_argument      , NULL, 'h' },
+	{ NULL, 0, NULL, 0 }
+    };
+    char *end;
+    int   opt, debug;
+    
+    debug = FALSE;
+    config_set_defaults(cfg);
+    
+    while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
+        switch (opt) {
+        case 'r':
+	    cfg->runtime = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid runtime length '%s'.", optarg);
+	    break;
+
+        case 'i':
+	    cfg->nio = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of I/O watches '%s'.", optarg);
+	    break;
+
+        case 't':
+	    cfg->ntimer = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of timers '%s'.", optarg);
+	    break;
+
+        case 's':
+	    cfg->nsignal = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of signals '%s'.", optarg);
+	    break;
+
+        case 'I':
+	    cfg->ngio = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of glib I/O watches '%s'.", optarg);
+	    break;
+
+        case 'T':
+	    cfg->ngtimer = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of glib timers '%s'.", optarg);
+	    break;
+
+        case 'S':
+	    cfg->ndbus_signal = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of DBUS signals '%s'.", optarg);
+	    break;
+
+        case 'M':
+	    cfg->ndbus_method = (int)strtoul(optarg, &end, 10);
+	    if (end && *end)
+		print_usage(argv[0], EINVAL,
+			    "invalid number of DBUS methods '%s'.", optarg);
+	    break;
+
+#ifdef PULSE_ENABLED
+	case 'p':
+	    cfg->pa_main = pa_mainloop_new();
+	    if (cfg->pa_main == NULL) {
+		mrp_log_error("Failed to create PulseAudio mainloop.");
+		exit(1);
+	    }
+	    cfg->pa = pa_mainloop_get_api(cfg->pa_main);
+	    break;
+#endif
+
+	case 'v':
+	    cfg->log_mask <<= 1;
+	    cfg->log_mask  |= 1;
+	    break;
+
+	case 'l':
+	    cfg->log_mask = mrp_log_parse_levels(optarg);
+	    if (cfg->log_mask < 0)
+		print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
+	    break;
+
+	case 'o':
+	    cfg->log_target = mrp_log_parse_target(optarg);
+	    if (!cfg->log_target)
+		print_usage(argv[0], EINVAL, "invalid log target '%s'", optarg);
+	    break;
+
+	case 'd':
+	    debug = TRUE;
+	    break;
+	    
+	case 'h':
+	    print_usage(argv[0], -1, "");
+	    exit(0);
+	    break;
+
+        default:
+	    print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
+	}
+    }
+
+    if (debug)
+	cfg->log_mask |= MRP_LOG_MASK_DEBUG;
+    
+    return TRUE;
+}
+
+
 int main(int argc, char *argv[])
 {
     mrp_mainloop_t *ml;
+    int             retval;
 
     mrp_clear(&cfg);
+    parse_cmdline(&cfg, argc, argv);
 
-    cfg.nio     = 5;
-    cfg.ntimer  = 10;
-    cfg.nsignal = 5;
-    cfg.ngio    = 5;
-    cfg.ngtimer = 10;
-
-    cfg.ndbus_method = 10;
-    cfg.ndbus_signal = 10;
-
-    if (argc == 2)
-	cfg.runtime = (int)strtoul(argv[1], NULL, 10);
-    else
-	cfg.runtime = DEFAULT_RUNTIME;
-
-    mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_INFO));
-    mrp_log_set_target(MRP_LOG_TO_STDOUT);
-
+    mrp_log_set_mask(cfg.log_mask);
+    mrp_log_set_target(cfg.log_target);
     
     if ((ml = mrp_mainloop_create()) == NULL)
 	fatal("failed to create main loop.");
@@ -1187,8 +1397,27 @@ int main(int argc, char *argv[])
     if (mrp_add_timer(ml, 1000, check_quit, NULL) == NULL)
 	fatal("failed to create quit-check timer");
     
-    mrp_mainloop_run(ml);
+#ifdef PULSE_ENABLED
+    if (cfg.pa != NULL) {
+	mrp_log_info("Running with PulseAudio mainloop.");
 
+	if (!mrp_mainloop_register_with_pulse(ml, cfg.pa)) {
+	    mrp_log_error("Failed to register with PulseAudio mainloop.");
+	    exit(1);
+	}
+	
+	pa_mainloop_run(cfg.pa_main, &retval);
+	
+	mrp_log_info("PulseAudio mainloop exited with status %d.", retval);
+
+	mrp_mainloop_unregister_from_pulse(ml, cfg.pa);
+
+	pa_mainloop_free(cfg.pa_main);
+    }
+    else
+#endif
+	retval = mrp_mainloop_run(ml);
+    
     check_io();
     check_timers();
     check_signals();

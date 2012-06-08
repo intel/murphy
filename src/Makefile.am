@@ -23,7 +23,8 @@ libmurphy_commonh_ladir      =		\
 		$(includedir)/murphy
 
 libmurphy_commonh_la_HEADERS =		\
-		common.h
+		common.h		\
+		config.h
 
 libmurphy_common_ladir      =		\
 		$(includedir)/murphy/common
@@ -164,6 +165,47 @@ linker-script.dbus: $(libmurphy_dbus_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.dbus
+endif
+
+###################################
+# murphy pulse glue library
+#
+
+if PULSE_ENABLED
+lib_LTLIBRARIES += libmurphy-pulse.la
+EXTRA_DIST      += common/murphy-pulse.pc
+pkgconfig_DATA  += common/murphy-pulse.pc
+
+libmurphy_pulse_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_pulse_la_HEADERS =		\
+		common/pulse-glue.h
+
+libmurphy_pulse_la_SOURCES =		\
+		common/pulse-glue.c
+
+libmurphy_pulse_la_CFLAGS  =		\
+		$(AM_CFLAGS)		\
+		$(PULSE_CFLAGS)
+
+libmurphy_pulse_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.pulse \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_pulse_la_LIBADD  =
+
+libmurphy_pulse_la_DEPENDENCIES = linker-script.pulse
+
+libpulseincludedir      = $(includedir)/murphy/pulse
+libpulseinclude_HEADERS = $(libmurphy_pulse_la_HEADERS)
+
+# linker script generation
+linker-script.pulse: $(libmurphy_pulse_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.pulse
 endif
 
 ###################################

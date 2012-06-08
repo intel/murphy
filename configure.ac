@@ -117,10 +117,39 @@ else
     AC_MSG_NOTICE([D-Bus support is disabled.])
 fi
 
+if test "$enable_dbus" = "yes"; then
+    AC_DEFINE([DBUS_ENABLED], 1, [Enable D-BUS support ?])
+fi
+
 AM_CONDITIONAL(DBUS_ENABLED, [test "$enable_dbus" = "yes"])
 AC_SUBST(DBUS_ENABLED)
 AC_SUBST(DBUS_CFLAGS)
 AC_SUBST(DBUS_LIBS)
+
+# Check if PulseAudio mainloop support was enabled.
+AC_ARG_ENABLE(pulse,
+              [  --enable-pulse        enable PulseAudio mainloop support],
+	      [enable_pulse=$enableval], [enable_pulse=auto])
+
+if test "$enable_pulse" != "no"; then
+    PKG_CHECK_MODULES(PULSE, libpulse >= 0.9.22,
+    			     [have_pulse=yes], [have_pulse=no])
+    if test "$have_pulse" = "no" -a "$enable_pulse" != "yes"; then
+        AC_MSG_ERROR([PulseAudio development libraries not found.])
+    else
+        enable_pulse="$have_pulse"
+    fi
+else
+    AC_MSG_NOTICE([PulseAudio mainloop support is disabled.])
+fi
+
+if test "$enable_pulse" = "yes"; then
+    AC_DEFINE([PULSE_ENABLED], 1, [Enable PulseAudio mainloop support ?])
+fi
+AM_CONDITIONAL(PULSE_ENABLED, [test "$enable_pulse" = "yes"])
+AC_SUBST(PULSE_ENABLED)
+AC_SUBST(PULSE_CFLAGS)
+AC_SUBST(PULSE_LIBS)
 
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS="$GLIB_CFLAGS $DBUS_CFLAGS"
@@ -271,6 +300,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/daemon/tests/Makefile
 		 src/common/murphy-common.pc
 		 src/common/murphy-dbus.pc
+		 src/common/murphy-pulse.pc
 		 src/core/murphy-core.pc
                  src/murphy-db/Makefile
                  src/murphy-db/mdb/Makefile
@@ -290,6 +320,7 @@ AC_OUTPUT
 echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
 echo "D-Bus support: $enable_dbus"
+echo "PulseAudio mainloop support: $enable_pulse"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do

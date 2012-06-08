@@ -19,6 +19,10 @@ hash_test_LDADD   = ../../libmurphy-common.la
 mainloop_test_SOURCES = mainloop-test.c
 mainloop_test_CFLAGS  = $(AM_CFLAGS) $(GLIB_CFLAGS) $(DBUS_CFLAGS)
 mainloop_test_LDADD   = ../../libmurphy-common.la $(GLIB_LIBS) $(DBUS_LIBS)
+if PULSE_ENABLED
+mainloop_test_CFLAGS += $(PULSE_CFLAGS)
+mainloop_test_LDADD  += ../../libmurphy-pulse.la $(PULSE_LIBS)
+endif
 
 # msg test
 msg_test_SOURCES = msg-test.c
