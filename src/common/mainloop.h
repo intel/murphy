@@ -116,6 +116,39 @@ mrp_subloop_t *mrp_add_subloop(mrp_mainloop_t *ml, mrp_subloop_ops_t *ops,
 void mrp_del_subloop(mrp_subloop_t *sl);
 
 
+/*
+ * superloops - external mainloop to pump murphy mainloops
+ */
+
+typedef struct {
+    void *(*add_io)(void *glue_data, int fd, mrp_io_event_t events,
+		    void (*cb)(void *glue_data, void *id, int fd,
+			       mrp_io_event_t events, void *user_data),
+		    void *user_data);
+    void (*del_io)(void *glue_data, void *id);
+    
+    void *(*add_timer)(void *glue_data, unsigned int msecs,
+		       void (*cb)(void *glue_data, void *id, void *user_data),
+		       void *user_data);
+    void (*del_timer)(void *glue_data, void *id);
+    void (*mod_timer)(void *glue_data, void *id, unsigned int msecs);
+
+    void *(*add_defer)(void *glue_data,
+		       void (*cb)(void *glue_data, void *id, void *user_data),
+		       void *user_data);
+    void  (*del_defer)(void *glue_data, void *id);
+    void  (*mod_defer)(void *glue_data, void *id, int enabled);
+} mrp_superloop_ops_t;
+
+
+/** Set a superloop to pump the given mainloop. */
+int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
+		      void *loop_data);
+
+/** Clear the superloop that pumps the given mainloop. */
+int mrp_clear_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
+			void *loop_data);
+
 
 /*
  * mainloop
@@ -134,7 +167,7 @@ int mrp_mainloop_run(mrp_mainloop_t *ml);
 int mrp_mainloop_prepare(mrp_mainloop_t *ml);
 
 /** Poll the mainloop. */
-int mrp_mainloop_poll(mrp_mainloop_t *ml);
+int mrp_mainloop_poll(mrp_mainloop_t *ml, int may_block);
 
 /** Dispatch pending events of the mainloop. */
 int mrp_mainloop_dispatch(mrp_mainloop_t *ml);
