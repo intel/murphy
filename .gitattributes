@@ -1,0 +1,2 @@
+*.c whitespace=tab-in-indent,trailing-space,cr-at-eol,tabwidth=4
+*.h whitespace=tab-in-indent,trailing-space,cr-at-eol,tabwidth=4
