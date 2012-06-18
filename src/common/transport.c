@@ -341,7 +341,7 @@ int mrp_transport_disconnect(mrp_transport_t *t)
 {
     int result;
     
-    if (t->connected) {
+    if (t != NULL && t->connected) {
 	MRP_TRANSPORT_BUSY(t, {
 		if (t->descr->req.disconnect(t)) {
 		    t->connected = FALSE;
