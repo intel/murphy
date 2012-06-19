@@ -99,7 +99,7 @@ touch $OUTPUT
 
 emit "{"
 emit "    global:"
-ctags $ignore_opts -f - --c-kinds=p $SOURCES | \
+ctags $ignore_opts -f - --c-kinds=px $SOURCES | \
     awk "/$PATTERN/ { print \$1; }" | \
         sort | \
             while read sym; do
