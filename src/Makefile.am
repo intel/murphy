@@ -33,6 +33,7 @@ libmurphy_common_la_HEADERS =		\
 		common/macros.h		\
 		common/list.h		\
 		common/log.h		\
+		common/debug.h 		\
 		common/mm.h		\
 		common/hashtbl.h	\
 		common/mainloop.h	\
@@ -43,6 +44,7 @@ libmurphy_common_la_HEADERS =		\
 
 libmurphy_common_la_SOURCES =			\
 		common/log.c			\
+		common/debug.c			\
 		common/mm.c			\
 		common/hashtbl.c		\
 		common/mainloop.c		\
@@ -113,7 +115,7 @@ libmurphy_core_la_LDFLAGS =		\
 libmurphy_core_la_LIBADD  =		\
 		libmurphy-common.la -ldl
 
-libmurphy_core_la_DEPENDENCIES = linker-script.core
+libmurphy_core_la_DEPENDENCIES = linker-script.core libmurphy-common.la
 
 # core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS)
@@ -294,6 +296,7 @@ plugin_console_la_LIBADD  = $(CONSOLE_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-console.la
 endif
+
 
 ###################################
 # murphy daemon

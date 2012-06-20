@@ -6,8 +6,10 @@
  */
 
 #include <syslog.h>
+#include <stdarg.h>
 
 #include <murphy/common/macros.h>
+#include <murphy/common/debug.h>
 
 MRP_CDECL_BEGIN
 
@@ -68,6 +70,7 @@ mrp_log_mask_t mrp_log_disable(mrp_log_mask_t mask);
 #define MRP_LOG_TO_SYSLOG     ((const char *)3)
 #define MRP_LOG_TO_FILE(path) ((const char *)(path))
 
+
 /** Parse a log target name to MRP_LOG_TO_*. */
 const char *mrp_log_parse_target(const char *target);
 
@@ -86,14 +89,15 @@ int mrp_log_set_target(const char *target);
 #define mrp_log_info(fmt, args...) \
     mrp_log_msg(MRP_LOG_INFO, __LOC__, fmt , ## args)
 
-/** Log an (unclassified) debugging message. */
-#define mrp_debug(fmt, args...) \
-    mrp_log_msg(MRP_LOG_DEBUG, __LOC__, fmt , ## args)
-
 /** Generic logging function. */
 void mrp_log_msg(mrp_log_level_t level,
 		 const char *file, int line, const char *func,
 		 const char *format, ...) MRP_PRINTF_LIKE(5, 6);
+
+/** Generic logging function for easy wrapping. */
+void mrp_log_msgv(mrp_log_level_t level, const char *file,
+		  int line, const char *func, const char *format, va_list ap);
+
 
 MRP_CDECL_END
 

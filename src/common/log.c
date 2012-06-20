@@ -137,10 +137,9 @@ int mrp_log_set_target(const char *target)
 }
 
 
-void mrp_log_msg(mrp_log_level_t level, const char *file,
-		 int line, const char *func, const char *format, ...)
+void mrp_log_msgv(mrp_log_level_t level, const char *file,
+		  int line, const char *func, const char *format, va_list ap)
 {
-    va_list     ap;
     int         lvl;
     const char *prefix;
     char        prfx[2*1024];
@@ -164,8 +163,6 @@ void mrp_log_msg(mrp_log_level_t level, const char *file,
 	return;
     }
     
-    va_start(ap, format);
-
     if (log_fp == NULL)
 	vsyslog(lvl, format, ap);
     else {
@@ -173,7 +170,22 @@ void mrp_log_msg(mrp_log_level_t level, const char *file,
 	vfprintf(log_fp, format, ap); fputs("\n", log_fp);
 	fflush(log_fp);
     }
+}
 
+
+void mrp_log_msg(mrp_log_level_t level, const char *file,
+		 int line, const char *func, const char *format, ...)
+{
+    va_list     ap;
+
+    (void)file;
+    (void)line;
+
+    if (!(log_mask & (1 << level)))
+	return;
+
+    va_start(ap, format);
+    mrp_log_msgv(level, file, line, func, format, ap);
     va_end(ap);
 }
 
