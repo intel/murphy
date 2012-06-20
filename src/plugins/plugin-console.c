@@ -218,7 +218,7 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 }
 
 
-void connection_evt(mrp_transport_t *lt, void *user_data)
+static void connection_evt(mrp_transport_t *lt, void *user_data)
 {
     static mrp_console_req_t req = {
 	.write      = write_req,
