@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 #include <murphy/common/list.h>
 #include <murphy/common/refcnt.h>
