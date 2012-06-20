@@ -111,6 +111,9 @@
 /** Extract micro version from a version integer. */
 #define MRP_VERSION_MICRO(ver) ((ver) & 0xff)
 
+/** Macro to stringify a macro argument. */
+#define MRP_STRINGIFY(arg) #arg
+
 /** C++-compatibility macros. */
 #ifdef __cplusplus
 #    define MRP_CDECL_BEGIN extern "C" {
