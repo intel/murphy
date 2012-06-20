@@ -50,9 +50,10 @@ struct mrp_dbus_s {
  * received message (regardless of their return value).
  */
 
+
 typedef struct {
-    char            *member;
-    mrp_list_hook_t  handlers;
+    char            *member;            /* signal/method name */
+    mrp_list_hook_t  handlers;          /* handlers with matching member */
 } handler_list_t;
 
 typedef struct {
@@ -107,7 +108,7 @@ static int purge_filters(void *key, void *entry, void *user_data)
     mrp_list_hook_t *p, *n;
     handler_t       *h;
 
-    (void)key;
+    MRP_UNUSED(key);
 
     mrp_list_foreach(&l->handlers, p, n) {
 	h = mrp_list_entry(p, handler_t, hook);
@@ -345,7 +346,7 @@ static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     mrp_list_hook_t *p, *n;
     name_tracker_t  *t;
 
-    (void)data;
+    MRP_UNUSED(data);
 
     if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
 	return FALSE;
@@ -546,7 +547,7 @@ static inline void handler_list_free(handler_list_t *l)
 
 static void handler_list_free_cb(void *key, void *entry)
 {
-    (void)key;
+    MRP_UNUSED(key);
 
     handler_list_free((handler_list_t *)entry);
 }
@@ -717,7 +718,7 @@ int mrp_dbus_del_signal_handler(mrp_dbus_t *dbus, const char *sender,
     handler_list_t *signals;
     handler_t      *s;
 
-    (void)sender;
+    MRP_UNUSED(sender);
 
     if ((signals = mrp_htbl_lookup(dbus->signals, (void *)member)) == NULL)
 	return FALSE;
@@ -915,15 +916,13 @@ static DBusHandlerResult dispatch_method(DBusConnection *c,
     handler_list_t *l;
     handler_t      *h;
 
-    (void)c;
+    MRP_UNUSED(c);
 
     if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_METHOD_CALL || !member)
 	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-#if 0
-    mrp_debug("path='%s', interface='%s', member='%s')..."
+    mrp_debug("path='%s', interface='%s', member='%s')...",
 	      SAFESTR(path), SAFESTR(interface), SAFESTR(member));
-#endif
     
     if ((l = mrp_htbl_lookup(dbus->methods, (void *)member)) != NULL) {
     retry:
@@ -939,8 +938,8 @@ static DBusHandlerResult dispatch_method(DBusConnection *c,
 	    goto retry;
     }
 
-    mrp_log_info("Unhandled method path=%s, %s.%s.", SAFESTR(path),
-		 SAFESTR(interface), SAFESTR(member));
+    mrp_debug("Unhandled method path=%s, %s.%s.", SAFESTR(path),
+	      SAFESTR(interface), SAFESTR(member));
     
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
@@ -961,16 +960,14 @@ static DBusHandlerResult dispatch_signal(DBusConnection *c,
     int              retried = FALSE;
     int              handled = FALSE;
 
-    (void)c;
+    MRP_UNUSED(c);
 
     if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL || !member)
 	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-#if 0
-    mrp_log_info("%s(path='%s', interface='%s', member='%s')...",
-		 __FUNCTION__,
-		 SAFESTR(path), SAFESTR(interface), SAFESTR(member));
-#endif
+    mrp_debug("%s(path='%s', interface='%s', member='%s')...",
+	      __FUNCTION__,
+	      SAFESTR(path), SAFESTR(interface), SAFESTR(member));
     
     if ((l = mrp_htbl_lookup(dbus->signals, (void *)member)) != NULL) {
     retry:
@@ -992,8 +989,8 @@ static DBusHandlerResult dispatch_signal(DBusConnection *c,
     }
     
     if (!handled)
-	mrp_log_info("Unhandled signal path=%s, %s.%s.", SAFESTR(path),
-		     SAFESTR(interface), SAFESTR(member));
+	mrp_debug("Unhandled signal path=%s, %s.%s.", SAFESTR(path),
+		  SAFESTR(interface), SAFESTR(member));
     
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 #undef MATCHES
