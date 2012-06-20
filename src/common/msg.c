@@ -88,14 +88,14 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
 		(_f)->type = _type | MRP_MSG_FIELD_ARRAY;		\
 		_base      = _type & ~MRP_MSG_FIELD_ARRAY;		\
 									\
-		_f->size[0] = va_arg(ap, uint32_t);			\
+		_f->size[0] = va_arg(*ap, uint32_t);			\
 		_f->_fld    = mrp_allocz_array(typeof(*_f->_fld),	\
 					       _f->size[0]);		\
 									\
 		if (_f->_fld == NULL)					\
 		    goto _errlbl;					\
 		else							\
-		    memcpy(_f->_fld, va_arg(ap, typeof(_f->_fld)),	\
+		    memcpy(_f->_fld, va_arg(*ap, typeof(_f->_fld)),	\
 			   _f->size[0] * sizeof(_f->_fld[0]));		\
 									\
 		if (_base == MRP_MSG_FIELD_STRING) {			\
@@ -151,7 +151,7 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
 	    break;
 
 	case MRP_MSG_FIELD_BLOB:
-	    size = va_arg(ap, uint32_t);
+	    size = va_arg(*ap, uint32_t);
 	    CREATE(f, tag, type, void *, blb, size[0], fail);
 
 	    blb        = f->blb;
