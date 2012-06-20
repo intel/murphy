@@ -76,9 +76,11 @@ static void tcp_close_req(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc->backend_data;
 
-    mrp_transport_disconnect(c->t);
-    mrp_transport_destroy(c->t);
-    c->t = NULL;
+    if (c->t != NULL) {
+	mrp_transport_disconnect(c->t);
+	mrp_transport_destroy(c->t);
+	c->t = NULL;
+    }
 }
 
 
@@ -218,14 +220,6 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 void connection_evt(mrp_transport_t *lt, void *user_data)
 {
-#if 0
-    static mrp_transport_evt_t evt = {
-	.recvmsg     = recv_evt,
-	.recvmsgfrom = NULL,
-	.closed      = closed_evt,
-    };
-#endif
-    
     static mrp_console_req_t req = {
 	.write      = write_req,
 	.close      = tcp_close_req,
