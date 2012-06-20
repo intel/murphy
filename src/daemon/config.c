@@ -625,12 +625,18 @@ static void free_load(any_action_t *action)
 static int exec_load(mrp_context_t *ctx, any_action_t *action)
 {
     load_action_t *load = (load_action_t *)action;
+    mrp_plugin_t  *plugin;
 
-    if (!mrp_load_plugin(ctx, load->name, load->instance,
-			 load->args, load->narg))
-	return (load->type == ACTION_TRYLOAD);
-    else
+    plugin = mrp_load_plugin(ctx, load->name, load->instance,
+			     load->args, load->narg);
+    
+    if (plugin != NULL) {
+	plugin->may_fail = (load->type == ACTION_TRYLOAD);
+	
 	return TRUE;
+    }
+    else
+	return (load->type == ACTION_TRYLOAD);
 }
 
 

@@ -331,7 +331,12 @@ int mrp_start_plugins(mrp_context_t *ctx)
 	if (!mrp_start_plugin(plugin)) {
 	    mrp_log_error("Failed to start plugin %s (%s).",
 			  plugin->instance, plugin->descriptor->name);
-	    return FALSE;
+	    
+	    if (!plugin->may_fail) {
+		return FALSE;
+	    }
+	    else
+		mrp_unload_plugin(plugin);
 	}
     }
 

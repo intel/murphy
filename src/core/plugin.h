@@ -195,6 +195,7 @@ struct mrp_plugin_s {
     void                *data;                 /* private plugin data */
     mrp_plugin_arg_t    *args;                 /* plugin arguments */
     mrp_console_group_t *cmds;                 /* default console commands */
+    int                  may_fail : 1;         /* load / start may fail */
 };
 
 
