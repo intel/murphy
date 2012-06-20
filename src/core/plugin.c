@@ -197,7 +197,7 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 	    goto fail;
 	
 	if (plugin->cmds != NULL)
-	    mrp_add_console_group(plugin->ctx, plugin->cmds);
+	    mrp_console_add_group(plugin->ctx, plugin->cmds);
 	
 	mrp_list_append(&ctx->plugins, &plugin->hook);
 
@@ -300,7 +300,7 @@ int mrp_unload_plugin(mrp_plugin_t *plugin)
 		dlclose(plugin->handle);
 	
 	    if (plugin->cmds != NULL) {
-		mrp_del_console_group(plugin->ctx, plugin->cmds);
+		mrp_console_del_group(plugin->ctx, plugin->cmds);
 		
 		mrp_free(plugin->cmds->name);
 		mrp_free(plugin->cmds);

@@ -19,13 +19,16 @@ void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
-
-MRP_CONSOLE_GROUP(test_group, "test", NULL, {
-	MRP_PARSED_CMD("one"  , "command 1", "description 1", one_cb),
-        MRP_PARSED_CMD("two"  , "command 2", "description 2", two_cb),
-        MRP_PARSED_CMD("three", "command 3", "description 3", three_cb),
-        MRP_PARSED_CMD("four" , "command 4", "description 4", four_cb)
-    });
+MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
+	MRP_TOKENIZED_CMD("one"  , one_cb  , TRUE,
+			  "one [args]", "command 1", "description 1"),	  
+	MRP_TOKENIZED_CMD("two"  , two_cb  , FALSE,
+			  "two [args]", "command 2", "description 2"),
+	MRP_TOKENIZED_CMD("three", three_cb, FALSE,
+			  "three [args]", "command 3", "description 3"),
+        MRP_TOKENIZED_CMD("four" , four_cb , TRUE,
+			  "four [args]", "command 4", "description 4")
+});
 
 
 void one_cb(mrp_console_t *c, void *user_data, int argc, char **argv)

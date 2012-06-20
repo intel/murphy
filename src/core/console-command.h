@@ -2,97 +2,57 @@
 #define __MURPHY_CONSOLE_COMMAND_H__
 
 
-/**
- * Convenience macro for declaring console commands.
- *
- * Here is how you can use these macros to declare a group of commands
- * for instance from/for your plugin:
- *
- * #define DESCRIPTION1 "Test command 1 (description of command 1)..."
- * #define HELP1        "Help for test command1...
- * #define DESCRIPTION2 "Test command 2 (description of command 2)..."
- * #define HELP2        "Help for test command2...
- * #define DESCRIPTION3 "Test command 3 (description of command 3)..."
- * #define HELP3        "Help for test command3...
- * #define DESCRIPTION4 "Test command 4 (description of command 4)..."
- * #define HELP4        "Help for test command4...
- *
- * static void cmd1_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
- * {
- *     int i;
- *
- *     for (i = 0; i < argc, i++) {
- *         mrp_console_printf(c, "%s(): arg #%d: '%s'\n", __FUNCTION__,
- *                            i, argv[i]);
- *     }
- * }
- *
- * ...
- *
- * MRP_CONSOLE_GROUP(test_cmd_group, "test", NULL, {
- *     MRP_PARSED_CMD("cmd1", CMD1_HELP, CMD1_DESCRIPTION, cmd1_cb),
- *     MRP_PARSED_CMD("cmd2", CMD2_HELP, CMD2_DESCRIPTION, cmd2_cb),
- *     MRP_PARSED_CMD("cmd3", CMD3_HELP, CMD3_DESCRIPTION, cmd3_cb),
- *     MRP_PARSED_CMD("cmd4", CMD4_HELP, CMD4_DESCRIPTION, cmd4_cb)
- * });
- *
- * ...
- *
- * static int plugin_init(mrp_plugin_t *plugin)
- * {
- *     ...
- *     mrp_add_console_group(plugin->ctx, &test_cmd_group);
- *     ...
- * }
- *
- *
- * static int plugin_exit(mrp_plugin_t *plugin)
- * {
- *     ...
- *     mrp_del_console_group(plugin->ctx, &test_cmd_group);
- *     ...
- * }
- * 
- */
-
+/** Macro to declare an array of console commands. */
 #define MRP_CONSOLE_COMMANDS(_var, ...)			\
     static mrp_console_cmd_t _var[] = __VA_ARGS__
 
-#define MRP_CONSOLE_GROUP(_var, _name, _data, ...)	   \
-    MRP_CONSOLE_COMMANDS(_var##_cmds, __VA_ARGS__);	   \
-    static mrp_console_group_t _var = {			   \
-        .name      = (char *)_name,			   \
-        .user_data = _data,                                \
-        .commands  = _var##_cmds,                          \
-        .ncommand  = MRP_ARRAY_SIZE(_var##_cmds),          \
-        .hook      = MRP_LIST_INIT(_var.hook),		   \
+/** Macro to declare a console command group. */
+#define MRP_CONSOLE_GROUP(_var, _name, _descr, _data, ...)  \
+    MRP_CONSOLE_COMMANDS(_var##_cmds, __VA_ARGS__);	    \
+    static mrp_console_group_t _var = {			    \
+        .name      = (char *)_name,			    \
+	.descr     = _descr,				    \
+        .user_data = _data,				    \
+        .commands  = _var##_cmds,			    \
+        .ncommand  = MRP_ARRAY_SIZE(_var##_cmds),	    \
+        .hook      = MRP_LIST_INIT(_var.hook),		    \
     };
 
-#define MRP_PARSED_CMD(_name, _summ, _descr, _cb) {			\
+/** Macro to declare a console command that wants tokenized input. */
+#define MRP_TOKENIZED_CMD(_name, _cb, _selectable, _syntax, _summ, _descr) { \
 	.name        = _name,						\
+	.syntax      = _syntax,					        \
 	.summary     = _summ,						\
 	.description = _descr,					        \
-	.tok         = _cb						\
+        .tok         = _cb,						\
+        .flags       =							\
+	              (_selectable ? MRP_CONSOLE_SELECTABLE : 0),	\
     }
 
-#define MRP_RAW_CMD(_name, _summ, _descr, _cb) {			\
+#if 0 /* XXX TODO: implement handling of raw input mode commands */
+/** Macro to declare a console command that wants a raw input. */
+#define MRP_RAWINPUT_CMD(_name, _cb, _selectable, _syntax, _summ, _descr) { \
 	.name        = _name,						\
+	.syntax      = _syntax,					        \
 	.summary     = _summ,						\
 	.description = _descr,					        \
-        .flags       = MRP_CONSOLE_RAWINPUT,				\
+        .flags       = MRP_CONSOLE_RAWINPUT |				\
+	              (_selectable ? MRP_CONSOLE_SELECTABLE : 0),	\
 	.raw         = _cb						\
     }
+#endif
 
 typedef struct mrp_console_s mrp_console_t;
 
 
 /*
- * console/command flags
+ * console command flags
  */
 
 typedef enum {
-    MRP_CONSOLE_TOKENIZE = 0x0,          /* callback wants tokenized input */
-    MRP_CONSOLE_RAWINPUT = 0x1,          /* callback wants 'raw' input */
+    MRP_CONSOLE_TOKENIZE   = 0x0,        /* wants tokenized input */
+    MRP_CONSOLE_RAWINPUT   = 0x1,        /* wants raw input */
+    MRP_CONSOLE_SELECTABLE = 0x2,        /* selectable as command mode */
 } mrp_console_flag_t;
 
 
@@ -102,6 +62,7 @@ typedef enum {
 
 typedef struct {
     const char         *name;            /* command name */
+    const char         *syntax;          /* command syntax */
     const char         *summary;         /* short help */
     const char         *description;     /* long command description */
     mrp_console_flag_t  flags;           /* command flags */
@@ -113,11 +74,12 @@ typedef struct {
 
 
 /*
- * a console command group
+ * a group of console commands
  */
 
 typedef struct {
     char              *name;             /* command group name/prefix */
+    char              *descr;            /* group description */
     void              *user_data;        /* opaque callback data */
     mrp_console_cmd_t *commands;         /* commands in this group */
     int                ncommand;         /* number of commands */
@@ -126,10 +88,33 @@ typedef struct {
 
 
 /** Register a console command group. */
-int mrp_add_console_group(mrp_context_t *ctx, mrp_console_group_t *group);
+int mrp_console_add_group(mrp_context_t *ctx, mrp_console_group_t *group);
 
 /** Unregister a console command group. */
-int mrp_del_console_group(mrp_context_t *ctx, mrp_console_group_t *group);
+int mrp_console_del_group(mrp_context_t *ctx, mrp_console_group_t *group);
 
+/** Convenience macro to register a group of core commands. */
+#define MRP_CORE_CONSOLE_GROUP(_var, _name, _descr, _data, ...)	\
+    MRP_CONSOLE_GROUP(_var, _name, _descr, _data, __VA_ARGS__);	\
+    								\
+    static void _var##_register_core_group(void)		\
+	__attribute__((constructor));				\
+    								\
+    static void __attribute__((constructor))			\
+    _var##_register_core_group(void) {				\
+	mrp_console_add_core_group(&_var);			\
+    }								\
+    								\
+    static void __attribute__((destructor))			\
+    _var##_unregister_core_group(void) {			\
+	mrp_console_del_core_group(&_var);			\
+    }								\
+    struct mrp_allow_trailing_semicolon
+
+/** Pre-register a group of core commands to register later to any context. */
+int mrp_console_add_core_group(mrp_console_group_t *group);
+
+/** Unregister a pre-registered group of core commands. */
+int mrp_console_del_core_group(mrp_console_group_t *group);
 
 #endif /* __MURPHY_CONSOLE_COMMAND_H__ */

@@ -13,6 +13,8 @@
 #include <murphy/core/console.h>
 
 #define MAX_PROMPT 64                    /* ie. way too long */
+#define CMD_EXIT   "exit"
+#define CMD_HELP   "help"
 
 #define COLOR  "\E"
 #define YELLOW "33m"
@@ -42,7 +44,7 @@ typedef struct {
 
 static int get_next_line(input_t *in, char **args, size_t size);
 
-
+static MRP_LIST_HOOK(core_groups);
 
 /*
  * an active console
@@ -51,6 +53,7 @@ static int get_next_line(input_t *in, char **args, size_t size);
 typedef struct {
     MRP_CONSOLE_PUBLIC_FIELDS;               /* publicly visible fields */
     mrp_console_group_t *grp;                /* active group if any */
+    mrp_console_cmd_t   *cmd;                /* active command if any */
     char                 prompt[MAX_PROMPT]; /* current prompt */
     input_t              in;                 /* input buffer */
     mrp_list_hook_t      hook;               /* to list of active consoles */
@@ -223,7 +226,11 @@ void mrp_set_console_prompt(mrp_console_t *mc)
     if (c->grp != NULL) {
 	prompt = buf;
 	
-	snprintf(buf, sizeof(buf), "murphy %s", c->grp->name);
+	if (c->cmd != NULL)
+	    snprintf(buf, sizeof(buf), "murphy %s/%s",
+		     c->grp->name, c->cmd->name);
+	else
+	    snprintf(buf, sizeof(buf), "murphy %s", c->grp->name);
     }
     else
 	prompt = "murphy";
@@ -240,7 +247,18 @@ static mrp_console_group_t *find_group(mrp_context_t *ctx, const char *name)
     mrp_list_hook_t     *p, *n;
     mrp_console_group_t *grp;
 
-    mrp_list_foreach(&ctx->cmd_groups, p, n) {
+    if (*name == '/')
+	name++;
+
+    if (ctx != NULL) {
+	mrp_list_foreach(&ctx->cmd_groups, p, n) {
+	    grp = mrp_list_entry(p, typeof(*grp), hook);
+	    if (!strcmp(grp->name, name))
+		return grp;
+	}
+    }
+    
+    mrp_list_foreach(&core_groups, p, n) {
 	grp = mrp_list_entry(p, typeof(*grp), hook);
 	if (!strcmp(grp->name, name))
 	    return grp;
@@ -256,16 +274,18 @@ static mrp_console_cmd_t *find_command(mrp_console_group_t *group,
     mrp_console_cmd_t *cmd;
     int                i;
 
-    for (i = 0, cmd = group->commands; i < group->ncommand; i++, cmd++) {
-	if (!strcmp(cmd->name, command))
-	    return cmd;
+    if (group != NULL) {
+	for (i = 0, cmd = group->commands; i < group->ncommand; i++, cmd++) {
+	    if (!strcmp(cmd->name, command))
+		return cmd;
+	}
     }
     
     return NULL;
 }
 
 
-int mrp_add_console_group(mrp_context_t *ctx, mrp_console_group_t *group)
+int mrp_console_add_group(mrp_context_t *ctx, mrp_console_group_t *group)
 {
     if (group != NULL && find_group(ctx, group->name) == NULL) {
 	mrp_list_append(&ctx->cmd_groups, &group->hook);
@@ -276,9 +296,31 @@ int mrp_add_console_group(mrp_context_t *ctx, mrp_console_group_t *group)
 }
 
 
-int mrp_del_console_group(mrp_context_t *ctx, mrp_console_group_t *group)
+int mrp_console_del_group(mrp_context_t *ctx, mrp_console_group_t *group)
 {
     if (group != NULL && find_group(ctx, group->name) == group) {
+	mrp_list_delete(&group->hook);
+	return TRUE;
+    }
+    else
+	return FALSE;
+}
+
+
+int mrp_console_add_core_group(mrp_console_group_t *group)
+{
+    if (group != NULL && find_group(NULL, group->name) == NULL) {
+	mrp_list_append(&core_groups, &group->hook);
+	return TRUE;
+    }
+    else
+	return FALSE;
+}
+
+
+int mrp_console_del_core_group(mrp_console_group_t *group)
+{
+    if (group != NULL && find_group(NULL, group->name) == group) {
 	mrp_list_delete(&group->hook);
 	return TRUE;
     }
@@ -297,6 +339,10 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
     char               **argv;
     int                  len;
 
+    /*
+     * parse the given command to tokens
+     */
+    
     len = size;
     strncpy(c->in.buf, buf, len);
     c->in.buf[len++] = '\n';
@@ -309,14 +355,14 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
     c->in.line  = 1;
     *c->in.in   = '\0';
 
-    argv = args + 1;
-    argc = get_next_line(&c->in, argv, MRP_ARRAY_SIZE(args) - 1);
+    argv = args + 2;
+    argc = get_next_line(&c->in, argv, MRP_ARRAY_SIZE(args) - 2);
     grp  = c->grp;
     cmd  = NULL;
     
     /*
-     * Notes: Uhmmkay... so this will need t get replaced eventually with
-     *        decent input processing login.
+     * Notes: Uhmmkay... so this will need to get replaced eventually with
+     *        decent input processing.
      */
 
     if (argc < 0)
@@ -324,97 +370,95 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
 		(int)size, (char *)buf);
     else if (argc == 0)
 	goto prompt;
+
+
+    /*
+     * take care of common top-level commands (exit, help)
+     */
+
+    grp = find_group(c->ctx, "");
+    cmd = find_command(grp, argv[0]);
     
+    if (cmd != NULL) {
+	argv[-1] = "";
+	argv--;
+	argc++;
+	goto execute;
+    }
+
+    
+    /*
+     * take care of group and command mode selection
+     */
+
     if (argc == 1) {
-	if (!strcmp(argv[0], "exit")) {
-	    if (grp != NULL) {
-		c->grp = NULL;
+	if (c->grp == NULL) {
+	    c->grp = find_group(c->ctx, argv[0]);
+
+	    if (c->grp != NULL)
 		goto prompt;
-	    }
-	    else {
-		grp = find_group(c->ctx, "");
-		cmd = find_command(grp, "exit");
-		goto execute;
-	    }
 	}
 	else {
-	    if (grp == NULL || *argv[0] == '/') {
-		grp = find_group(c->ctx, argv[0]);
-		if (c->grp == NULL && grp != NULL) {
-		    c->grp = grp;
+	    if (c->cmd == NULL) {
+		cmd = find_command(c->grp, argv[0]);
+		
+		if (cmd != NULL && cmd->flags & MRP_CONSOLE_SELECTABLE) {
+		    c->cmd = cmd;
 		    goto prompt;
 		}
-		else {
-		    grp = find_group(c->ctx, "");
-		    cmd = find_command(grp, argv[0]);
-		    
-		    if (cmd == NULL && *argv[0] == '/')
-			cmd = find_command(grp, argv[0] + 1);
-		    
-		    goto execute;
-		}
-	    }
-	    else {
-		if (grp != NULL) {
-		    cmd = find_command(grp, argv[0]);
-		
-		    if (cmd == NULL) {
-			grp = find_group(c->ctx, "");
-			cmd = find_command(grp, argv[0] + 1);
-		    }
-		}
-		else {
-		    grp = find_group(c->ctx, "");
-		    cmd = find_command(grp, argv[0]);
-		    
-		    if (cmd == NULL && *argv[0] == '/')
-			cmd = find_command(grp, argv[0] + 1);
-		}
-
-		goto execute;
 	    }
 	}
     }
-    else {
-	if (*argv[0] == '/') {
-	    grp = find_group(c->ctx, argv[0] + 1);
-	    
-	    if (grp != NULL)
-		cmd = find_command(grp, argv[1]);
-	    else {
-		grp = find_group(c->ctx, "");
-		cmd = find_command(grp, argv[0] + 1);
-	    }
 
-	    goto execute;
+
+    /*
+     * take care of commands while in group or command mode
+     */
+
+    if (c->grp != NULL && *argv[0] != '/') {
+	if (c->cmd != NULL) {
+	    grp = c->grp;
+	    cmd = c->cmd;
+	    argv[-2] = grp->name;
+	    argv[-1] = (char *)cmd->name;
+	    argv -= 2;
+	    argc += 2;
 	}
 	else {
-	    if (c->grp != NULL) {
-		grp = c->grp;
-		cmd = find_command(grp, argv[0]);
+	    grp = c->grp;
+	    cmd = find_command(grp, argv[0]);
 
-		if (cmd == NULL) {
-		    grp = find_group(c->ctx, "");
-		    cmd = find_command(grp, argv[0]);
-		}
-	    }
-	    else {
-		grp = find_group(c->ctx, argv[0]);
-		cmd = grp ? find_command(grp, argv[1]) : NULL;
-	    }
-
-	    goto execute;
+	    if (cmd == NULL)
+		goto unknown_command;
+	    
+	    argv[-1] = grp->name;
+	    argv--;
+	    argc++;
 	}
+
+	goto execute;
     }
 
+    
+    /*
+     * take care of commands while at the top-level
+     */
+
+    if (argc > 1) {
+	grp = find_group(c->ctx, argv[0]);
+	cmd = find_command(grp, argv[1]);
+    }
+    
  execute:
     if (cmd != NULL) {
 	MRP_CONSOLE_BUSY(mc, {
 		cmd->tok(mc, grp->user_data, argc, argv);
 	    });
     }
-    else
+    else {
+    unknown_command:
 	fprintf(mc->stderr, "invalid command '%.*s'\n", (int)size, (char *)buf);
+    }
     
  prompt:
     if (mc->check_destroy(mc))
@@ -497,13 +541,13 @@ static FILE *console_fopen(mrp_console_t *mc)
 
 static void register_commands(mrp_context_t *ctx)
 {
-    mrp_add_console_group(ctx, &builtin_cmd_group);
+    mrp_console_add_group(ctx, &builtin_cmd_group);
 }
 
 
 static void unregister_commands(mrp_context_t *ctx)
 {
-    mrp_del_console_group(ctx, &builtin_cmd_group);
+    mrp_console_del_group(ctx, &builtin_cmd_group);
 }
 
 
