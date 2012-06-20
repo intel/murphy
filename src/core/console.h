@@ -96,31 +96,35 @@ struct mrp_console_s {
  */
 
 #ifndef __MRP_CONSOLE_DISABLE_CODE_CHECK__
-#  define __CONSOLE_CHK_BLOCK(...) do {					\
-    static int __warned = 0;						\
-    									\
-    if (MRP_UNLIKELY(__warned == 0 &&					\
-		     strstr(#__VA_ARGS__, "return") != NULL)) {		\
-	mrp_log_error("********************* WARNING *********************"); \
-	mrp_log_error("* You seem to directly do a return from a block   *"); \
-	mrp_log_error("* of code protected by MRP_CONSOLE_BUSY. Are      *"); \
-	mrp_log_error("* you absolutely sure you know what you are doing *"); \
-	mrp_log_error("* and that you are also doing it correctly ?      *"); \
-	mrp_log_error("***************************************************"); \
-	mrp_log_error("The suspicious code block is located at: ");	      \
-	mrp_log_error("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);	      \
-	mrp_log_error("and it looks like this:");			      \
-	mrp_log_error("---------------------------------------------");	      \
-	mrp_log_error("%s", #__VA_ARGS__);				      \
-	mrp_log_error("---------------------------------------------");	      \
-	mrp_log_error("If you understand what MRP_CONSOLE_BUSY does");        \
-	mrp_log_error("and how, and you are sure about the correctness of");  \
-	mrp_log_error("your code you can disable this error message by");     \
-	mrp_log_error("#defining __MRP_CONSOLE_DISABLE_CODE_CHECK__");        \
-	mrp_log_error("when compiling %s.", __FILE__);			      \
-	__warned = 1;							      \
-    }									      \
- } while (0)
+#  define W mrp_log_error
+#  define __CONSOLE_CHK_BLOCK(...) do {					  \
+	static int __checked = FALSE, __warned = FALSE;			  \
+    									  \
+	if (MRP_UNLIKELY(!__checked)) {					  \
+	    __checked = TRUE;						  \
+	    if (MRP_UNLIKELY(!__warned &&				  \
+			     strstr(#__VA_ARGS__, "return") != NULL)) {	  \
+		W("********************* WARNING *********************"); \
+		W("* You seem to directly do a return from a block   *"); \
+		W("* of code protected by MRP_CONSOLE_BUSY. Are      *"); \
+		W("* you absolutely sure you know what you are doing *"); \
+		W("* and that you are also doing it correctly ?      *"); \
+		W("***************************************************"); \
+		W("The suspicious code block is located at: ");		  \
+		W("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);	  \
+		W("and it looks like this:");				  \
+		W("---------------------------------------------");	  \
+		W("%s", #__VA_ARGS__);					  \
+		W("---------------------------------------------");	  \
+		W("If you understand what MRP_CONSOLE_BUSY does");	  \
+		W("and how, and you are sure about the correctness of");  \
+		W("your code you can disable this error message by");	  \
+		W("#defining __MRP_CONSOLE_DISABLE_CODE_CHECK__");	  \
+		W("when compiling %s.", __FILE__);			  \
+		__warned = TRUE;					  \
+	    }								  \
+	}								  \
+    } while (0)
 #else
 #  define __CONSOLE_CHK_BLOCK(...) do { } while (0)
 #endif
