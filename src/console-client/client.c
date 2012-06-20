@@ -267,6 +267,7 @@ int client_setup(client_t *c, const char *addrstr)
 	if (!mrp_transport_connect(c->t, &addr, addrlen)) {
 	    mrp_log_error("Failed to connect to %s.", addrstr);
 	    mrp_transport_destroy(c->t);
+	    c->t = NULL;
 	    return FALSE;
 	}
 
