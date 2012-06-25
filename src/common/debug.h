@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 #include <murphy/common/macros.h>
+#include <murphy/common/debug-info.h>
 
 MRP_CDECL_BEGIN
 
@@ -49,6 +50,15 @@ void mrp_debug_msg(const char *site, const char *file, int line,
 
 /** Check if the given debug site is enabled. */
 int mrp_debug_check(const char *func, const char *file, int line);
+
+/** Register line->funcion mapping for file. */
+int mrp_debug_register_file(mrp_debug_file_t *df);
+
+/** Unregister line->funcion mapping for file. */
+int mrp_debug_unregister_file(mrp_debug_file_t *df);
+
+/** Return the name of the function that corresponds to file:line. */
+const char *mrp_debug_site_function(const char *file, int line);
 
 MRP_CDECL_END
 

@@ -57,7 +57,6 @@ mrp_htbl_t *mrp_htbl_create(mrp_htbl_config_t *cfg)
     mrp_htbl_t *ht;
     size_t     i, nbucket;
 
-
     if (cfg->comp && cfg->hash) {
 	if ((ht = mrp_allocz(sizeof(*ht))) != NULL) {
 	    if (cfg->nbucket != 0)
