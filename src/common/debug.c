@@ -16,7 +16,10 @@ int mrp_debug_stamp = 0;     /* debug config stamp */
 static int         debug_enabled;           /* debug messages enabled */
 static mrp_htbl_t *rules_on;                /* enabling rules */
 static mrp_htbl_t *rules_off;               /* disabling rules */
+static mrp_htbl_t *files;                   /* table of per-file debug info */
+static MRP_LIST_HOOK(debug_files);
 
+static void populate_file_table(void);
 
 static void free_rule_cb(void *key, void *entry)
 {
@@ -80,7 +83,9 @@ static int add_rule(const char *func, const char *file, int line, int off)
     if (rules_on == NULL)
 	if (!init_rules())
 	    return FALSE;
-    
+
+    r = rule = NULL;
+
     if (!off)
 	ht = rules_on;
     else
@@ -134,6 +139,8 @@ static int del_rule(const char *func, const char *file, int line, int off)
     if (rules_on == NULL)
 	if (!init_rules())
 	    return FALSE;
+
+    r = NULL;
     
     if (!off)
 	ht = rules_on;
@@ -372,3 +379,95 @@ int mrp_debug_check(const char *func, const char *file, int line)
     
     return TRUE;
 }
+
+
+int mrp_debug_register_file(mrp_debug_file_t *df)
+{
+    mrp_list_append(&debug_files, &df->hook);
+    
+    return TRUE;
+}
+
+
+int mrp_debug_unregister_file(mrp_debug_file_t *df)
+{
+    mrp_list_delete(&df->hook);
+
+    if (files != NULL)
+	mrp_htbl_remove(files, (void *)df->file, FALSE);
+
+    return TRUE;
+}
+
+
+const char *mrp_debug_site_function(const char *file, int line)
+{
+    mrp_debug_info_t *info;
+    const char       *func;
+
+    if (files == NULL)
+	populate_file_table();
+
+    func = NULL;
+
+    if (files != NULL) {
+	info = mrp_htbl_lookup(files, (void *)file);
+
+	if (info != NULL) {
+	    while (info->func != NULL) {
+		if (info->line < line) {
+		    func = info->func;
+		    info++;
+		}
+		else
+		    break;
+	    }
+	}
+    }
+
+    return func;
+}
+
+
+static void populate_file_table(void)
+{
+    mrp_htbl_config_t  hcfg;
+    mrp_debug_file_t  *df;
+    mrp_list_hook_t   *p, *n;
+
+    if (files == NULL) {
+	mrp_clear(&hcfg);
+	hcfg.comp = mrp_string_comp;
+	hcfg.hash = mrp_string_hash;
+	
+	files = mrp_htbl_create(&hcfg);
+    }
+
+    if (files != NULL) {
+	mrp_list_foreach(&debug_files, p, n) {
+	    df = mrp_list_entry(p, typeof(*df), hook);
+
+	    mrp_htbl_insert(files, (void *)df->file, df->info);
+	}
+    }
+}
+
+
+static void flush_file_table(void)
+{
+    mrp_debug_file_t  *df;
+    mrp_list_hook_t   *p, *n;
+
+    if (files != NULL) {
+	mrp_htbl_reset(files, FALSE);
+	files = NULL;
+
+	mrp_list_foreach(&debug_files, p, n) {
+	    df = mrp_list_entry(p, typeof(*df), hook);
+
+	    mrp_htbl_insert(files, (void *)df->file, df->info);
+	}
+    }
+}
+
+

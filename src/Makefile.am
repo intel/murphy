@@ -42,7 +42,7 @@ libmurphy_common_la_HEADERS =		\
 		common/msg.h		\
 		common/transport.h
 
-libmurphy_common_la_SOURCES =			\
+libmurphy_common_la_REGULAR_SOURCES =		\
 		common/log.c			\
 		common/debug.c			\
 		common/mm.c			\
@@ -54,6 +54,10 @@ libmurphy_common_la_SOURCES =			\
 		common/transport.c		\
 		common/stream-transport.c	\
 		common/dgram-transport.c
+
+libmurphy_common_la_SOURCES =				\
+		$(libmurphy_common_la_REGULAR_SOURCES)	\
+		common-func-info.c
 
 libmurphy_common_la_CFLAGS  =		\
 		$(AM_CFLAGS)
@@ -76,6 +80,13 @@ linker-script.common: $(libmurphy_common_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.common
+
+# debug file:line-function mapping generation
+common-func-info.c: $(libmurphy_common_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm common-func-info.c
 
 ###################################
 # murphy core library
@@ -100,10 +111,14 @@ libmurphy_core_la_HEADERS =		\
 		core/console-command.h	\
 		core/console.h
 
-libmurphy_core_la_SOURCES =		\
+libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
 		core/plugin.c		\
 		core/console.c
+
+libmurphy_core_la_SOURCES =		\
+		$(libmurphy_core_la_REGULAR_SOURCES) \
+		core-func-info.c
 
 libmurphy_core_la_CFLAGS  =		\
 		$(AM_CFLAGS)
@@ -124,6 +139,13 @@ linker-script.core: $(libmurphy_core_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.core
 
+# debug file:line-function mapping generation
+core-func-info.c: $(libmurphy_core_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm core-func-info.c
+
 ###################################
 # murphy dbus library
 #
@@ -140,10 +162,14 @@ libmurphy_dbus_la_HEADERS =		\
 		common/dbus.h		\
 		common/dbus-transport.h
 
-libmurphy_dbus_la_SOURCES =		\
+libmurphy_dbus_la_REGULAR_SOURCES =	\
 		common/dbus.c		\
 		common/dbus-glue.c	\
 		common/dbus-transport.c
+
+libmurphy_dbus_la_SOURCES =		\
+		$(libmurphy_dbus_la_REGULAR_SOURCES) \
+		dbus-func-info.c
 
 libmurphy_dbus_la_CFLAGS  =		\
 		$(AM_CFLAGS)		\
@@ -167,6 +193,13 @@ linker-script.dbus: $(libmurphy_dbus_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.dbus
+
+# debug file:line-function mapping generation
+dbus-func-info.c: $(libmurphy_dbus_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm dbus-func-info.c
 endif
 
 ###################################
@@ -279,9 +312,11 @@ plugin_LTLIBRARIES    += plugin-glib.la
 endif
 
 # console plugin
-CONSOLE_PLUGIN_SOURCES = plugins/plugin-console.c
-CONSOLE_PLUGIN_CFLAGS  =
-CONSOLE_PLUGIN_LIBS    =
+CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/plugin-console.c
+CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES) \
+				 plugin-console-func-info.c
+CONSOLE_PLUGIN_CFLAGS  	       =
+CONSOLE_PLUGIN_LIBS    	       =
 
 if BUILTIN_PLUGIN_CONSOLE
 BUILTIN_PLUGINS += $(CONSOLE_PLUGIN_SOURCES)
@@ -297,6 +332,12 @@ plugin_console_la_LIBADD  = $(CONSOLE_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-console.la
 endif
 
+# debug file:line-function mapping generation
+plugin-console-func-info.c: $(CONSOLE_PLUGIN_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm plugin-console-func-info.c
 
 ###################################
 # murphy daemon
@@ -347,5 +388,5 @@ murphy_console_LDFLAGS = -rdynamic -lreadline
 #end
 
 # cleanup
-clean-local:: clean-linker-script
+clean-local:: clean-linker-script clean-func-infos
 	-rm -f *~

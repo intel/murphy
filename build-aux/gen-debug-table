@@ -1,0 +1,155 @@
+#!/bin/bash
+
+#
+# Generate the necessary information for resolving line-number information
+# to function names in C files that reference a certain symbol (by default
+# mrp_debug). This is used to convert file:line information to function
+# names while _listing_ debug sites.
+#
+
+
+error () {
+    echo "error: $*" 1>&2
+}
+
+info () {
+    echo "$*" 1>&2
+}
+
+usage () {
+    info "usage: $0 [-s <symbol>] [-q] -o <output> <inputs>"
+    exit ${1:-1}
+}
+
+emit () {
+    local _opts
+
+    if [ "$1" = "-n" ]; then
+        _opts="-n"
+        shift
+    else
+        _opts=""
+    fi
+    if [ "$1" = "-e" ]; then
+        _opts="$_opts -e"
+        shift
+    fi
+
+    echo $_opts "$*" >> $OUTPUT
+}
+
+emit_preamble() {
+    emit "#include <stdlib.h>"
+    emit "#include <murphy/common/debug.h>"
+    emit
+}
+
+emit_postamble() {
+    emit
+    emit "#include <murphy/common/debug-auto-register.c>"
+}
+
+emit_function_info() {
+    prev=""
+    cnt=0
+    while read func line file; do
+        if [ "$prev" != "$file" ]; then
+            if [ $cnt -gt 0 ]; then
+                emit "    { .line = 0, .func = NULL }"
+                emit "};"
+                emit "static mrp_debug_file_t file_$(($cnt - 1)) = {"
+                emit "    .file = \"$prev\","
+                emit "    .info = info_$(($cnt - 1))"
+                emit "};"
+                emit ""
+            fi
+            emit "/* $file */"
+            emit "static mrp_debug_info_t info_$cnt[] = {"
+            cnt=$(($cnt + 1))
+            prev=$file
+        fi
+        emit "    { .line = $line, .func = \"$func\" },"
+    done
+    emit "    { .line = 0, .func = NULL }"
+    emit "};"
+    emit "static mrp_debug_file_t file_$(($cnt - 1)) = {"
+    emit "    .file = \"$prev\","
+    emit "    .info = info_$(($cnt - 1))"
+    emit "};"
+    emit ""
+    emit "/* table of all files */"
+    emit "static mrp_debug_file_t *debug_files[] = {"
+    i=0
+    while [ $i -lt $cnt ]; do
+        emit "    &file_$i,"
+        i=$(($i + 1))
+    done
+    emit "    NULL"
+    emit "};"
+    emit ""
+}
+
+
+# set up defaults
+SYMBOL="mrp_debug\("                  # symbol to look for
+SOURCE=""                             # default to all file containing $SYMBOL
+OUTPUT=""                             # no default output, must be specified
+
+# parse command line
+while [ -n "${1#-}" ]; do
+    case $1 in
+        -o|--output)
+            if [ -z "$OUTPUT" ]; then
+                shift
+                OUTPUT="$1"
+            else
+                error "Multiple output files requested."
+                usage
+            fi
+            ;;
+        -s|--symbol)
+	    shift;
+           SYMBOL="$1"
+            ;;
+	-v|--verbose)
+	    VERBOSE="yes"
+	    ;;
+        -h|--help)
+            usage 0
+            ;;
+        -*)
+            error "Unknown option '$1'."
+            usage
+            ;;
+        *)
+            SOURCE="$SOURCE $1"
+            ;;
+    esac
+    shift
+done
+
+# check that we've got everything mandatory
+if [ -z "$OUTPUT" ]; then
+    error "No output file specified (use the -o option)."
+    usage
+fi
+if [ -z "$SYMBOL" ]; then
+    SYMBOL="mrp_debug\("
+fi
+if [ -z "$SOURCE" ]; then
+    [ -n "VERBOSE" ] && info "Scanning all C files containing $SYMBOL..."
+    SOURCE="`find . -name \*.c -exec grep -Hn $SYMBOL\( {} \; | \
+                  cut -d ':' -f 1 | sort -u`"
+fi
+
+[ -n "$VERBOSE" ] && info "Generating debug function info file $OUTPUT..."
+rm -f $OUTPUT
+touch $OUTPUT
+
+# generate the output
+emit_preamble
+
+ctags -x --c-kinds=f $SOURCE | tr -s '\t' ' ' | \
+    cut -d ' '  -f 1,3,4 | sort -k 3,3 -k 2,2n | emit_function_info
+
+emit_postamble
