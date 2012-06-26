@@ -90,7 +90,7 @@ static table_size_t  sizes[]          = {
     {  911, 10}, {  919, 10}, {  929, 10}, {  937, 10}, {  941, 10},
     {  947, 10}, {  953, 10}, {  967, 10}, {  971, 10}, {  977, 10},
     {  983, 10}, {  991, 10}, {  997, 10}, {65535, 16}
-}; 
+};
 static uint32_t  charmap[256] = {
     /*        00  01  02  03  04  05  06  07  08  09  0a  0b  0c  0d  0e  0f */
     /* 00 */   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -147,7 +147,7 @@ mdb_hash_t *mdb_hash_table_create(int                  max_entries,
     htbl->hfunc  = hfunc;
     htbl->hcomp  = hcomp;
     htbl->hprint = hprint;
-    
+
     MDB_DLIST_INIT(htbl->entries.head);
 
     for (i = 0; i < htbl->nchain; i++)
@@ -196,7 +196,7 @@ void *mdb_hash_table_iterate(mdb_hash_t *htbl,void **key_ret,void **cursor_ptr)
 
     if (key_ret)
         *key_ret = entry->key;
-    
+
     return entry->data;
 }
 
@@ -297,7 +297,7 @@ void *mdb_hash_delete(mdb_hash_t *htbl, int klen, void *key)
             return data;
         }
     }
-    
+
     errno = ENOENT;
     return NULL;
 }
@@ -366,7 +366,7 @@ int mdb_hash_function_string(int bits, int nchain, int klen, void *key)
 
         for (h.wide = 0; (s = *varchar); varchar++)
             h.wide = 33ULL * h.wide + (uint64_t)charmap[s];
-        
+
         if (bits <= 8) {
             hashval = h.narrow[0] ^ h.narrow[1] ^ h.narrow[2] ^ h.narrow[3] ^
                       h.narrow[4] ^ h.narrow[5] ^ h.narrow[6] ^ h.narrow[7];
@@ -379,7 +379,7 @@ int mdb_hash_function_string(int bits, int nchain, int klen, void *key)
 
         hashval %= nchain;
     }
-       
+
     return hashval;
 }
 
@@ -421,7 +421,7 @@ int mdb_hash_function_blob(int bits, int nchain, int klen, void *key)
     {
         for (i = 0, h.wide = 0;   i < klen;   i++)
             h.wide = 33ULL * h.wide + (uint64_t)data[i];
-        
+
         if (bits <= 8) {
             hashval = h.narrow[0] ^ h.narrow[1] ^ h.narrow[2] ^ h.narrow[3] ^
                       h.narrow[4] ^ h.narrow[5] ^ h.narrow[6] ^ h.narrow[7];
@@ -434,7 +434,7 @@ int mdb_hash_function_blob(int bits, int nchain, int klen, void *key)
 
         hashval %= nchain;
     }
-       
+
     return hashval;
 }
 

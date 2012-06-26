@@ -37,7 +37,7 @@ typedef struct mrp_transport_s mrp_transport_t;
  *      shooting out the transport underneath the active operation or
  *      callback.
  *
- *    To handle the latter case, the generic (ie. top-level) transport 
+ *    To handle the latter case, the generic (ie. top-level) transport
  *    layer has a member function check_destroy. This function checks
  *    for pending destroy requests and destroys the transport if it
  *    is not busy. All transport backends MUST CALL this function and
@@ -71,7 +71,7 @@ typedef union {
 
 
 static inline mrp_sockaddr_t *mrp_sockaddr_cpy(mrp_sockaddr_t *d,
-					       mrp_sockaddr_t *s, socklen_t n)
+                                               mrp_sockaddr_t *s, socklen_t n)
 {
     memcpy(d, s, n);
     return d;
@@ -120,7 +120,7 @@ typedef struct {
     int  (*accept)(mrp_transport_t *t, mrp_transport_t *lt);
     /** Connect a transport to an endpoint. */
     int  (*connect)(mrp_transport_t *t, mrp_sockaddr_t *addr,
-		    socklen_t addrlen);
+                    socklen_t addrlen);
     /** Disconnect a transport, if it is connection-oriented. */
     int  (*disconnect)(mrp_transport_t *t);
     /** Close a transport, free all resources from open/accept/connect. */
@@ -134,13 +134,13 @@ typedef struct {
 
     /** Send a message over a(n unconnected) transport. */
     int (*sendmsgto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
-		     socklen_t addrlen);
+                     socklen_t addrlen);
     /** Send raw data over a(n unconnected) transport. */
     int (*sendrawto)(mrp_transport_t *t, void *buf, size_t size,
-		     mrp_sockaddr_t *addr, socklen_t addrlen);
+                     mrp_sockaddr_t *addr, socklen_t addrlen);
     /** Send custom data over a(n unconnected) transport. */
     int (*senddatato)(mrp_transport_t *t, void *data, uint16_t tag,
-		      mrp_sockaddr_t *addr, socklen_t addrlen);
+                      mrp_sockaddr_t *addr, socklen_t addrlen);
 } mrp_transport_req_t;
 
 
@@ -157,30 +157,30 @@ typedef struct {
 typedef struct {
     /** Message received on a connected transport. */
     union {
-	/** Generic message callback for connected transports. */
-	void (*recvmsg)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
-	/** Raw data callback for connected transports. */
-	void (*recvraw)(mrp_transport_t *t, void *data, size_t size,
-			void *user_data);
-	/** Custom data callback for connected transports. */
-	void (*recvdata)(mrp_transport_t *t, void *data, uint16_t tag,
-			 void *user_data);
+        /** Generic message callback for connected transports. */
+        void (*recvmsg)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
+        /** Raw data callback for connected transports. */
+        void (*recvraw)(mrp_transport_t *t, void *data, size_t size,
+                        void *user_data);
+        /** Custom data callback for connected transports. */
+        void (*recvdata)(mrp_transport_t *t, void *data, uint16_t tag,
+                         void *user_data);
     };
-    
+
     /** Message received on an unconnected transport. */
     union {
-	/** Generic message callback for unconnected transports. */
-	void (*recvmsgfrom)(mrp_transport_t *t, mrp_msg_t *msg,
-			    mrp_sockaddr_t *addr, socklen_t addrlen,
-			    void *user_data);
-	/** Raw data callback for unconnected transports. */
-	void (*recvrawfrom)(mrp_transport_t *t, void *data, size_t size,
-			    mrp_sockaddr_t *addr, socklen_t addrlen,
-			    void *user_data);
-	/** Custom data callback for unconnected transports. */
-	void (*recvdatafrom)(mrp_transport_t *t, void *data, uint16_t tag,
-			     mrp_sockaddr_t *addr, socklen_t addrlen,
-			     void *user_data);
+        /** Generic message callback for unconnected transports. */
+        void (*recvmsgfrom)(mrp_transport_t *t, mrp_msg_t *msg,
+                            mrp_sockaddr_t *addr, socklen_t addrlen,
+                            void *user_data);
+        /** Raw data callback for unconnected transports. */
+        void (*recvrawfrom)(mrp_transport_t *t, void *data, size_t size,
+                            mrp_sockaddr_t *addr, socklen_t addrlen,
+                            void *user_data);
+        /** Custom data callback for unconnected transports. */
+        void (*recvdatafrom)(mrp_transport_t *t, void *data, uint16_t tag,
+                             mrp_sockaddr_t *addr, socklen_t addrlen,
+                             void *user_data);
     };
     /** Connection closed by peer. */
     void (*closed)(mrp_transport_t *t, int error, void *user_data);
@@ -198,7 +198,7 @@ typedef struct {
     size_t               size;           /* full transport struct size */
     mrp_transport_req_t  req;            /* transport requests */
     socklen_t          (*resolve)(const char *str, mrp_sockaddr_t *addr,
-				  socklen_t addrlen, const char **typep);
+                                  socklen_t addrlen, const char **typep);
     mrp_list_hook_t      hook;           /* to list of registered transports */
 } mrp_transport_descr_t;
 
@@ -207,22 +207,22 @@ typedef struct {
  * transport
  */
 
-#define MRP_TRANSPORT_PUBLIC_FIELDS					\
-    mrp_mainloop_t          *ml;					\
-    mrp_transport_descr_t   *descr;					\
-    mrp_transport_evt_t      evt;					\
-    int                    (*check_destroy)(mrp_transport_t *t);	\
-    int                    (*recv_data)(mrp_transport_t *t, void *data,	\
-					size_t size,			\
-					mrp_sockaddr_t *addr,		\
-					socklen_t addrlen);		\
-    void                    *user_data;					\
-    int                      flags;					\
-    int                      busy;					\
-    int                      connected : 1;				\
-    int                      listened : 1;				\
-    int                      destroyed : 1				\
-    
+#define MRP_TRANSPORT_PUBLIC_FIELDS                                       \
+    mrp_mainloop_t          *ml;                                          \
+    mrp_transport_descr_t   *descr;                                       \
+    mrp_transport_evt_t      evt;                                         \
+    int                    (*check_destroy)(mrp_transport_t *t);          \
+    int                    (*recv_data)(mrp_transport_t *t, void *data,   \
+                                        size_t size,                      \
+                                        mrp_sockaddr_t *addr,             \
+                                        socklen_t addrlen);               \
+    void                    *user_data;                                   \
+    int                      flags;                                       \
+    int                      busy;                                        \
+    int                      connected : 1;                               \
+    int                      listened : 1;                                \
+    int                      destroyed : 1                                \
+
 
 struct mrp_transport_s {
     MRP_TRANSPORT_PUBLIC_FIELDS;
@@ -246,7 +246,7 @@ struct mrp_transport_s {
  *
  * These are the easiest to accomplish using the provided MRP_TRANSPORT_BUSY
  * macro and the check_destroy callback member provided by mrp_transport_t.
- * 
+ *
  *     1) Use the provided MRP_TRANSPORT_BUSY macro to enclose al blocks of
  *        code that invoke event callbacks. Do not do a return directly
  *        from within the enclosed call blocks, rather just set a flag
@@ -265,87 +265,87 @@ struct mrp_transport_s {
 
 #ifndef __MRP_TRANSPORT_DISABLE_CODE_CHECK__
 #  define W mrp_log_error
-#  define __TRANSPORT_CHK_BLOCK(...) do {				   \
-	static int __checked = FALSE, __warned = FALSE;			   \
-									   \
-	if (MRP_UNLIKELY(!__checked)) {					   \
-	    __checked = TRUE;						   \
-	    if (MRP_UNLIKELY(!__warned &&				   \
-			     strstr(#__VA_ARGS__, "return") != NULL)) {	   \
-		W("*********************** WARNING ********************"); \
-		W("* You seem to directly do a return from a block of *"); \
-		W("* code protected by MRP_TRANSPORT_BUSY. Are you    *"); \
-		W("* absolutely sure you know what you are doing and  *"); \
-		W("* that you are also doing it correctly ?           *"); \
-		W("****************************************************"); \
-		W("The suspicious code block is located at: ");		   \
-		W("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);	   \
-		W("and it looks like this:");				   \
-		W("---------------------------------------------");	   \
-		W("%s", #__VA_ARGS__);					   \
-		W("---------------------------------------------");	   \
-		W("If you understand what MRP_TRANSPORT_BUSY does and");   \
-		W("how, and you are sure about the corretness of your");   \
-		W("code you can disable this error message by");	   \
-		W("#defining __MRP_TRANSPORT_DISABLE_CODE_CHECK__");	   \
-		W("when compiling %s.", __FILE__);			   \
-		__warned = TRUE;					   \
-	    }								   \
-	}								   \
+#  define __TRANSPORT_CHK_BLOCK(...) do {                                  \
+        static int __checked = FALSE, __warned = FALSE;                    \
+                                                                           \
+        if (MRP_UNLIKELY(!__checked)) {                                    \
+            __checked = TRUE;                                              \
+            if (MRP_UNLIKELY(!__warned &&                                  \
+                             strstr(#__VA_ARGS__, "return") != NULL)) {    \
+                W("*********************** WARNING ********************"); \
+                W("* You seem to directly do a return from a block of *"); \
+                W("* code protected by MRP_TRANSPORT_BUSY. Are you    *"); \
+                W("* absolutely sure you know what you are doing and  *"); \
+                W("* that you are also doing it correctly ?           *"); \
+                W("****************************************************"); \
+                W("The suspicious code block is located at: ");            \
+                W("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);         \
+                W("and it looks like this:");                              \
+                W("---------------------------------------------");        \
+                W("%s", #__VA_ARGS__);                                     \
+                W("---------------------------------------------");        \
+                W("If you understand what MRP_TRANSPORT_BUSY does and");   \
+                W("how, and you are sure about the corretness of your");   \
+                W("code you can disable this error message by");           \
+                W("#defining __MRP_TRANSPORT_DISABLE_CODE_CHECK__");       \
+                W("when compiling %s.", __FILE__);                         \
+                __warned = TRUE;                                           \
+            }                                                              \
+        }                                                                  \
     } while (0)
 #else
 #  define __TRANSPORT_CHK_BLOCK(...) do { } while (0)
 #endif
 
-#define MRP_TRANSPORT_BUSY(t, ...) do {		\
-	__TRANSPORT_CHK_BLOCK(__VA_ARGS__);	\
-	(t)->busy++;				\
-	__VA_ARGS__				\
-        (t)->busy--;			        \
+#define MRP_TRANSPORT_BUSY(t, ...) do {                \
+        __TRANSPORT_CHK_BLOCK(__VA_ARGS__);        \
+        (t)->busy++;                                \
+        __VA_ARGS__                                \
+        (t)->busy--;                                \
     } while (0)
 
 
 
 /** Automatically register a transport on startup. */
-#define MRP_REGISTER_TRANSPORT(_prfx, _typename, _structtype, _resolve,	\
-			       _open, _createfrom, _close,		\
-			       _bind, _listen, _accept,			\
-			       _connect, _disconnect,			\
-			       _sendmsg, _sendmsgto,			\
-			       _sendraw, _sendrawto,			\
-			       _senddata, _senddatato)			\
-    static void _prfx##_register_transport(void)			\
-	 __attribute__((constructor));					\
-    									\
-    static void _prfx##_register_transport(void) {			\
-	static mrp_transport_descr_t descriptor = {			\
-	    .type    = _typename,					\
-	    .size    = sizeof(_structtype),				\
-	    .resolve = _resolve,					\
-	    .req     = {						\
-		.open       = _open,					\
-	        .createfrom = _createfrom,				\
-		.bind       = _bind,					\
-		.listen     = _listen,					\
-		.accept     = _accept,					\
-		.close      = _close,					\
-		.connect    = _connect,					\
-		.disconnect = _disconnect,				\
-		.sendmsg    = _sendmsg,					\
-		.sendmsgto  = _sendmsgto,				\
-		.sendraw    = _sendraw,					\
-		.sendrawto  = _sendrawto,				\
-		.senddata   = _senddata,				\
-		.senddatato = _senddatato,				\
-	    },								\
-	};								\
-									\
-	if (!mrp_transport_register(&descriptor))			\
-	    mrp_log_error("Failed to register transport '%s'.",		\
-			  _typename);					\
-	else								\
-	    mrp_log_info("Registered transport '%s'.", _typename);	\
-    }									\
+#define MRP_REGISTER_TRANSPORT(_prfx, _typename, _structtype, _resolve,   \
+                               _open, _createfrom, _close,                \
+                               _bind, _listen, _accept,                   \
+                               _connect, _disconnect,                     \
+                               _sendmsg, _sendmsgto,                      \
+                               _sendraw, _sendrawto,                      \
+                               _senddata, _senddatato)                    \
+    static void _prfx##_register_transport(void)                          \
+         __attribute__((constructor));                                    \
+                                                                          \
+    static void _prfx##_register_transport(void) {                        \
+        static mrp_transport_descr_t descriptor = {                       \
+            .type    = _typename,                                         \
+            .size    = sizeof(_structtype),                               \
+            .resolve = _resolve,                                          \
+            .req     = {                                                  \
+                .open       = _open,                                      \
+                .createfrom = _createfrom,                                \
+                .bind       = _bind,                                      \
+                .listen     = _listen,                                    \
+                .accept     = _accept,                                    \
+                .close      = _close,                                     \
+                .connect    = _connect,                                   \
+                .disconnect = _disconnect,                                \
+                .sendmsg    = _sendmsg,                                   \
+                .sendmsgto  = _sendmsgto,                                 \
+                .sendraw    = _sendraw,                                   \
+                .sendrawto  = _sendrawto,                                 \
+                .senddata   = _senddata,                                  \
+                .senddatato = _senddatato,                                \
+            },                                                            \
+        };                                                                \
+                                                                          \
+        if (!mrp_transport_register(&descriptor))                         \
+            mrp_log_error("Failed to register transport '%s'.",           \
+                          _typename);                                     \
+        else                                                              \
+            mrp_log_info("Registered transport '%s'.", _typename);        \
+    }                                                                     \
     struct mrp_allow_trailing_semicolon
 
 
@@ -358,37 +358,37 @@ void mrp_transport_unregister(mrp_transport_descr_t *d);
 
 /** Create a new transport. */
 mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
-				      mrp_transport_evt_t *evt,
-				      void *user_data, int flags);
+                                      mrp_transport_evt_t *evt,
+                                      void *user_data, int flags);
 
 /** Create a new transport from a backend object. */
 mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
-					   void *conn, mrp_transport_evt_t *evt,
-					   void *user_data, int flags,
-					   int connected);
+                                           void *conn, mrp_transport_evt_t *evt,
+                                           void *user_data, int flags,
+                                           int connected);
 
 /** Resolve an address string to a transport-specific address. */
 socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
-				mrp_sockaddr_t *addr, socklen_t addrlen,
-				const char **type);
+                                mrp_sockaddr_t *addr, socklen_t addrlen,
+                                const char **type);
 
 /** Bind a given transport to a transport-specific address. */
 int mrp_transport_bind(mrp_transport_t *t, mrp_sockaddr_t *addr,
-		       socklen_t addrlen);
+                       socklen_t addrlen);
 
 /** Listen for incoming connection on the given transport. */
 int  mrp_transport_listen(mrp_transport_t *t, int backlog);
 
 /** Accept and create a new transport connection. */
 mrp_transport_t *mrp_transport_accept(mrp_transport_t *t,
-				      void *user_data, int flags);
+                                      void *user_data, int flags);
 
 /** Destroy a transport. */
 void mrp_transport_destroy(mrp_transport_t *t);
 
 /** Connect a transport to the given address. */
 int mrp_transport_connect(mrp_transport_t *t, mrp_sockaddr_t  *addr,
-			  socklen_t addrlen);
+                          socklen_t addrlen);
 
 /** Disconnect a transport. */
 int mrp_transport_disconnect(mrp_transport_t *t);
@@ -398,20 +398,20 @@ int mrp_transport_send(mrp_transport_t *t, mrp_msg_t *msg);
 
 /** Send a message through the given transport to the remote address. */
 int mrp_transport_sendto(mrp_transport_t *t, mrp_msg_t *msg,
-			 mrp_sockaddr_t *addr, socklen_t addrlen);
+                         mrp_sockaddr_t *addr, socklen_t addrlen);
 
 /** Send raw data through the given (connected) transport. */
 int mrp_transport_sendraw(mrp_transport_t *t, void *data, size_t size);
 
 /** Send raw data through the given transport to the remote address. */
 int mrp_transport_sendrawto(mrp_transport_t *t, void *data, size_t size,
-			    mrp_sockaddr_t *addr, socklen_t addrlen);
+                            mrp_sockaddr_t *addr, socklen_t addrlen);
 
 /** Send custom data through the given (connected) transport. */
 int mrp_transport_senddata(mrp_transport_t *t, void *data, uint16_t tag);
 
 /** Send custom data through the given transport to the remote address. */
 int mrp_transport_senddatato(mrp_transport_t *t, void *data, uint16_t tag,
-			     mrp_sockaddr_t *addr, socklen_t addrlen);
+                             mrp_sockaddr_t *addr, socklen_t addrlen);
 
 #endif /* __MURPHY_TRANSPORT_H__ */

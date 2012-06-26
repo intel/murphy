@@ -82,7 +82,7 @@ static int init(void)
 
         done = true;
     }
-     
+
     return sts;
 }
 

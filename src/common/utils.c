@@ -38,9 +38,9 @@ int mrp_daemonize(const char *dir, const char *new_out, const char *new_err)
      */
 
     if (pipe(chnl) == -1) {
-	mrp_log_error("Failed to create pipe to get child status (%d: %s).",
-		      errno, strerror(errno));
-	return FALSE;
+        mrp_log_error("Failed to create pipe to get child status (%d: %s).",
+                      errno, strerror(errno));
+        return FALSE;
     }
 
 
@@ -50,108 +50,108 @@ int mrp_daemonize(const char *dir, const char *new_out, const char *new_err)
 
     switch ((pid = fork())) {
     case -1: /* failed */
-	mrp_log_error("Could not daemonize, fork failed (%d: %s).",
-		      errno, strerror(errno));
-	return FALSE;
-	
+        mrp_log_error("Could not daemonize, fork failed (%d: %s).",
+                      errno, strerror(errno));
+        return FALSE;
+
     case 0:  /* child */
-	close(chnl[0]);
-	break;
-	
+        close(chnl[0]);
+        break;
+
     default: /* parent */
-	close(chnl[1]);
+        close(chnl[1]);
 
-	/*
-	 * wait for and check the status report from the child
-	 */
-	
-	len = read(chnl[0], msg, sizeof(msg) - 1);
-	
-	if (len > 0) {
-	    msg[len] = '\0';
-	    
-	    if (!strcmp(msg, MSG_OK)) {
-		mrp_log_info("Successfully daemonized.");
-		exit(0);
-	    }
-	    else
-		mrp_log_error("Daemonizing failed after fork: %s.", msg);
-	}
-	else
-	    mrp_log_error("Daemonizing failed in forked child.");
+        /*
+         * wait for and check the status report from the child
+         */
 
-	return FALSE;
+        len = read(chnl[0], msg, sizeof(msg) - 1);
+
+        if (len > 0) {
+            msg[len] = '\0';
+
+            if (!strcmp(msg, MSG_OK)) {
+                mrp_log_info("Successfully daemonized.");
+                exit(0);
+            }
+            else
+                mrp_log_error("Daemonizing failed after fork: %s.", msg);
+        }
+        else
+            mrp_log_error("Daemonizing failed in forked child.");
+
+        return FALSE;
     }
-    
-    
+
+
     if (chdir(dir) != 0) {
-	mrp_log_error("Could not daemonize, failed to chdir to %s (%d: %s).",
-		      dir, errno, strerror(errno));
-	return FALSE;
-    }
-    
-    if (setsid() < 0) {
-	notify_parent(chnl[1], "Failed to create new session (%d: %s).",
-		      errno, strerror(errno));
-	exit(1);
+        mrp_log_error("Could not daemonize, failed to chdir to %s (%d: %s).",
+                      dir, errno, strerror(errno));
+        return FALSE;
     }
 
-    
+    if (setsid() < 0) {
+        notify_parent(chnl[1], "Failed to create new session (%d: %s).",
+                      errno, strerror(errno));
+        exit(1);
+    }
+
+
     /*
      * fork again and redirect our stdin, stdout, and stderr
      */
-    
+
     switch ((pid = fork())) {
     case -1: /* failed */
-	notify_parent(chnl[1], "Could not daemonize, fork failed (%d: %s).",
-		      errno, strerror(errno));
-	exit(1);
-	
+        notify_parent(chnl[1], "Could not daemonize, fork failed (%d: %s).",
+                      errno, strerror(errno));
+        exit(1);
+
     case 0: /* child */
-	break;
+        break;
 
     default: /* parent */
-	close(chnl[1]);
-	exit(0);
+        close(chnl[1]);
+        exit(0);
     }
-    
-    
+
+
     if ((in = open("/dev/null", O_RDONLY)) < 0) {
-	notify_parent(chnl[1], "Failed to open /dev/null (%d: %s).", errno,
-		      strerror(errno));
-	exit(1);
+        notify_parent(chnl[1], "Failed to open /dev/null (%d: %s).", errno,
+                      strerror(errno));
+        exit(1);
     }
 
     if ((out = open(new_out, O_WRONLY)) < 0) {
-	notify_parent(chnl[1], "Failed to open %s (%d: %s).", new_out, errno,
-		      strerror(errno));
-	exit(1);
+        notify_parent(chnl[1], "Failed to open %s (%d: %s).", new_out, errno,
+                      strerror(errno));
+        exit(1);
     }
-    
+
     if ((err = open(new_err, O_WRONLY)) < 0) {
-	notify_parent(chnl[1], "Failed to open %s (%d: %s).", new_err, errno,
-		      strerror(errno));
-	exit(1);
+        notify_parent(chnl[1], "Failed to open %s (%d: %s).", new_err, errno,
+                      strerror(errno));
+        exit(1);
     }
 
     if (dup2(in, fileno(stdin)) < 0) {
-	notify_parent(chnl[1], "Failed to redirect stdin (%d: %s).", errno,
-		     strerror(errno));
-	exit(1);
+        notify_parent(chnl[1], "Failed to redirect stdin (%d: %s).", errno,
+                     strerror(errno));
+        exit(1);
     }
-	
+
     if (dup2(out, fileno(stdout)) < 0) {
-	notify_parent(chnl[1], "Failed to redirect stdout (%d: %s).", errno,
-		     strerror(errno));
-	exit(1);
+        notify_parent(chnl[1], "Failed to redirect stdout (%d: %s).", errno,
+                     strerror(errno));
+        exit(1);
     }
 
     if (dup2(err, fileno(stderr)) < 0) {
-	notify_parent(chnl[1], "Failed to redirect stderr (%d: %s).", errno,
-		     strerror(errno));
-	exit(1);
+        notify_parent(chnl[1], "Failed to redirect stderr (%d: %s).", errno,
+                     strerror(errno));
+        exit(1);
     }
-    
+
     close(in);
     close(out);
     close(err);
@@ -177,6 +177,6 @@ uint32_t mrp_string_hash(const void *key)
         h <<= 1;
         h  ^= *p;
     }
-    
+
     return h;
 }

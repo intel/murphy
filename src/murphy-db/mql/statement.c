@@ -406,7 +406,7 @@ mql_statement_t *mql_make_select_statement(mqi_handle_t       table,
     sel->colnames = (char **)(sel->columns + (ncolumn+1));
     sel->coltypes = (mqi_data_type_t *)(sel->colnames + ncolumn);
     sel->colsizes = (int *)(sel->coltypes + ncolumn);
-    sel->cond     = (mqi_cond_entry_t *)(sel->colsizes + ncolumn); 
+    sel->cond     = (mqi_cond_entry_t *)(sel->colsizes + ncolumn);
     sel->nbind    = nbind;
 
     strpool = (char *)(sel->cond + ncond);
@@ -656,7 +656,7 @@ static void copy_column_values(int                 ncol,
             case mqi_unsignd:
                 val->unsignd  = *(uint32_t *)vptr;
                 break;
-            case mqi_floating: 
+            case mqi_floating:
                 val->floating = *(double *)vptr;
                 break;
             default:
@@ -899,7 +899,7 @@ static mql_result_t *exec_select(mql_result_type_t type, select_statement_t *s)
             nrow = mqi_select(s->table, s->cond, s->columns,
                               rows, s->rowsize, maxrow);
         }
- 
+
        if (nrow < 0) {
            rslt = mql_result_error_create(errno, "select error: %s",
                                           strerror(errno));

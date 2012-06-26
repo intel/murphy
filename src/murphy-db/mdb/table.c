@@ -101,10 +101,10 @@ mdb_table_t *mdb_table_create(char *name,
 
 
     length = sizeof(mdb_table_t) + sizeof(mdb_dlist_t) * ncolumn;
-    
+
     if (!(tbl = calloc(1, length)) ||
         !(columns = calloc(ncolumn, sizeof(mdb_column_t))))
-    { 
+    {
         free(tbl);
         errno = ENOMEM;
         return NULL;
@@ -192,7 +192,7 @@ int mdb_table_drop(mdb_table_t *tbl)
     else {
         MDB_HASH_TABLE_DESTROY(table_hash);
         table_hash  = NULL;
-        table_count = 0;        
+        table_count = 0;
     }
 
     return 0;
@@ -289,9 +289,9 @@ int mdb_table_insert(mdb_table_t        *tbl,
                 ninsert = -1;
             else
                 ninsert += (ninsert >= 0) ? 1 : 0;
-        }        
+        }
 
-    } 
+    }
 
     if (error) {
         errno = error;
@@ -299,7 +299,7 @@ int mdb_table_insert(mdb_table_t        *tbl,
     }
 
     return ninsert;
-} 
+}
 
 int mdb_table_select(mdb_table_t       *tbl,
                      mqi_cond_entry_t  *cond,
@@ -402,7 +402,7 @@ int mdb_table_delete(mdb_table_t *tbl, mqi_cond_entry_t *cond)
         ndelete = delete_conditional(tbl, cond);
     else
         ndelete = delete_all(tbl);
-    
+
     return ndelete;
 }
 
@@ -623,7 +623,7 @@ static int select_all(mdb_table_t       *tbl,
     int                cindex;
     int                j;
 
-    for (it.cursor = NULL, nresult = 0; 
+    for (it.cursor = NULL, nresult = 0;
          (row = table_iterator(tbl, &it));
          nresult++)
     {
@@ -706,13 +706,13 @@ static int update_all(mdb_table_t       *tbl,
 }
 
 static int update_single_row(mdb_table_t       *tbl,
-                             mdb_row_t         *row, 
+                             mdb_row_t         *row,
                              mqi_column_desc_t *cds,
                              void              *data,
                              int                index_update)
 {
     mdb_row_t   *before  = NULL;
-    uint32_t     txdepth = mdb_transaction_get_depth(); 
+    uint32_t     txdepth = mdb_transaction_get_depth();
     mqi_bitfld_t cmask;
 
 
@@ -721,7 +721,7 @@ static int update_single_row(mdb_table_t       *tbl,
 
     if (mdb_row_update(tbl, row, cds, data, index_update, &cmask) < 0)
         return -1;
-    
+
     if (mdb_log_change(tbl, txdepth, mdb_log_update, cmask, before, row) < 0)
         return -1;
 
@@ -730,7 +730,7 @@ static int update_single_row(mdb_table_t       *tbl,
 
 static int delete_conditional(mdb_table_t *tbl, mqi_cond_entry_t *cond)
 {
-    table_iterator_t  it;    
+    table_iterator_t  it;
     mdb_row_t        *row;
     mqi_cond_entry_t *ce;
     int               ndelete;
@@ -745,7 +745,7 @@ static int delete_conditional(mdb_table_t *tbl, mqi_cond_entry_t *cond)
                 ndelete += (ndelete >= 0) ? 1 : 0;
         }
     }
-    
+
     return ndelete;
 }
 

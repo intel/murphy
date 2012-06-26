@@ -96,9 +96,9 @@ int mdb_row_update(mdb_table_t       *tbl,
 
     for (cmask = i = 0;  (cindex = (source_dsc = cds + i)->cindex) >= 0;  i++){
         cmask |= (((mqi_bitfld_t)1) << cindex);
-        mdb_column_write(columns + cindex, row->data, source_dsc, data); 
+        mdb_column_write(columns + cindex, row->data, source_dsc, data);
     }
-    
+
     if (index_update)
         mdb_index_insert(tbl, row, cmask, 0);
 
@@ -114,12 +114,12 @@ int mdb_row_copy_over(mdb_table_t *tbl, mdb_row_t *dst, mdb_row_t *src)
 
     if (mdb_index_delete(tbl, dst) < 0)
         return -1;
-    
+
     memcpy(dst->data, src->data, tbl->dlgh);
-    
+
     if (mdb_index_insert(tbl, dst, 0, 0) < 0)
         return -1;
-    
+
     return 0;
 }
 

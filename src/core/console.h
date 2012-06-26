@@ -47,20 +47,20 @@ typedef struct {
     void (*disconnected)(mrp_console_t *c, int error);
     /** Generate possible completions for the given input. */
     ssize_t (*complete)(mrp_console_t *c, void *input, size_t insize,
-			char **completions, size_t csize);
+                        char **completions, size_t csize);
 } mrp_console_evt_t;
 
 
-#define MRP_CONSOLE_PUBLIC_FIELDS					\
-    mrp_context_t         *ctx;						\
-    mrp_console_req_t      req;						\
-    mrp_console_evt_t      evt;						\
-    int                  (*check_destroy)(mrp_console_t *c);		\
-    FILE                  *stdout;					\
-    FILE                  *stderr;					\
-    void                  *backend_data;				\
-    int                    busy;					\
-    int                    destroyed : 1;				\
+#define MRP_CONSOLE_PUBLIC_FIELDS                                         \
+    mrp_context_t         *ctx;                                           \
+    mrp_console_req_t      req;                                           \
+    mrp_console_evt_t      evt;                                           \
+    int                  (*check_destroy)(mrp_console_t *c);              \
+    FILE                  *stdout;                                        \
+    FILE                  *stderr;                                        \
+    void                  *backend_data;                                  \
+    int                    busy;                                          \
+    int                    destroyed : 1;                                 \
     int                    preserve : 1 /* the Kludge of Death, Sir Robin... */
 
 struct mrp_console_s {
@@ -79,7 +79,7 @@ struct mrp_console_s {
  *
  * These are the easiest to accomplish using the provided MRP_CONSOLE_BUSY
  * macro and the check_destroy callback member provided by mrp_console_t.
- * 
+ *
  *     1) Use the provided MRP_CONSOLE_BUSY macro to enclose al blocks of
  *        code that invoke event callbacks. Do not do a return directly
  *        from within the enclosed call blocks, rather just set a flag
@@ -97,49 +97,49 @@ struct mrp_console_s {
 
 #ifndef __MRP_CONSOLE_DISABLE_CODE_CHECK__
 #  define W mrp_log_error
-#  define __CONSOLE_CHK_BLOCK(...) do {					  \
-	static int __checked = FALSE, __warned = FALSE;			  \
-    									  \
-	if (MRP_UNLIKELY(!__checked)) {					  \
-	    __checked = TRUE;						  \
-	    if (MRP_UNLIKELY(!__warned &&				  \
-			     strstr(#__VA_ARGS__, "return") != NULL)) {	  \
-		W("********************* WARNING *********************"); \
-		W("* You seem to directly do a return from a block   *"); \
-		W("* of code protected by MRP_CONSOLE_BUSY. Are      *"); \
-		W("* you absolutely sure you know what you are doing *"); \
-		W("* and that you are also doing it correctly ?      *"); \
-		W("***************************************************"); \
-		W("The suspicious code block is located at: ");		  \
-		W("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);	  \
-		W("and it looks like this:");				  \
-		W("---------------------------------------------");	  \
-		W("%s", #__VA_ARGS__);					  \
-		W("---------------------------------------------");	  \
-		W("If you understand what MRP_CONSOLE_BUSY does");	  \
-		W("and how, and you are sure about the correctness of");  \
-		W("your code you can disable this error message by");	  \
-		W("#defining __MRP_CONSOLE_DISABLE_CODE_CHECK__");	  \
-		W("when compiling %s.", __FILE__);			  \
-		__warned = TRUE;					  \
-	    }								  \
-	}								  \
+#  define __CONSOLE_CHK_BLOCK(...) do {                                   \
+        static int __checked = FALSE, __warned = FALSE;                   \
+                                                                          \
+        if (MRP_UNLIKELY(!__checked)) {                                   \
+            __checked = TRUE;                                             \
+            if (MRP_UNLIKELY(!__warned &&                                 \
+                             strstr(#__VA_ARGS__, "return") != NULL)) {          \
+                W("********************* WARNING *********************"); \
+                W("* You seem to directly do a return from a block   *"); \
+                W("* of code protected by MRP_CONSOLE_BUSY. Are      *"); \
+                W("* you absolutely sure you know what you are doing *"); \
+                W("* and that you are also doing it correctly ?      *"); \
+                W("***************************************************"); \
+                W("The suspicious code block is located at: ");           \
+                W("  %s@%s:%d", __FUNCTION__, __FILE__, __LINE__);        \
+                W("and it looks like this:");                             \
+                W("---------------------------------------------");       \
+                W("%s", #__VA_ARGS__);                                    \
+                W("---------------------------------------------");       \
+                W("If you understand what MRP_CONSOLE_BUSY does");        \
+                W("and how, and you are sure about the correctness of");  \
+                W("your code you can disable this error message by");     \
+                W("#defining __MRP_CONSOLE_DISABLE_CODE_CHECK__");        \
+                W("when compiling %s.", __FILE__);                        \
+                __warned = TRUE;                                          \
+            }                                                             \
+        }                                                                 \
     } while (0)
 #else
 #  define __CONSOLE_CHK_BLOCK(...) do { } while (0)
 #endif
 
-#define MRP_CONSOLE_BUSY(c, ...) do {		\
-       __CONSOLE_CHK_BLOCK(__VA_ARGS__);	\
-	(c)->busy++;				\
-	__VA_ARGS__				\
-	(c)->busy--;				\
+#define MRP_CONSOLE_BUSY(c, ...) do {           \
+       __CONSOLE_CHK_BLOCK(__VA_ARGS__);        \
+        (c)->busy++;                            \
+        __VA_ARGS__                             \
+        (c)->busy--;                            \
     } while (0)
 
 
 /** Create a new console instance. */
 mrp_console_t *mrp_create_console(mrp_context_t *ctx, mrp_console_req_t *req,
-				  void *backend_data);
+                                  void *backend_data);
 
 /** Close and mark a console for destruction. */
 void mrp_destroy_console(mrp_console_t *mc);

@@ -18,7 +18,7 @@
  * mqi_handle_t value for nonexisting handle. Zero is a valid handle
  * thus casting a zero to mqi_handle_t will produce a valid handle
  * (remeber this when using static mqi_handle_t).
- */ 
+ */
 #define MQI_HANDLE_INVALID     (~((mqi_handle_t)0))
 
 #define MQI_DIMENSION(array)  \

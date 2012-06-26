@@ -175,9 +175,9 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
         }
         else {
             change = MDB_LIST_RELOCATE(change_t, link, cursor->clink);
-            
+
             cursor->clink = forward ? change->link.next : change->link.prev;
-            
+
             entry->change  = change->type;
             entry->colmask = change->colmask;
             entry->before  = change->before;
@@ -187,7 +187,7 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
                 MDB_DLIST_UNLINK(change_t, link, change);
                 free(change);
             }
-            
+
             return entry;
         }
 
@@ -201,11 +201,11 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
         else {
             tblog = MDB_LIST_RELOCATE(tbl_log_t, hlink, cursor->hlink);
             chead = &tblog->changes;
-            
+
             cursor->hlink = tblog->hlink.next;
             cursor->chead = chead;
             cursor->clink = forward ? chead->next : chead->prev;
-            
+
             entry->table  = tblog->table;
         }
     }
@@ -275,9 +275,9 @@ mdb_log_entry_t *mdb_log_table_iterate(mdb_table_t  *tbl,
         }
         else {
             change = MDB_LIST_RELOCATE(change_t, link, cursor->clink);
-            
+
             cursor->clink = change->link.next;
-            
+
             entry->change  = change->type;
             entry->colmask = change->colmask;
             entry->before  = change->before;
@@ -287,7 +287,7 @@ mdb_log_entry_t *mdb_log_table_iterate(mdb_table_t  *tbl,
                 MDB_DLIST_UNLINK(change_t, link, change);
                 free(change);
             }
-            
+
             return entry;
         }
 
@@ -301,11 +301,11 @@ mdb_log_entry_t *mdb_log_table_iterate(mdb_table_t  *tbl,
         else {
             tblog = MDB_LIST_RELOCATE(tbl_log_t, vlink, cursor->vlink);
             chead = &tblog->changes;
-            
+
             cursor->vlink = tblog->vlink.prev;
             cursor->chead = chead;
             cursor->clink = chead->next;
-            
+
             if (tbl != tblog->table)
                 return NULL;
         }
@@ -331,7 +331,7 @@ static inline log_t *new_log(mdb_dlist_t *vhead,
 
         log->depth = depth;
     }
-    
+
     return log;
 }
 
@@ -339,7 +339,7 @@ static inline void delete_log(log_t *log)
 {
     MDB_DLIST_UNLINK(log_t, vlink, log);
     MDB_DLIST_UNLINK(log_t, hlink, log);
-    
+
     free(log);
 }
 
@@ -365,7 +365,7 @@ static tx_log_t *get_tx_log(uint32_t depth)
         errno = ENOKEY;
         return NULL;
     }
-        
+
     return log;
 }
 
@@ -392,7 +392,7 @@ static tbl_log_t *get_tbl_log(mdb_dlist_t *vhead,
         errno = ENOKEY;
         return NULL;
     }
-        
+
     return log;
 }
 

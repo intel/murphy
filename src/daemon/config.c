@@ -23,21 +23,21 @@
 static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 {
     va_list ap;
-    
+
     if (fmt && *fmt) {
         va_start(ap, fmt);
         vprintf(fmt, ap);
         va_end(ap);
     }
-    
+
     printf("usage: %s [options]\n\n"
            "The possible options are:\n"
            "  -C, --config-file=PATH         main configuration file to use\n"
-	   "      The default configuration file is '%s'.\n"
+           "      The default configuration file is '%s'.\n"
            "  -D, --config-dir=PATH          configuration directory to use\n"
-	   "      If omitted, defaults to '%s'.\n"
-	   "  -P, --plugin-dir=PATH          load plugins from DIR\n"
-	   "      The default plugin directory is '%s'.\n"
+           "      If omitted, defaults to '%s'.\n"
+           "  -P, --plugin-dir=PATH          load plugins from DIR\n"
+           "      The default plugin directory is '%s'.\n"
            "  -t, --log-target=TARGET        log target to use\n"
            "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
            "  -l, --log-level=LEVELS         logging level to use\n"
@@ -45,20 +45,20 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -v, --verbose                  increase logging verbosity\n"
            "  -f, --foreground               don't daemonize\n"
 #if 0
-	   "  -a, --plugin=name:key=value    set plugin config variable\n"
-	   "      E.g -a foo:bar=xyzzy sets the value of configuration key\n"
-	   "      'bar' to the value 'xyzzy' for plugin 'foo'.\n"
+           "  -a, --plugin=name:key=value    set plugin config variable\n"
+           "      E.g -a foo:bar=xyzzy sets the value of configuration key\n"
+           "      'bar' to the value 'xyzzy' for plugin 'foo'.\n"
 #endif
            "  -h, --help                     show help on usage\n"
            "  -q, --query-plugins            show detailed information about\n"
-	   "                                 all the available plugins\n",
+           "                                 all the available plugins\n",
            argv0, MRP_DEFAULT_CONFIG_FILE, MRP_DEFAULT_CONFIG_DIR,
-	   MRP_DEFAULT_PLUGIN_DIR);
+           MRP_DEFAULT_PLUGIN_DIR);
 
     if (exit_code < 0)
-	return;
+        return;
     else
-	exit(exit_code);
+        exit(exit_code);
 }
 
 
@@ -72,70 +72,70 @@ static void print_plugin_help(mrp_context_t *ctx, int detailed)
     mrp_list_hook_t    *p, *n;
     char               *type, defval[64];
     int                 i;
-    
+
     mrp_load_all_plugins(ctx);
-    
+
     printf("\nAvailable plugins:\n\n");
 
     mrp_list_foreach(&ctx->plugins, p, n) {
-	plugin = mrp_list_entry(p, typeof(*plugin), hook);
-	descr  = plugin->descriptor;
-	
-	printf("- %splugin %s:", plugin->handle ? "" : "Builtin ", descr->name);
-	if (detailed) {
-	    printf(" (%s, version %d.%d.%d)\n", plugin->path,
-		   MRP_VERSION_MAJOR(descr->version),
-		   MRP_VERSION_MINOR(descr->version),
-		   MRP_VERSION_MICRO(descr->version));
-	    printf("  Authors: %s\n", descr->authors);
-	}
-	else
-	    printf("\n");
-	
-	if (detailed)
-	    printf("  Description:\n    %s\n", descr->description);
-	
-	if (descr->args != NULL) {
-	    printf("  Arguments:\n");
+        plugin = mrp_list_entry(p, typeof(*plugin), hook);
+        descr  = plugin->descriptor;
 
-	    for (i = 0, arg = descr->args; i < descr->narg; i++, arg++) {
-		printf("    %s: ", arg->key);
-		switch (arg->type) {
-		case MRP_PLUGIN_ARG_TYPE_STRING:
-		    type = "string";
-		    PRNT("%s", arg->str ? arg->str : "<none>");
-		    break;
-		case MRP_PLUGIN_ARG_TYPE_BOOL:
-		    type = "boolean";
-		    PRNT("%s", arg->bln ? "TRUE" : "FALSE");
-		    break;
-		case MRP_PLUGIN_ARG_TYPE_UINT32:
-		    type = "unsigned 32-bit integer";
-		    PRNT("%u", arg->u32);
-		    break;
-		case MRP_PLUGIN_ARG_TYPE_INT32:
-		    type = "signed 32-bit integer";
-		    PRNT("%d", arg->i32);
-		    break;
-		case MRP_PLUGIN_ARG_TYPE_DOUBLE:
-		    type = "double-precision floating point";
-		    PRNT("%f", arg->dbl);
-		    break;
-		default:
-		    type = "<unknown argument type>";
-		    PRNT("%s", "<unknown>");
-		}
+        printf("- %splugin %s:", plugin->handle ? "" : "Builtin ", descr->name);
+        if (detailed) {
+            printf(" (%s, version %d.%d.%d)\n", plugin->path,
+                   MRP_VERSION_MAJOR(descr->version),
+                   MRP_VERSION_MINOR(descr->version),
+                   MRP_VERSION_MICRO(descr->version));
+            printf("  Authors: %s\n", descr->authors);
+        }
+        else
+            printf("\n");
 
-		printf("%s, default value=%s\n", type, defval);
-	    }
-	}
-	
-	if (descr->help != NULL && descr->help[0])
-	    printf("  Help:\n    %s\n", descr->help);
-	
-	printf("\n");
+        if (detailed)
+            printf("  Description:\n    %s\n", descr->description);
+
+        if (descr->args != NULL) {
+            printf("  Arguments:\n");
+
+            for (i = 0, arg = descr->args; i < descr->narg; i++, arg++) {
+                printf("    %s: ", arg->key);
+                switch (arg->type) {
+                case MRP_PLUGIN_ARG_TYPE_STRING:
+                    type = "string";
+                    PRNT("%s", arg->str ? arg->str : "<none>");
+                    break;
+                case MRP_PLUGIN_ARG_TYPE_BOOL:
+                    type = "boolean";
+                    PRNT("%s", arg->bln ? "TRUE" : "FALSE");
+                    break;
+                case MRP_PLUGIN_ARG_TYPE_UINT32:
+                    type = "unsigned 32-bit integer";
+                    PRNT("%u", arg->u32);
+                    break;
+                case MRP_PLUGIN_ARG_TYPE_INT32:
+                    type = "signed 32-bit integer";
+                    PRNT("%d", arg->i32);
+                    break;
+                case MRP_PLUGIN_ARG_TYPE_DOUBLE:
+                    type = "double-precision floating point";
+                    PRNT("%f", arg->dbl);
+                    break;
+                default:
+                    type = "<unknown argument type>";
+                    PRNT("%s", "<unknown>");
+                }
+
+                printf("%s, default value=%s\n", type, defval);
+            }
+        }
+
+        if (descr->help != NULL && descr->help[0])
+            printf("  Help:\n    %s\n", descr->help);
+
+        printf("\n");
     }
-    
+
     printf("\n");
 
 #if 0
@@ -159,20 +159,20 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
 {
     #define OPTIONS "C:D:l:t:fP:a:vdhq"
     struct option options[] = {
-	{ "config-file"  , required_argument, NULL, 'C' },
-	{ "config-dir"   , required_argument, NULL, 'D' },
-	{ "plugin-dir"   , required_argument, NULL, 'P' },
-	{ "log-level"    , required_argument, NULL, 'l' },
-	{ "log-target"   , required_argument, NULL, 't' },
-	{ "verbose"      , optional_argument, NULL, 'v' },
-	{ "debug"        , no_argument      , NULL, 'd' },
-	{ "foreground"   , no_argument      , NULL, 'f' },
+        { "config-file"  , required_argument, NULL, 'C' },
+        { "config-dir"   , required_argument, NULL, 'D' },
+        { "plugin-dir"   , required_argument, NULL, 'P' },
+        { "log-level"    , required_argument, NULL, 'l' },
+        { "log-target"   , required_argument, NULL, 't' },
+        { "verbose"      , optional_argument, NULL, 'v' },
+        { "debug"        , no_argument      , NULL, 'd' },
+        { "foreground"   , no_argument      , NULL, 'f' },
 #if 0
-	{ "plugin"       , required_argument, NULL, 'a' },
+        { "plugin"       , required_argument, NULL, 'a' },
 #endif
-	{ "help"         , no_argument      , NULL, 'h' },
-	{ "query-plugins", no_argument      , NULL, 'q' },
-	{ NULL, 0, NULL, 0 }
+        { "help"         , no_argument      , NULL, 'h' },
+        { "query-plugins", no_argument      , NULL, 'q' },
+        { NULL, 0, NULL, 0 }
     };
 
     int  opt, debug;
@@ -182,89 +182,89 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
 
     debug = FALSE;
     config_set_defaults(ctx);
-    
+
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
         switch (opt) {
         case 'C':
-	    ctx->config_file = optarg;
-	    break;
+            ctx->config_file = optarg;
+            break;
 
-	case 'D':
-	    ctx->config_dir = optarg;
-	    break;
-	    
-	case 'P':
-	    ctx->plugin_dir = optarg;
-	    break;
+        case 'D':
+            ctx->config_dir = optarg;
+            break;
 
-	case 'v':
-	    ctx->log_mask <<= 1;
-	    ctx->log_mask  |= 1;
-	    break;
+        case 'P':
+            ctx->plugin_dir = optarg;
+            break;
 
-	case 'l':
-	    ctx->log_mask = mrp_log_parse_levels(optarg);
-	    if (ctx->log_mask < 0)
-		print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
-	    break;
+        case 'v':
+            ctx->log_mask <<= 1;
+            ctx->log_mask  |= 1;
+            break;
 
-	case 't':
-	    ctx->log_target = mrp_log_parse_target(optarg);
-	    if (!ctx->log_target)
-		print_usage(argv[0], EINVAL, "invalid log target '%s'", optarg);
-	    break;
+        case 'l':
+            ctx->log_mask = mrp_log_parse_levels(optarg);
+            if (ctx->log_mask < 0)
+                print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
+            break;
 
-	case 'd':
-	    debug = TRUE;
-	    break;
-	    
-	case 'f':
-	    ctx->foreground = TRUE;
-	    break;
+        case 't':
+            ctx->log_target = mrp_log_parse_target(optarg);
+            if (!ctx->log_target)
+                print_usage(argv[0], EINVAL, "invalid log target '%s'", optarg);
+            break;
+
+        case 'd':
+            debug = TRUE;
+            break;
+
+        case 'f':
+            ctx->foreground = TRUE;
+            break;
 
 #if 0
-	case 'a':
-	    strncpy(arg, optarg, sizeof(arg) - 1);
-	    arg[sizeof(arg) - 1] = '\0';
-	    
-	    plugin = arg;
+        case 'a':
+            strncpy(arg, optarg, sizeof(arg) - 1);
+            arg[sizeof(arg) - 1] = '\0';
 
-	    key = strchr(plugin, ':');
-	    if (key == NULL)
-		print_usage(argv[0], EINVAL, "invalid plugin arg '%s'", optarg);
-	    else
-		*key++ = '\0';
-	    
-	    value = strchr(key, '=');
-	    if (value != NULL)
-		*value++ = '\0';
-	    else
-		value = "TRUE";
-	    
-	    if (!mrp_plugin_set(ctx, plugin, key, value))
-		si_log_error("failed to set '%s' = '%s' for plugin '%s'",
-			     key, value, plugin);
-	    break;
+            plugin = arg;
+
+            key = strchr(plugin, ':');
+            if (key == NULL)
+                print_usage(argv[0], EINVAL, "invalid plugin arg '%s'", optarg);
+            else
+                *key++ = '\0';
+
+            value = strchr(key, '=');
+            if (value != NULL)
+                *value++ = '\0';
+            else
+                value = "TRUE";
+
+            if (!mrp_plugin_set(ctx, plugin, key, value))
+                si_log_error("failed to set '%s' = '%s' for plugin '%s'",
+                             key, value, plugin);
+            break;
 #endif
-	    
-	case 'h':
-	    print_usage(argv[0], -1, "");
-	    print_plugin_help(ctx, FALSE);
-	    exit(0);
-	    break;
 
-	case 'q':
-	    print_plugin_help(ctx, TRUE);
-	    break;
-	    
+        case 'h':
+            print_usage(argv[0], -1, "");
+            print_plugin_help(ctx, FALSE);
+            exit(0);
+            break;
+
+        case 'q':
+            print_plugin_help(ctx, TRUE);
+            break;
+
         default:
-	    print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
-	}
+            print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
+        }
     }
 
     if (debug)
-	ctx->log_mask |= MRP_LOG_MASK_DEBUG;
-    
+        ctx->log_mask |= MRP_LOG_MASK_DEBUG;
+
     return TRUE;
 }
 
@@ -288,8 +288,8 @@ typedef struct {
 } input_t;
 
 
-#define COMMON_ACTION_FIELDS						\
-    action_type_t   type;                /* action to execute */	\
+#define COMMON_ACTION_FIELDS                                                \
+    action_type_t   type;                /* action to execute */            \
     mrp_list_hook_t hook                 /* to command sequence */
 
 typedef enum {                           /* action types */
@@ -403,40 +403,40 @@ mrp_cfgfile_t *mrp_parse_cfgfile(const char *path)
     input.fd     = open(path, O_RDONLY);
     input.file   = (char *)path;
     input.line   = 1;
-    
+
     if (input.fd < 0) {
-	mrp_log_error("Failed to open configuration file '%s' (%d: %s).",
-		      path, errno, strerror(errno));
-	goto fail;
+        mrp_log_error("Failed to open configuration file '%s' (%d: %s).",
+                      path, errno, strerror(errno));
+        goto fail;
     }
 
     cfg = mrp_allocz(sizeof(*cfg));
 
     if (cfg == NULL) {
-	mrp_log_error("Failed to allocate configuration file buffer.");
-	goto fail;
+        mrp_log_error("Failed to allocate configuration file buffer.");
+        goto fail;
     }
 
     mrp_list_init(&cfg->actions);
 
     while ((narg = get_next_line(&input, args, MRP_ARRAY_SIZE(args))) > 0) {
-	a = parse_action(&input, args, narg);
-		
-	if (a != NULL)
-	    mrp_list_append(&cfg->actions, &a->hook);
-	else
-	    goto fail;
+        a = parse_action(&input, args, narg);
+
+        if (a != NULL)
+            mrp_list_append(&cfg->actions, &a->hook);
+        else
+            goto fail;
     }
 
     if (narg == 0)
-	return cfg;
+        return cfg;
 
  fail:
     if (input.fd >= 0)
-	close(input.fd);
+        close(input.fd);
     if (cfg)
-	mrp_free_cfgfile(cfg);
-    
+        mrp_free_cfgfile(cfg);
+
     return NULL;
 }
 
@@ -447,8 +447,8 @@ void mrp_free_cfgfile(mrp_cfgfile_t *cfg)
     any_action_t    *a;
 
     mrp_list_foreach(&cfg->actions, p, n) {
-	a = mrp_list_entry(p, typeof(*a), hook);
-	free_action(a);
+        a = mrp_list_entry(p, typeof(*a), hook);
+        free_action(a);
     }
 
     mrp_free(cfg);
@@ -461,9 +461,9 @@ int mrp_exec_cfgfile(mrp_context_t *ctx, mrp_cfgfile_t *cfg)
     any_action_t    *a;
 
     mrp_list_foreach(&cfg->actions, p, n) {
-	a = mrp_list_entry(p, typeof(*a), hook);
-	if (!exec_action(ctx, a))
-	    return FALSE;
+        a = mrp_list_entry(p, typeof(*a), hook);
+        if (!exec_action(ctx, a))
+            return FALSE;
     }
 
     return TRUE;
@@ -473,14 +473,14 @@ int mrp_exec_cfgfile(mrp_context_t *ctx, mrp_cfgfile_t *cfg)
 static any_action_t *parse_action(input_t *in, char **args, int narg)
 {
     action_descr_t *ad = actions + 1;
-    
+
     while (ad->keyword != NULL) {
-	if (!strcmp(args[0], ad->keyword))
-	    return ad->parse(in, args, narg);
-	ad++;
+        if (!strcmp(args[0], ad->keyword))
+            return ad->parse(in, args, narg);
+        ad++;
     }
 
-    mrp_log_error("Unknown command '%s' in file '%s'.", args[0], in->file);    
+    mrp_log_error("Unknown command '%s' in file '%s'.", args[0], in->file);
     return NULL;
 }
 
@@ -490,11 +490,11 @@ static void free_action(any_action_t *action)
     mrp_list_delete(&action->hook);
 
     if (ACTION_UNKNOWN < action->type && action->type < ACTION_MAX)
-	actions[action->type].free(action);
+        actions[action->type].free(action);
     else {
-	mrp_log_error("Unknown configuration action of type 0x%x.",
-		      action->type);
-	mrp_free(action);
+        mrp_log_error("Unknown configuration action of type 0x%x.",
+                      action->type);
+        mrp_free(action);
     }
 }
 
@@ -502,11 +502,11 @@ static void free_action(any_action_t *action)
 static int exec_action(mrp_context_t *ctx, any_action_t *action)
 {
     if (ACTION_UNKNOWN < action->type && action->type < ACTION_MAX)
-	return actions[action->type].exec(ctx, action);
+        return actions[action->type].exec(ctx, action);
     else {
-	mrp_log_error("Unknown configuration action of type 0x%x.",
-		      action->type);
-	return FALSE;
+        mrp_log_error("Unknown configuration action of type 0x%x.",
+                      action->type);
+        return FALSE;
     }
 }
 
@@ -522,84 +522,84 @@ static any_action_t *parse_load(input_t *in, char **argv, int argc)
     MRP_UNUSED(in);
 
     if (!strcmp(argv[0], MRP_KEYWORD_LOAD))
-	type = ACTION_LOAD;
+        type = ACTION_LOAD;
     else
-	type = ACTION_TRYLOAD;
-    
+        type = ACTION_TRYLOAD;
+
     if (argc < 2 || (action = mrp_allocz(sizeof(*action))) == NULL) {
-	mrp_log_error("Failed to allocate load config action.");
-	return NULL;
+        mrp_log_error("Failed to allocate load config action.");
+        return NULL;
     }
-    
+
     mrp_list_init(&action->hook);
     action->type = type;
     action->name = mrp_strdup(argv[1]);
-    
+
     if (action->name == NULL) {
-	mrp_log_error("Failed to allocate load config action.");
-	mrp_free(action);
-	return NULL;
+        mrp_log_error("Failed to allocate load config action.");
+        mrp_free(action);
+        return NULL;
     }
 
     args = NULL;
 
     if (argc > 3 && !strcmp(argv[2], MRP_KEYWORD_AS)) {
-	/* [try-]load-plugin name as instance [args...] */
-	action->instance = mrp_strdup(argv[3]);
-	start = 4;
+        /* [try-]load-plugin name as instance [args...] */
+        action->instance = mrp_strdup(argv[3]);
+        start = 4;
 
-	if (action->instance == NULL) {
-	    mrp_log_error("Failed to allocate load config action.");
-	    mrp_free(action->name);
-	    mrp_free(action);
-	    goto fail;
-	}
+        if (action->instance == NULL) {
+            mrp_log_error("Failed to allocate load config action.");
+            mrp_free(action->name);
+            mrp_free(action);
+            goto fail;
+        }
     }
     else {
-	/* [try-]load-plugin name [args...] */
-	start = 2;
+        /* [try-]load-plugin name [args...] */
+        start = 2;
     }
 
     if (start < argc) {
-	if ((args = mrp_allocz_array(typeof(*args), argc - 1)) != NULL) {
-	    for (i = start, a = args; i < argc; i++, a++) {
-		if (*argv[i] == MRP_START_COMMENT)
-		    break;
+        if ((args = mrp_allocz_array(typeof(*args), argc - 1)) != NULL) {
+            for (i = start, a = args; i < argc; i++, a++) {
+                if (*argv[i] == MRP_START_COMMENT)
+                    break;
 
-		k = argv[i];
-		v = strchr(k, '=');
+                k = argv[i];
+                v = strchr(k, '=');
 
-		if (v != NULL)
-		    *v++ = '\0';
-		
-		a->type = MRP_PLUGIN_ARG_TYPE_STRING;
-		a->key  = mrp_strdup(k);
-		a->str  = v ? mrp_strdup(v) : NULL;
+                if (v != NULL)
+                    *v++ = '\0';
 
-		if (a->key == NULL || (a->str == NULL && v != NULL)) {
-		    mrp_log_error("Failed to allocate plugin arg %s%s%s.",
-				  k, v ? "=" : "", v ? v : "");
-		    goto fail;
-		}
-	    }
-	}
+                a->type = MRP_PLUGIN_ARG_TYPE_STRING;
+                a->key  = mrp_strdup(k);
+                a->str  = v ? mrp_strdup(v) : NULL;
+
+                if (a->key == NULL || (a->str == NULL && v != NULL)) {
+                    mrp_log_error("Failed to allocate plugin arg %s%s%s.",
+                                  k, v ? "=" : "", v ? v : "");
+                    goto fail;
+                }
+            }
+        }
     }
-    
+
     action->args = args;
     action->narg = argc - start;
-    
+
     return (any_action_t *)action;
-    
-    
+
+
  fail:
     if (args != NULL) {
-	for (i = 1; i < argc && args[i].key != NULL; i++) {
-	    mrp_free(args[i].key);
-	    mrp_free(args[i].str);
-	}
-	mrp_free(args);
+        for (i = 1; i < argc && args[i].key != NULL; i++) {
+            mrp_free(args[i].key);
+            mrp_free(args[i].str);
+        }
+        mrp_free(args);
     }
-    
+
     return NULL;
 }
 
@@ -608,16 +608,16 @@ static void free_load(any_action_t *action)
 {
     load_action_t *load = (load_action_t *)action;
     int            i;
-    
-    if (load != NULL) {
-	mrp_free(load->name);
-	
-	for (i = 0; i < load->narg; i++) {
-	    mrp_free(load->args[i].key);
-	    mrp_free(load->args[i].str);
-	}
 
-	mrp_free(load->args);
+    if (load != NULL) {
+        mrp_free(load->name);
+
+        for (i = 0; i < load->narg; i++) {
+            mrp_free(load->args[i].key);
+            mrp_free(load->args[i].str);
+        }
+
+        mrp_free(load->args);
     }
 }
 
@@ -628,15 +628,15 @@ static int exec_load(mrp_context_t *ctx, any_action_t *action)
     mrp_plugin_t  *plugin;
 
     plugin = mrp_load_plugin(ctx, load->name, load->instance,
-			     load->args, load->narg);
-    
+                             load->args, load->narg);
+
     if (plugin != NULL) {
-	plugin->may_fail = (load->type == ACTION_TRYLOAD);
-	
-	return TRUE;
+        plugin->may_fail = (load->type == ACTION_TRYLOAD);
+
+        return TRUE;
     }
     else
-	return (load->type == ACTION_TRYLOAD);
+        return (load->type == ACTION_TRYLOAD);
 }
 
 
@@ -647,74 +647,74 @@ static any_action_t *parse_if_else(input_t *in, char **argv, int argc)
     any_action_t    *a;
     char            *args[MRP_CFG_MAXARGS], *op, *name;
     int              start, narg, pos;
-    
+
     if (argc < 2) {
-	mrp_log_error("%s:%d: invalid use of if-conditional.",
-		      in->file, in->line - 1);
-	return NULL;
+        mrp_log_error("%s:%d: invalid use of if-conditional.",
+                      in->file, in->line - 1);
+        return NULL;
     }
-    
+
     start = in->line - 1;
     op    = argv[1];
     name  = argv[2];
 
     if (strcmp(op, MRP_KEYWORD_EXISTS)) {
-	mrp_log_error("%s:%d: unknown operator '%s' in if-conditional.",
-		      in->file, in->line - 1, op);
+        mrp_log_error("%s:%d: unknown operator '%s' in if-conditional.",
+                      in->file, in->line - 1, op);
     }
 
     branch = mrp_allocz(sizeof(*branch));
-    
-    if (branch != NULL) {
-	mrp_list_init(&branch->pos);
-	mrp_list_init(&branch->neg);
-	
-	branch->type = ACTION_IF;
-	branch->op   = BR_PLUGIN_EXISTS;
-	branch->arg1 = mrp_strdup(name);
-	
-	if (branch->arg1 == NULL) {
-	    mrp_log_error("Failed to allocate configuration if-conditional.");
-	    goto fail;
-	}
-	
-	pos     = TRUE;
-	actions = &branch->pos;
-	while ((narg = get_next_line(in, args, sizeof(args))) > 0) {
-	    if (narg == 1) {
-		if (!strcmp(args[0], MRP_KEYWORD_END))
-		    return (any_action_t *)branch;
 
-		if (!strcmp(args[0], MRP_KEYWORD_ELSE)) {
-		    if (pos) {
-			actions = &branch->neg;
-			pos = FALSE;
-		    }
-		    else {
-			mrp_log_error("%s:%d: extra else without if.",
-				      in->file, in->line - 1);
-			goto fail;
-		    }
-		}
-	    }
-	    else {
-		a = parse_action(in, args, narg);
-		
-		if (a != NULL)
-		    mrp_list_append(actions, &a->hook);
-		else
-		    goto fail;
-	    }
-	}
+    if (branch != NULL) {
+        mrp_list_init(&branch->pos);
+        mrp_list_init(&branch->neg);
+
+        branch->type = ACTION_IF;
+        branch->op   = BR_PLUGIN_EXISTS;
+        branch->arg1 = mrp_strdup(name);
+
+        if (branch->arg1 == NULL) {
+            mrp_log_error("Failed to allocate configuration if-conditional.");
+            goto fail;
+        }
+
+        pos     = TRUE;
+        actions = &branch->pos;
+        while ((narg = get_next_line(in, args, sizeof(args))) > 0) {
+            if (narg == 1) {
+                if (!strcmp(args[0], MRP_KEYWORD_END))
+                    return (any_action_t *)branch;
+
+                if (!strcmp(args[0], MRP_KEYWORD_ELSE)) {
+                    if (pos) {
+                        actions = &branch->neg;
+                        pos = FALSE;
+                    }
+                    else {
+                        mrp_log_error("%s:%d: extra else without if.",
+                                      in->file, in->line - 1);
+                        goto fail;
+                    }
+                }
+            }
+            else {
+                a = parse_action(in, args, narg);
+
+                if (a != NULL)
+                    mrp_list_append(actions, &a->hook);
+                else
+                    goto fail;
+            }
+        }
     }
     else {
-	mrp_log_error("Failed to allocate configuration if-conditional.");
-	return NULL;
+        mrp_log_error("Failed to allocate configuration if-conditional.");
+        return NULL;
     }
 
     mrp_log_error("%s:%d: unterminated if-conditional (missing 'end')",
-		  in->file, start);
-    
+                  in->file, start);
+
  fail:
     free_action((any_action_t *)branch);
     return NULL;
@@ -728,20 +728,20 @@ static void free_if_else(any_action_t *action)
     mrp_list_hook_t *p, *n;
 
     if (branch != NULL) {
-	mrp_free(branch->arg1);
-	mrp_free(branch->arg2);
-	
-	mrp_list_foreach(&branch->pos, p, n) {
-	    a = mrp_list_entry(p, typeof(*a), hook);
-	    free_action(a);
-	}
+        mrp_free(branch->arg1);
+        mrp_free(branch->arg2);
 
-	mrp_list_foreach(&branch->neg, p, n) {
-	    a = mrp_list_entry(p, typeof(*a), hook);
-	    free_action(a);
-	}
-	
-	mrp_free(branch);
+        mrp_list_foreach(&branch->pos, p, n) {
+            a = mrp_list_entry(p, typeof(*a), hook);
+            free_action(a);
+        }
+
+        mrp_list_foreach(&branch->neg, p, n) {
+            a = mrp_list_entry(p, typeof(*a), hook);
+            free_action(a);
+        }
+
+        mrp_free(branch);
     }
 }
 
@@ -753,20 +753,20 @@ static int exec_if_else(mrp_context_t *ctx, any_action_t *action)
     any_action_t    *a;
 
     if (branch->op != BR_PLUGIN_EXISTS || branch->arg1 == NULL)
-	return FALSE;
+        return FALSE;
 
     if (mrp_plugin_exists(ctx, branch->arg1))
-	actions = &branch->pos;
+        actions = &branch->pos;
     else
-	actions = &branch->neg;
+        actions = &branch->neg;
 
     mrp_list_foreach(actions, p, n) {
-	a = mrp_list_entry(p, typeof(*a), hook);
-	
-	if (!exec_action(ctx, a))
-	    return FALSE;
+        a = mrp_list_entry(p, typeof(*a), hook);
+
+        if (!exec_action(ctx, a))
+            return FALSE;
     }
-    
+
     return TRUE;
 }
 
@@ -782,36 +782,36 @@ static any_action_t *parse_message(input_t *in, char **argv, int argc)
     MRP_UNUSED(in);
 
     if (argc < 2) {
-	mrp_log_error("%s requires at least one argument.", argv[0]);
-	return NULL;
+        mrp_log_error("%s requires at least one argument.", argv[0]);
+        return NULL;
     }
 
     if (!strcmp(argv[0], MRP_KEYWORD_ERROR))
-	type = ACTION_ERROR;
+        type = ACTION_ERROR;
     else if (!strcmp(argv[0], MRP_KEYWORD_WARNING))
-	type = ACTION_WARNING;
+        type = ACTION_WARNING;
     else if (!strcmp(argv[0], MRP_KEYWORD_INFO))
-	type = ACTION_INFO;
+        type = ACTION_INFO;
     else
-	return NULL;
+        return NULL;
 
     p = buf;
     n = sizeof(buf);
     if ((msg = mrp_allocz(sizeof(*msg))) != NULL) {
-	for (i = 1, t=""; i < argc && n > 0; i++, t=" ") {
-	    l  = snprintf(p, n, "%s%s", t, argv[i]);
-	    p += l;
-	    n -= l;
-	}
+        for (i = 1, t=""; i < argc && n > 0; i++, t=" ") {
+            l  = snprintf(p, n, "%s%s", t, argv[i]);
+            p += l;
+            n -= l;
+        }
 
-	msg->type    = type;
-	msg->message = mrp_strdup(buf);
+        msg->type    = type;
+        msg->message = mrp_strdup(buf);
 
-	if (msg->message == NULL) {
-	    mrp_log_error("Failed to allocate %s config action.", argv[0]);
-	    mrp_free(msg);
-	    msg = NULL;
-	}
+        if (msg->message == NULL) {
+            mrp_log_error("Failed to allocate %s config action.", argv[0]);
+            mrp_free(msg);
+            msg = NULL;
+        }
     }
 
     return (any_action_t *)msg;
@@ -829,7 +829,7 @@ static int exec_message(mrp_context_t *ctx, any_action_t *action)
     case ACTION_WARNING: mrp_log_warning("%s", msg->message); return TRUE;
     case ACTION_INFO:    mrp_log_info("%s", msg->message);    return TRUE;
     default:
-	return FALSE;
+        return FALSE;
     }
 }
 
@@ -837,10 +837,10 @@ static int exec_message(mrp_context_t *ctx, any_action_t *action)
 static void free_message(any_action_t *action)
 {
     message_action_t *msg = (message_action_t *)action;
-    
+
     if (msg != NULL) {
-	mrp_free(msg->message);
-	mrp_free(msg);
+        mrp_free(msg->message);
+        mrp_free(msg);
     }
 }
 
@@ -852,32 +852,32 @@ static int get_next_line(input_t *in, char **args, size_t size)
 
     narg = 0;
     while ((token = get_next_token(in)) != NULL && narg < (int)size) {
-	if (in->error)
-	    return -1;
-	
-	if (token[0] != '\n')
-	    args[narg++] = token;
-	else {
-	    if (narg && *args[0] != MRP_START_COMMENT && *args[0] != '\n')
-		return narg;
-	    else
-		narg = 0;
-	}
+        if (in->error)
+            return -1;
+
+        if (token[0] != '\n')
+            args[narg++] = token;
+        else {
+            if (narg && *args[0] != MRP_START_COMMENT && *args[0] != '\n')
+                return narg;
+            else
+                narg = 0;
+        }
     }
 
     if (in->error)
-	return -1;
+        return -1;
 
     if (narg >= (int)size) {
-	mrp_log_error("Too many tokens on line %d of %s.",
-		      in->line - 1, in->file);
-	return -1;
+        mrp_log_error("Too many tokens on line %d of %s.",
+                      in->line - 1, in->file);
+        return -1;
     }
     else {
-	if (*args[0] != MRP_START_COMMENT && *args[0] != '\n')
-	    return narg;
-	else
-	    return 0;
+        if (*args[0] != MRP_START_COMMENT && *args[0] != '\n')
+            return narg;
+        else
+            return 0;
     }
 }
 
@@ -885,14 +885,14 @@ static int get_next_line(input_t *in, char **args, size_t size)
 static inline void skip_whitespace(input_t *in)
 {
     while ((*in->out == ' ' || *in->out == '\t') && in->out < in->in)
-	in->out++;
+        in->out++;
 }
 
 
 static inline void skip_rest_of_line(input_t *in)
 {
     while (*in->out != '\n' && in->out < in->in)
-	in->out++;
+        in->out++;
 }
 
 
@@ -912,26 +912,26 @@ static char *get_next_token(input_t *in)
      */
 
     if (in->next_newline) {
-	in->next_newline = FALSE;
-	in->was_newline  = TRUE;
-	in->line++;
+        in->next_newline = FALSE;
+        in->was_newline  = TRUE;
+        in->line++;
 
-	return "\n";
+        return "\n";
     }
-    
-    
+
+
     /*
      * if we just finished a line, discard all old data/tokens
      */
 
     if (*in->token == '\n' || in->was_newline) {
-	diff = in->out - in->buf;
-	size = in->in - in->out;
-	memmove(in->buf, in->out, size);
-	in->out  -= diff;
-	in->in   -= diff;
-	in->next  = in->buf;
-	*in->in   = '\0';
+        diff = in->out - in->buf;
+        size = in->in - in->out;
+        memmove(in->buf, in->out, size);
+        in->out  -= diff;
+        in->in   -= diff;
+        in->next  = in->buf;
+        *in->in   = '\0';
     }
 
     /*
@@ -939,33 +939,33 @@ static char *get_next_token(input_t *in)
      */
 
     if (in->token == in->buf && in->fd != -1) {
-	size = sizeof(in->buf) - 1 - (in->in - in->buf);
-	len  = read(in->fd, in->in, size);
-	
-	if (len < size) {
-	    close(in->fd);
-	    in->fd = -1;
-	}
-	
-	if (len < 0) {
-	    mrp_log_error("Failed to read from config file (%d: %s).",
-			  errno, strerror(errno));
-	    in->error = TRUE;
-	    close(in->fd);
-	    in->fd = -1;
+        size = sizeof(in->buf) - 1 - (in->in - in->buf);
+        len  = read(in->fd, in->in, size);
 
-	    return NULL;
-	}
-	
-	in->in += len;
-	*in->in = '\0';
+        if (len < size) {
+            close(in->fd);
+            in->fd = -1;
+        }
+
+        if (len < 0) {
+            mrp_log_error("Failed to read from config file (%d: %s).",
+                          errno, strerror(errno));
+            in->error = TRUE;
+            close(in->fd);
+            in->fd = -1;
+
+            return NULL;
+        }
+
+        in->in += len;
+        *in->in = '\0';
     }
 
     if (in->out >= in->in)
-	return NULL;
+        return NULL;
 
     skip_whitespace(in);
-    
+
     quote = FALSE;
     quote_line = 0;
 
@@ -974,161 +974,161 @@ static char *get_next_token(input_t *in)
     in->token = q;
 
     while (p < in->in) {
-	/*printf("[%c]\n", *p == '\n' ? '.' : *p);*/
-	switch (*p) {
-	    /*
-	     * Quoting:
-	     *
-	     *     If we're not within a quote, mark a quote started.
-	     *     Otherwise if quote matches, close quoting. Otherwise
-	     *     copy the quoted quote verbatim.
-	     */
-	case '\'':
-	case '\"':
-	    if (!quote) {
-		quote      = *p++;
-		quote_line = in->line;
-	    }
-	    else {
-		if (*p == quote) {
-		    quote      = FALSE;
-		    quote_line = 0;
-		    p++;
-		}
-		else {
-		    *q++ = *p++;
-		}
-	    }
-	    in->was_newline = FALSE;
-	    break;
-	    
-	    /*
-	     * Whitespace:
-	     *
-	     *     If we're quoting, copy verbatim. Otherwise mark the end
-	     *     of the token.
-	     */
-	case ' ':
-	case '\t':
-	    if (quote)
-		*q++ = *p++;
-	    else {
-		p++;
-		*q++ = '\0';
-		
-		in->out  = p;
-		in->next = q;
+        /*printf("[%c]\n", *p == '\n' ? '.' : *p);*/
+        switch (*p) {
+            /*
+             * Quoting:
+             *
+             *     If we're not within a quote, mark a quote started.
+             *     Otherwise if quote matches, close quoting. Otherwise
+             *     copy the quoted quote verbatim.
+             */
+        case '\'':
+        case '\"':
+            if (!quote) {
+                quote      = *p++;
+                quote_line = in->line;
+            }
+            else {
+                if (*p == quote) {
+                    quote      = FALSE;
+                    quote_line = 0;
+                    p++;
+                }
+                else {
+                    *q++ = *p++;
+                }
+            }
+            in->was_newline = FALSE;
+            break;
 
-		return in->token;
-	    }
-	    in->was_newline = FALSE;
-	    break;
+            /*
+             * Whitespace:
+             *
+             *     If we're quoting, copy verbatim. Otherwise mark the end
+             *     of the token.
+             */
+        case ' ':
+        case '\t':
+            if (quote)
+                *q++ = *p++;
+            else {
+                p++;
+                *q++ = '\0';
 
-	    /*
-	     * Escaping:
-	     *
-	     *     If the last character in the input, copy verbatim.
-	     *     Otherwise if it escapes a '\n', skip both. Otherwise
-	     *     copy the escaped character verbatim.
-	     */
-	case '\\':
-	    if (p < in->in - 1) {
-		p++;
-		if (*p != '\n')
-		    *q++ = *p++;
-		else {
-		    p++;
-		    in->line++;
-		    in->out = p;
-		    skip_whitespace(in);
-		    p = in->out;
-		}
-	    }
-	    else
-		*q++ = *p++;
-	    in->was_newline = FALSE;
-	    break;
-	    
-	    /*
-	     * Newline:
-	     *
-	     *     We don't allow newlines to be quoted. Otherwise
-	     *     if the token is not the newline itself, we mark
-	     *     the next token to be newline and return the token
-	     *     it terminated.
-	     */
-	case '\n':
-	    if (quote) {
-		mrp_log_error("%s:%d: Unterminated quote (%c) started "
-			      "on line %d.", in->file, in->line, quote,
-			      quote_line);
-		in->error = TRUE;
+                in->out  = p;
+                in->next = q;
 
-		return NULL;
-	    }
-	    else {
-		*q = '\0';
-		p++;
-		
-		in->out  = p;
-		in->next = q;
-		
-		if (in->token == q) {
-		    in->line++;
-		    in->was_newline = TRUE;
-		    return "\n";
-		}
-		else {
-		    in->next_newline = TRUE;
-		    return in->token;
-		}
-	    }
-	    break;
+                return in->token;
+            }
+            in->was_newline = FALSE;
+            break;
 
-	    /*
-	     * Comments:
-	     *
-	     *     Attempt to allow and filter out partial-line comments.
-	     *
-	     *     This has not been thoroughly thought through. Probably
-	     *     there are broken border-cases. The whole tokenizing loop
-	     *     has not been written so that it could grow the buffer and
-	     *     refill it even if even we run out of input and we're not
-	     *     sure whehter a full token has been consumed... beware.
-	     *     To be sure, we bail out here if it looks like we exhausted
-	     *     the input buffer while skipping a comment. This needs to
-	     *     be thought through properly.
-	     */
-	case MRP_START_COMMENT:
-	    skip_rest_of_line(in);
-	    if (in->out == in->in) {
-		mrp_log_error("%s:%d Exhausted input buffer while skipping "
-			      "a comment.", in->file, in->line);
-		in->error = TRUE;
-		return NULL;
-	    }
-	    else {
-		p = in->out;
-		in->line++;
-	    }
-	    break;
+            /*
+             * Escaping:
+             *
+             *     If the last character in the input, copy verbatim.
+             *     Otherwise if it escapes a '\n', skip both. Otherwise
+             *     copy the escaped character verbatim.
+             */
+        case '\\':
+            if (p < in->in - 1) {
+                p++;
+                if (*p != '\n')
+                    *q++ = *p++;
+                else {
+                    p++;
+                    in->line++;
+                    in->out = p;
+                    skip_whitespace(in);
+                    p = in->out;
+                }
+            }
+            else
+                *q++ = *p++;
+            in->was_newline = FALSE;
+            break;
 
-	default:
-	    *q++ = *p++;
-	    in->was_newline = FALSE;
-	}
+            /*
+             * Newline:
+             *
+             *     We don't allow newlines to be quoted. Otherwise
+             *     if the token is not the newline itself, we mark
+             *     the next token to be newline and return the token
+             *     it terminated.
+             */
+        case '\n':
+            if (quote) {
+                mrp_log_error("%s:%d: Unterminated quote (%c) started "
+                              "on line %d.", in->file, in->line, quote,
+                              quote_line);
+                in->error = TRUE;
+
+                return NULL;
+            }
+            else {
+                *q = '\0';
+                p++;
+
+                in->out  = p;
+                in->next = q;
+
+                if (in->token == q) {
+                    in->line++;
+                    in->was_newline = TRUE;
+                    return "\n";
+                }
+                else {
+                    in->next_newline = TRUE;
+                    return in->token;
+                }
+            }
+            break;
+
+            /*
+             * Comments:
+             *
+             *     Attempt to allow and filter out partial-line comments.
+             *
+             *     This has not been thoroughly thought through. Probably
+             *     there are broken border-cases. The whole tokenizing loop
+             *     has not been written so that it could grow the buffer and
+             *     refill it even if even we run out of input and we're not
+             *     sure whehter a full token has been consumed... beware.
+             *     To be sure, we bail out here if it looks like we exhausted
+             *     the input buffer while skipping a comment. This needs to
+             *     be thought through properly.
+             */
+        case MRP_START_COMMENT:
+            skip_rest_of_line(in);
+            if (in->out == in->in) {
+                mrp_log_error("%s:%d Exhausted input buffer while skipping "
+                              "a comment.", in->file, in->line);
+                in->error = TRUE;
+                return NULL;
+            }
+            else {
+                p = in->out;
+                in->line++;
+            }
+            break;
+
+        default:
+            *q++ = *p++;
+            in->was_newline = FALSE;
+        }
     }
-    
+
     if (in->fd == -1) {
-	*q = '\0';
-	in->out = p;
-	in->in = q;
-	
-	return in->token;
+        *q = '\0';
+        in->out = p;
+        in->in = q;
+
+        return in->token;
     }
     else {
-	mrp_log_error("Input line %d of file %s exceeds allowed length.",
-		      in->line, in->file);
-	return NULL;
+        mrp_log_error("Input line %d of file %s exceeds allowed length.",
+                      in->line, in->file);
+        return NULL;
     }
 }

@@ -18,7 +18,7 @@
 typedef enum {
     MRP_MSG_FIELD_INVALID = 0x00,        /* defined invalid type */
     MRP_MSG_FIELD_STRING  = 0x01,        /* string */
-    MRP_MSG_FIELD_BOOL    = 0x02,        /* boolean */ 
+    MRP_MSG_FIELD_BOOL    = 0x02,        /* boolean */
     MRP_MSG_FIELD_UINT8   = 0x03,        /* unsigned 8-bit integer */
     MRP_MSG_FIELD_SINT8   = 0x04,        /* signed 8-bit integer */
     MRP_MSG_FIELD_INT8    = A(SINT8),    /* alias for SINT8 */
@@ -62,31 +62,31 @@ typedef enum {
  * require a size (blobs and arrays).
  */
 
-#define MRP_MSG_VALUE_UNION union {		\
-	char      *str;				\
-	bool       bln;				\
-	uint8_t    u8;				\
-	int8_t     s8;				\
-	uint16_t   u16;				\
-	int16_t    s16;				\
-	uint32_t   u32;				\
-	int32_t    s32;				\
-	uint64_t   u64;				\
-	int64_t    s64;				\
-	double     dbl;				\
-	void      *blb;				\
-	void      *aany;			\
-	char     **astr;			\
-	bool      *abln;			\
-	uint8_t   *au8;				\
-	int8_t    *as8;				\
-	uint16_t  *au16;			\
-	int16_t   *as16;			\
-	uint32_t  *au32;			\
-	int32_t   *as32;			\
-	uint64_t  *au64;			\
-	int64_t   *as64;			\
-	double    *adbl;			\
+#define MRP_MSG_VALUE_UNION union {                                       \
+        char      *str;                                                   \
+        bool       bln;                                                   \
+        uint8_t    u8;                                                    \
+        int8_t     s8;                                                    \
+        uint16_t   u16;                                                   \
+        int16_t    s16;                                                   \
+        uint32_t   u32;                                                   \
+        int32_t    s32;                                                   \
+        uint64_t   u64;                                                   \
+        int64_t    s64;                                                   \
+        double     dbl;                                                   \
+        void      *blb;                                                   \
+        void      *aany;                                                  \
+        char     **astr;                                                  \
+        bool      *abln;                                                  \
+        uint8_t   *au8;                                                   \
+        int8_t    *as8;                                                   \
+        uint16_t  *au16;                                                  \
+        int16_t   *as16;                                                  \
+        uint32_t  *au32;                                                  \
+        int32_t   *as32;                                                  \
+        uint64_t  *au64;                                                  \
+        int64_t   *as64;                                                  \
+        double    *adbl;                                                  \
     }
 
 typedef MRP_MSG_VALUE_UNION mrp_msg_value_t;
@@ -180,54 +180,54 @@ typedef struct {
 
 
 /** Convenience macro to declare a custom data type (and its members). */
-#define MRP_DATA_DESCRIPTOR(_var, _tag, _type, ...)		\
-    static mrp_data_member_t _var##_members[] = {		\
-	__VA_ARGS__						\
-    };								\
-								\
-    static mrp_data_descr_t _var = {				\
-	.size   = sizeof(_type),				\
-	.tag    = _tag,						\
-	.fields = _var##_members,				\
-	.nfield = MRP_ARRAY_SIZE(_var##_members)		\
+#define MRP_DATA_DESCRIPTOR(_var, _tag, _type, ...)                       \
+    static mrp_data_member_t _var##_members[] = {                         \
+        __VA_ARGS__                                                       \
+    };                                                                    \
+                                                                          \
+    static mrp_data_descr_t _var = {                                      \
+        .size   = sizeof(_type),                                          \
+        .tag    = _tag,                                                   \
+        .fields = _var##_members,                                         \
+        .nfield = MRP_ARRAY_SIZE(_var##_members)                          \
  }
 
 /** Convenience macro to declare a data member. */
-#define MRP_DATA_MEMBER(_data_type, _member, _member_type) {	\
-        .offs  = MRP_OFFSET(_data_type, _member),		\
-	.type  = _member_type,					\
-	.guard = FALSE						\
+#define MRP_DATA_MEMBER(_data_type, _member, _member_type) {              \
+        .offs  = MRP_OFFSET(_data_type, _member),                         \
+        .type  = _member_type,                                            \
+        .guard = FALSE                                                    \
  }
 
 /** Convenience macro to declare an array data member with a count field. */
-#define MRP_DATA_ARRAY_COUNT(_data_type, _array, _count, _base_type) {	\
-        .offs  = MRP_OFFSET(_data_type, _array),			\
-	.type  = MRP_MSG_FIELD_ARRAY | _base_type,		        \
-	.guard = FALSE,						        \
-	.u32   = MRP_OFFSET(_data_type, _count)			        \
+#define MRP_DATA_ARRAY_COUNT(_data_type, _array, _count, _base_type) {    \
+        .offs  = MRP_OFFSET(_data_type, _array),                          \
+        .type  = MRP_MSG_FIELD_ARRAY | _base_type,                        \
+        .guard = FALSE,                                                   \
+        .u32   = MRP_OFFSET(_data_type, _count)                           \
     }
 
 /** Convenience macro to declare an array data member with a sentinel value. */
 #define MRP_DATA_ARRAY_GUARD(_data_type, _array, _guard_member, _guard_val, \
-			     _base_type) {				\
-        .offs          = MRP_OFFSET(_data_type, _array),		\
-	.type          = MRP_MSG_FIELD_ARRAY | _base_type,	        \
-	.guard         = TRUE,						\
-	._guard_member = _guard_val					\
+                             _base_type) {                                  \
+        .offs          = MRP_OFFSET(_data_type, _array),                    \
+        .type          = MRP_MSG_FIELD_ARRAY | _base_type,                  \
+        .guard         = TRUE,                                              \
+        ._guard_member = _guard_val                                         \
     }
 
 /** Convenience macro to declare a blob data member with a count field. */
-#define MRP_DATA_BLOB_MEMBER(_data_type, _blob, _count) {		\
-        .offs  = MRP_OFFSET(_data_type, _blob),			        \
-	.type  = MRP_MSG_FIELD_BLOB,				        \
-	.guard = FALSE,						        \
-	.u32   = MRP_OFFSET(_data_type, _count)			        \
+#define MRP_DATA_BLOB_MEMBER(_data_type, _blob, _count) {                 \
+        .offs  = MRP_OFFSET(_data_type, _blob),                           \
+        .type  = MRP_MSG_FIELD_BLOB,                                      \
+        .guard = FALSE,                                                   \
+        .u32   = MRP_OFFSET(_data_type, _count)                           \
     }
 
 
 /** Encode a structure using the given message descriptor. */
 size_t mrp_data_encode(void **bufp, void *data, mrp_data_descr_t *descr,
-		       size_t reserve);
+                       size_t reserve);
 
 /** Decode a structure using the given message descriptor. */
 void *mrp_data_decode(void **bufp, size_t *sizep, mrp_data_descr_t *descr);
@@ -299,55 +299,55 @@ void *mrp_msgbuf_reserve(mrp_msgbuf_t *mb, size_t size, size_t align);
 void *mrp_msgbuf_pull(mrp_msgbuf_t *mb, size_t size, size_t align);
 
 /** Push data with alignment to the buffer, jumping to errlbl on errors. */
-#define MRP_MSGBUF_PUSH(mb, data, align, errlbl) do {		\
-	size_t        _size = sizeof(data);			\
-	typeof(data) *_ptr;					\
-		 						\
-	_ptr  = mrp_msgbuf_reserve((mb), _size, (align));	\
-								\
-	if (_ptr != NULL)					\
-	    *_ptr = data;					\
-	else							\
-	    goto errlbl;					\
+#define MRP_MSGBUF_PUSH(mb, data, align, errlbl) do {                     \
+        size_t        _size = sizeof(data);                               \
+        typeof(data) *_ptr;                                               \
+                                                                          \
+        _ptr  = mrp_msgbuf_reserve((mb), _size, (align));                 \
+                                                                          \
+        if (_ptr != NULL)                                                 \
+            *_ptr = data;                                                 \
+        else                                                              \
+            goto errlbl;                                                  \
     } while (0)
 
 /** Push aligned data to the buffer, jumping to errlbl on errors. */
-#define MRP_MSGBUF_PUSH_DATA(mb, data, size, align, errlbl) do {	\
-	size_t _size = (size);						\
-	void   *_ptr;							\
-									\
-	_ptr  = mrp_msgbuf_reserve((mb), _size, (align));		\
-		     							\
-	if (_ptr != NULL)						\
-	    memcpy(_ptr, data, _size);					\
-	else								\
-	    goto errlbl;						\
+#define MRP_MSGBUF_PUSH_DATA(mb, data, size, align, errlbl) do {          \
+        size_t _size = (size);                                            \
+        void   *_ptr;                                                     \
+                                                                          \
+        _ptr  = mrp_msgbuf_reserve((mb), _size, (align));                 \
+                                                                          \
+        if (_ptr != NULL)                                                 \
+            memcpy(_ptr, data, _size);                                    \
+        else                                                              \
+            goto errlbl;                                                  \
     } while (0)
 
 /** Pull aligned data of type from the buffer, jump to errlbl on errors. */
-#define MRP_MSGBUF_PULL(mb, type, align, errlbl) ({			\
-	    size_t  _size = sizeof(type);				\
-	    type   *_ptr;						\
-									\
-	    _ptr = mrp_msgbuf_pull((mb), _size, (align));		\
-									\
-	    if (_ptr == NULL) 						\
-		goto errlbl;						\
-									\
-	    *_ptr;							\
-	})
+#define MRP_MSGBUF_PULL(mb, type, align, errlbl) ({                       \
+            size_t  _size = sizeof(type);                                 \
+            type   *_ptr;                                                 \
+                                                                          \
+            _ptr = mrp_msgbuf_pull((mb), _size, (align));                 \
+                                                                          \
+            if (_ptr == NULL)                                             \
+                goto errlbl;                                              \
+                                                                          \
+            *_ptr;                                                        \
+        })
 
 /** Pull aligned data of type from the buffer, jump to errlbl on errors. */
-#define MRP_MSGBUF_PULL_DATA(mb, size, align, errlbl) ({	\
-	    size_t  _size = size;				\
-	    void   *_ptr;					\
-								\
-	    _ptr = mrp_msgbuf_pull((mb), _size, (align));	\
-								\
-	    if (_ptr == NULL)					\
-		goto errlbl;					\
-								\
-	    _ptr;						\
-	})
+#define MRP_MSGBUF_PULL_DATA(mb, size, align, errlbl) ({                  \
+            size_t  _size = size;                                         \
+            void   *_ptr;                                                 \
+                                                                          \
+            _ptr = mrp_msgbuf_pull((mb), _size, (align));                 \
+                                                                          \
+            if (_ptr == NULL)                                             \
+                goto errlbl;                                              \
+                                                                          \
+            _ptr;                                                         \
+        })
 
 #endif /* __MURPHY_MSG_H__ */

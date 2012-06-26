@@ -30,11 +30,11 @@ typedef enum {
 
 /** Directory scanning callback type. */
 typedef int (*mrp_scan_dir_cb_t)(const char *entry, mrp_dirent_type_t type,
-				 void *user_data);
+                                 void *user_data);
 
 /** Scan a directory, calling cb with all matching entries. */
 int mrp_scan_dir(const char *path, const char *pattern, mrp_dirent_type_t mask,
-		 mrp_scan_dir_cb_t cb, void *user_data);
+                 mrp_scan_dir_cb_t cb, void *user_data);
 
 
 #endif /* __MURPHY_FILEUTILS_H__ */

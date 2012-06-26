@@ -93,7 +93,7 @@ int main(int argc, char **argv)
                    "  -f  forces no-forking mode\n",
                    basename(argv[0]));
             exit(strcmp("-h", argv[i]) ? 1 : 0);
-        }        
+        }
     }
 
     srunner_set_log(sr, LOGFILE);
@@ -168,13 +168,13 @@ START_TEST(describe_persons)
 
         fail_if(n  < 1, "invalid column count %d", n);
         fail_if(n != persons_ncolumn, "coulumn count is %d but "
-                "it supposed to be %d", n, persons_ncolumn); 
+                "it supposed to be %d", n, persons_ncolumn);
 
         for (i = 0;   i < n;   i++) {
             cd = persons_columns + i;
             name = mql_result_columns_get_name(r, i);
             type = mql_result_columns_get_type(r, i);
-            length = mql_result_columns_get_length(r, i); 
+            length = mql_result_columns_get_length(r, i);
 
             fail_if(strcmp(name, cd->name), "column%d name mismatch "
                     "('%s' vs. '%s')", i, cd->name, name);
@@ -235,7 +235,7 @@ START_TEST(insert_into_persons)
         r = mql_exec_string(mql_result_string, statement);
 
         fail_unless(mql_result_is_success(r), "error @ row%d: %s",
-                    i, mql_result_error_get_message(r)); 
+                    i, mql_result_error_get_message(r));
     }
 }
 END_TEST
@@ -269,7 +269,7 @@ START_TEST(precompile_transaction_statements)
     };
 
     static int done;
-    
+
     int i;
 
     if (!done) {
@@ -336,7 +336,7 @@ START_TEST(precompile_update_persons)
                                "  SET family_name = %s,"
                                "      first_name  = %s"
                                "  WHERE id = %u");
-        
+
         fail_if(!stmnt, "precompilation error (%s)", strerror(errno));
 
         persons.update = stmnt;
@@ -472,7 +472,7 @@ START_TEST(exec_precompiled_update_persons)
 
 
     r = mql_exec_statement(mql_result_string, persons.update);
-    
+
     fail_unless(mql_result_is_success(r), "exec error: %s",
                 mql_result_error_get_message(r));
 
@@ -554,7 +554,7 @@ START_TEST(exec_precompiled_delete_from_persons)
         fail("bind error (%s)", strerror(errno));
 
     r = mql_exec_statement(mql_result_string, persons.delete);
-    
+
     fail_unless(mql_result_is_success(r), "exec error: %s",
                 mql_result_error_get_message(r));
 
@@ -576,7 +576,7 @@ START_TEST(exec_precompiled_delete_from_persons)
                 break;
             }
         }
- 
+
         n = mql_result_rows_get_row_count(r);
 
         for (i = 0;   i < n;   i++) {
@@ -634,7 +634,7 @@ START_TEST(exec_precompiled_insert_into_persons)
 
     /* insert Veijo Baltzar */
     r = mql_exec_statement(mql_result_string, persons.insert);
-    
+
     if (p)
         fail_if(mql_result_is_success(r), "manage to insert a duplicate");
     else {
@@ -656,11 +656,11 @@ START_TEST(exec_precompiled_insert_into_persons)
     else {
         if (!p) {
             n = mql_result_rows_get_row_count(r);
-        
+
             for (inserted = 0, i = 0;   i < n;   i++) {
                 first  = mql_result_rows_get_string(r, 1, i, NULL,0);
                 family = mql_result_rows_get_string(r, 2, i, NULL,0);
-                
+
                 if (!strcmp(first, "Veijo") && !strcmp(family, "Baltzar")) {
                     inserted = 1;
                     break;
@@ -748,7 +748,7 @@ START_TEST(table_trigger)
     PREREQUISITE(register_table_event_cb);
 
     r = mql_exec_string(mql_result_dontcare, mqlstr);
-    
+
     fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
                 mql_result_error_get_code(r), mql_result_error_get_message(r));
 
@@ -773,9 +773,9 @@ START_TEST(row_trigger)
 
     fail_unless(mql_result_is_success(r), "failed to begin transaction: %s",
                 strerror(errno));
-    
+
     r = mql_exec_string(mql_result_dontcare, mqlstr);
-    
+
     fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
                 mql_result_error_get_code(r), mql_result_error_get_message(r));
 
@@ -805,9 +805,9 @@ START_TEST(column_trigger)
 
     fail_unless(mql_result_is_success(r), "failed to begin transaction: %s",
                 strerror(errno));
-    
+
     r = mql_exec_string(mql_result_dontcare, mqlstr);
-    
+
     fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
                 mql_result_error_get_code(r), mql_result_error_get_message(r));
 
@@ -831,7 +831,7 @@ START_TEST(transaction_trigger)
     PREREQUISITE(register_transaction_event_cb);
 
     r = mql_exec_string(mql_result_dontcare, mqlstr);
-    
+
     fail_unless(mql_result_is_success(r),"failed to exec '%s': (%d) %s",mqlstr,
                 mql_result_error_get_code(r), mql_result_error_get_message(r));
 

@@ -92,7 +92,7 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
                 sp->data.type    = mqi_integer;
                 sp++;
                 break;
-                
+
             case mqi_end:
                 *cond_ptr = cond+1;
                 sp--;
@@ -212,7 +212,7 @@ static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
             result = (newsp = lastop) - 1;
             value = cond_binary_logicop(lastop->operator, lastop-1,lastop+1);
             goto find_new_lastop_and_store_on_stack;
-            
+
         case mqi_less:
         case mqi_leq:
         case mqi_eq:
@@ -228,12 +228,12 @@ static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
             newsp = (result = lastop) + 1;
             value = cond_unary_logicop(lastop->operator, lastop+1);
             goto find_new_lastop_and_store_on_stack;
-            
+
         find_new_lastop_and_store_on_stack:
             for (lastop--;  lastop->precedence >= PRECEDENCE_DATA;  lastop--)
                 ;
             /* intentional fall over */
-            
+
         store_on_stack:
             result->precedence   = PRECEDENCE_DATA;
             result->data.type    = mqi_integer;

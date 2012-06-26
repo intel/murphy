@@ -91,12 +91,12 @@ int mrp_log_set_target(const char *target);
 
 /** Generic logging function. */
 void mrp_log_msg(mrp_log_level_t level,
-		 const char *file, int line, const char *func,
-		 const char *format, ...) MRP_PRINTF_LIKE(5, 6);
+                 const char *file, int line, const char *func,
+                 const char *format, ...) MRP_PRINTF_LIKE(5, 6);
 
 /** Generic logging function for easy wrapping. */
 void mrp_log_msgv(mrp_log_level_t level, const char *file,
-		  int line, const char *func, const char *format, va_list ap);
+                  int line, const char *func, const char *format, va_list ap);
 
 
 MRP_CDECL_END

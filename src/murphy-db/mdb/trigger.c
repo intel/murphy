@@ -355,7 +355,7 @@ int mdb_trigger_add_transaction_callback(mqi_trigger_cb_t  cb_function,
             cb_data == tr->callback.user_data)
         {
             return 0; /* silently ignore multiple registrations */
-        }        
+        }
     }
 
     if (!(tr = calloc(1, sizeof(transact_trigger_t)))) {
@@ -427,19 +427,19 @@ void mdb_trigger_column_change(mdb_table_t  *tbl,
 
     for (mask = colmask, i = 0;     mask != 0;     mask >>= 8, i += 8) {
         byte = mask & 0xff;
-            
+
         while ((j = lowest_bit_in[byte]) >= 0) {
             byte &= ~MQI_BIT(j);
             cx  = i + j;
             col = tbl->columns + cx;
             hd  = tbl->trigger.column_change + cx;
-            
+
             MDB_DLIST_FOR_EACH(column_trigger_t, link, tr, hd) {
                 ce->column.index = cx;
                 ce->column.name  = tbl->columns[cx].name;
-                
+
                 ce->value.type = tbl->columns[cx].type;
-                
+
                 cd.cindex = cx;
                 cd.offset = 0;
 
@@ -458,8 +458,8 @@ void mdb_trigger_column_change(mdb_table_t  *tbl,
         }
     }
 }
-                                        
-                                        
+
+
 void mdb_trigger_row_insert(mdb_table_t *tbl, mdb_row_t *row)
 {
     if (tbl && row)
@@ -504,7 +504,7 @@ static int get_select_params(mdb_table_t       *tbl,
     int ncd, length;
     int end;
     int cx;
-    
+
     *ncd_ret = *length_ret = 0;
 
     for (ncd = length = 0;    (cx = (cd = cds + ncd)->cindex) >= 0;    ncd++) {
@@ -549,7 +549,7 @@ static void row_change(mqi_event_type_t  event,
                                 tbl->columns + sx, row->data);
             }
         }
-        
+
         tr->callback.function(&evt, tr->callback.user_data);
     }
 }

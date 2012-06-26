@@ -36,29 +36,29 @@ typedef struct {
     char                  *key;          /* plugin argument name */
     mrp_plugin_arg_type_t  type;         /* plugin argument type */
     union {                              /* default/supplied value */
-	char              *str;          /* string values */
-	bool               bln;          /* boolean values */
-	uint32_t           u32;          /* 32-bit unsigned values */
-	int32_t            i32;          /* 32-bit signed values */
-	double             dbl;          /* double prec. floating pt. values */
+        char              *str;          /* string values */
+        bool               bln;          /* boolean values */
+        uint32_t           u32;          /* 32-bit unsigned values */
+        int32_t            i32;          /* 32-bit signed values */
+        double             dbl;          /* double prec. floating pt. values */
     };
 } mrp_plugin_arg_t;
 
 
 /** Convenience macros for setting up argument tables with type and defaults. */
-#define MRP_PLUGIN_ARG_STRING(name, defval)				\
+#define MRP_PLUGIN_ARG_STRING(name, defval)                                \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_STRING, { str: defval } }
 
-#define MRP_PLUGIN_ARG_BOOL(name, defval)				\
+#define MRP_PLUGIN_ARG_BOOL(name, defval)                                  \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_BOOL  , { bln: !!defval } }
 
-#define MRP_PLUGIN_ARG_UINT32(name, defval)				\
+#define MRP_PLUGIN_ARG_UINT32(name, defval)                                \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_UINT32, { u32: defval } }
 
-#define MRP_PLUGIN_ARG_INT32(name, defval)				\
+#define MRP_PLUGIN_ARG_INT32(name, defval)                                 \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_INT32 , { i32: defval } }
 
-#define MRP_PLUGIN_ARG_DOUBLE(name, defval)				\
+#define MRP_PLUGIN_ARG_DOUBLE(name, defval)                                \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_DOUBLE, { dbl: defval } }
 
 /** Similar convenience macros for indexed argument access. */
@@ -68,13 +68,13 @@ typedef struct {
 #define MRP_PLUGIN_ARGIDX_STRING(idx, name, defval) \
     [idx] MRP_PLUGIN_ARG_STRING(name, defval)
 
-#define MRP_PLUGIN_ARGIDX_BOOL(idx, name, defval) \
+#define MRP_PLUGIN_ARGIDX_BOOL(idx, name, defval)   \
     [idx] MRP_PLUGIN_ARG_BOOL(name, defval)
 
 #define MRP_PLUGIN_ARGIDX_UINT32(idx, name, defval) \
     [idx] MRP_PLUGIN_ARG_UINT32(name, defval)
 
-#define MRP_PLUGIN_ARGIDX_INT32(idx, name, defval) \
+#define MRP_PLUGIN_ARGIDX_INT32(idx, name, defval)  \
     [idx] MRP_PLUGIN_ARG_INT32(name, defval)
 
 #define MRP_PLUGIN_ARGIDX_DOUBLE(idx, name, defval) \
@@ -122,7 +122,7 @@ typedef struct {
  *                        MRP_MULTIPLE, test_init, test_exit, test_args);
  */
 
-#define MRP_PLUGIN_ARGIDX(idx, type, name, defval)	\
+#define MRP_PLUGIN_ARGIDX(idx, type, name, defval) \
     [idx] MRP_PLUGIN_ARG_##type(name, defval)
 
 
@@ -201,79 +201,79 @@ struct mrp_plugin_s {
 
 #ifdef __MURPHY_BUILTIN_PLUGIN__
 /*   statically linked in plugins */
-#    define __MURPHY_REGISTER_PLUGIN(_name,				\
-				     _version,				\
-				     _description,			\
-				     _authors,				\
-				     _help,				\
-				     _core,				\
-				     _single,				\
-				     _init,				\
-				     _exit,				\
-				     _args,				\
-				     _cmds)				\
-    static void register_plugin(void) __attribute__((constructor));	\
-    									\
-    static void register_plugin(void) {					\
-	char *path = __FILE__, *base;					\
-	static mrp_plugin_descr_t descriptor = {			\
-	    .name        = _name,					\
-	    .version     = _version,					\
-	    .description = _description,				\
-	    .authors     = _authors,					\
-	    .mrp_version = MRP_PLUGIN_API_VERSION,			\
-	    .help        = _help,					\
-	    .init        = _init,					\
-	    .exit        = _exit,					\
-	    .core        = _core,					\
-	    .singleton   = _single,					\
-	    .ninstance   = 0,						\
-            .args        = _args,					\
-	    .narg        = MRP_ARRAY_SIZE(_args),			\
-	    .cmds = _cmds,						\
-	};								\
-									\
-	if ((base = strrchr(path, '/')) != NULL)			\
-	    descriptor.path = base + 1;					\
-	else								\
-	    descriptor.path = (char *)path;				\
-									\
-	mrp_register_builtin_plugin(&descriptor);			\
-    }									\
+#    define __MURPHY_REGISTER_PLUGIN(_name,                               \
+                                     _version,                            \
+                                     _description,                        \
+                                     _authors,                            \
+                                     _help,                               \
+                                     _core,                               \
+                                     _single,                             \
+                                     _init,                               \
+                                     _exit,                               \
+                                     _args,                               \
+                                     _cmds)                               \
+    static void register_plugin(void) __attribute__((constructor));       \
+                                                                          \
+    static void register_plugin(void) {                                   \
+        char *path = __FILE__, *base;                                     \
+        static mrp_plugin_descr_t descriptor = {                          \
+            .name        = _name,                                         \
+            .version     = _version,                                      \
+            .description = _description,                                  \
+            .authors     = _authors,                                      \
+            .mrp_version = MRP_PLUGIN_API_VERSION,                        \
+            .help        = _help,                                         \
+            .init        = _init,                                         \
+            .exit        = _exit,                                         \
+            .core        = _core,                                         \
+            .singleton   = _single,                                       \
+            .ninstance   = 0,                                             \
+            .args        = _args,                                         \
+            .narg        = MRP_ARRAY_SIZE(_args),                         \
+            .cmds = _cmds,                                                \
+        };                                                                \
+                                                                          \
+        if ((base = strrchr(path, '/')) != NULL)                          \
+            descriptor.path = base + 1;                                   \
+        else                                                              \
+            descriptor.path = (char *)path;                               \
+                                                                          \
+        mrp_register_builtin_plugin(&descriptor);                         \
+    }                                                                     \
     struct mrp_allow_trailing_semicolon
 #else /* dynamically loaded plugins */
-#    define __MURPHY_REGISTER_PLUGIN(_name,				\
-				     _version,				\
-				     _description,			\
-				     _authors,				\
-				     _help,				\
-				     _core,				\
-				     _single,				\
-				     _init,				\
-				     _exit,				\
-				     _args,				\
-				     _cmds)				\
-    									\
-    mrp_plugin_descr_t *mrp_get_plugin_descriptor(void) {		\
-	static mrp_plugin_descr_t descriptor = {			\
-	    .name        = _name,					\
-	    .version     = _version,					\
-	    .description = _description,				\
-	    .authors     = _authors,					\
-	    .mrp_version = MRP_PLUGIN_API_VERSION,			\
-	    .help        = _help,					\
-	    .init        = _init,					\
-	    .exit        = _exit,					\
-	    .core        = _core,					\
-	    .singleton   = _single,					\
-	    .ninstance   = 0,						\
-	    .args        = _args,					\
-	    .narg        = MRP_ARRAY_SIZE(_args),			\
-	    .cmds        = _cmds,					\
-	};								\
-									\
-	return &descriptor;						\
-    }									\
+#    define __MURPHY_REGISTER_PLUGIN(_name,                               \
+                                     _version,                            \
+                                     _description,                        \
+                                     _authors,                            \
+                                     _help,                               \
+                                     _core,                               \
+                                     _single,                             \
+                                     _init,                               \
+                                     _exit,                               \
+                                     _args,                               \
+                                     _cmds)                               \
+                                                                          \
+    mrp_plugin_descr_t *mrp_get_plugin_descriptor(void) {                 \
+        static mrp_plugin_descr_t descriptor = {                          \
+            .name        = _name,                                         \
+            .version     = _version,                                      \
+            .description = _description,                                  \
+            .authors     = _authors,                                      \
+            .mrp_version = MRP_PLUGIN_API_VERSION,                        \
+            .help        = _help,                                         \
+            .init        = _init,                                         \
+            .exit        = _exit,                                         \
+            .core        = _core,                                         \
+            .singleton   = _single,                                       \
+            .ninstance   = 0,                                             \
+            .args        = _args,                                         \
+            .narg        = MRP_ARRAY_SIZE(_args),                         \
+            .cmds        = _cmds,                                         \
+        };                                                                \
+                                                                          \
+        return &descriptor;                                               \
+    }                                                                     \
     struct mrp_allow_trailing_semicolon
 #endif
 
@@ -291,15 +291,15 @@ struct mrp_plugin_s {
 int mrp_register_builtin_plugin(mrp_plugin_descr_t *descr);
 int mrp_plugin_exists(mrp_context_t *ctx, const char *name);
 mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
-			      const char *instance, mrp_plugin_arg_t *args,
-			      int narg);
+                              const char *instance, mrp_plugin_arg_t *args,
+                              int narg);
 int mrp_load_all_plugins(mrp_context_t *ctx);
 int mrp_unload_plugin(mrp_plugin_t *plugin);
 int mrp_start_plugins(mrp_context_t *ctx);
 int mrp_start_plugin(mrp_plugin_t *plugin);
 int mrp_stop_plugin(mrp_plugin_t *plugin);
 int mrp_request_plugin(mrp_context_t *ctx, const char *name,
-		       const char *instance);
+                       const char *instance);
 
 
 #endif /* __MURPHY_PLUGIN_H__ */

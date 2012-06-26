@@ -41,13 +41,13 @@ static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data);
 
 static void peer_state_cb(mrp_dbus_t *dbus, const char *name, int up,
-			  const char *owner, void *user_data);
+                          const char *owner, void *user_data);
 
 static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg);
 static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id);
 
 static DBusMessage *data_encode(const char *sender_id,
-				void *data, uint16_t tag);
+                                void *data, uint16_t tag);
 static void *data_decode(DBusMessage *m, uint16_t *tag, const char **sender_id);
 
 static DBusMessage *raw_encode(const char *sender_id, void *data, size_t size);
@@ -56,22 +56,22 @@ static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id);
 
 
 static socklen_t parse_address(const char *str, mrp_dbusaddr_t *addr,
-			       socklen_t size)
+                               socklen_t size)
 {
     const char *p, *e;
     char       *q;
     size_t      l, n;
 
     if (size < sizeof(*addr)) {
-	errno = EINVAL;
-	return FALSE;
+        errno = EINVAL;
+        return FALSE;
     }
 
     if (strncmp(str, DBUS":", DBUSL + 1))
-	return 0;
+        return 0;
     else
-	str += DBUSL + 1;
-    
+        str += DBUSL + 1;
+
     /*
      * The format of the address is
      *     dbus:[bus-address]@address/path
@@ -83,26 +83,26 @@ static socklen_t parse_address(const char *str, mrp_dbusaddr_t *addr,
     p = str;
     q = addr->db_fqa;
     l = sizeof(addr->db_fqa);
-    
+
     /* get bus address */
     if (*p != '[') {
-	errno = EINVAL;
-	return 0;
+        errno = EINVAL;
+        return 0;
     }
     else
-	p++;
+        p++;
 
     e = strchr(p, ']');
 
     if (e == NULL) {
-	errno = EINVAL;
-	return 0;
+        errno = EINVAL;
+        return 0;
     }
-    
+
     n = e - p;
     if (n >= l) {
-	errno = ENAMETOOLONG;
-	return 0;
+        errno = ENAMETOOLONG;
+        return 0;
     }
 
     /* save bus address */
@@ -113,45 +113,45 @@ static socklen_t parse_address(const char *str, mrp_dbusaddr_t *addr,
     q += n + 1;
     l -= n + 1;
     p  = e + 1;
-    
+
     /* get (local or remote) address on bus */
     if (*p != '@')
-	addr->db_addr = ANY_ADDRESS;
+        addr->db_addr = ANY_ADDRESS;
     else {
-	p++;
-	e = strchr(p, '/');
+        p++;
+        e = strchr(p, '/');
 
-	if (e == NULL) {
-	    errno = EINVAL;
-	    return 0;
-	}
-	
-	n = e - p;
-	if (n >= l) {
-	    errno = ENAMETOOLONG;
-	    return 0;
-	}
+        if (e == NULL) {
+            errno = EINVAL;
+            return 0;
+        }
 
-	/* save address on bus */
-	strncpy(q, p, n);
-	q[n] = '\0';
-	addr->db_addr = q;
-	
-	q += n + 1;
-	l -= n + 1;
-	p  = e;
+        n = e - p;
+        if (n >= l) {
+            errno = ENAMETOOLONG;
+            return 0;
+        }
+
+        /* save address on bus */
+        strncpy(q, p, n);
+        q[n] = '\0';
+        addr->db_addr = q;
+
+        q += n + 1;
+        l -= n + 1;
+        p  = e;
     }
-    
+
     /* get object path */
     if (*p != '/') {
-	errno = EINVAL;
-	return 0;
+        errno = EINVAL;
+        return 0;
     }
 
     n = snprintf(q, l, "%s%s", TRANSPORT_PATH, p);
     if (n >= l) {
-	errno = ENAMETOOLONG;
-	return 0;
+        errno = ENAMETOOLONG;
+        return 0;
     }
 
     addr->db_path   = q;
@@ -175,8 +175,8 @@ static mrp_dbusaddr_t *copy_address(mrp_dbusaddr_t *dst, mrp_dbusaddr_t *src)
 
     n = strlen(p);
     if (l < n + 1) {
-	errno = EOVERFLOW;
-	return NULL;
+        errno = EOVERFLOW;
+        return NULL;
     }
 
     dst->db_bus = q;
@@ -188,8 +188,8 @@ static mrp_dbusaddr_t *copy_address(mrp_dbusaddr_t *dst, mrp_dbusaddr_t *src)
     p = src->db_addr;
     n = strlen(p);
     if (l < n + 1) {
-	errno = EOVERFLOW;
-	return NULL;
+        errno = EOVERFLOW;
+        return NULL;
     }
 
     dst->db_addr = q;
@@ -201,8 +201,8 @@ static mrp_dbusaddr_t *copy_address(mrp_dbusaddr_t *dst, mrp_dbusaddr_t *src)
     p = src->db_path;
     n = strlen(p);
     if (l < n + 1) {
-	errno = EOVERFLOW;
-	return NULL;
+        errno = EOVERFLOW;
+        return NULL;
     }
 
     dst->db_path = q;
@@ -217,13 +217,13 @@ static mrp_dbusaddr_t *copy_address(mrp_dbusaddr_t *dst, mrp_dbusaddr_t *src)
 static inline int check_address(mrp_sockaddr_t *addr, socklen_t addrlen)
 {
     mrp_dbusaddr_t *a = (mrp_dbusaddr_t *)addr;
-    
+
     return (a->db_family = MRP_AF_DBUS && addrlen == sizeof(*a));
 }
 
 
 static size_t peer_address(mrp_sockaddr_t *addrp, const char *sender,
-			   const char *path)
+                           const char *path)
 {
     mrp_dbusaddr_t *addr = (mrp_dbusaddr_t *)addrp;
     const char     *p;
@@ -239,14 +239,14 @@ static size_t peer_address(mrp_sockaddr_t *addrp, const char *sender,
     memcpy(q, p, n + 1);
     q += n + 1;
     l -= n + 1;
-    
+
     addr->db_addr = q;
     p = sender;
     n = strlen(sender);
-    
+
     if (l < n + 1)
-	return 0;
-    
+        return 0;
+
     memcpy(q, p, n + 1);
     q += n + 1;
     l -= n + 1;
@@ -256,8 +256,8 @@ static size_t peer_address(mrp_sockaddr_t *addrp, const char *sender,
     n = strlen(p);
 
     if (l < n + 1)
-	return 0;
-    
+        return 0;
+
     memcpy(q, p, n + 1);
 
     return sizeof(addrp);
@@ -265,15 +265,15 @@ static size_t peer_address(mrp_sockaddr_t *addrp, const char *sender,
 
 
 static socklen_t dbus_resolve(const char *str, mrp_sockaddr_t *addr,
-			      socklen_t size, const char **typep)
+                              socklen_t size, const char **typep)
 {
     socklen_t len;
-    
+
     len = parse_address(str, (mrp_dbusaddr_t *)addr, size);
-    
+
     if (len > 0) {
-	if (typep != NULL)
-	    *typep = DBUS;
+        if (typep != NULL)
+            *typep = DBUS;
     }
 
     return len;
@@ -283,7 +283,7 @@ static socklen_t dbus_resolve(const char *str, mrp_sockaddr_t *addr,
 static int dbus_open(mrp_transport_t *mt)
 {
     MRP_UNUSED(mt);
-    
+
     return TRUE;
 }
 
@@ -296,84 +296,84 @@ static int dbus_createfrom(mrp_transport_t *mt, void *conn)
     t->dbus = mrp_dbus_ref(dbus);
 
     if (t->dbus != NULL)
-	return TRUE;
+        return TRUE;
     else
-	return FALSE;
+        return FALSE;
 }
 
 
 static int dbus_bind(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
-		     socklen_t addrlen)
+                     socklen_t addrlen)
 {
     dbus_t          *t    = (dbus_t *)mt;
     mrp_dbus_t      *dbus = NULL;
     mrp_dbusaddr_t  *addr = (mrp_dbusaddr_t *)addrp;
     int            (*cb)(mrp_dbus_t *, DBusMessage *, void *);
     const char      *method;
-    
+
     if (t->bound) {
-	errno = EINVAL;
-	goto fail;
+        errno = EINVAL;
+        goto fail;
     }
 
     if (!check_address(addrp, addrlen)) {
-	errno = EINVAL;
-	goto fail;
+        errno = EINVAL;
+        goto fail;
     }
-    
-    if (t->dbus == NULL) {
-	dbus = mrp_dbus_connect(t->ml, addr->db_bus, NULL);
-	    
-	if (dbus == NULL) {
-	    errno = ECONNRESET;
-	    goto fail;
-	}
-	else {
-	    t->dbus = dbus;
 
-	    if (addr->db_addr != NULL && strcmp(addr->db_addr, ANY_ADDRESS)) {
-		if (!mrp_dbus_acquire_name(t->dbus, addr->db_addr, NULL)) {
-		    errno = EADDRINUSE; /* XXX TODO, should check error... */
-		    goto fail;
-		}
-	    }
-	}
+    if (t->dbus == NULL) {
+        dbus = mrp_dbus_connect(t->ml, addr->db_bus, NULL);
+
+        if (dbus == NULL) {
+            errno = ECONNRESET;
+            goto fail;
+        }
+        else {
+            t->dbus = dbus;
+
+            if (addr->db_addr != NULL && strcmp(addr->db_addr, ANY_ADDRESS)) {
+                if (!mrp_dbus_acquire_name(t->dbus, addr->db_addr, NULL)) {
+                    errno = EADDRINUSE; /* XXX TODO, should check error... */
+                    goto fail;
+                }
+            }
+        }
     }
     else {
-	/* XXX TODO: should check given address against address of the bus */
+        /* XXX TODO: should check given address against address of the bus */
     }
-    
+
     copy_address(&t->local, addr);
-    
+
     if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
-	method = TRANSPORT_CUSTOM;
-	cb     = dbus_data_cb;
+        method = TRANSPORT_CUSTOM;
+        cb     = dbus_data_cb;
     }
     else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
-	method = TRANSPORT_RAW;
-	cb     = dbus_raw_cb;
+        method = TRANSPORT_RAW;
+        cb     = dbus_raw_cb;
     }
     else {
-	method = TRANSPORT_MESSAGE;
-	cb     = dbus_msg_cb;
+        method = TRANSPORT_MESSAGE;
+        cb     = dbus_msg_cb;
     }
 
     if (!mrp_dbus_export_method(t->dbus, addr->db_path, TRANSPORT_INTERFACE,
-				method, cb, t)) {
-	errno = EIO;
-	goto fail;
+                                method, cb, t)) {
+        errno = EIO;
+        goto fail;
     }
     else {
-	t->bound = TRUE;
-	return TRUE;
+        t->bound = TRUE;
+        return TRUE;
     }
-    
+
  fail:
     if (dbus != NULL) {
-	mrp_dbus_unref(dbus);
-	t->dbus = NULL;
+        mrp_dbus_unref(dbus);
+        t->dbus = NULL;
     }
-    
+
     return FALSE;
 }
 
@@ -384,15 +384,15 @@ static int dbus_autobind(mrp_transport_t *mt, mrp_sockaddr_t *addrp)
     char            astr[MRP_SOCKADDR_SIZE];
     mrp_sockaddr_t  addr;
     socklen_t       alen;
-    
+
     snprintf(astr, sizeof(astr), "dbus:[%s]/auto/%u", a->db_bus, nauto++);
-    
+
     alen = dbus_resolve(astr, &addr, sizeof(addr), NULL);
 
     if (alen > 0)
-	return dbus_bind(mt, &addr, alen);
+        return dbus_bind(mt, &addr, alen);
     else
-	return FALSE;
+        return FALSE;
 }
 
 
@@ -402,29 +402,29 @@ static void dbus_close(mrp_transport_t *mt)
     mrp_dbusaddr_t *addr;
     const char     *method;
     int           (*cb)(mrp_dbus_t *, DBusMessage *, void *);
-    
-    if (t->bound) {
-	if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
-	    method = TRANSPORT_CUSTOM;
-	    cb     = dbus_data_cb;
-	}
-	else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
-	    method = TRANSPORT_RAW;
-	    cb     = dbus_raw_cb;
-	}
-	else {
-	    method = TRANSPORT_MESSAGE;
-	    cb     = dbus_msg_cb;
-	}
 
-	addr = (mrp_dbusaddr_t *)&t->local;
-	mrp_dbus_remove_method(t->dbus, addr->db_path, TRANSPORT_INTERFACE,
-			       method, cb, t);
+    if (t->bound) {
+        if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
+            method = TRANSPORT_CUSTOM;
+            cb     = dbus_data_cb;
+        }
+        else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
+            method = TRANSPORT_RAW;
+            cb     = dbus_raw_cb;
+        }
+        else {
+            method = TRANSPORT_MESSAGE;
+            cb     = dbus_msg_cb;
+        }
+
+        addr = (mrp_dbusaddr_t *)&t->local;
+        mrp_dbus_remove_method(t->dbus, addr->db_path, TRANSPORT_INTERFACE,
+                               method, cb, t);
     }
-    
+
     if (t->connected && t->remote.db_addr != NULL)
-	mrp_dbus_forget_name(t->dbus, t->remote.db_addr, peer_state_cb, t);
-    
+        mrp_dbus_forget_name(t->dbus, t->remote.db_addr, peer_state_cb, t);
+
     mrp_dbus_unref(t->dbus);
     t->dbus = NULL;
 }
@@ -438,37 +438,37 @@ static int dbus_msg_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     socklen_t        alen;
     const char      *sender, *sender_path;
     mrp_msg_t       *msg;
-    
+
     MRP_UNUSED(dbus);
 
     msg = msg_decode(dmsg, &sender_path);
 
     if (msg != NULL) {
-	sender = dbus_message_get_sender(dmsg);
-	    
-	if (mt->connected) {
-	    if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvmsg(mt, msg, mt->user_data);
-		    });
-	}
-	else {
-	    peer_address(&addr, sender, sender_path);
-	    alen = sizeof(addr);
+        sender = dbus_message_get_sender(dmsg);
 
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvmsgfrom(mt, msg, &addr, alen, mt->user_data);
-		});
-	}
-	    
-	mrp_msg_unref(msg);
-	
-	mt->check_destroy(mt);
+        if (mt->connected) {
+            if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
+                MRP_TRANSPORT_BUSY(mt, {
+                        mt->evt.recvmsg(mt, msg, mt->user_data);
+                    });
+        }
+        else {
+            peer_address(&addr, sender, sender_path);
+            alen = sizeof(addr);
+
+            MRP_TRANSPORT_BUSY(mt, {
+                    mt->evt.recvmsgfrom(mt, msg, &addr, alen, mt->user_data);
+                });
+        }
+
+        mrp_msg_unref(msg);
+
+        mt->check_destroy(mt);
     }
     else {
-	mrp_log_error("Failed to decode message.");
+        mrp_log_error("Failed to decode message.");
     }
-    
+
     return TRUE;
 }
 
@@ -482,36 +482,36 @@ static int dbus_data_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     const char      *sender, *sender_path;
     uint16_t         tag;
     void            *decoded;
-    
+
     MRP_UNUSED(dbus);
 
     decoded = data_decode(dmsg, &tag, &sender_path);
-	
+
     if (decoded != NULL) {
-	sender = dbus_message_get_sender(dmsg);
-	
-	if (mt->connected) {
-	    if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvdata(mt, decoded, tag, mt->user_data);
-		    });
-	}
-	else {
-	    peer_address(&addr, sender, sender_path);
-	    alen = sizeof(addr);
+        sender = dbus_message_get_sender(dmsg);
 
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvdatafrom(mt, decoded, tag, &addr, alen,
-					 mt->user_data);
-		});
-	}
+        if (mt->connected) {
+            if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
+                MRP_TRANSPORT_BUSY(mt, {
+                        mt->evt.recvdata(mt, decoded, tag, mt->user_data);
+                    });
+        }
+        else {
+            peer_address(&addr, sender, sender_path);
+            alen = sizeof(addr);
 
-	mt->check_destroy(mt);
+            MRP_TRANSPORT_BUSY(mt, {
+                    mt->evt.recvdatafrom(mt, decoded, tag, &addr, alen,
+                                         mt->user_data);
+                });
+        }
+
+        mt->check_destroy(mt);
     }
     else {
-	mrp_log_error("Failed to decode custom data message.");
+        mrp_log_error("Failed to decode custom data message.");
     }
-    
+
     return TRUE;
 }
 
@@ -525,42 +525,42 @@ static int dbus_raw_cb(mrp_dbus_t *dbus, DBusMessage *dmsg, void *user_data)
     const char      *sender, *sender_path;
     void            *data;
     size_t           size;
-    
+
     MRP_UNUSED(dbus);
 
     data = raw_decode(dmsg, &size, &sender_path);
 
     if (data != NULL) {
-	sender = dbus_message_get_sender(dmsg);
+        sender = dbus_message_get_sender(dmsg);
 
-	if (mt->connected) {
-	    if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
-		MRP_TRANSPORT_BUSY(mt, {
-			mt->evt.recvraw(mt, data, size, mt->user_data);
-		    });
-	}
-	else {
-	    peer_address(&addr, sender, sender_path);
-	    alen = sizeof(addr);
+        if (mt->connected) {
+            if (!t->peer_resolved || !strcmp(t->remote.db_addr, sender))
+                MRP_TRANSPORT_BUSY(mt, {
+                        mt->evt.recvraw(mt, data, size, mt->user_data);
+                    });
+        }
+        else {
+            peer_address(&addr, sender, sender_path);
+            alen = sizeof(addr);
 
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.recvrawfrom(mt, data, size, &addr, alen,
-					mt->user_data);
-		});
-	}
-	
-	mt->check_destroy(mt);
+            MRP_TRANSPORT_BUSY(mt, {
+                    mt->evt.recvrawfrom(mt, data, size, &addr, alen,
+                                        mt->user_data);
+                });
+        }
+
+        mt->check_destroy(mt);
     }
     else {
-	mrp_log_error("Failed to decode raw message.");
+        mrp_log_error("Failed to decode raw message.");
     }
-    
+
     return TRUE;
 }
 
 
 static void peer_state_cb(mrp_dbus_t *dbus, const char *name, int up,
-			  const char *owner, void *user_data)
+                          const char *owner, void *user_data)
 {
     dbus_t         *t = (dbus_t *)user_data;
     mrp_sockaddr_t  addr;
@@ -569,83 +569,83 @@ static void peer_state_cb(mrp_dbus_t *dbus, const char *name, int up,
     MRP_UNUSED(name);
 
     if (up) {
-	peer_address(&addr, owner, t->remote.db_path);
-	copy_address(&t->remote, (mrp_dbusaddr_t *)&addr);
-	t->peer_resolved = TRUE;
+        peer_address(&addr, owner, t->remote.db_path);
+        copy_address(&t->remote, (mrp_dbusaddr_t *)&addr);
+        t->peer_resolved = TRUE;
     }
     else {
-	/*
-	 * XXX TODO:
-	 *     It would be really tempting here to call
-	 *         mt->evt.closed(mt, ECONNRESET, mt->user_data)
-	 *     to notify the user about the fact our peer went down.
-	 *     However, that would not be in line with the other
-	 *     transports which call the closed event handler only
-	 *     upon foricble transport closes upon errors.
-	 *
-	 *     The transport interface abstraction (especially the
-	 *     available set of events) anyway needs some eyeballing,
-	 *     so the right thing to do might be to define a new event
-	 *     for disconnection and call the handler for that here...
-	 */
+        /*
+         * XXX TODO:
+         *     It would be really tempting here to call
+         *         mt->evt.closed(mt, ECONNRESET, mt->user_data)
+         *     to notify the user about the fact our peer went down.
+         *     However, that would not be in line with the other
+         *     transports which call the closed event handler only
+         *     upon foricble transport closes upon errors.
+         *
+         *     The transport interface abstraction (especially the
+         *     available set of events) anyway needs some eyeballing,
+         *     so the right thing to do might be to define a new event
+         *     for disconnection and call the handler for that here...
+         */
     }
-    
+
 }
 
 
 static int dbus_connect(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
-			socklen_t addrlen)
+                        socklen_t addrlen)
 {
     dbus_t         *t    = (dbus_t *)mt;
     mrp_dbusaddr_t *addr = (mrp_dbusaddr_t *)addrp;
 
     if (!check_address(addrp, addrlen)) {
-	errno = EINVAL;
-	return FALSE;
+        errno = EINVAL;
+        return FALSE;
     }
 
     if (t->dbus == NULL) {
-	t->dbus = mrp_dbus_connect(t->ml, addr->db_bus, NULL);
-	
-	if (t->dbus == NULL) {
-	    errno = ECONNRESET;
-	    return FALSE;
-	}
+        t->dbus = mrp_dbus_connect(t->ml, addr->db_bus, NULL);
+
+        if (t->dbus == NULL) {
+            errno = ECONNRESET;
+            return FALSE;
+        }
     }
     else {
-	/* XXX TODO: check given address against address of the bus */
+        /* XXX TODO: check given address against address of the bus */
     }
-    
-    if (!t->bound)
-	if (!dbus_autobind(mt, addrp))
-	    return FALSE;
-    
-    if (mrp_dbus_follow_name(t->dbus, addr->db_addr, peer_state_cb, t)) {
-	copy_address(&t->remote, addr);
 
-	return TRUE;
+    if (!t->bound)
+        if (!dbus_autobind(mt, addrp))
+            return FALSE;
+
+    if (mrp_dbus_follow_name(t->dbus, addr->db_addr, peer_state_cb, t)) {
+        copy_address(&t->remote, addr);
+
+        return TRUE;
     }
     else
-	return FALSE;
+        return FALSE;
 }
 
 
 static int dbus_disconnect(mrp_transport_t *mt)
 {
     dbus_t *t = (dbus_t *)mt;
-    
+
     if (t->connected && t->remote.db_addr != NULL) {
-	mrp_dbus_forget_name(t->dbus, t->remote.db_addr, peer_state_cb, t);
-	mrp_clear(&t->remote);
-	t->peer_resolved = FALSE;
+        mrp_dbus_forget_name(t->dbus, t->remote.db_addr, peer_state_cb, t);
+        mrp_clear(&t->remote);
+        t->peer_resolved = FALSE;
     }
-    
+
     return TRUE;
 }
 
 
 static int dbus_sendmsgto(mrp_transport_t *mt, mrp_msg_t *msg,
-			  mrp_sockaddr_t *addrp, socklen_t addrlen)
+                          mrp_sockaddr_t *addrp, socklen_t addrlen)
 {
     dbus_t         *t    = (dbus_t *)mt;
     mrp_dbusaddr_t *addr = (mrp_dbusaddr_t *)addrp;
@@ -653,29 +653,29 @@ static int dbus_sendmsgto(mrp_transport_t *mt, mrp_msg_t *msg,
     int             success;
 
     if (check_address(addrp, addrlen)) {
-	if (t->dbus == NULL && !dbus_autobind(mt, addrp))
-	    return FALSE;
-	
-	m = msg_encode(t->local.db_path, msg);
+        if (t->dbus == NULL && !dbus_autobind(mt, addrp))
+            return FALSE;
 
-	if (m != NULL) {
-	    if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
-			      TRANSPORT_INTERFACE, TRANSPORT_MESSAGE,
-			      0, NULL, NULL, m))
-		success = TRUE;
-	    else {
-		errno   = ECOMM;
-		success = FALSE;
-	    }
+        m = msg_encode(t->local.db_path, msg);
 
-	    dbus_message_unref(m);
-	}
-	else
-	    success = FALSE;
+        if (m != NULL) {
+            if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
+                              TRANSPORT_INTERFACE, TRANSPORT_MESSAGE,
+                              0, NULL, NULL, m))
+                success = TRUE;
+            else {
+                errno   = ECOMM;
+                success = FALSE;
+            }
+
+            dbus_message_unref(m);
+        }
+        else
+            success = FALSE;
     }
     else {
-	errno   = EINVAL;
-	success = FALSE;
+        errno   = EINVAL;
+        success = FALSE;
     }
 
     return success;
@@ -687,52 +687,52 @@ static int dbus_sendmsg(mrp_transport_t *mt, mrp_msg_t *msg)
     dbus_t         *t    = (dbus_t *)mt;
     mrp_sockaddr_t *addr = (mrp_sockaddr_t *)&t->remote;
     socklen_t       alen = sizeof(t->remote);
-    
+
     return dbus_sendmsgto(mt, msg, addr, alen);
 }
 
 
 static int dbus_sendrawto(mrp_transport_t *mt, void *data, size_t size,
-			  mrp_sockaddr_t *addrp, socklen_t addrlen)
+                          mrp_sockaddr_t *addrp, socklen_t addrlen)
 {
     dbus_t         *t    = (dbus_t *)mt;
     mrp_dbusaddr_t *addr = (mrp_dbusaddr_t *)addrp;
     DBusMessage    *m;
     int             success;
 
-    
+
     MRP_UNUSED(mt);
     MRP_UNUSED(data);
     MRP_UNUSED(size);
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
-    
+
     if (check_address(addrp, addrlen)) {
-	if (t->dbus == NULL && !dbus_autobind(mt, addrp))
-	    return FALSE;
-	
-	m = raw_encode(t->local.db_path, data, size);
+        if (t->dbus == NULL && !dbus_autobind(mt, addrp))
+            return FALSE;
 
-	if (m != NULL) {
-	    if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
-			      TRANSPORT_INTERFACE, TRANSPORT_RAW,
-			      0, NULL, NULL, m))
-		success = TRUE;
-	    else {
-		errno   = ECOMM;
-		success = FALSE;
-	    }
+        m = raw_encode(t->local.db_path, data, size);
 
-	    dbus_message_unref(m);
-	}
-	else
-	    success = FALSE;
+        if (m != NULL) {
+            if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
+                              TRANSPORT_INTERFACE, TRANSPORT_RAW,
+                              0, NULL, NULL, m))
+                success = TRUE;
+            else {
+                errno   = ECOMM;
+                success = FALSE;
+            }
+
+            dbus_message_unref(m);
+        }
+        else
+            success = FALSE;
     }
     else {
-	errno   = EINVAL;
-	success = FALSE;
+        errno   = EINVAL;
+        success = FALSE;
     }
-    
+
     return success;
 }
 
@@ -742,13 +742,13 @@ static int dbus_sendraw(mrp_transport_t *mt, void *data, size_t size)
     dbus_t         *t    = (dbus_t *)mt;
     mrp_sockaddr_t *addr = (mrp_sockaddr_t *)&t->remote;
     socklen_t       alen = sizeof(t->remote);
-    
+
     return dbus_sendrawto(mt, data, size, addr, alen);
 }
 
 
 static int dbus_senddatato(mrp_transport_t *mt, void *data, uint16_t tag,
-			   mrp_sockaddr_t *addrp, socklen_t addrlen)
+                           mrp_sockaddr_t *addrp, socklen_t addrlen)
 {
     dbus_t         *t    = (dbus_t *)mt;
     mrp_dbusaddr_t *addr = (mrp_dbusaddr_t *)addrp;
@@ -756,29 +756,29 @@ static int dbus_senddatato(mrp_transport_t *mt, void *data, uint16_t tag,
     int             success;
 
     if (check_address(addrp, addrlen)) {
-	if (t->dbus == NULL && !dbus_autobind(mt, addrp))
-	    return FALSE;
+        if (t->dbus == NULL && !dbus_autobind(mt, addrp))
+            return FALSE;
 
-	m = data_encode(t->local.db_path, data, tag);
+        m = data_encode(t->local.db_path, data, tag);
 
-	if (m != NULL) {
-	    if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
-			      TRANSPORT_INTERFACE, TRANSPORT_CUSTOM,
-			      0, NULL, NULL, m))
-		success = TRUE;
-	    else {
-		errno   = ECOMM;
-		success = FALSE;
-	    }
-	    
-	    dbus_message_unref(m);
-	}
-	else
-	    success = FALSE;
+        if (m != NULL) {
+            if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
+                              TRANSPORT_INTERFACE, TRANSPORT_CUSTOM,
+                              0, NULL, NULL, m))
+                success = TRUE;
+            else {
+                errno   = ECOMM;
+                success = FALSE;
+            }
+
+            dbus_message_unref(m);
+        }
+        else
+            success = FALSE;
     }
     else {
-	errno   = EINVAL;
-	success = FALSE;
+        errno   = EINVAL;
+        success = FALSE;
     }
 
     return success;
@@ -797,25 +797,25 @@ static int dbus_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
 
 static const char *get_array_signature(uint16_t type)
 {
-#define MAP(from, to) \
-    case MRP_MSG_FIELD_##from:			\
-	return DBUS_TYPE_##to##_AS_STRING;
-    
+#define MAP(from, to)                                 \
+    case MRP_MSG_FIELD_##from:                        \
+        return DBUS_TYPE_##to##_AS_STRING;
+
     switch (type) {
-	MAP(STRING, STRING);
-	MAP(BOOL  , BOOLEAN);
-	MAP(UINT8 , UINT16);
-	MAP(SINT8 , INT16);
-	MAP(UINT16, UINT16);
-	MAP(SINT16, INT16);
-	MAP(UINT32, UINT32);
-	MAP(SINT32, INT32);
-	MAP(UINT64, UINT64);
-	MAP(SINT64, INT64);
-	MAP(DOUBLE, DOUBLE);
-	MAP(BLOB  , BYTE  );
+        MAP(STRING, STRING);
+        MAP(BOOL  , BOOLEAN);
+        MAP(UINT8 , UINT16);
+        MAP(SINT8 , INT16);
+        MAP(UINT16, UINT16);
+        MAP(SINT16, INT16);
+        MAP(UINT32, UINT32);
+        MAP(SINT32, INT32);
+        MAP(UINT64, UINT64);
+        MAP(SINT64, INT64);
+        MAP(DOUBLE, DOUBLE);
+        MAP(BLOB  , BYTE  );
     default:
-	return NULL;
+        return NULL;
     }
 }
 
@@ -829,44 +829,44 @@ static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg)
      *        to specify the type and gcc uses a signed char). The
      *        QUIRKY versions of the macros take care of these mismatches.
      */
-    
-#define BASIC_SIMPLE(_i, _mtype, _dtype, _val)				\
-	case MRP_MSG_FIELD_##_mtype:					\
-	    type = DBUS_TYPE_##_dtype;					\
-	    vptr = &(_val);						\
-									\
-	    if (!dbus_message_iter_append_basic(_i, type, vptr))	\
-		goto fail;						\
-	    break
 
-#define BASIC_QUIRKY(_i, _mtype, _dtype, _mval, _dval)			\
-	case MRP_MSG_FIELD_##_mtype:					\
-	    type  = DBUS_TYPE_##_dtype;					\
-	    _dval = _mval;						\
-	    vptr  = &_dval;						\
-									\
-	    if (!dbus_message_iter_append_basic(_i, type, vptr))	\
-		goto fail;						\
-	    break
+#define BASIC_SIMPLE(_i, _mtype, _dtype, _val)                            \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            type = DBUS_TYPE_##_dtype;                                    \
+            vptr = &(_val);                                               \
+                                                                          \
+            if (!dbus_message_iter_append_basic(_i, type, vptr))          \
+                goto fail;                                                \
+            break
 
-#define ARRAY_SIMPLE(_i, _mtype, _dtype, _val)				  \
-		case MRP_MSG_FIELD_##_mtype:				  \
-		    type = DBUS_TYPE_##_dtype;				  \
-		    vptr = &_val;					  \
-									  \
-		    if (!dbus_message_iter_append_basic(_i, type, vptr))  \
-			goto fail;					  \
-		    break
+#define BASIC_QUIRKY(_i, _mtype, _dtype, _mval, _dval)                    \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            type  = DBUS_TYPE_##_dtype;                                   \
+            _dval = _mval;                                                \
+            vptr  = &_dval;                                               \
+                                                                          \
+            if (!dbus_message_iter_append_basic(_i, type, vptr))          \
+                goto fail;                                                \
+            break
 
-#define ARRAY_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)			  \
-		case MRP_MSG_FIELD_##_mtype:				  \
-		    type  = DBUS_TYPE_##_dtype;				  \
-		    _dvar = _mvar;					  \
-		    vptr  = &_dvar;					  \
-									  \
-		    if (!dbus_message_iter_append_basic(_i, type, vptr))  \
-			goto fail;					  \
-		    break
+#define ARRAY_SIMPLE(_i, _mtype, _dtype, _val)                            \
+                case MRP_MSG_FIELD_##_mtype:                              \
+                    type = DBUS_TYPE_##_dtype;                            \
+                    vptr = &_val;                                         \
+                                                                          \
+                    if (!dbus_message_iter_append_basic(_i, type, vptr))  \
+                        goto fail;                                        \
+                    break
+
+#define ARRAY_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)                    \
+                case MRP_MSG_FIELD_##_mtype:                              \
+                    type  = DBUS_TYPE_##_dtype;                           \
+                    _dvar = _mvar;                                        \
+                    vptr  = &_dvar;                                       \
+                                                                          \
+                    if (!dbus_message_iter_append_basic(_i, type, vptr))  \
+                        goto fail;                                        \
+                    break
 
     DBusMessage     *m;
     mrp_list_hook_t *p, *n;
@@ -882,102 +882,102 @@ static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg)
     int16_t          s16;
 
     m = dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL);
-    
+
     if (m == NULL)
-	return NULL;
-    
+        return NULL;
+
     dbus_message_iter_init_append(m, &im);
 
     if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_OBJECT_PATH, &sender_id))
-	goto fail;
+        goto fail;
 
     if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &msg->nfield))
-	goto fail;
-    
+        goto fail;
+
     mrp_list_foreach(&msg->fields, p, n) {
-	f = mrp_list_entry(p, typeof(*f), hook);
-	
-	if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->tag) ||
-	    !dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->type))
-	    goto fail;
-		
-	switch (f->type) {
-	    BASIC_SIMPLE(&im, STRING, STRING , f->str);
-	    BASIC_QUIRKY(&im, BOOL  , BOOLEAN, f->bln, bln);
-	    BASIC_QUIRKY(&im, UINT8 , UINT16 , f->u8 , u16);
-	    BASIC_QUIRKY(&im, SINT8 ,  INT16 , f->s8 , s16);
-	    BASIC_SIMPLE(&im, UINT16, UINT16 , f->u16);
-	    BASIC_SIMPLE(&im, SINT16,  INT16 , f->s16);
-	    BASIC_SIMPLE(&im, UINT32, UINT32 , f->u32);
-	    BASIC_SIMPLE(&im, SINT32,  INT32 , f->s32);
-	    BASIC_SIMPLE(&im, UINT64, UINT64 , f->u64);
-	    BASIC_SIMPLE(&im, SINT64,  INT64 , f->s64);
-	    BASIC_SIMPLE(&im, DOUBLE, DOUBLE , f->dbl);
-	    
-	case MRP_MSG_FIELD_BLOB:
-	    vptr = f->blb;
-	    len  = (int)f->size[0];
-	    sig  = get_array_signature(f->type);
+        f = mrp_list_entry(p, typeof(*f), hook);
 
-	    if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
-						  sig, &ia) ||
-		!dbus_message_iter_append_fixed_array(&ia, sig[0],
-						      &vptr, len) ||
-		!dbus_message_iter_close_container(&im, &ia))
-		goto fail;
-	    break;
-	    
-	default:
-	    if (f->type & MRP_MSG_FIELD_ARRAY) {
-		base  = f->type & ~(MRP_MSG_FIELD_ARRAY);
-		asize = f->size[0];
-		sig   = get_array_signature(base);
+        if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->tag) ||
+            !dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->type))
+            goto fail;
 
-		if (!dbus_message_iter_append_basic(&im,
-						    DBUS_TYPE_UINT32, &asize))
-		    goto fail;
+        switch (f->type) {
+            BASIC_SIMPLE(&im, STRING, STRING , f->str);
+            BASIC_QUIRKY(&im, BOOL  , BOOLEAN, f->bln, bln);
+            BASIC_QUIRKY(&im, UINT8 , UINT16 , f->u8 , u16);
+            BASIC_QUIRKY(&im, SINT8 ,  INT16 , f->s8 , s16);
+            BASIC_SIMPLE(&im, UINT16, UINT16 , f->u16);
+            BASIC_SIMPLE(&im, SINT16,  INT16 , f->s16);
+            BASIC_SIMPLE(&im, UINT32, UINT32 , f->u32);
+            BASIC_SIMPLE(&im, SINT32,  INT32 , f->s32);
+            BASIC_SIMPLE(&im, UINT64, UINT64 , f->u64);
+            BASIC_SIMPLE(&im, SINT64,  INT64 , f->s64);
+            BASIC_SIMPLE(&im, DOUBLE, DOUBLE , f->dbl);
 
-		if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
-						      sig, &ia))
-		    goto fail;
+        case MRP_MSG_FIELD_BLOB:
+            vptr = f->blb;
+            len  = (int)f->size[0];
+            sig  = get_array_signature(f->type);
 
-		for (i = 0; i < asize; i++) {
-		    switch (base) {
-			ARRAY_SIMPLE(&ia, STRING, STRING , f->astr[i]);
-			ARRAY_QUIRKY(&ia, BOOL  , BOOLEAN, f->abln[i], bln);
-			ARRAY_QUIRKY(&ia, UINT8 , UINT16 , f->au8[i] , u16);
-			ARRAY_QUIRKY(&ia, SINT8 ,  INT16 , f->as8[i] , s16);
-			ARRAY_SIMPLE(&ia, UINT16, UINT16 , f->au16[i]);
-			ARRAY_SIMPLE(&ia, SINT16,  INT16 , f->as16[i]);
-			ARRAY_SIMPLE(&ia, UINT32, UINT32 , f->au32[i]);
-			ARRAY_SIMPLE(&ia, SINT32,  INT32 , f->as32[i]);
-			ARRAY_SIMPLE(&ia, UINT64, UINT64 , f->au64[i]);
-			ARRAY_SIMPLE(&ia, DOUBLE, DOUBLE , f->adbl[i]);
-			
-		    case MRP_MSG_FIELD_BLOB:
-			goto fail;
-			    
-		    default:
-			goto fail;
-		    }
-		}
-		
-		if (!dbus_message_iter_close_container(&im, &ia))
-		    goto fail;
-	    }
-	    else
-		goto fail;
-	}
+            if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
+                                                  sig, &ia) ||
+                !dbus_message_iter_append_fixed_array(&ia, sig[0],
+                                                      &vptr, len) ||
+                !dbus_message_iter_close_container(&im, &ia))
+                goto fail;
+            break;
+
+        default:
+            if (f->type & MRP_MSG_FIELD_ARRAY) {
+                base  = f->type & ~(MRP_MSG_FIELD_ARRAY);
+                asize = f->size[0];
+                sig   = get_array_signature(base);
+
+                if (!dbus_message_iter_append_basic(&im,
+                                                    DBUS_TYPE_UINT32, &asize))
+                    goto fail;
+
+                if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
+                                                      sig, &ia))
+                    goto fail;
+
+                for (i = 0; i < asize; i++) {
+                    switch (base) {
+                        ARRAY_SIMPLE(&ia, STRING, STRING , f->astr[i]);
+                        ARRAY_QUIRKY(&ia, BOOL  , BOOLEAN, f->abln[i], bln);
+                        ARRAY_QUIRKY(&ia, UINT8 , UINT16 , f->au8[i] , u16);
+                        ARRAY_QUIRKY(&ia, SINT8 ,  INT16 , f->as8[i] , s16);
+                        ARRAY_SIMPLE(&ia, UINT16, UINT16 , f->au16[i]);
+                        ARRAY_SIMPLE(&ia, SINT16,  INT16 , f->as16[i]);
+                        ARRAY_SIMPLE(&ia, UINT32, UINT32 , f->au32[i]);
+                        ARRAY_SIMPLE(&ia, SINT32,  INT32 , f->as32[i]);
+                        ARRAY_SIMPLE(&ia, UINT64, UINT64 , f->au64[i]);
+                        ARRAY_SIMPLE(&ia, DOUBLE, DOUBLE , f->adbl[i]);
+
+                    case MRP_MSG_FIELD_BLOB:
+                        goto fail;
+
+                    default:
+                        goto fail;
+                    }
+                }
+
+                if (!dbus_message_iter_close_container(&im, &ia))
+                    goto fail;
+            }
+            else
+                goto fail;
+        }
     }
 
     return m;
-    
+
  fail:
     if (m != NULL)
-	dbus_message_unref(m);
-    
+        dbus_message_unref(m);
+
     errno = ECOMM;
-    
+
     return FALSE;
 
 #undef BASIC_SIMPLE
@@ -989,55 +989,55 @@ static DBusMessage *msg_encode(const char *sender_id, mrp_msg_t *msg)
 
 static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
 {
-#define BASIC_SIMPLE(_i, _mtype, _dtype, _var)				   \
-	case MRP_MSG_FIELD_##_mtype:					   \
-	    if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype)  \
-		goto fail;						   \
-	    dbus_message_iter_get_basic(_i, &(_var));			   \
-	    dbus_message_iter_next(_i);					   \
-									   \
-	    if (!mrp_msg_append(msg, tag, type, (_var)))		   \
-		goto fail;						   \
-	    break
+#define BASIC_SIMPLE(_i, _mtype, _dtype, _var)                            \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype) \
+                goto fail;                                                \
+            dbus_message_iter_get_basic(_i, &(_var));                     \
+            dbus_message_iter_next(_i);                                   \
+                                                                          \
+            if (!mrp_msg_append(msg, tag, type, (_var)))                  \
+                goto fail;                                                \
+            break
 
-#define BASIC_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)			   \
-	case MRP_MSG_FIELD_##_mtype:					   \
-	    if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype)  \
-		goto fail;						   \
-	    dbus_message_iter_get_basic(_i, &(_dvar));			   \
-	    dbus_message_iter_next(_i);					   \
-									   \
-	    _mvar = _dvar;						   \
-	    if (!mrp_msg_append(msg, tag, type, (_mvar)))		   \
-		goto fail;						   \
-	    break
+#define BASIC_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)                    \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype) \
+                goto fail;                                                \
+            dbus_message_iter_get_basic(_i, &(_dvar));                    \
+            dbus_message_iter_next(_i);                                   \
+                                                                          \
+            _mvar = _dvar;                                                \
+            if (!mrp_msg_append(msg, tag, type, (_mvar)))                 \
+                goto fail;                                                \
+            break
 
-#define ARRAY_SIMPLE(_i, _mtype, _dtype, _var)				   \
-	case MRP_MSG_FIELD_##_mtype:					   \
-	    if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype)  \
-		goto fail;						   \
-	    dbus_message_iter_get_basic(_i, &(_var));			   \
-	    dbus_message_iter_next(_i);					   \
-	    break
+#define ARRAY_SIMPLE(_i, _mtype, _dtype, _var)                            \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype) \
+                goto fail;                                                \
+            dbus_message_iter_get_basic(_i, &(_var));                     \
+            dbus_message_iter_next(_i);                                   \
+            break
 
-#define ARRAY_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)			   \
-	case MRP_MSG_FIELD_##_mtype:					   \
-	    if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype)  \
-		goto fail;						   \
-	    dbus_message_iter_get_basic(_i, &(_dvar));			   \
-	    dbus_message_iter_next(_i);					   \
-									   \
-	    _mvar = _dvar;						   \
-	    break
+#define ARRAY_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)                    \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype) \
+                goto fail;                                                \
+            dbus_message_iter_get_basic(_i, &(_dvar));                    \
+            dbus_message_iter_next(_i);                                   \
+                                                                          \
+            _mvar = _dvar;                                                \
+            break
 
-#define APPEND_ARRAY(_type, _var)					\
-		case MRP_MSG_FIELD_##_type:				\
-		    if (!mrp_msg_append(msg, tag,			\
-					MRP_MSG_FIELD_ARRAY |		\
-					MRP_MSG_FIELD_##_type,		\
-					n, _var))			\
-			goto fail;					\
-		    break
+#define APPEND_ARRAY(_type, _var)                                         \
+                case MRP_MSG_FIELD_##_type:                               \
+                    if (!mrp_msg_append(msg, tag,                         \
+                                        MRP_MSG_FIELD_ARRAY |             \
+                                        MRP_MSG_FIELD_##_type,            \
+                                        n, _var))                         \
+                        goto fail;                                        \
+                    break
 
     mrp_msg_t       *msg;
     mrp_msg_value_t  v;
@@ -1051,139 +1051,139 @@ static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
     const char      *sender;
 
     if (!dbus_message_iter_init(m, &im))
-	goto fail;
+        goto fail;
 
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_OBJECT_PATH)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_get_basic(&im, &sender);
     dbus_message_iter_next(&im);
-    
+
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_get_basic(&im, &nfield);
     dbus_message_iter_next(&im);
 
     msg = mrp_msg_create_empty();
-    
+
     if (msg == NULL)
-	goto fail;
+        goto fail;
 
     for (i = 0; i < nfield; i++) {
-	if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	    goto fail;
+        if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
+            goto fail;
 
-	dbus_message_iter_get_basic(&im, &tag);
-	dbus_message_iter_next(&im);
+        dbus_message_iter_get_basic(&im, &tag);
+        dbus_message_iter_next(&im);
 
-	if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	    goto fail;
-	
-	dbus_message_iter_get_basic(&im, &type);
-	dbus_message_iter_next(&im);
+        if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
+            goto fail;
 
-	switch (type) {
-	    BASIC_SIMPLE(&im, STRING, STRING , v.str);
-	    BASIC_QUIRKY(&im, BOOL  , BOOLEAN, v.bln, u32);
-	    BASIC_QUIRKY(&im, UINT8 , UINT16 , v.u8 , u16);
-	    BASIC_QUIRKY(&im, SINT8 ,  INT16 , v.s8 , s16);
-	    BASIC_SIMPLE(&im, UINT16, UINT16 , v.u16);
-	    BASIC_SIMPLE(&im, SINT16,  INT16 , v.s16);
-	    BASIC_SIMPLE(&im, UINT32, UINT32 , v.u32);
-	    BASIC_SIMPLE(&im, SINT32,  INT32 , v.s32);
-	    BASIC_SIMPLE(&im, UINT64, UINT64 , v.u64);
-	    BASIC_SIMPLE(&im, SINT64,  INT64 , v.s64);
-	    BASIC_SIMPLE(&im, DOUBLE, DOUBLE , v.dbl);
-	    
-	case MRP_MSG_FIELD_BLOB:
-	    if (dbus_message_iter_get_element_type(&im) != DBUS_TYPE_BYTE)
-		goto fail;
+        dbus_message_iter_get_basic(&im, &type);
+        dbus_message_iter_next(&im);
 
-	    dbus_message_iter_recurse(&im, &ia);
-	    dbus_message_iter_get_fixed_array(&ia, &v.blb, &asize);
-	    dbus_message_iter_next(&im);
-	    if (!mrp_msg_append(msg, tag, type, asize, v.blb))
-		goto fail;
-	    break;
-	    
-	default:
-	    if (!(type & MRP_MSG_FIELD_ARRAY))
-		goto fail;
-	    
-	    base = type & ~(MRP_MSG_FIELD_ARRAY);
-		
-	    if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT32)
-		goto fail;
-		
-	    dbus_message_iter_get_basic(&im, &n);
-	    dbus_message_iter_next(&im);
+        switch (type) {
+            BASIC_SIMPLE(&im, STRING, STRING , v.str);
+            BASIC_QUIRKY(&im, BOOL  , BOOLEAN, v.bln, u32);
+            BASIC_QUIRKY(&im, UINT8 , UINT16 , v.u8 , u16);
+            BASIC_QUIRKY(&im, SINT8 ,  INT16 , v.s8 , s16);
+            BASIC_SIMPLE(&im, UINT16, UINT16 , v.u16);
+            BASIC_SIMPLE(&im, SINT16,  INT16 , v.s16);
+            BASIC_SIMPLE(&im, UINT32, UINT32 , v.u32);
+            BASIC_SIMPLE(&im, SINT32,  INT32 , v.s32);
+            BASIC_SIMPLE(&im, UINT64, UINT64 , v.u64);
+            BASIC_SIMPLE(&im, SINT64,  INT64 , v.s64);
+            BASIC_SIMPLE(&im, DOUBLE, DOUBLE , v.dbl);
 
-	    if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_ARRAY)
-		goto fail;
-	    dbus_message_iter_recurse(&im, &ia);
-	    dbus_message_iter_next(&im);
+        case MRP_MSG_FIELD_BLOB:
+            if (dbus_message_iter_get_element_type(&im) != DBUS_TYPE_BYTE)
+                goto fail;
 
-	    {
-		char     *astr[n];
-		uint32_t  dbln[n];
-		bool      abln[n];
-		uint8_t   au8 [n];
-		int8_t    as8 [n];
-		uint16_t  au16[n];
-		int16_t   as16[n];
-		uint32_t  au32[n];
-		int32_t   as32[n];
-		uint64_t  au64[n];
-		int64_t   as64[n];
-		double    adbl[n];
+            dbus_message_iter_recurse(&im, &ia);
+            dbus_message_iter_get_fixed_array(&ia, &v.blb, &asize);
+            dbus_message_iter_next(&im);
+            if (!mrp_msg_append(msg, tag, type, asize, v.blb))
+                goto fail;
+            break;
 
-		for (j = 0; j < n; j++) {
-		    switch (base) {
-			ARRAY_SIMPLE(&ia, STRING, STRING , astr[j]);
-			ARRAY_QUIRKY(&ia, BOOL  , BOOLEAN, abln[j], dbln[j]);
-			ARRAY_QUIRKY(&ia, UINT8 , UINT16 , au8[j] , au16[j]);
-			ARRAY_QUIRKY(&ia, SINT8 ,  INT16 , as8[j] , as16[j]);
-			ARRAY_SIMPLE(&ia, UINT16, UINT16 , au16[j]);
-			ARRAY_SIMPLE(&ia, SINT16,  INT16 , as16[j]);
-			ARRAY_SIMPLE(&ia, UINT32, UINT32 , au32[j]);
-			ARRAY_SIMPLE(&ia, SINT32,  INT32 , as32[j]);
-			ARRAY_SIMPLE(&ia, UINT64, UINT64 , au64[j]);
-			ARRAY_SIMPLE(&ia, SINT64,  INT64 , as64[j]);
-			ARRAY_SIMPLE(&ia, DOUBLE, DOUBLE , adbl[j]);
-		    default:
-			goto fail;
-		    }
-		}
+        default:
+            if (!(type & MRP_MSG_FIELD_ARRAY))
+                goto fail;
 
-		switch (base) {
-		    APPEND_ARRAY(STRING, astr);
-		    APPEND_ARRAY(BOOL  , abln);
-		    APPEND_ARRAY(UINT8 , au8 );
-		    APPEND_ARRAY(SINT8 , as8 );
-		    APPEND_ARRAY(UINT16, au16);
-		    APPEND_ARRAY(SINT16, as16);
-		    APPEND_ARRAY(UINT32, au32);
-		    APPEND_ARRAY(SINT32, as32);
-		    APPEND_ARRAY(UINT64, au64);
-		    APPEND_ARRAY(SINT64, as64);
-		    APPEND_ARRAY(DOUBLE, adbl);
-		default:
-		    goto fail;
-		}
-	    }
-	}
+            base = type & ~(MRP_MSG_FIELD_ARRAY);
+
+            if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT32)
+                goto fail;
+
+            dbus_message_iter_get_basic(&im, &n);
+            dbus_message_iter_next(&im);
+
+            if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_ARRAY)
+                goto fail;
+            dbus_message_iter_recurse(&im, &ia);
+            dbus_message_iter_next(&im);
+
+            {
+                char     *astr[n];
+                uint32_t  dbln[n];
+                bool      abln[n];
+                uint8_t   au8 [n];
+                int8_t    as8 [n];
+                uint16_t  au16[n];
+                int16_t   as16[n];
+                uint32_t  au32[n];
+                int32_t   as32[n];
+                uint64_t  au64[n];
+                int64_t   as64[n];
+                double    adbl[n];
+
+                for (j = 0; j < n; j++) {
+                    switch (base) {
+                        ARRAY_SIMPLE(&ia, STRING, STRING , astr[j]);
+                        ARRAY_QUIRKY(&ia, BOOL  , BOOLEAN, abln[j], dbln[j]);
+                        ARRAY_QUIRKY(&ia, UINT8 , UINT16 , au8[j] , au16[j]);
+                        ARRAY_QUIRKY(&ia, SINT8 ,  INT16 , as8[j] , as16[j]);
+                        ARRAY_SIMPLE(&ia, UINT16, UINT16 , au16[j]);
+                        ARRAY_SIMPLE(&ia, SINT16,  INT16 , as16[j]);
+                        ARRAY_SIMPLE(&ia, UINT32, UINT32 , au32[j]);
+                        ARRAY_SIMPLE(&ia, SINT32,  INT32 , as32[j]);
+                        ARRAY_SIMPLE(&ia, UINT64, UINT64 , au64[j]);
+                        ARRAY_SIMPLE(&ia, SINT64,  INT64 , as64[j]);
+                        ARRAY_SIMPLE(&ia, DOUBLE, DOUBLE , adbl[j]);
+                    default:
+                        goto fail;
+                    }
+                }
+
+                switch (base) {
+                    APPEND_ARRAY(STRING, astr);
+                    APPEND_ARRAY(BOOL  , abln);
+                    APPEND_ARRAY(UINT8 , au8 );
+                    APPEND_ARRAY(SINT8 , as8 );
+                    APPEND_ARRAY(UINT16, au16);
+                    APPEND_ARRAY(SINT16, as16);
+                    APPEND_ARRAY(UINT32, au32);
+                    APPEND_ARRAY(SINT32, as32);
+                    APPEND_ARRAY(UINT64, au64);
+                    APPEND_ARRAY(SINT64, as64);
+                    APPEND_ARRAY(DOUBLE, adbl);
+                default:
+                    goto fail;
+                }
+            }
+        }
     }
 
     if (sender_id != NULL)
-	*sender_id = sender;
+        *sender_id = sender;
 
     return msg;
-    
+
  fail:
     mrp_msg_unref(msg);
     errno = EBADMSG;
-    
+
     return NULL;
 
 #undef BASIC_SIMPLE
@@ -1196,43 +1196,43 @@ static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
 
 static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
 {
-#define BASIC_SIMPLE(_mtype, _dtype, _val)				\
-	case MRP_MSG_FIELD_##_mtype:					\
-	    type = DBUS_TYPE_##_dtype;					\
-	    vptr = &(_val);						\
-									\
-	    if (!dbus_message_iter_append_basic(&im, type, vptr))	\
-		goto fail;						\
-	    break
+#define BASIC_SIMPLE(_mtype, _dtype, _val)                                \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            type = DBUS_TYPE_##_dtype;                                    \
+            vptr = &(_val);                                               \
+                                                                          \
+            if (!dbus_message_iter_append_basic(&im, type, vptr))         \
+                goto fail;                                                \
+            break
 
-#define BASIC_QUIRKY(_mtype, _dtype, _mval, _dval)			\
-	case MRP_MSG_FIELD_##_mtype:					\
-	    type  = DBUS_TYPE_##_dtype;					\
-	    _dval = _mval;						\
-	    vptr  = &_dval;						\
-									\
-	    if (!dbus_message_iter_append_basic(&im, type, vptr))	\
-		goto fail;						\
-	    break
+#define BASIC_QUIRKY(_mtype, _dtype, _mval, _dval)                        \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            type  = DBUS_TYPE_##_dtype;                                   \
+            _dval = _mval;                                                \
+            vptr  = &_dval;                                               \
+                                                                          \
+            if (!dbus_message_iter_append_basic(&im, type, vptr))         \
+                goto fail;                                                \
+            break
 
-#define ARRAY_SIMPLE(_mtype, _dtype, _val)				  \
-		case MRP_MSG_FIELD_##_mtype:				  \
-		    type = DBUS_TYPE_##_dtype;				  \
-		    vptr = &_val;					  \
-									  \
-		    if (!dbus_message_iter_append_basic(&ia, type, vptr)) \
-			goto fail;					  \
-		    break
+#define ARRAY_SIMPLE(_mtype, _dtype, _val)                                \
+                case MRP_MSG_FIELD_##_mtype:                              \
+                    type = DBUS_TYPE_##_dtype;                            \
+                    vptr = &_val;                                         \
+                                                                          \
+                    if (!dbus_message_iter_append_basic(&ia, type, vptr)) \
+                        goto fail;                                        \
+                    break
 
-#define ARRAY_QUIRKY(_mtype, _dtype, _mvar, _dvar)			  \
-		case MRP_MSG_FIELD_##_mtype:				  \
-		    type  = DBUS_TYPE_##_dtype;				  \
-		    _dvar = _mvar;					  \
-		    vptr = &_dvar;					  \
-									  \
-		    if (!dbus_message_iter_append_basic(&ia, type, vptr)) \
-			goto fail;					  \
-		    break
+#define ARRAY_QUIRKY(_mtype, _dtype, _mvar, _dvar)                        \
+                case MRP_MSG_FIELD_##_mtype:                              \
+                    type  = DBUS_TYPE_##_dtype;                           \
+                    _dvar = _mvar;                                        \
+                    vptr = &_dvar;                                        \
+                                                                          \
+                    if (!dbus_message_iter_append_basic(&ia, type, vptr)) \
+                        goto fail;                                        \
+                    break
 
     DBusMessage       *m;
     mrp_data_descr_t  *descr;
@@ -1250,111 +1250,111 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
     uint32_t           bln;
 
     m = dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL);
-    
+
     if (m == NULL)
-	return NULL;
-    
+        return NULL;
+
     descr = mrp_msg_find_type(tag);
-    
+
     if (descr == NULL)
-	goto fail;
+        goto fail;
 
     fields = descr->fields;
     nfield = descr->nfield;
-    
+
     dbus_message_iter_init_append(m, &im);
 
     if (!dbus_message_iter_append_basic(&im,
-					DBUS_TYPE_OBJECT_PATH, &sender_id))
-	goto fail;
+                                        DBUS_TYPE_OBJECT_PATH, &sender_id))
+        goto fail;
 
     if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &tag))
-	goto fail;
+        goto fail;
 
     if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &nfield))
-	goto fail;
+        goto fail;
 
     for (i = 0, f = fields; i < nfield; i++, f++) {
-	if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->tag) ||
-	    !dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->type))
-	    goto fail;
+        if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->tag) ||
+            !dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT16, &f->type))
+            goto fail;
 
-	v = (mrp_msg_value_t *)(data + f->offs);
-	
-	switch (f->type) {
-	    BASIC_SIMPLE(STRING, STRING , v->str);
-	    BASIC_QUIRKY(BOOL  , BOOLEAN, v->bln, bln);
-	    BASIC_QUIRKY(UINT8 , UINT16 , v->u8 , u16);
-	    BASIC_QUIRKY(SINT8 ,  INT16 , v->s8 , s16);
-	    BASIC_SIMPLE(UINT16, UINT16 , v->u16);
-	    BASIC_SIMPLE(SINT16,  INT16 , v->s16);
-	    BASIC_SIMPLE(UINT32, UINT32 , v->u32);
-	    BASIC_SIMPLE(SINT32,  INT32 , v->s32);
-	    BASIC_SIMPLE(UINT64, UINT64 , v->u64);
-	    BASIC_SIMPLE(SINT64,  INT64 , v->s64);
-	    BASIC_SIMPLE(DOUBLE, DOUBLE , v->dbl);
+        v = (mrp_msg_value_t *)(data + f->offs);
 
-	case MRP_MSG_FIELD_BLOB:
-	    sig    = get_array_signature(f->type);
-	    blblen = mrp_data_get_blob_size(data, descr, i);
+        switch (f->type) {
+            BASIC_SIMPLE(STRING, STRING , v->str);
+            BASIC_QUIRKY(BOOL  , BOOLEAN, v->bln, bln);
+            BASIC_QUIRKY(UINT8 , UINT16 , v->u8 , u16);
+            BASIC_QUIRKY(SINT8 ,  INT16 , v->s8 , s16);
+            BASIC_SIMPLE(UINT16, UINT16 , v->u16);
+            BASIC_SIMPLE(SINT16,  INT16 , v->s16);
+            BASIC_SIMPLE(UINT32, UINT32 , v->u32);
+            BASIC_SIMPLE(SINT32,  INT32 , v->s32);
+            BASIC_SIMPLE(UINT64, UINT64 , v->u64);
+            BASIC_SIMPLE(SINT64,  INT64 , v->s64);
+            BASIC_SIMPLE(DOUBLE, DOUBLE , v->dbl);
 
-	    if (blblen == -1)
-		goto fail;
+        case MRP_MSG_FIELD_BLOB:
+            sig    = get_array_signature(f->type);
+            blblen = mrp_data_get_blob_size(data, descr, i);
 
-	    if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
-						  sig, &ia) ||
-		!dbus_message_iter_append_fixed_array(&ia, sig[0],
-						      &f->blb, blblen) ||
-		!dbus_message_iter_close_container(&im, &ia))
-		goto fail;
-	    break;
-	    
-	default:
-	    if (!(f->type & MRP_MSG_FIELD_ARRAY))
-		goto fail;
-	    
-	    base = f->type & ~(MRP_MSG_FIELD_ARRAY);
-	    n    = mrp_data_get_array_size(data, descr, i);
-	    sig  = get_array_signature(base);
-		
-	    if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT32, &n))
-		goto fail;
-	    
-	    if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
-						  sig, &ia))
-		goto fail;
-	    
-	    for (j = 0; j < n; j++) {
-		switch (base) {
-		    ARRAY_SIMPLE(STRING, STRING , v->astr[j]);
-		    ARRAY_QUIRKY(BOOL  , BOOLEAN, v->abln[j], bln);
-		    ARRAY_QUIRKY(UINT8 , UINT16 , v->au8[j] , u16);
-		    ARRAY_QUIRKY(SINT8 ,  INT16 , v->as8[j] , s16);
-		    ARRAY_SIMPLE(UINT16, UINT16 , v->au16[j]);
-		    ARRAY_SIMPLE(SINT16,  INT16 , v->as16[j]);
-		    ARRAY_SIMPLE(UINT32, UINT32 , v->au32[j]);
-		    ARRAY_SIMPLE(SINT32,  INT32 , v->as32[j]);
-		    ARRAY_SIMPLE(UINT64, UINT64 , v->au64[j]);
-		    ARRAY_SIMPLE(DOUBLE, DOUBLE , v->adbl[j]);
-		    
-		case MRP_MSG_FIELD_BLOB:
-		    goto fail;
-		    
-		default:
-		    goto fail;
-		}
-	    }
-	    
-	    if (!dbus_message_iter_close_container(&im, &ia))
-		goto fail;
-	}
+            if (blblen == -1)
+                goto fail;
+
+            if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
+                                                  sig, &ia) ||
+                !dbus_message_iter_append_fixed_array(&ia, sig[0],
+                                                      &f->blb, blblen) ||
+                !dbus_message_iter_close_container(&im, &ia))
+                goto fail;
+            break;
+
+        default:
+            if (!(f->type & MRP_MSG_FIELD_ARRAY))
+                goto fail;
+
+            base = f->type & ~(MRP_MSG_FIELD_ARRAY);
+            n    = mrp_data_get_array_size(data, descr, i);
+            sig  = get_array_signature(base);
+
+            if (!dbus_message_iter_append_basic(&im, DBUS_TYPE_UINT32, &n))
+                goto fail;
+
+            if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY,
+                                                  sig, &ia))
+                goto fail;
+
+            for (j = 0; j < n; j++) {
+                switch (base) {
+                    ARRAY_SIMPLE(STRING, STRING , v->astr[j]);
+                    ARRAY_QUIRKY(BOOL  , BOOLEAN, v->abln[j], bln);
+                    ARRAY_QUIRKY(UINT8 , UINT16 , v->au8[j] , u16);
+                    ARRAY_QUIRKY(SINT8 ,  INT16 , v->as8[j] , s16);
+                    ARRAY_SIMPLE(UINT16, UINT16 , v->au16[j]);
+                    ARRAY_SIMPLE(SINT16,  INT16 , v->as16[j]);
+                    ARRAY_SIMPLE(UINT32, UINT32 , v->au32[j]);
+                    ARRAY_SIMPLE(SINT32,  INT32 , v->as32[j]);
+                    ARRAY_SIMPLE(UINT64, UINT64 , v->au64[j]);
+                    ARRAY_SIMPLE(DOUBLE, DOUBLE , v->adbl[j]);
+
+                case MRP_MSG_FIELD_BLOB:
+                    goto fail;
+
+                default:
+                    goto fail;
+                }
+            }
+
+            if (!dbus_message_iter_close_container(&im, &ia))
+                goto fail;
+        }
     }
-    
+
     return m;
 
  fail:
     if (m != NULL)
-	dbus_message_unref(m);
+        dbus_message_unref(m);
 
     errno = ECOMM;
 
@@ -1368,38 +1368,38 @@ static DBusMessage *data_encode(const char *sender_id, void *data, uint16_t tag)
 
 
 static mrp_data_member_t *member_type(mrp_data_member_t *fields, int nfield,
-				      uint16_t tag)
+                                      uint16_t tag)
 {
     mrp_data_member_t *f;
     int                i;
 
     for (i = 0, f = fields; i < nfield; i++, f++)
-	if (f->tag == tag)
-	    return f;
-    
+        if (f->tag == tag)
+            return f;
+
     return NULL;
 }
 
 
 static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
 {
-#define HANDLE_SIMPLE(_i, _mtype, _dtype, _var)				   \
-	case MRP_MSG_FIELD_##_mtype:					   \
-	    if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype)  \
-		goto fail;						   \
-	    dbus_message_iter_get_basic(_i, &(_var));			   \
-	    dbus_message_iter_next(_i);					   \
-	    break
+#define HANDLE_SIMPLE(_i, _mtype, _dtype, _var)                           \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype) \
+                goto fail;                                                \
+            dbus_message_iter_get_basic(_i, &(_var));                     \
+            dbus_message_iter_next(_i);                                   \
+            break
 
-#define HANDLE_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)			   \
-	case MRP_MSG_FIELD_##_mtype:					   \
-	    if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype)  \
-		goto fail;						   \
-	    dbus_message_iter_get_basic(_i, &(_dvar));			   \
-	    dbus_message_iter_next(_i);					   \
-									   \
-	    _mvar = _dvar;						   \
-	    break
+#define HANDLE_QUIRKY(_i, _mtype, _dtype, _mvar, _dvar)                   \
+        case MRP_MSG_FIELD_##_mtype:                                      \
+            if (dbus_message_iter_get_arg_type(_i) != DBUS_TYPE_##_dtype) \
+                goto fail;                                                \
+            dbus_message_iter_get_basic(_i, &(_dvar));                    \
+            dbus_message_iter_next(_i);                                   \
+                                                                          \
+            _mvar = _dvar;                                                \
+            break
 
     void              *data;
     mrp_data_descr_t  *descr;
@@ -1418,170 +1418,170 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
     data = NULL;
 
     if (!dbus_message_iter_init(m, &im))
-	goto fail;
+        goto fail;
 
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_OBJECT_PATH)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_get_basic(&im, &sender);
     dbus_message_iter_next(&im);
-    
+
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_get_basic(&im, &tag);
     dbus_message_iter_next(&im);
 
     descr = mrp_msg_find_type(tag);
-    
+
     if (descr == NULL)
-	goto fail;
+        goto fail;
 
     *tagp = tag;
 
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_get_basic(&im, &nfield);
     dbus_message_iter_next(&im);
 
     if (nfield != descr->nfield)
-	goto fail;
+        goto fail;
 
     fields = descr->fields;
     data   = mrp_allocz(descr->size);
 
     if (MRP_UNLIKELY(data == NULL))
-	goto fail;
-    
+        goto fail;
+
     for (i = 0; i < nfield; i++) {
-	if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	    goto fail;
+        if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
+            goto fail;
 
-	dbus_message_iter_get_basic(&im, &tag);
-	dbus_message_iter_next(&im);
-	
-	if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
-	    goto fail;
+        dbus_message_iter_get_basic(&im, &tag);
+        dbus_message_iter_next(&im);
 
-	dbus_message_iter_get_basic(&im, &type);
-	dbus_message_iter_next(&im);
+        if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT16)
+            goto fail;
 
-	f = member_type(fields, nfield, tag);
+        dbus_message_iter_get_basic(&im, &type);
+        dbus_message_iter_next(&im);
 
-	if (MRP_UNLIKELY(f == NULL))
-	    goto fail;
-	
-	v = (mrp_msg_value_t *)(data + f->offs);
+        f = member_type(fields, nfield, tag);
 
-	switch (type) {
-	    HANDLE_SIMPLE(&im, STRING, STRING , v->str);
-	    HANDLE_QUIRKY(&im, BOOL  , BOOLEAN, v->bln, u32);
-	    HANDLE_QUIRKY(&im, UINT8 , UINT16 , v->u8 , u16);
-	    HANDLE_QUIRKY(&im, SINT8 ,  INT16 , v->s8 , s16);
-	    HANDLE_SIMPLE(&im, UINT16, UINT16 , v->u16);
-	    HANDLE_SIMPLE(&im, SINT16,  INT16 , v->s16);
-	    HANDLE_SIMPLE(&im, UINT32, UINT32 , v->u32);
-	    HANDLE_SIMPLE(&im, SINT32,  INT32 , v->s32);
-	    HANDLE_SIMPLE(&im, UINT64, UINT64 , v->u64);
-	    HANDLE_SIMPLE(&im, SINT64,  INT64 , v->s64);
-	    HANDLE_SIMPLE(&im, DOUBLE, DOUBLE , v->dbl);
+        if (MRP_UNLIKELY(f == NULL))
+            goto fail;
 
-	case MRP_MSG_FIELD_BLOB:
-	    if (dbus_message_iter_get_element_type(&ia) != DBUS_TYPE_BYTE)
-		goto fail;
+        v = (mrp_msg_value_t *)(data + f->offs);
 
-	    dbus_message_iter_recurse(&im, &ia);
-	    dbus_message_iter_get_fixed_array(&ia, &v->blb, &blblen);
-	    dbus_message_iter_next(&im);
-	    v->blb = mrp_datadup(v->blb, blblen);
-	    if (v->blb == NULL)
-		goto fail;
-	    break;
-	    
-	default:
-	    if (!(f->type & MRP_MSG_FIELD_ARRAY))
-		goto fail;
+        switch (type) {
+            HANDLE_SIMPLE(&im, STRING, STRING , v->str);
+            HANDLE_QUIRKY(&im, BOOL  , BOOLEAN, v->bln, u32);
+            HANDLE_QUIRKY(&im, UINT8 , UINT16 , v->u8 , u16);
+            HANDLE_QUIRKY(&im, SINT8 ,  INT16 , v->s8 , s16);
+            HANDLE_SIMPLE(&im, UINT16, UINT16 , v->u16);
+            HANDLE_SIMPLE(&im, SINT16,  INT16 , v->s16);
+            HANDLE_SIMPLE(&im, UINT32, UINT32 , v->u32);
+            HANDLE_SIMPLE(&im, SINT32,  INT32 , v->s32);
+            HANDLE_SIMPLE(&im, UINT64, UINT64 , v->u64);
+            HANDLE_SIMPLE(&im, SINT64,  INT64 , v->s64);
+            HANDLE_SIMPLE(&im, DOUBLE, DOUBLE , v->dbl);
 
-	    base = type & ~(MRP_MSG_FIELD_ARRAY);
-		
-	    if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT32)
-		goto fail;
-		
-	    dbus_message_iter_get_basic(&im, &n);
-	    dbus_message_iter_next(&im);
+        case MRP_MSG_FIELD_BLOB:
+            if (dbus_message_iter_get_element_type(&ia) != DBUS_TYPE_BYTE)
+                goto fail;
 
-	    if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_ARRAY)
-		goto fail;
-	    
-	    dbus_message_iter_recurse(&im, &ia);
-	    dbus_message_iter_next(&im);
+            dbus_message_iter_recurse(&im, &ia);
+            dbus_message_iter_get_fixed_array(&ia, &v->blb, &blblen);
+            dbus_message_iter_next(&im);
+            v->blb = mrp_datadup(v->blb, blblen);
+            if (v->blb == NULL)
+                goto fail;
+            break;
 
-	    size = n;
+        default:
+            if (!(f->type & MRP_MSG_FIELD_ARRAY))
+                goto fail;
 
-	    switch (base) {
-	    case MRP_MSG_FIELD_STRING: size *= sizeof(*v->astr); break;
-	    case MRP_MSG_FIELD_BOOL:   size *= sizeof(*v->abln); break;
-	    case MRP_MSG_FIELD_UINT8:  size *= sizeof(*v->au8);  break;
-	    case MRP_MSG_FIELD_SINT8:  size *= sizeof(*v->as8);  break;
-	    case MRP_MSG_FIELD_UINT16: size *= sizeof(*v->au16); break;
-	    case MRP_MSG_FIELD_SINT16: size *= sizeof(*v->as16); break;
-	    case MRP_MSG_FIELD_UINT32: size *= sizeof(*v->au32); break;
-	    case MRP_MSG_FIELD_SINT32: size *= sizeof(*v->as32); break;
-	    case MRP_MSG_FIELD_UINT64: size *= sizeof(*v->au64); break;
-	    case MRP_MSG_FIELD_SINT64: size *= sizeof(*v->as64); break;
-	    case MRP_MSG_FIELD_DOUBLE: size *= sizeof(*v->adbl); break;
-	    default:
-		goto fail;
-	    }
+            base = type & ~(MRP_MSG_FIELD_ARRAY);
 
-	    v->aany = mrp_allocz(size);
-	    if (v->aany == NULL)
-		goto fail;
+            if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_UINT32)
+                goto fail;
 
-	    for (j = 0; j < n; j++) {
-		uint32_t  dbln[n];
-		uint16_t  au16[n];
-		int16_t   as16[n];
-		
-		switch (base) {
-		    HANDLE_SIMPLE(&ia, STRING, STRING , v->astr[j]);
-		    HANDLE_QUIRKY(&ia, BOOL  , BOOLEAN, v->abln[j], dbln[j]);
-		    HANDLE_QUIRKY(&ia, UINT8 , UINT16 , v->au8[j] , au16[j]);
-		    HANDLE_QUIRKY(&ia, SINT8 ,  INT16 , v->as8[j] , as16[j]);
-		    HANDLE_SIMPLE(&ia, UINT16, UINT16 , v->au16[j]);
-		    HANDLE_SIMPLE(&ia, SINT16,  INT16 , v->as16[j]);
-		    HANDLE_SIMPLE(&ia, UINT32, UINT32 , v->au32[j]);
-		    HANDLE_SIMPLE(&ia, SINT32,  INT32 , v->as32[j]);
-		    HANDLE_SIMPLE(&ia, UINT64, UINT64 , v->au64[j]);
-		    HANDLE_SIMPLE(&ia, SINT64,  INT64 , v->as64[j]);
-		    HANDLE_SIMPLE(&ia, DOUBLE, DOUBLE , v->adbl[j]);
-		}
+            dbus_message_iter_get_basic(&im, &n);
+            dbus_message_iter_next(&im);
 
-		if (base == MRP_MSG_FIELD_STRING) {
-		    v->astr[j] = mrp_strdup(v->astr[j]);
-		    if (v->astr[j] == NULL)
-			goto fail;
-		}
-	    }
-	}
+            if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_ARRAY)
+                goto fail;
 
-	if (f->type == MRP_MSG_FIELD_STRING) {
-	    v->str = mrp_strdup(v->str);
-	    if (v->str == NULL)
-		goto fail;
-	}
+            dbus_message_iter_recurse(&im, &ia);
+            dbus_message_iter_next(&im);
+
+            size = n;
+
+            switch (base) {
+            case MRP_MSG_FIELD_STRING: size *= sizeof(*v->astr); break;
+            case MRP_MSG_FIELD_BOOL:   size *= sizeof(*v->abln); break;
+            case MRP_MSG_FIELD_UINT8:  size *= sizeof(*v->au8);  break;
+            case MRP_MSG_FIELD_SINT8:  size *= sizeof(*v->as8);  break;
+            case MRP_MSG_FIELD_UINT16: size *= sizeof(*v->au16); break;
+            case MRP_MSG_FIELD_SINT16: size *= sizeof(*v->as16); break;
+            case MRP_MSG_FIELD_UINT32: size *= sizeof(*v->au32); break;
+            case MRP_MSG_FIELD_SINT32: size *= sizeof(*v->as32); break;
+            case MRP_MSG_FIELD_UINT64: size *= sizeof(*v->au64); break;
+            case MRP_MSG_FIELD_SINT64: size *= sizeof(*v->as64); break;
+            case MRP_MSG_FIELD_DOUBLE: size *= sizeof(*v->adbl); break;
+            default:
+                goto fail;
+            }
+
+            v->aany = mrp_allocz(size);
+            if (v->aany == NULL)
+                goto fail;
+
+            for (j = 0; j < n; j++) {
+                uint32_t  dbln[n];
+                uint16_t  au16[n];
+                int16_t   as16[n];
+
+                switch (base) {
+                    HANDLE_SIMPLE(&ia, STRING, STRING , v->astr[j]);
+                    HANDLE_QUIRKY(&ia, BOOL  , BOOLEAN, v->abln[j], dbln[j]);
+                    HANDLE_QUIRKY(&ia, UINT8 , UINT16 , v->au8[j] , au16[j]);
+                    HANDLE_QUIRKY(&ia, SINT8 ,  INT16 , v->as8[j] , as16[j]);
+                    HANDLE_SIMPLE(&ia, UINT16, UINT16 , v->au16[j]);
+                    HANDLE_SIMPLE(&ia, SINT16,  INT16 , v->as16[j]);
+                    HANDLE_SIMPLE(&ia, UINT32, UINT32 , v->au32[j]);
+                    HANDLE_SIMPLE(&ia, SINT32,  INT32 , v->as32[j]);
+                    HANDLE_SIMPLE(&ia, UINT64, UINT64 , v->au64[j]);
+                    HANDLE_SIMPLE(&ia, SINT64,  INT64 , v->as64[j]);
+                    HANDLE_SIMPLE(&ia, DOUBLE, DOUBLE , v->adbl[j]);
+                }
+
+                if (base == MRP_MSG_FIELD_STRING) {
+                    v->astr[j] = mrp_strdup(v->astr[j]);
+                    if (v->astr[j] == NULL)
+                        goto fail;
+                }
+            }
+        }
+
+        if (f->type == MRP_MSG_FIELD_STRING) {
+            v->str = mrp_strdup(v->str);
+            if (v->str == NULL)
+                goto fail;
+        }
     }
 
     if (sender_id != NULL)
-	*sender_id = sender;
+        *sender_id = sender;
 
     return data;
-    
+
  fail:
     mrp_data_free(data, tag);
     errno = EBADMSG;
-    
+
     return NULL;
 }
 
@@ -1594,33 +1594,33 @@ static DBusMessage *raw_encode(const char *sender_id, void *data, size_t size)
     int              len;
 
     m = dbus_message_new(DBUS_MESSAGE_TYPE_METHOD_CALL);
-    
-    if (m != NULL) {
-	dbus_message_iter_init_append(m, &im);
-	
-	if (!dbus_message_iter_append_basic(&im,
-					    DBUS_TYPE_OBJECT_PATH, &sender_id))
-	    goto fail;
-	
-	sig = DBUS_TYPE_BYTE_AS_STRING;
-	len = (int)size;
 
-	if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY, sig, &ia) ||
-	    !dbus_message_iter_append_fixed_array(&ia, sig[0], &data, len) ||
-	    !dbus_message_iter_close_container(&im, &ia))
-	    goto fail;
-	
-	return m;
+    if (m != NULL) {
+        dbus_message_iter_init_append(m, &im);
+
+        if (!dbus_message_iter_append_basic(&im,
+                                            DBUS_TYPE_OBJECT_PATH, &sender_id))
+            goto fail;
+
+        sig = DBUS_TYPE_BYTE_AS_STRING;
+        len = (int)size;
+
+        if (!dbus_message_iter_open_container(&im, DBUS_TYPE_ARRAY, sig, &ia) ||
+            !dbus_message_iter_append_fixed_array(&ia, sig[0], &data, len) ||
+            !dbus_message_iter_close_container(&im, &ia))
+            goto fail;
+
+        return m;
     }
     else
-	return NULL;
+        return NULL;
 
- fail:    
+ fail:
     if (m != NULL)
-	dbus_message_unref(m);
+        dbus_message_unref(m);
 
     errno = ECOMM;
-    
+
     return NULL;
 }
 
@@ -1631,35 +1631,35 @@ static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id)
     const char      *sender;
     void            *data;
     int              len;
-    
+
     data = NULL;
 
     if (!dbus_message_iter_init(m, &im))
-	goto fail;
+        goto fail;
 
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_OBJECT_PATH)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_get_basic(&im, &sender);
     dbus_message_iter_next(&im);
 
     if (dbus_message_iter_get_element_type(&ia) != DBUS_TYPE_BYTE)
-	goto fail;
-    
+        goto fail;
+
     if (dbus_message_iter_get_arg_type(&im) != DBUS_TYPE_ARRAY)
-	goto fail;
+        goto fail;
 
     dbus_message_iter_recurse(&im, &ia);
     dbus_message_iter_get_fixed_array(&ia, &data, &len);
-    
+
     data = mrp_datadup(data, len);
 
     if (sizep != NULL)
-	*sizep = (size_t)len;
-    
+        *sizep = (size_t)len;
+
     if (sender_id != NULL)
-	*sender_id = sender;
-    
+        *sender_id = sender;
+
     return data;
 
  fail:
@@ -1670,10 +1670,10 @@ static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id)
 
 
 MRP_REGISTER_TRANSPORT(dbus, DBUS, dbus_t, dbus_resolve,
-		       dbus_open, dbus_createfrom, dbus_close,
-		       dbus_bind, NULL, NULL,
-		       dbus_connect, dbus_disconnect,
-		       dbus_sendmsg, dbus_sendmsgto,
-		       dbus_sendraw, dbus_sendrawto,
-		       dbus_senddata, dbus_senddatato);
+                       dbus_open, dbus_createfrom, dbus_close,
+                       dbus_bind, NULL, NULL,
+                       dbus_connect, dbus_disconnect,
+                       dbus_sendmsg, dbus_sendmsgto,
+                       dbus_sendraw, dbus_sendrawto,
+                       dbus_senddata, dbus_senddatato);
 

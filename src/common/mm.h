@@ -16,53 +16,53 @@ MRP_CDECL_BEGIN
 #define mrp_alloc(size)        mrp_mm_alloc((size), __LOC__)
 #define mrp_free(ptr)          mrp_mm_free((ptr), __LOC__)
 #define mrp_strdup(s)          mrp_mm_strdup((s), __LOC__)
-#define mrp_datadup(ptr, size) ({			\
-	    typeof(ptr) _ptr = mrp_alloc(size);		\
-	    						\
-	    if (_ptr != NULL)				\
-		memcpy(_ptr, ptr, size);		\
-							\
-	    _ptr;					\
-	})
+#define mrp_datadup(ptr, size) ({                                         \
+            typeof(ptr) _ptr = mrp_alloc(size);                           \
+                                                                          \
+            if (_ptr != NULL)                                             \
+                memcpy(_ptr, ptr, size);                                  \
+                                                                          \
+            _ptr;                                                         \
+        })
 
-#define mrp_allocz(size) ({					\
-	    void *_ptr;						\
-	    							\
-	    if ((_ptr = mrp_mm_alloc(size, __LOC__)) != NULL)	\
-		memset(_ptr, 0, size);				\
-	    							\
-	    _ptr;})
+#define mrp_allocz(size) ({                                               \
+            void *_ptr;                                                   \
+                                                                          \
+            if ((_ptr = mrp_mm_alloc(size, __LOC__)) != NULL)             \
+                memset(_ptr, 0, size);                                    \
+                                                                          \
+            _ptr;})
 
 #define mrp_calloc(n, size) mrp_allocz((n) * (size))
 
-#define mrp_reallocz(ptr, o, n) ({					\
-            typeof(ptr) __ptr;                                          \
-            size_t      __size = sizeof(*__ptr) * (n);			\
-	    typeof(n)   __n    = (n);					\
-	    typeof(o)   __o;						\
-                                                                        \
-            if ((ptr) != NULL)						\
-		__o = o;						\
-	    else							\
-		__o = 0;						\
-									\
-            __ptr = mrp_mm_realloc(ptr, __size, __LOC__);		\
-	    if (__ptr != NULL) {					\
-		if ((unsigned)(__n) > (unsigned)(__o))			\
-                    memset(__ptr + (__o), 0,				\
-			   ((__n)-(__o)) * sizeof(*__ptr));		\
-                ptr = __ptr;                                            \
-            }                                                           \
+#define mrp_reallocz(ptr, o, n) ({                                        \
+            typeof(ptr) __ptr;                                            \
+            size_t      __size = sizeof(*__ptr) * (n);                    \
+            typeof(n)   __n    = (n);                                     \
+            typeof(o)   __o;                                              \
+                                                                          \
+            if ((ptr) != NULL)                                            \
+                __o = o;                                                  \
+            else                                                          \
+                __o = 0;                                                  \
+                                                                          \
+            __ptr = mrp_mm_realloc(ptr, __size, __LOC__);                 \
+            if (__ptr != NULL) {                                          \
+                if ((unsigned)(__n) > (unsigned)(__o))                    \
+                    memset(__ptr + (__o), 0,                              \
+                           ((__n)-(__o)) * sizeof(*__ptr));               \
+                ptr = __ptr;                                              \
+            }                                                             \
             __ptr; })
 
-#define mrp_realloc(ptr, size) ({					\
-            typeof(ptr) __ptr;                                          \
-            size_t      __size = size;					\
-									\
-            __ptr = mrp_mm_realloc(ptr, __size, __LOC__);		\
-	    if (__ptr != NULL)						\
-                ptr = __ptr;                                            \
-									\
+#define mrp_realloc(ptr, size) ({                                         \
+            typeof(ptr) __ptr;                                            \
+            size_t      __size = size;                                    \
+                                                                          \
+            __ptr = mrp_mm_realloc(ptr, __size, __LOC__);                 \
+            if (__ptr != NULL)                                            \
+                ptr = __ptr;                                              \
+                                                                          \
             __ptr; })
 
 #define mrp_clear(obj) memset((obj), 0, sizeof(*(obj)))
@@ -83,11 +83,11 @@ void mrp_mm_check(FILE *fp);
 
 void *mrp_mm_alloc(size_t size, const char *file, int line, const char *func);
 void *mrp_mm_realloc(void *ptr, size_t size, const char *file, int line,
-		     const char *func);
+                     const char *func);
 char *mrp_mm_strdup(const char *s, const char *file, int line,
-		    const char *func);
+                    const char *func);
 int mrp_mm_memalign(void **ptr, size_t align, size_t size, const char *file,
-		    int line, const char *func);
+                    int line, const char *func);
 void mrp_mm_free(void *ptr, const char *file, int line, const char *func);
 
 

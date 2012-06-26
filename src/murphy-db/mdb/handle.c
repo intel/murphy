@@ -92,11 +92,11 @@ mdb_handle_t mdb_handle_add(mdb_handle_map_t *hmap, void *data)
     int index;
 
     MDB_CHECKARG(hmap && data, MDB_HANDLE_INVALID);
-    
+
     if ((index = freemap_alloc(&hmap->freemap)) == HANDLE_INDEX_INVALID) {
         return MDB_HANDLE_INVALID;
     }
-    
+
     return index_alloc(&hmap->indextbl, index, data);
 }
 
@@ -118,7 +118,7 @@ void *mdb_handle_delete(mdb_handle_map_t *hmap, mdb_handle_t h)
         /* errno has been set by freemap_free() */
         return NULL;
     }
-    
+
     return old_data;
 }
 
@@ -164,7 +164,7 @@ int mdb_handle_print(mdb_handle_map_t *hmap, char *buf, int len)
     e = (p = buf) + len;
 
     p += snprintf(p, e-p, "   useid index data\n");
-    
+
     for (i = 0;   i < it->nentry && e > p;   i++) {
         indextbl_entry_t *en = it->entries + i;
 
@@ -184,39 +184,39 @@ static mdb_handle_t index_alloc(indextbl_t *indextbl, int index, void *data)
     int nentry;
     indextbl_entry_t *entries, *entry;
     size_t size;
-    
+
     MDB_CHECKARG(index >= 0 && index < HANDLE_INDEX_MAX && data,
                  MDB_HANDLE_INVALID);
-    
+
     if (index >= indextbl->nentry) {
         nentry  = ALIGN(index + 1, bits_per_bucket);
         size    = sizeof(indextbl_entry_t) * nentry;
         entries = realloc(indextbl->entries, size);
-        
+
         if (!entries) {
             errno = ENOMEM;
             return MDB_HANDLE_INVALID;
         }
-        
+
         size = sizeof(indextbl_entry_t) * (nentry - indextbl->nentry);
         memset(entries + indextbl->nentry, 0, size);
-        
+
         indextbl->nentry  = nentry;
         indextbl->entries = entries;
     }
 
     entry = indextbl->entries + index;
-    
+
     if (entry->data && entry->data != data) {
         errno = EBUSY;
         return MDB_HANDLE_INVALID;
     }
-    
+
     entry->useid += 1;
     entry->data   = data;
-    
+
     handle = HANDLE_MAKE(entry->useid, index);
-    
+
     return handle;
 
 #undef ALIGN
@@ -232,14 +232,14 @@ static void *index_realloc(indextbl_t *indextbl,
     void *old_data;
 
     MDB_CHECKARG(indextbl, NULL);
-    
+
     if (index < 0 || index >= indextbl->nentry) {
         errno = EKEYREJECTED;
         return NULL;
     }
-    
+
     entry = indextbl->entries + index;
-    
+
     if (entry->useid != useid) {
         errno = ENOKEY;
         return NULL;
@@ -249,10 +249,10 @@ static void *index_realloc(indextbl_t *indextbl,
         errno = ENOENT;
         return NULL;
     }
-    
-    
+
+
     entry->data = data;
-    
+
     return old_data;
 }
 
@@ -271,10 +271,10 @@ static int freemap_alloc(freemap_t *freemap)
     int       bit_idx;
     int       index;
     size_t    size;
-    
+
     for (bucket_idx = 0;   bucket_idx < freemap->nbucket;   bucket_idx++) {
         bucket = freemap->buckets + bucket_idx;
-        
+
         if (*bucket && (bit_idx = ffsll(*bucket) - 1) >= 0) {
             index = bucket_idx * bits_per_bucket + bit_idx;
             mask  = ~(((bucket_t)1) << bit_idx);
@@ -282,22 +282,22 @@ static int freemap_alloc(freemap_t *freemap)
             return index;
         }
     }
-    
+
     index   = bucket_idx * bits_per_bucket;
     nbucket = bucket_idx + 1;
     size    = sizeof(bucket_t) * nbucket;
     buckets = realloc(freemap->buckets, size);
-    
+
     if (!buckets) {
         errno = ENOMEM;
         return HANDLE_INDEX_INVALID;
     }
-    
+
     buckets[bucket_idx] = ~((bucket_t)1);
 
     freemap->nbucket = nbucket;
     freemap->buckets = buckets;
-    
+
     return index;
 }
 
@@ -309,10 +309,10 @@ static int freemap_free(freemap_t *freemap, int index)
     int       nbucket;
     bucket_t *buckets;
     size_t    size;
-    
+
     if (freemap && index >= 0 && bucket_idx < freemap->nbucket) {
         freemap->buckets[bucket_idx] |= ((bucket_t)1) << bit_idx;
-        
+
         if ((bucket_idx + 1 == freemap->nbucket) &&
             freemap->buckets[bucket_idx] == empty_bucket) {
             if (freemap->nbucket == 1) {
@@ -324,17 +324,17 @@ static int freemap_free(freemap_t *freemap, int index)
                 nbucket = bucket_idx;
                 size    = sizeof(bucket_t) * nbucket;
                 buckets = realloc(freemap->buckets, size);
-                
+
                 if (!buckets) {
                     errno = ENOMEM;
                     return -1;
                 }
             }
         }
-        
+
         return 0;
     }
-    
+
     errno = EINVAL;
     return -1;
 }

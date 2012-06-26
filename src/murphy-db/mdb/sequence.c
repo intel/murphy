@@ -41,7 +41,7 @@ mdb_sequence_t *mdb_sequence_table_create(int                    alloc,
     mdb_sequence_t *seq;
 
     MDB_CHECKARG(scomp && sprint && alloc > 0 && alloc < 65536, NULL);
-    
+
     if (!(seq = calloc(1, sizeof(mdb_sequence_t)))) {
         errno = ENOMEM;
         return NULL;
@@ -114,7 +114,7 @@ int mdb_sequence_add(mdb_sequence_t *seq, int klen, void *key, void *data)
     size_t            old_length;
     size_t            length;
     int               cmp;
-    int               min, max, i;    
+    int               min, max, i;
 
     MDB_CHECKARG(seq && key && data, -1);
 
@@ -146,7 +146,7 @@ int mdb_sequence_add(mdb_sequence_t *seq, int klen, void *key, void *data)
 
         if (cmp < 0)
             max = i;
-        else 
+        else
             min = i;
     }
 
@@ -195,7 +195,7 @@ void *mdb_sequence_delete(mdb_sequence_t *seq, int klen, void *key)
             }
             break;
         }
-         
+
         if (cmp < 0)
             max = i;
         else
@@ -264,7 +264,7 @@ void *mdb_sequence_iterate(mdb_sequence_t *seq, void **cursor_ptr)
 
         for (i = 0;  i < seq->nentry;  i++)
             cursor->entries[i] = seq->entries[i].data;
-        
+
         *cursor_ptr = cursor;
     }
 

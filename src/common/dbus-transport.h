@@ -5,11 +5,11 @@
 
 #define MRP_AF_DBUS 0xDB
 
-#define MRP_DBUSADDR_BASE						\
-    __SOCKADDR_COMMON(db_);						\
-    char *db_bus;                               /* D-BUS bus address */ \
-    char *db_addr;				/* address on bus */	\
-    char *db_path				/* instance path */	\
+#define MRP_DBUSADDR_BASE                                                 \
+    __SOCKADDR_COMMON(db_);                                               \
+    char *db_bus;                               /* D-BUS bus address */   \
+    char *db_addr;                                /* address on bus */    \
+    char *db_path                                /* instance path */      \
 
 typedef struct {
     MRP_DBUSADDR_BASE;

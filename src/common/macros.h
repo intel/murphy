@@ -23,17 +23,17 @@
 
 #ifdef __GNUC__
      /** MAX that evalutes its arguments only once. */
-#    define MRP_MAX(a, b) ({			\
-	    typeof(a) _a = (a);			\
-	    typeof(b) _b = (b);			\
-	    _a > _b ? _a : _b;			\
-	})
+#    define MRP_MAX(a, b) ({                                              \
+            typeof(a) _a = (a);                                           \
+            typeof(b) _b = (b);                                           \
+            _a > _b ? _a : _b;                                            \
+        })
 
      /** MIN that evalutes its arguments only once. */
-#    define MRP_MIN(a, b) ({			\
-	    typeof(a) _a = (a), _b = (b);	\
-	    _a < _b ? _a : _b;			\
-	})
+#    define MRP_MIN(a, b) ({                                              \
+            typeof(a) _a = (a), _b = (b);                                 \
+            _a < _b ? _a : _b;                                            \
+        })
 
      /** Likeliness branch-prediction hint for the compiler. */
 #    define MRP_LIKELY(cond)   __builtin_expect((cond), 1)
@@ -51,7 +51,7 @@
 #    define MRP_NULLTERM __attribute__((sentinel))
 
      /** Ask for printf-like format string checks of calls to this function. */
-#    define MRP_PRINTF_LIKE(format_idx, first_arg_idx)	\
+#    define MRP_PRINTF_LIKE(format_idx, first_arg_idx)                    \
          __attribute__ ((format (printf, format_idx, first_arg_idx)))
 
      /** Mark a function to be called before main is entered. */
@@ -84,19 +84,19 @@
 
 /** Assertions. */
 #ifndef NDEBUG
-#    define MRP_ASSERT(expr, msg) do {					\
-	if (!(expr)) {							\
-	    printf("assertion '%s' failed at %s@%s:%d: %s\n", #expr,	\
-		   __FUNCTION__, __FILE__, __LINE__, msg);		\
-	    abort();							\
-	}								\
+#    define MRP_ASSERT(expr, msg) do {                                    \
+        if (!(expr)) {                                                    \
+            printf("assertion '%s' failed at %s@%s:%d: %s\n", #expr,      \
+                   __FUNCTION__, __FILE__, __LINE__, msg);                \
+            abort();                                                      \
+        }                                                                 \
     } while (0)
 #else
 #    define MRP_ASSERT(expr, msg) do { } while (0)
 #endif
 
 /** Create a version integer from a (major, minor, micro) tuple. */
-#define MRP_VERSION_INT(maj, min, mic) \
+#define MRP_VERSION_INT(maj, min, mic)                                    \
     ((((maj) & 0xff) << 16) | (((min) & 0xff) << 8) | ((mic) & 0xff))
 
 /** Create a version string from a (const) (major, minor, micro) tuple.  */

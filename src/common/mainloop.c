@@ -158,7 +158,7 @@ struct mrp_mainloop_s {
     mrp_list_hook_t      sighandlers;            /* signal handlers */
 
     mrp_list_hook_t      subloops;               /* external main loops */
-    
+
     mrp_list_hook_t      deleted;                /* unfreed deleted items */
     int                  quit;                   /* TRUE if _quit called */
     int                  exit_code;              /* returned from _run */
@@ -188,26 +188,26 @@ static int add_slave_io_watch(mrp_io_watch_t *w)
     mrp_list_hook_t    *p, *n, *sp, *sn;
 
     mrp_list_foreach(&ml->iowatches, p, n) {
-	master = mrp_list_entry(p, typeof(*master), hook);
-	if (master->fd != w->fd)
-	    continue;
-	
-	evt.events   = master->events;
-	evt.data.ptr = master;
-	
-	mrp_list_foreach(&master->slave, sp, sn) {
-	    slave = mrp_list_entry(sp, typeof(*slave), slave);
-	    evt.events |= slave->events;
-	}
-	
-	slave = w;
-	evt.events |= slave->events;
-	if (epoll_ctl(ml->epollfd, EPOLL_CTL_MOD, master->fd, &evt) == 0) {
-	    mrp_list_append(&master->slave, &slave->slave);
-	    return TRUE;
-	}
-	else
-	    break;
+        master = mrp_list_entry(p, typeof(*master), hook);
+        if (master->fd != w->fd)
+            continue;
+
+        evt.events   = master->events;
+        evt.data.ptr = master;
+
+        mrp_list_foreach(&master->slave, sp, sn) {
+            slave = mrp_list_entry(sp, typeof(*slave), slave);
+            evt.events |= slave->events;
+        }
+
+        slave = w;
+        evt.events |= slave->events;
+        if (epoll_ctl(ml->epollfd, EPOLL_CTL_MOD, master->fd, &evt) == 0) {
+            mrp_list_append(&master->slave, &slave->slave);
+            return TRUE;
+        }
+        else
+            break;
     }
 
     return FALSE;
@@ -222,11 +222,11 @@ static uint32_t slave_io_events(mrp_io_watch_t *watch, mrp_io_watch_t **master)
 
     events = watch->events;
     mrp_list_foreach(&watch->slave, p, n) {
-	w       = mrp_list_entry(p, typeof(*w), slave);
-	events |= w->events;
-	
-	if (master != NULL && !mrp_list_empty(&w->hook))
-	    *master = w;
+        w       = mrp_list_entry(p, typeof(*w), slave);
+        events |= w->events;
+
+        if (master != NULL && !mrp_list_empty(&w->hook))
+            *master = w;
     }
 
     return events;
@@ -241,54 +241,54 @@ static int free_io_watch(void *ptr)
     /*
      * try removing from epoll if we failed to do so
      */
-    
+
     if (w->fd != -1) {
-	if (epoll_ctl(w->ml->epollfd, EPOLL_CTL_DEL, w->fd, &evt) != 0)
-	    if (errno != EBADF)
-		return FALSE;
+        if (epoll_ctl(w->ml->epollfd, EPOLL_CTL_DEL, w->fd, &evt) != 0)
+            if (errno != EBADF)
+                return FALSE;
     }
-    
+
     mrp_free(w);
-    
+
     return TRUE;
 }
 
 
 mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
-				 mrp_io_event_t events,
-				 mrp_io_watch_cb_t cb, void *user_data)
+                                 mrp_io_event_t events,
+                                 mrp_io_watch_cb_t cb, void *user_data)
 {
     struct epoll_event  evt;
     mrp_io_watch_t     *w;
 
     if (fd < 0 || cb == NULL)
-	return NULL;
-    
+        return NULL;
+
     if ((w = mrp_allocz(sizeof(*w))) != NULL) {
-	mrp_list_init(&w->hook);
-	mrp_list_init(&w->slave);
-	w->ml        = ml;
-	w->fd        = fd;
-	w->events    = events & MRP_IO_EVENT_ALL;
-	w->cb        = cb;
-	w->user_data = user_data;
-	w->free      = free_io_watch;
-	
-	evt.events   = w->events;
-	evt.data.ptr = w;
-	
-	if (epoll_ctl(ml->epollfd, EPOLL_CTL_ADD, w->fd, &evt) == 0) {
-	    mrp_list_append(&ml->iowatches, &w->hook);
-	    ml->niowatch++;
-	}
-	else {
-	    if (errno != EEXIST || !add_slave_io_watch(w)) {
-		mrp_free(w);
-		w = NULL;
-	    }
-	}
+        mrp_list_init(&w->hook);
+        mrp_list_init(&w->slave);
+        w->ml        = ml;
+        w->fd        = fd;
+        w->events    = events & MRP_IO_EVENT_ALL;
+        w->cb        = cb;
+        w->user_data = user_data;
+        w->free      = free_io_watch;
+
+        evt.events   = w->events;
+        evt.data.ptr = w;
+
+        if (epoll_ctl(ml->epollfd, EPOLL_CTL_ADD, w->fd, &evt) == 0) {
+            mrp_list_append(&ml->iowatches, &w->hook);
+            ml->niowatch++;
+        }
+        else {
+            if (errno != EEXIST || !add_slave_io_watch(w)) {
+                mrp_free(w);
+                w = NULL;
+            }
+        }
     }
-    
+
     return w;
 }
 
@@ -303,7 +303,7 @@ void mrp_del_io_watch(mrp_io_watch_t *w)
      */
 
     if (w != NULL)
-	mark_deleted(w);
+        mark_deleted(w);
 }
 
 
@@ -318,41 +318,41 @@ static void delete_io_watch(mrp_io_watch_t *w)
     mrp_list_delete(&w->hook);
 
     if (was_master) {
-	if (mrp_list_empty(&w->slave)) {
-	    op = EPOLL_CTL_DEL;
-	}
-	else {
-	    /* relink first slave as new master to mainloop */
-	    master = mrp_list_entry(w->slave.next, typeof(*master), slave);
-	    mrp_list_delete(&w->slave);
-	    mrp_list_append(&ml->iowatches, &master->hook);
-	    /* relink old master to deleted list */
-	    mrp_list_init(&w->slave);
-	    mrp_list_append(&ml->deleted, &w->hook);
+        if (mrp_list_empty(&w->slave)) {
+            op = EPOLL_CTL_DEL;
+        }
+        else {
+            /* relink first slave as new master to mainloop */
+            master = mrp_list_entry(w->slave.next, typeof(*master), slave);
+            mrp_list_delete(&w->slave);
+            mrp_list_append(&ml->iowatches, &master->hook);
+            /* relink old master to deleted list */
+            mrp_list_init(&w->slave);
+            mrp_list_append(&ml->deleted, &w->hook);
 
-	    op           = EPOLL_CTL_MOD;
-	    evt.events   = master->events | slave_io_events(master, NULL);
-	    evt.data.ptr = master;
-	}
+            op           = EPOLL_CTL_MOD;
+            evt.events   = master->events | slave_io_events(master, NULL);
+            evt.data.ptr = master;
+        }
     }
     else {
-	master       = NULL;
-	w->events    = 0;
-	op           = EPOLL_CTL_MOD;
-	evt.events   = slave_io_events(w, &master);
-	evt.data.ptr = master;
+        master       = NULL;
+        w->events    = 0;
+        op           = EPOLL_CTL_MOD;
+        evt.events   = slave_io_events(w, &master);
+        evt.data.ptr = master;
 
-	mrp_list_delete(&w->slave);
-	mrp_list_init(&w->slave);
-	mrp_list_append(&ml->deleted, &w->hook);
+        mrp_list_delete(&w->slave);
+        mrp_list_init(&w->slave);
+        mrp_list_append(&ml->deleted, &w->hook);
     }
-    
+
     if (epoll_ctl(ml->epollfd, op, w->fd, &evt) == 0 ||
-	errno == EBADF || errno == ENOENT)
-	w->fd = -1;
+        errno == EBADF || errno == ENOENT)
+        w->fd = -1;
     else
-	mrp_log_error("Failed to update epoll for deleted I/O watch %p.", w);
-    
+        mrp_log_error("Failed to update epoll for deleted I/O watch %p.", w);
+
     ml->niowatch--;
 }
 
@@ -365,11 +365,11 @@ static uint64_t time_now(void)
 {
     struct timespec ts;
     uint64_t        now;
-    
+
     clock_gettime(CLOCK_MONOTONIC, &ts);
     now  = ts.tv_sec  * USECS_PER_SEC;
     now += ts.tv_nsec / NSECS_PER_USEC;
-    
+
     return now;
 }
 
@@ -377,9 +377,9 @@ static uint64_t time_now(void)
 static inline int usecs_to_msecs(uint64_t usecs)
 {
     int msecs;
-    
+
     msecs = (usecs + USECS_PER_MSEC - 1) / USECS_PER_MSEC;
-    
+
     return msecs;
 }
 
@@ -390,7 +390,7 @@ static void insert_timer(mrp_timer_t *t)
     mrp_list_hook_t *p, *n;
     mrp_timer_t     *t1;
     int              inserted;
-    
+
     /*
      * Notes:
      *     If there is ever a need to run a large number of
@@ -400,20 +400,20 @@ static void insert_timer(mrp_timer_t *t)
 
     inserted = FALSE;
     mrp_list_foreach(&ml->timers, p, n) {
-	t1 = mrp_list_entry(p, mrp_timer_t, hook);
-	
-	if (!is_deleted(t1) && t->expire <= t1->expire) {
-	    mrp_list_prepend(p->prev, &t->hook);
-	    inserted = TRUE;
-	    break;
-	}
+        t1 = mrp_list_entry(p, mrp_timer_t, hook);
+
+        if (!is_deleted(t1) && t->expire <= t1->expire) {
+            mrp_list_prepend(p->prev, &t->hook);
+            inserted = TRUE;
+            break;
+        }
     }
-    
+
     if (!inserted)
-	mrp_list_append(&ml->timers, &t->hook);
-    
+        mrp_list_append(&ml->timers, &t->hook);
+
     if (ml->next_timer == NULL || t->expire < ml->next_timer->expire)
-	ml->next_timer = t;
+        ml->next_timer = t;
 }
 
 
@@ -429,14 +429,14 @@ static mrp_timer_t *find_next_timer(mrp_mainloop_t *ml)
 {
     mrp_list_hook_t *p, *n;
     mrp_timer_t     *t = NULL;
-    
+
     mrp_list_foreach(&ml->timers, p, n) {
-	t = mrp_list_entry(p, typeof(*t), hook);
-	
-	if (!is_deleted(t))
-	    break;
-	else
-	    t = NULL;
+        t = mrp_list_entry(p, typeof(*t), hook);
+
+        if (!is_deleted(t))
+            break;
+        else
+            t = NULL;
     }
 
     ml->next_timer = t;
@@ -445,22 +445,22 @@ static mrp_timer_t *find_next_timer(mrp_mainloop_t *ml)
 
 
 mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
-			   mrp_timer_cb_t cb, void *user_data)
+                           mrp_timer_cb_t cb, void *user_data)
 {
     mrp_timer_t *t;
-    
+
     if (cb == NULL)
-	return NULL;
+        return NULL;
 
     if ((t = mrp_allocz(sizeof(*t))) != NULL) {
-	mrp_list_init(&t->hook);
-	t->ml        = ml;
-	t->expire    = time_now() + msecs * USECS_PER_MSEC;
-	t->msecs     = msecs;
-	t->cb        = cb;
-	t->user_data = user_data;
-	
-	insert_timer(t);
+        mrp_list_init(&t->hook);
+        t->ml        = ml;
+        t->expire    = time_now() + msecs * USECS_PER_MSEC;
+        t->msecs     = msecs;
+        t->cb        = cb;
+        t->user_data = user_data;
+
+        insert_timer(t);
     }
 
     return t;
@@ -478,12 +478,12 @@ void mrp_del_timer(mrp_timer_t *t)
      *        this entry for deletion and the rest will be taken care of in
      *        dispatch_timers().
      */
-    
+
     if (t != NULL) {
-	mark_deleted(t);
-	
-	if (t->ml->next_timer == t)
-	    find_next_timer(t->ml);
+        mark_deleted(t);
+
+        if (t->ml->next_timer == t)
+            find_next_timer(t->ml);
     }
 }
 
@@ -500,20 +500,20 @@ static inline void delete_timer(mrp_timer_t *t)
  */
 
 mrp_deferred_t *mrp_add_deferred(mrp_mainloop_t *ml, mrp_deferred_cb_t cb,
-				 void *user_data)
+                                 void *user_data)
 {
     mrp_deferred_t *d;
 
     if (cb == NULL)
-	return NULL;
-    
-    if ((d = mrp_allocz(sizeof(*d))) != NULL) {
-	mrp_list_init(&d->hook);
-	d->ml        = ml;
-	d->cb        = cb;
-	d->user_data = user_data;
+        return NULL;
 
-	mrp_list_append(&ml->deferred, &d->hook);
+    if ((d = mrp_allocz(sizeof(*d))) != NULL) {
+        mrp_list_init(&d->hook);
+        d->ml        = ml;
+        d->cb        = cb;
+        d->user_data = user_data;
+
+        mrp_list_append(&ml->deferred, &d->hook);
     }
 
     return d;
@@ -528,9 +528,9 @@ void mrp_del_deferred(mrp_deferred_t *d)
      *        We just mark this here deleted and take care of the rest
      *        in the dispatching loop.
      */
-    
+
     if (d != NULL)
-	mark_deleted(d);
+        mark_deleted(d);
 }
 
 
@@ -544,28 +544,28 @@ static inline void delete_deferred(mrp_deferred_t *d)
 void mrp_disable_deferred(mrp_deferred_t *d)
 {
     if (d != NULL)
-	d->inactive = TRUE;
+        d->inactive = TRUE;
 }
 
 
 static inline void disable_deferred(mrp_deferred_t *d)
 {
     if (MRP_LIKELY(d->inactive)) {
-	mrp_list_delete(&d->hook);
-	mrp_list_append(&d->ml->inactive_deferred, &d->hook);
+        mrp_list_delete(&d->hook);
+        mrp_list_append(&d->ml->inactive_deferred, &d->hook);
     }
-	
+
 }
 
 
 void mrp_enable_deferred(mrp_deferred_t *d)
 {
     if (d != NULL) {
-	if (!is_deleted(d)) {
-	    d->inactive = FALSE;
-	    mrp_list_delete(&d->hook);
-	    mrp_list_append(&d->ml->deferred, &d->hook);
-	}
+        if (!is_deleted(d)) {
+            d->inactive = FALSE;
+            mrp_list_delete(&d->hook);
+            mrp_list_append(&d->ml->deferred, &d->hook);
+        }
     }
 }
 
@@ -582,7 +582,7 @@ static inline void delete_sighandler(mrp_sighandler_t *h)
 
 
 static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-			     mrp_io_event_t events, void *user_data)
+                             mrp_io_event_t events, void *user_data)
 {
     struct signalfd_siginfo  sig;
     mrp_list_hook_t         *p, *n;
@@ -594,19 +594,19 @@ static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     MRP_UNUSED(user_data);
 
     while (read(fd, &sig, sizeof(sig)) > 0) {
-	signum = sig.ssi_signo;
-	
-	mrp_list_foreach(&ml->sighandlers, p, n) {
-	    h = mrp_list_entry(p, typeof(*h), hook);
+        signum = sig.ssi_signo;
 
-	    if (!is_deleted(h)) {
-		if (h->signum == signum)
-		    h->cb(ml, h, signum, h->user_data);
-	    }
+        mrp_list_foreach(&ml->sighandlers, p, n) {
+            h = mrp_list_entry(p, typeof(*h), hook);
 
-	    if (is_deleted(h))
-		delete_sighandler(h);
-	}
+            if (!is_deleted(h)) {
+                if (h->signum == signum)
+                    h->cb(ml, h, signum, h->user_data);
+            }
+
+            if (is_deleted(h))
+                delete_sighandler(h);
+        }
     }
 }
 
@@ -614,47 +614,47 @@ static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 static int setup_sighandlers(mrp_mainloop_t *ml)
 {
     if (ml->sigfd == -1) {
-	sigemptyset(&ml->sigmask);
-	
-	ml->sigfd = signalfd(-1, &ml->sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
-	
-	if (ml->sigfd == -1)
-	    return FALSE;
-	
-	ml->sigwatch = mrp_add_io_watch(ml, ml->sigfd, MRP_IO_EVENT_IN,
-					dispatch_signals, NULL);
-	
-	if (ml->sigwatch == NULL) {
-	    close(ml->sigfd);
-	    return FALSE;
-	}
+        sigemptyset(&ml->sigmask);
+
+        ml->sigfd = signalfd(-1, &ml->sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
+
+        if (ml->sigfd == -1)
+            return FALSE;
+
+        ml->sigwatch = mrp_add_io_watch(ml, ml->sigfd, MRP_IO_EVENT_IN,
+                                        dispatch_signals, NULL);
+
+        if (ml->sigwatch == NULL) {
+            close(ml->sigfd);
+            return FALSE;
+        }
     }
-    
+
     return TRUE;
 }
 
 
 mrp_sighandler_t *mrp_add_sighandler(mrp_mainloop_t *ml, int signum,
-				     mrp_sighandler_cb_t cb, void *user_data)
+                                     mrp_sighandler_cb_t cb, void *user_data)
 {
     mrp_sighandler_t *s;
 
     if (cb == NULL || ml->sigfd == -1)
-	return NULL;
+        return NULL;
 
     if ((s = mrp_allocz(sizeof(*s))) != NULL) {
-	mrp_list_init(&s->hook);
-	s->ml        = ml;
-	s->signum    = signum;
-	s->cb        = cb;
-	s->user_data = user_data;
-	
-	mrp_list_append(&ml->sighandlers, &s->hook);
-	sigaddset(&ml->sigmask, s->signum);
-	signalfd(ml->sigfd, &ml->sigmask, SFD_NONBLOCK|SFD_CLOEXEC);
-	sigprocmask(SIG_BLOCK, &ml->sigmask, NULL);
+        mrp_list_init(&s->hook);
+        s->ml        = ml;
+        s->signum    = signum;
+        s->cb        = cb;
+        s->user_data = user_data;
+
+        mrp_list_append(&ml->sighandlers, &s->hook);
+        sigaddset(&ml->sigmask, s->signum);
+        signalfd(ml->sigfd, &ml->sigmask, SFD_NONBLOCK|SFD_CLOEXEC);
+        sigprocmask(SIG_BLOCK, &ml->sigmask, NULL);
     }
-    
+
     return s;
 }
 
@@ -666,11 +666,11 @@ static void recalc_sigmask(mrp_mainloop_t *ml)
 
     sigprocmask(SIG_UNBLOCK, &ml->sigmask, NULL);
     sigemptyset(&ml->sigmask);
-    
+
     mrp_list_foreach(&ml->sighandlers, p, n) {
-	h = mrp_list_entry(p, typeof(*h), hook);
-	if (!is_deleted(h))
-	    sigaddset(&ml->sigmask, h->signum);
+        h = mrp_list_entry(p, typeof(*h), hook);
+        if (!is_deleted(h))
+            sigaddset(&ml->sigmask, h->signum);
     }
 
     sigprocmask(SIG_BLOCK, &ml->sigmask, NULL);
@@ -680,10 +680,10 @@ static void recalc_sigmask(mrp_mainloop_t *ml)
 void mrp_del_sighandler(mrp_sighandler_t *h)
 {
     if (h != NULL) {
-	if (!is_deleted(h)) {
-	    mark_deleted(h);
-	    recalc_sigmask(h->ml);
-	}
+        if (!is_deleted(h)) {
+            mark_deleted(h);
+            recalc_sigmask(h->ml);
+        }
     }
 }
 
@@ -695,7 +695,7 @@ void mrp_del_sighandler(mrp_sighandler_t *h)
 static int free_subloop(void *ptr)
 {
     mrp_subloop_t *sl = (mrp_subloop_t *)ptr;
-    
+
     mrp_free(sl->pollfds);
     mrp_free(sl->events);
     mrp_free(sl);
@@ -705,10 +705,10 @@ static int free_subloop(void *ptr)
 
 
 static void subloop_event_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-			     mrp_io_event_t events, void *user_data)
+                             mrp_io_event_t events, void *user_data)
 {
     mrp_subloop_t *sl = (mrp_subloop_t *)user_data;
-    
+
     MRP_UNUSED(ml);
     MRP_UNUSED(w);
     MRP_UNUSED(fd);
@@ -719,37 +719,37 @@ static void subloop_event_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 
 
 mrp_subloop_t *mrp_add_subloop(mrp_mainloop_t *ml, mrp_subloop_ops_t *ops,
-			       void *user_data)
+                               void *user_data)
 {
     mrp_subloop_t *sl;
 
     if (ops == NULL || user_data == NULL)
-	return NULL;
-    
+        return NULL;
+
     if ((sl = mrp_allocz(sizeof(*sl))) != NULL) {
-	mrp_list_init(&sl->hook);
-	sl->free      = free_subloop;
-	sl->cb        = ops;
-	sl->user_data = user_data;
-	sl->epollfd   = epoll_create1(EPOLL_CLOEXEC);
+        mrp_list_init(&sl->hook);
+        sl->free      = free_subloop;
+        sl->cb        = ops;
+        sl->user_data = user_data;
+        sl->epollfd   = epoll_create1(EPOLL_CLOEXEC);
 
-	if (sl->epollfd < 0) {
-	    mrp_free(sl);
-	    return NULL;
-	}
+        if (sl->epollfd < 0) {
+            mrp_free(sl);
+            return NULL;
+        }
 
-	sl->w = mrp_add_io_watch(ml, sl->epollfd, MRP_IO_EVENT_IN,
-				 subloop_event_cb, sl);
+        sl->w = mrp_add_io_watch(ml, sl->epollfd, MRP_IO_EVENT_IN,
+                                 subloop_event_cb, sl);
 
-	if (sl->w == NULL) {
-	    close(sl->epollfd);
-	    mrp_free(sl);
-	    return NULL;
-	}
+        if (sl->w == NULL) {
+            close(sl->epollfd);
+            mrp_free(sl);
+            return NULL;
+        }
 
-	mrp_list_append(&ml->subloops, &sl->hook);
+        mrp_list_append(&ml->subloops, &sl->hook);
     }
-    
+
     return sl;
 }
 
@@ -769,20 +769,20 @@ void mrp_del_subloop(mrp_subloop_t *sl)
      *        end of the next main loop iteration. So we just remove the
      *        pollfds from epoll, mark this as deleted and relink it.
      */
-    
-    if (sl != NULL && !is_deleted(sl)) {
-	ml = sl->w->ml;
-	mrp_del_io_watch(sl->w);
 
-	for (i = 0; i < sl->npollfd; i++)
-	    epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, sl->pollfds[i].fd, &dummy);
-	
-	close(sl->epollfd);
-	sl->epollfd = -1;
-	
-	mark_deleted(sl);
-	mrp_list_delete(&sl->hook);
-	mrp_list_append(&ml->deleted, &sl->hook);
+    if (sl != NULL && !is_deleted(sl)) {
+        ml = sl->w->ml;
+        mrp_del_io_watch(sl->w);
+
+        for (i = 0; i < sl->npollfd; i++)
+            epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, sl->pollfds[i].fd, &dummy);
+
+        close(sl->epollfd);
+        sl->epollfd = -1;
+
+        mark_deleted(sl);
+        mrp_list_delete(&sl->hook);
+        mrp_list_append(&ml->deleted, &sl->hook);
     }
 }
 
@@ -792,7 +792,7 @@ void mrp_del_subloop(mrp_subloop_t *sl)
  */
 
 static void super_io_cb(void *super_data, void *id, int fd,
-			mrp_io_event_t events, void *user_data)
+                        mrp_io_event_t events, void *user_data)
 {
     mrp_mainloop_t      *ml  = (mrp_mainloop_t *)user_data;
     mrp_superloop_ops_t *ops = ml->super_ops;
@@ -831,78 +831,78 @@ static void super_work_cb(void *super_data, void *id, void *user_data)
 
     mrp_mainloop_poll(ml, FALSE);
     mrp_mainloop_dispatch(ml);
-    
+
     if (!ml->quit) {
-	mrp_mainloop_prepare(ml);
+        mrp_mainloop_prepare(ml);
 
-	/*
-	 * Notes:
-	 *
-	 *     Some mainloop abstractions (eg. the one in PulseAudio)
-	 *     have deferred callbacks that starve all other event
-	 *     processing until no more deferred callbacks are pending.
-	 *     For this reason, we cannot map our deferred callbacks
-	 *     directly to superloop deferred callbacks (in some cases
-	 *     this could starve the superloop indefinitely). Hence, if
-	 *     we have enabled deferred callbacks, we arm our timer with
-	 *     0 timeout to let the superloop do one round of its event
-	 *     processing.
-	 */
+        /*
+         * Notes:
+         *
+         *     Some mainloop abstractions (eg. the one in PulseAudio)
+         *     have deferred callbacks that starve all other event
+         *     processing until no more deferred callbacks are pending.
+         *     For this reason, we cannot map our deferred callbacks
+         *     directly to superloop deferred callbacks (in some cases
+         *     this could starve the superloop indefinitely). Hence, if
+         *     we have enabled deferred callbacks, we arm our timer with
+         *     0 timeout to let the superloop do one round of its event
+         *     processing.
+         */
 
-	timeout = mrp_list_empty(&ml->deferred) ? ml->poll_timeout : 0;
-	ops->mod_timer(ml->super_data, ml->timer, timeout);
-	ops->mod_defer(ml->super_data, ml->work, FALSE);
+        timeout = mrp_list_empty(&ml->deferred) ? ml->poll_timeout : 0;
+        ops->mod_timer(ml->super_data, ml->timer, timeout);
+        ops->mod_defer(ml->super_data, ml->work, FALSE);
     }
     else {
-	ops->del_io(ml->super_data, ml->iow);
-	ops->del_timer(ml->super_data, ml->timer);
-	ops->del_defer(ml->super_data, ml->work);
+        ops->del_io(ml->super_data, ml->iow);
+        ops->del_timer(ml->super_data, ml->timer);
+        ops->del_defer(ml->super_data, ml->work);
 
-	ml->iow   = NULL;
-	ml->timer = NULL;
-	ml->work  = NULL;
+        ml->iow   = NULL;
+        ml->timer = NULL;
+        ml->work  = NULL;
     }
 }
 
 
 int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
-		      void *loop_data)
+                      void *loop_data)
 {
     mrp_io_event_t events;
     int            timeout;
 
     if (ml->super_ops == NULL) {
-	ml->super_ops  = ops;
-	ml->super_data = loop_data;
+        ml->super_ops  = ops;
+        ml->super_data = loop_data;
 
-	mrp_mainloop_prepare(ml);
+        mrp_mainloop_prepare(ml);
 
-	events    = MRP_IO_EVENT_IN | MRP_IO_EVENT_OUT | MRP_IO_EVENT_HUP;
-	ml->iow   = ops->add_io(ml->super_data, ml->epollfd, events,
-				super_io_cb, ml);
-	ml->work  = ops->add_defer(ml->super_data, super_work_cb, ml);
+        events    = MRP_IO_EVENT_IN | MRP_IO_EVENT_OUT | MRP_IO_EVENT_HUP;
+        ml->iow   = ops->add_io(ml->super_data, ml->epollfd, events,
+                                super_io_cb, ml);
+        ml->work  = ops->add_defer(ml->super_data, super_work_cb, ml);
 
-	/*
-	 * Notes:
-	 *
-	 *     Some mainloop abstractions (eg. the one in PulseAudio)
-	 *     have deferred callbacks that starve all other event
-	 *     processing until no more deferred callbacks are pending.
-	 *     For this reason, we cannot map our deferred callbacks
-	 *     directly to superloop deferred callbacks (in some cases
-	 *     this could starve the superloop indefinitely). Hence, if
-	 *     we have enabled deferred callbacks, we arm our timer with
-	 *     0 timeout to let the superloop do one round of its event
-	 *     processing.
-	 */
+        /*
+         * Notes:
+         *
+         *     Some mainloop abstractions (eg. the one in PulseAudio)
+         *     have deferred callbacks that starve all other event
+         *     processing until no more deferred callbacks are pending.
+         *     For this reason, we cannot map our deferred callbacks
+         *     directly to superloop deferred callbacks (in some cases
+         *     this could starve the superloop indefinitely). Hence, if
+         *     we have enabled deferred callbacks, we arm our timer with
+         *     0 timeout to let the superloop do one round of its event
+         *     processing.
+         */
 
-	timeout   = mrp_list_empty(&ml->deferred) ? ml->poll_timeout : 0;
-	ml->timer = ops->add_timer(ml->super_data, timeout, super_timer_cb, ml);
+        timeout   = mrp_list_empty(&ml->deferred) ? ml->poll_timeout : 0;
+        ml->timer = ops->add_timer(ml->super_data, timeout, super_timer_cb, ml);
 
-	if (ml->iow != NULL && ml->timer != NULL && ml->work != NULL)
-	    return TRUE;
-	else
-	    mrp_clear_superloop(ml, ops, loop_data);
+        if (ml->iow != NULL && ml->timer != NULL && ml->work != NULL)
+            return TRUE;
+        else
+            mrp_clear_superloop(ml, ops, loop_data);
     }
 
     return FALSE;
@@ -910,19 +910,19 @@ int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
 
 
 int mrp_clear_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
-			void *loop_data)
+                        void *loop_data)
 {
     if (ml->super_ops == ops && ml->super_data == loop_data) {
-	if (ml->iow != NULL)
-	    ops->del_io(ml->super_data, ml->iow);
-	
-	ml->super_ops  = NULL;
-	ml->super_data = NULL;
+        if (ml->iow != NULL)
+            ops->del_io(ml->super_data, ml->iow);
 
-	return TRUE;
+        ml->super_ops  = NULL;
+        ml->super_data = NULL;
+
+        return TRUE;
     }
     else
-	return FALSE;
+        return FALSE;
 }
 
 
@@ -937,16 +937,16 @@ static void purge_io_watches(mrp_mainloop_t *ml)
     mrp_io_watch_t  *w, *s;
 
     mrp_list_foreach(&ml->iowatches, p, n) {
-	w = mrp_list_entry(p, typeof(*w), hook);
-	mrp_list_delete(&w->hook);
+        w = mrp_list_entry(p, typeof(*w), hook);
+        mrp_list_delete(&w->hook);
 
-	mrp_list_foreach(&w->slave, sp, sn) {
-	    s = mrp_list_entry(sp, typeof(*s), slave);
-	    mrp_list_delete(&s->slave);
-	    mrp_free(s);
-	}
-	
-	mrp_free(w);
+        mrp_list_foreach(&w->slave, sp, sn) {
+            s = mrp_list_entry(sp, typeof(*s), slave);
+            mrp_list_delete(&s->slave);
+            mrp_free(s);
+        }
+
+        mrp_free(w);
     }
 }
 
@@ -957,9 +957,9 @@ static void purge_timers(mrp_mainloop_t *ml)
     mrp_timer_t     *t;
 
     mrp_list_foreach(&ml->timers, p, n) {
-	t = mrp_list_entry(p, typeof(*t), hook);
-	mrp_list_delete(&t->hook);
-	mrp_free(t);
+        t = mrp_list_entry(p, typeof(*t), hook);
+        mrp_list_delete(&t->hook);
+        mrp_free(t);
     }
 }
 
@@ -970,15 +970,15 @@ static void purge_deferred(mrp_mainloop_t *ml)
     mrp_deferred_t  *d;
 
     mrp_list_foreach(&ml->deferred, p, n) {
-	d = mrp_list_entry(p, typeof(*d), hook);
-	mrp_list_delete(&d->hook);
-	mrp_free(d);
+        d = mrp_list_entry(p, typeof(*d), hook);
+        mrp_list_delete(&d->hook);
+        mrp_free(d);
     }
 
     mrp_list_foreach(&ml->inactive_deferred, p, n) {
-	d = mrp_list_entry(p, typeof(*d), hook);
-	mrp_list_delete(&d->hook);
-	mrp_free(d);
+        d = mrp_list_entry(p, typeof(*d), hook);
+        mrp_list_delete(&d->hook);
+        mrp_free(d);
     }
 }
 
@@ -989,9 +989,9 @@ static void purge_sighandlers(mrp_mainloop_t *ml)
     mrp_sighandler_t *s;
 
     mrp_list_foreach(&ml->sighandlers, p, n) {
-	s = mrp_list_entry(p, typeof(*s), hook);
-	mrp_list_delete(&s->hook);
-	mrp_free(s);
+        s = mrp_list_entry(p, typeof(*s), hook);
+        mrp_list_delete(&s->hook);
+        mrp_free(s);
     }
 }
 
@@ -1002,16 +1002,16 @@ static void purge_deleted(mrp_mainloop_t *ml)
     deleted_t       *d;
 
     mrp_list_foreach(&ml->deleted, p, n) {
-	d = mrp_list_entry(p, typeof(*d), hook);
-	mrp_list_delete(&d->hook);
-	if (d->free == NULL)
-	    mrp_free(d);
-	else {
-	    if (!d->free(d)) {
-		mrp_log_error("Failed to free purged item %p.", d);
-		mrp_list_prepend(p, &d->hook);
-	    }
-	}
+        d = mrp_list_entry(p, typeof(*d), hook);
+        mrp_list_delete(&d->hook);
+        if (d->free == NULL)
+            mrp_free(d);
+        else {
+            if (!d->free(d)) {
+                mrp_log_error("Failed to free purged item %p.", d);
+                mrp_list_prepend(p, &d->hook);
+            }
+        }
     }
 }
 
@@ -1022,9 +1022,9 @@ static void purge_subloops(mrp_mainloop_t *ml)
     mrp_subloop_t   *sl;
 
     mrp_list_foreach(&ml->subloops, p, n) {
-	sl = mrp_list_entry(p, typeof(*sl), hook);
-	mrp_list_delete(&sl->hook);
-	free_subloop(sl);
+        sl = mrp_list_entry(p, typeof(*sl), hook);
+        mrp_list_delete(&sl->hook);
+        free_subloop(sl);
     }
 }
 
@@ -1034,31 +1034,31 @@ mrp_mainloop_t *mrp_mainloop_create(void)
     mrp_mainloop_t *ml;
 
     if ((ml = mrp_allocz(sizeof(*ml))) != NULL) {
-	ml->epollfd = epoll_create1(EPOLL_CLOEXEC);
-	ml->sigfd   = -1;
+        ml->epollfd = epoll_create1(EPOLL_CLOEXEC);
+        ml->sigfd   = -1;
 
-	if (ml->epollfd >= 0) {
-	    mrp_list_init(&ml->iowatches);
-	    mrp_list_init(&ml->timers);
-	    mrp_list_init(&ml->deferred);
-	    mrp_list_init(&ml->inactive_deferred);
-	    mrp_list_init(&ml->sighandlers);
-	    mrp_list_init(&ml->deleted);
-	    mrp_list_init(&ml->subloops);
+        if (ml->epollfd >= 0) {
+            mrp_list_init(&ml->iowatches);
+            mrp_list_init(&ml->timers);
+            mrp_list_init(&ml->deferred);
+            mrp_list_init(&ml->inactive_deferred);
+            mrp_list_init(&ml->sighandlers);
+            mrp_list_init(&ml->deleted);
+            mrp_list_init(&ml->subloops);
 
-	    if (!setup_sighandlers(ml)) {
-		close(ml->epollfd);
-		goto fail;
-	    }
+            if (!setup_sighandlers(ml)) {
+                close(ml->epollfd);
+                goto fail;
+            }
 
-	}
-	else {
-	fail:
-	    mrp_free(ml);
-	    ml = NULL;
-	}
+        }
+        else {
+        fail:
+            mrp_free(ml);
+            ml = NULL;
+        }
     }
-    
+
     return ml;
 }
 
@@ -1066,16 +1066,16 @@ mrp_mainloop_t *mrp_mainloop_create(void)
 void mrp_mainloop_destroy(mrp_mainloop_t *ml)
 {
     if (ml != NULL) {
-	purge_io_watches(ml);
-	purge_timers(ml);
-	purge_deferred(ml);
-	purge_sighandlers(ml);
-	purge_subloops(ml);
-	purge_deleted(ml);
-	
-	
-	mrp_free(ml->events);
-	mrp_free(ml);
+        purge_io_watches(ml);
+        purge_timers(ml);
+        purge_deferred(ml);
+        purge_sighandlers(ml);
+        purge_subloops(ml);
+        purge_deleted(ml);
+
+
+        mrp_free(ml->events);
+        mrp_free(ml);
     }
 }
 
@@ -1101,7 +1101,7 @@ static int prepare_subloop(mrp_subloop_t *sl)
      *     But let's not go there yet...
      */
 
-    
+
     struct epoll_event  evt;
     struct pollfd      *fds, *pollfds;
     int                 timeout;
@@ -1110,24 +1110,24 @@ static int prepare_subloop(mrp_subloop_t *sl)
 
     pollfds = sl->pollfds;
     npollfd = sl->npollfd;
-    
+
     if (sl->cb->prepare(sl->user_data))
-	sl->cb->dispatch(sl->user_data);
+        sl->cb->dispatch(sl->user_data);
     sl->poll = FALSE;
-    
+
     nfd = npollfd;
     fds = nfd ? mrp_allocz(nfd * sizeof(*fds)) : NULL;
-    
+
     MRP_ASSERT(nfd == 0 || fds != NULL, "failed to allocate pollfd's");
 
     while ((n = sl->cb->query(sl->user_data, fds, nfd, &timeout)) > nfd) {
-	fds = mrp_reallocz(fds, nfd, n);
-	nfd = n;
-	MRP_ASSERT(fds != NULL, "failed to allocate pollfd's");
+        fds = mrp_reallocz(fds, nfd, n);
+        nfd = n;
+        MRP_ASSERT(fds != NULL, "failed to allocate pollfd's");
     }
     nfd = n;
 
-    
+
 #if 0
     printf("-------------------------\n");
     dump_pollfds("old: ", sl->pollfds, sl->npollfd);
@@ -1139,54 +1139,54 @@ static int prepare_subloop(mrp_subloop_t *sl)
     /*
      * skip over the identical portion of the old and new pollfd's
      */
-    
+
     for (i = nmatch = 0; i < npollfd && i < n; i++, nmatch++) {
-	if (fds[i].fd     != pollfds[i].fd ||
-	    fds[i].events != pollfds[i].events)
-	    break;
-	else
-	    fds[i].revents = pollfds[i].revents = 0;
-    }
-    
-    
-    if (nmatch == npollfd && npollfd == nfd) {
-	mrp_free(fds);
-	goto out;
+        if (fds[i].fd     != pollfds[i].fd ||
+            fds[i].events != pollfds[i].events)
+            break;
+        else
+            fds[i].revents = pollfds[i].revents = 0;
     }
 
-    
+
+    if (nmatch == npollfd && npollfd == nfd) {
+        mrp_free(fds);
+        goto out;
+    }
+
+
     /*
      * replace file descriptors with the new set (remove old, add new)
      */
 
     for (i = 0 ; i < npollfd; i++)
-	epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, pollfds[i].fd, &evt);
-    
+        epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, pollfds[i].fd, &evt);
+
     for (i = 0; i < nfd; i++) {
-	evt.events   = fds[i].events;
-	evt.data.ptr = &fds[i];
-	epoll_ctl(sl->epollfd, EPOLL_CTL_ADD, fds[i].fd, &evt);
-	fds[i].revents = 0;
+        evt.events   = fds[i].events;
+        evt.data.ptr = &fds[i];
+        epoll_ctl(sl->epollfd, EPOLL_CTL_ADD, fds[i].fd, &evt);
+        fds[i].revents = 0;
     }
-    
-    
+
+
     mrp_free(sl->pollfds);
     sl->pollfds = fds;
     sl->npollfd = nfd;
 
-    
+
     /*
      * resize event buffer if needed
      */
 
     if (sl->nevent < nfd) {
-	sl->nevent = nfd;
-	sl->events = mrp_realloc(sl->events, sl->nevent * sizeof(*sl->events));
-	
-	MRP_ASSERT(sl->events != NULL || sl->nevent == 0,
-		   "can't allocate epoll event buffer");
+        sl->nevent = nfd;
+        sl->events = mrp_realloc(sl->events, sl->nevent * sizeof(*sl->events));
+
+        MRP_ASSERT(sl->events != NULL || sl->nevent == 0,
+                   "can't allocate epoll event buffer");
     }
-    
+
  out:
     return timeout;
 }
@@ -1199,14 +1199,14 @@ static int prepare_subloops(mrp_mainloop_t *ml)
     int              ext_timeout, min_timeout;
 
     min_timeout = INT_MAX;
-    
+
     mrp_list_foreach(&ml->subloops, p, n) {
-	sl = mrp_list_entry(p, typeof(*sl), hook);
-	
-	if (!is_deleted(sl)) {
-	    ext_timeout = prepare_subloop(sl);
-	    min_timeout = MRP_MIN(min_timeout, ext_timeout);
-	}
+        sl = mrp_list_entry(p, typeof(*sl), hook);
+
+        if (!is_deleted(sl)) {
+            ext_timeout = prepare_subloop(sl);
+            min_timeout = MRP_MIN(min_timeout, ext_timeout);
+        }
     }
 
     return min_timeout;
@@ -1220,34 +1220,34 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
     uint64_t     now;
 
     if (!mrp_list_empty(&ml->deferred)) {
-	timeout = 0;
+        timeout = 0;
     }
     else {
-	next_timer = ml->next_timer;
+        next_timer = ml->next_timer;
 
-	if (next_timer == NULL)
-	    timeout = -1;
-	else {
-	    now = time_now();
-	    if (MRP_UNLIKELY(next_timer->expire <= now))
-		timeout = 0;
-	    else
-		timeout = usecs_to_msecs(next_timer->expire - now);
-	}
+        if (next_timer == NULL)
+            timeout = -1;
+        else {
+            now = time_now();
+            if (MRP_UNLIKELY(next_timer->expire <= now))
+                timeout = 0;
+            else
+                timeout = usecs_to_msecs(next_timer->expire - now);
+        }
     }
-    
+
     ext_timeout = prepare_subloops(ml);
 
     if (ext_timeout != -1)
-	ml->poll_timeout = MRP_MIN(timeout, ext_timeout);
+        ml->poll_timeout = MRP_MIN(timeout, ext_timeout);
     else
-	ml->poll_timeout = timeout;
+        ml->poll_timeout = timeout;
 
     if (ml->nevent < ml->niowatch) {
-	ml->nevent = ml->niowatch;
-	ml->events = mrp_realloc(ml->events, ml->nevent * sizeof(*ml->events));
-	
-	MRP_ASSERT(ml->events != NULL, "can't allocate epoll event buffer");
+        ml->nevent = ml->niowatch;
+        ml->events = mrp_realloc(ml->events, ml->nevent * sizeof(*ml->events));
+
+        MRP_ASSERT(ml->events != NULL, "can't allocate epoll event buffer");
     }
 
     return TRUE;
@@ -1257,28 +1257,28 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
  int mrp_mainloop_poll(mrp_mainloop_t *ml, int may_block)
 {
     int n, timeout;
-    
-    timeout = may_block ? ml->poll_timeout : 0;
-    
-    if (ml->nevent > 0) {
-	n = epoll_wait(ml->epollfd, ml->events, ml->nevent, timeout);
 
-	if (n < 0 && errno == EINTR)
-	    n = 0;
-	
-	ml->poll_result = n;
+    timeout = may_block ? ml->poll_timeout : 0;
+
+    if (ml->nevent > 0) {
+        n = epoll_wait(ml->epollfd, ml->events, ml->nevent, timeout);
+
+        if (n < 0 && errno == EINTR)
+            n = 0;
+
+        ml->poll_result = n;
     }
     else {
-	/*
-	 * Notes: Practically we should never branch here because
-	 *     we always have at least ml->sigfd registered for epoll.
-	 */
-	if (timeout > 0)
-	    usleep(timeout * USECS_PER_MSEC);
-	
-	ml->poll_result = 0;
+        /*
+         * Notes: Practically we should never branch here because
+         *     we always have at least ml->sigfd registered for epoll.
+         */
+        if (timeout > 0)
+            usleep(timeout * USECS_PER_MSEC);
+
+        ml->poll_result = 0;
     }
-    
+
     return TRUE;
 }
 
@@ -1290,21 +1290,21 @@ static int poll_subloop(mrp_subloop_t *sl)
     int                 n, i;
 
     if (sl->poll) {
-	n = epoll_wait(sl->epollfd, sl->events, sl->nevent, 0);
-	
-	if (n < 0 && errno == EINTR)
-	    n = 0;
+        n = epoll_wait(sl->epollfd, sl->events, sl->nevent, 0);
 
-	for (i = 0, e = sl->events; i < n; i++, e++) {
-	    pfd = (struct pollfd *)sl->events[i].data.ptr;
+        if (n < 0 && errno == EINTR)
+            n = 0;
 
-	    pfd->revents = e->events;
-	}
+        for (i = 0, e = sl->events; i < n; i++, e++) {
+            pfd = (struct pollfd *)sl->events[i].data.ptr;
 
-	return n;
+            pfd->revents = e->events;
+        }
+
+        return n;
     }
     else
-	return 0;
+        return 0;
 }
 
 
@@ -1312,20 +1312,20 @@ static void dispatch_deferred(mrp_mainloop_t *ml)
 {
     mrp_list_hook_t *p, *n;
     mrp_deferred_t  *d;
-    
-    mrp_list_foreach(&ml->deferred, p, n) {
-	d = mrp_list_entry(p, typeof(*d), hook);
 
-	if (!is_deleted(d) && !d->inactive)
-	    d->cb(ml, d, d->user_data);
-	
-	if (is_deleted(d))
-	    delete_deferred(d);
-	else if (d->inactive)
-	    disable_deferred(d);
-	
-	if (ml->quit)
-	    break;
+    mrp_list_foreach(&ml->deferred, p, n) {
+        d = mrp_list_entry(p, typeof(*d), hook);
+
+        if (!is_deleted(d) && !d->inactive)
+            d->cb(ml, d, d->user_data);
+
+        if (is_deleted(d))
+            delete_deferred(d);
+        else if (d->inactive)
+            disable_deferred(d);
+
+        if (ml->quit)
+            break;
     }
 }
 
@@ -1339,24 +1339,24 @@ static void dispatch_timers(mrp_mainloop_t *ml)
     now = time_now();
 
     mrp_list_foreach(&ml->timers, p, n) {
-	t = mrp_list_entry(p, typeof(*t), hook);
-	
-	if (!is_deleted(t)) {
-	    if (t->expire <= now) {
-		t->cb(ml, t, t->user_data);
-	
-		if (!is_deleted(t))
-		    rearm_timer(t);
-	    }
-	    else
-		break;
-	}
-	
-	if (is_deleted(t))
-	    delete_timer(t);
-	
-	if (ml->quit)
-	    break;
+        t = mrp_list_entry(p, typeof(*t), hook);
+
+        if (!is_deleted(t)) {
+            if (t->expire <= now) {
+                t->cb(ml, t, t->user_data);
+
+                if (!is_deleted(t))
+                    rearm_timer(t);
+            }
+            else
+                break;
+        }
+
+        if (is_deleted(t))
+            delete_timer(t);
+
+        if (ml->quit)
+            break;
     }
 }
 
@@ -1365,17 +1365,17 @@ static void dispatch_subloops(mrp_mainloop_t *ml)
 {
     mrp_list_hook_t *p, *n;
     mrp_subloop_t   *sl;
-    
+
     mrp_list_foreach(&ml->subloops, p, n) {
-	sl = mrp_list_entry(p, typeof(*sl), hook);
-	
-	if (!is_deleted(sl)) {
-	    poll_subloop(sl);
-	    
-	    if (sl->cb->check(sl->user_data, sl->pollfds,
-			      sl->npollfd))
-		sl->cb->dispatch(sl->user_data);
-	}
+        sl = mrp_list_entry(p, typeof(*sl), hook);
+
+        if (!is_deleted(sl)) {
+            poll_subloop(sl);
+
+            if (sl->cb->check(sl->user_data, sl->pollfds,
+                              sl->npollfd))
+                sl->cb->dispatch(sl->user_data);
+        }
     }
 }
 
@@ -1388,20 +1388,20 @@ static void dispatch_slaves(mrp_io_watch_t *w, struct epoll_event *e)
     mrp_io_event_t   events;
 
     events = e->events & ~(MRP_IO_EVENT_INOUT & w->events);
-    
+
     mrp_list_foreach(&w->slave, p, n) {
-	if (events == MRP_IO_EVENT_NONE)
-	    break;
-	
-	s = mrp_list_entry(p, typeof(*s), slave);
-	
-	if (!is_deleted(s))
-	    s->cb(ml, s, s->fd, events, s->user_data);
-	
-	events &= ~(MRP_IO_EVENT_INOUT & s->events);
-	
-	if (is_deleted(s))
-	    delete_io_watch(s);
+        if (events == MRP_IO_EVENT_NONE)
+            break;
+
+        s = mrp_list_entry(p, typeof(*s), slave);
+
+        if (!is_deleted(s))
+            s->cb(ml, s, s->fd, events, s->user_data);
+
+        events &= ~(MRP_IO_EVENT_INOUT & s->events);
+
+        if (is_deleted(s))
+            delete_io_watch(s);
     }
 }
 
@@ -1413,26 +1413,26 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
     int                 i;
 
     for (i = 0, e = ml->events; i < ml->poll_result; i++, e++) {
-	w = e->data.ptr;
+        w = e->data.ptr;
 
-	if (!is_deleted(w))
-	    w->cb(ml, w, w->fd, e->events, w->user_data);
-	
-	if (!mrp_list_empty(&w->slave))
-	    dispatch_slaves(w, e);
-	
-	if (e->events & EPOLLRDHUP)
-	    epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
+        if (!is_deleted(w))
+            w->cb(ml, w, w->fd, e->events, w->user_data);
 
-	if (is_deleted(w))
-	    delete_io_watch(w);
-	
-	if (ml->quit)
-	    break;
+        if (!mrp_list_empty(&w->slave))
+            dispatch_slaves(w, e);
+
+        if (e->events & EPOLLRDHUP)
+            epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
+
+        if (is_deleted(w))
+            delete_io_watch(w);
+
+        if (ml->quit)
+            break;
     }
 
     if (ml->quit)
-	return;
+        return;
 
     dispatch_subloops(ml);
 }
@@ -1441,20 +1441,20 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
 int mrp_mainloop_dispatch(mrp_mainloop_t *ml)
 {
     dispatch_deferred(ml);
-    
+
     if (ml->quit)
-	goto quit;
-    
+        goto quit;
+
     dispatch_timers(ml);
 
     if (ml->quit)
-	goto quit;
-    
+        goto quit;
+
     dispatch_poll_events(ml);
-    
+
  quit:
     purge_deleted(ml);
-    
+
     return !ml->quit;
 }
 
@@ -1462,18 +1462,18 @@ int mrp_mainloop_dispatch(mrp_mainloop_t *ml)
 int mrp_mainloop_iterate(mrp_mainloop_t *ml)
 {
     return
-	mrp_mainloop_prepare(ml) && 
-	mrp_mainloop_poll(ml, TRUE) && 
-	mrp_mainloop_dispatch(ml) &&
-	!ml->quit;
+        mrp_mainloop_prepare(ml) &&
+        mrp_mainloop_poll(ml, TRUE) &&
+        mrp_mainloop_dispatch(ml) &&
+        !ml->quit;
 }
 
 
 int mrp_mainloop_run(mrp_mainloop_t *ml)
 {
     while (mrp_mainloop_iterate(ml))
-	;
-    
+        ;
+
     return ml->exit_code;
 }
 
@@ -1497,6 +1497,6 @@ static void dump_pollfds(const char *prefix, struct pollfd *fds, int nfd)
 
     printf("%s (%d): ", prefix, nfd);
     for (i = 0, t = ""; i < nfd; i++, t = ", ")
-	printf("%s%d/0x%x", t, fds[i].fd, fds[i].events);
+        printf("%s%d/0x%x", t, fds[i].fd, fds[i].events);
     printf("\n");
 }

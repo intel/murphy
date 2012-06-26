@@ -152,7 +152,7 @@ int mql_unregister_callback(const char *name)
     mql_callback_t *cb;
 
     MDB_CHECKARG(name, -1);
-    
+
     if (!(cb = mdb_hash_delete(callbacks, 0,(void *)name)))
         return -1;
 
@@ -197,7 +197,7 @@ int mql_create_column_trigger(char              *name,
     int i;
 
     MDB_CHECKARG(name && table != MQI_HANDLE_INVALID && callback &&
-                 (!nselcol || (nselcol > 0 && nselcol < MQI_COLUMN_MAX && 
+                 (!nselcol || (nselcol > 0 && nselcol < MQI_COLUMN_MAX &&
                   selcoldscs && selcolsizes && rowsize > 0)), -1);
 
     if (!triggers) {
@@ -231,7 +231,7 @@ int mql_create_column_trigger(char              *name,
     tr->table = table;
 
     tr->column.index = colidx;
-    tr->column.type  = coltyp; 
+    tr->column.type  = coltyp;
 
     if (nselcol > 0) {
         data = tr->data;
@@ -245,7 +245,7 @@ int mql_create_column_trigger(char              *name,
         tr->select.strpool.addr = (char *)(data += ssiz);
         tr->select.strpool.size = nsiz - asiz;
 
-        tr->select.rowsize = rowsize; 
+        tr->select.rowsize = rowsize;
 
         memcpy(tr->select.column.descs, selcoldscs , dsiz);
         memcpy(tr->select.column.types, selcoltypes, tsiz);
@@ -268,7 +268,7 @@ int mql_create_column_trigger(char              *name,
                                     tr->select.column.descs);
     return sts;
 }
-                              
+
 
 
 int mql_create_row_trigger(char              *name,
@@ -294,7 +294,7 @@ int mql_create_row_trigger(char              *name,
     int i;
 
     MDB_CHECKARG(name && table != MQI_HANDLE_INVALID && callback &&
-                 nselcol > 0 && nselcol < MQI_COLUMN_MAX && 
+                 nselcol > 0 && nselcol < MQI_COLUMN_MAX &&
                  selcoldscs && selcolsizes && rowsize > 0, -1);
 
     if (!triggers) {
@@ -330,11 +330,11 @@ int mql_create_row_trigger(char              *name,
     tr->select.column.descs = (mqi_column_desc_t *)(data += asiz);
     tr->select.column.types = (mqi_data_type_t *)(data += dsiz);
     tr->select.column.sizes = (int *)(data += tsiz);
-    
+
     tr->select.strpool.addr = (char *)(data += ssiz);
     tr->select.strpool.size = nsiz - asiz;
-    
-    tr->select.rowsize = rowsize; 
+
+    tr->select.rowsize = rowsize;
 
     memcpy(tr->select.column.descs, selcoldscs , dsiz);
     memcpy(tr->select.column.types, selcoltypes, tsiz);
@@ -509,7 +509,7 @@ static void column_event_callback(mqi_event_t *evt, void *user_data)
             }
         }
     }
-    
+
     if (!rslt)
         free(rsel);
     else {
@@ -556,7 +556,7 @@ static void row_event_callback(mqi_event_t *evt, void *user_data)
                                       1,
                                       s->rowsize,
                                       re->select.data);
-        
+
         if (mql_result_is_success(rsel)) {
             rslt = mql_result_event_row_change_create(re->event,
                                                       re->table.handle,
@@ -579,7 +579,7 @@ static void row_event_callback(mqi_event_t *evt, void *user_data)
                                                        rsel);
         }
     }
-    
+
     if (!rslt)
         free(rsel);
     else {
@@ -615,7 +615,7 @@ static void table_event_callback(mqi_event_t *evt, void *user_data)
         rslt = mql_result_event_table_create(te->event, te->table.handle);
     else
         rslt = mql_result_string_create_table_change(te->event,te->table.name);
-    
+
     if (rslt) {
         cb->function(rslt, cb->user_data);
         free(rslt);
@@ -651,7 +651,7 @@ static void transaction_event_callback(mqi_event_t *evt, void *user_data)
         rslt = mql_result_event_transaction_create(te->event);
     else
         rslt = mql_result_string_create_transaction_change(te->event);
-    
+
     if (rslt) {
         cb->function(rslt, cb->user_data);
         free(rslt);

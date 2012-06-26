@@ -92,9 +92,9 @@ int mqi_open(void)
 
         table_handle = MDB_HANDLE_MAP_CREATE();
         table_name_hash = MDB_HASH_TABLE_CREATE(varchar, 256);
-        
+
         transact_handle = MDB_HANDLE_MAP_CREATE();
-        
+
         if (db_register("MurphyDB", MQI_TEMPORARY, mdb_backend_init()) < 0) {
             errno = EIO;
             return -1;
@@ -121,7 +121,7 @@ int mqi_close(void)
         table_handle = NULL;
         table_name_hash = NULL;
         transact_handle = NULL;
-        
+
         dbs = NULL;
         ndb = 0;
     }
@@ -366,7 +366,7 @@ mqi_handle_t mqi_begin_transaction(void)
         ftb = db->functbl;
         tx->txid[i] = ftb->begin_transaction();
     }
-    
+
     return TX_HANDLE(tx->useid, depth);
 }
 
@@ -439,7 +439,7 @@ mqi_handle_t mqi_get_transaction_handle(void)
 
     depth = txdepth - 1;
     tx = txstack + depth;
-    
+
     return TX_HANDLE(tx->useid, depth);
 }
 
@@ -474,7 +474,7 @@ mqi_handle_t mqi_create_table(char *name,
 
     tbl->db = db;
     tbl->handle = NULL;
-    
+
     if (!(namedup = strdup(name)))
         goto cleanup;
 
@@ -503,7 +503,7 @@ mqi_handle_t mqi_create_table(char *name,
         free(namedup);
         free(tbl);
     }
-     
+
     return MDB_HANDLE_INVALID;
 }
 
@@ -578,7 +578,7 @@ int mqi_insert_into(mqi_handle_t         h,
     GET_TABLE(tbl, ftb, h, -1);
 
     return ftb->insert_into(tbl, ignore, cds, data);
-} 
+}
 
 int mqi_select(mqi_handle_t       h,
                mqi_cond_entry_t  *cond,
@@ -593,7 +593,7 @@ int mqi_select(mqi_handle_t       h,
     MDB_CHECKARG(h != MDB_HANDLE_INVALID && cds &&
                  rows && rowsize > 0 && dim > 0, -1);
     MDB_PREREQUISITE(dbs && ndb > 0, -1);
-    
+
     GET_TABLE(tbl, ftb, h, -1);
 
     return ftb->select(tbl, cond, cds, rows, rowsize, dim);
@@ -609,7 +609,7 @@ int mqi_select_by_index(mqi_handle_t       h,
 
     MDB_CHECKARG(h != MDB_HANDLE_INVALID && idxvars && cds && result, -1);
     MDB_PREREQUISITE(dbs && ndb > 0, -1);
-    
+
     GET_TABLE(tbl, ftb, h, -1);
 
     return ftb->select_by_index(tbl, idxvars, cds, result);
@@ -760,7 +760,7 @@ static int db_register(const char       *engine,
     db->engine  = strdup(engine);
     db->flags   = flags;
     db->functbl = functbl;
-    
+
     return 0;
 }
 

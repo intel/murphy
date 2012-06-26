@@ -55,7 +55,7 @@ int mdb_transaction_commit(uint32_t depth)
 
         if (!(after = en->after))
             after = (mdb_row_t *)blank;
-            
+
         switch (en->change) {
 
         case mdb_log_insert:
@@ -69,7 +69,7 @@ int mdb_transaction_commit(uint32_t depth)
             s = destroy_row(en->table, en->before);
             break;
 
-        case mdb_log_delete: 
+        case mdb_log_delete:
             mdb_trigger_row_delete(en->table, before);
             s = destroy_row(en->table, en->before);
             break;
@@ -85,7 +85,7 @@ int mdb_transaction_commit(uint32_t depth)
 
     if (start_triggered)
         mdb_trigger_transaction_end();
-    
+
     return sts;
 
 #undef DATA_MAX
@@ -115,7 +115,7 @@ int mdb_transaction_rollback(uint32_t depth)
         if (sts == 0)
             sts = s;
     }
-    
+
     return sts;
 }
 
@@ -132,7 +132,7 @@ int mdb_transaction_drop_table(mdb_table_t *tbl)
         switch (en->change) {
 
         case mdb_log_insert:  s = 0;                                     break;
-        case mdb_log_delete: 
+        case mdb_log_delete:
         case mdb_log_update:  s = destroy_row(en->table, en->before);    break;
         default:              s = -1;                                    break;
         }

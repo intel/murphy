@@ -34,19 +34,19 @@ void mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
             memset(dst, 0, lgh);
             strncpy((char *)dst, *(const char **)src, lgh-1);
             break;
-            
+
         case mqi_integer:
             *(int32_t *)dst = *(int32_t *)src;
             break;
-            
+
         case mqi_unsignd:
             *(uint32_t *)dst = *(uint32_t *)src;
             break;
-            
+
         case mqi_blob:
             memcpy(dst, src, lgh);
             break;
-            
+
         default:
             /* we do not knopw what this is,
                so we silently ignore it */
@@ -72,19 +72,19 @@ void mdb_column_read(mqi_column_desc_t *dst_desc, void *dst_data,
         case mqi_varchar:
             *(char **)dst = (char *)src;
             break;
-            
+
         case mqi_integer:
             *(int32_t *)dst = *(int32_t *)src;
             break;
-            
+
         case mqi_unsignd:
             *(uint32_t *)dst = *(uint32_t *)src;
             break;
-            
+
         case mqi_blob:
             memcpy(dst, src, lgh);
             break;
-            
+
         default:
             /* we do not know what this is,
                so we silently ignore it */

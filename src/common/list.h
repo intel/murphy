@@ -57,7 +57,7 @@ static inline void mrp_list_append(mrp_list_hook_t *list, mrp_list_hook_t *item)
     }
     else {
         mrp_list_hook_t *prev = list->prev;
-        
+
         prev->next = item;
         item->prev = prev;
         item->next = list;
@@ -91,7 +91,7 @@ static inline void mrp_list_delete(mrp_list_hook_t *item)
     if (!mrp_list_empty(item)) {
         prev = item->prev;
         next = item->next;
-        
+
         prev->next = next;
         next->prev = prev;
 
@@ -100,13 +100,13 @@ static inline void mrp_list_delete(mrp_list_hook_t *item)
 }
 
 /** Macro to iterate through a list (current item safe to remove). */
-#define mrp_list_foreach(list, p, n)                                    \
-    if ((list)->next != NULL)                                           \
+#define mrp_list_foreach(list, p, n)                                      \
+    if ((list)->next != NULL)                                             \
         for (p = (list)->next, n = p->next; p != (list); p = n, n = n->next)
 
 /** Macro to iterate through a list backwards (current item safe to remove). */
-#define mrp_list_foreach_back(list, p, n)                               \
-    if ((list)->prev != NULL)                                           \
+#define mrp_list_foreach_back(list, p, n)                                 \
+    if ((list)->prev != NULL)                                             \
         for (p = (list)->prev, n = p->prev; p != (list); p = n, n = n->prev)
 
 /** Macro to get a pointer to a embedding structure from a list pointer. */
@@ -116,7 +116,7 @@ static inline void mrp_list_delete(mrp_list_hook_t *item)
 #    define PTR_ARITH_TYPE char
 #endif
 
-#define mrp_list_entry(ptr, type, member)        \
+#define mrp_list_entry(ptr, type, member)                                 \
     (type *)(((PTR_ARITH_TYPE *)(ptr)) - MRP_OFFSET(type, member))
 
 

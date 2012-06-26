@@ -83,7 +83,7 @@ typedef struct {
 
     entry_t    *entries;
     int         nentry;
-    
+
     int         keyidx;
     uint32_t    pattern;
 } test_t;
@@ -97,7 +97,7 @@ populate(void)
     entry_t *entry;
     char    *key;
     int      i;
-    
+
     INFO("populating...");
 
     for (i = 0, entry = test.entries; i < test.nentry; i++, entry++) {
@@ -134,7 +134,7 @@ evict(void)
             INFO("removed entry '%s' (%p)", key, found);
         }
     }
-    
+
     INFO("done.");
 }
 
@@ -162,7 +162,7 @@ readd(void)
             INFO("re-added entry '%s'", key);
         }
     }
-    
+
     INFO("done.");
 }
 
@@ -178,7 +178,7 @@ check(void)
 
     for (i = 0, entry = test.entries; i < test.nentry; i++, entry++) {
         key   = ENTRY_KEY(entry, test.keyidx);
-        found = hash_tbl_lookup(test.ht, key);            
+        found = hash_tbl_lookup(test.ht, key);
 
         if (!PATTERN_BIT(test.pattern, i)) {
             if (found != entry)
@@ -199,7 +199,7 @@ void
 empty_cb(char *key, entry_t *entry, void *data)
 {
     (void)data;
-    
+
     FATAL("unexpected entry %p (%s) in hash table", entry, key);
 }
 
@@ -223,7 +223,7 @@ reset(void)
 
         INFO("removed entry '%s' (%p)", key, found);
     }
-    
+
     INFO("done.");
 }
 
@@ -237,7 +237,7 @@ unsigned int hash_func(const void *key)
         h <<= 1;
         h  ^= *p;
     }
-    
+
     return h;
 }
 
@@ -253,7 +253,7 @@ test_init(void)
 {
     int      i;
     entry_t *entry;
-    
+
     INFO("setting up tests...");
 
     if ((test.entries = ALLOC_ARR(entry_t, test.nentry)) == NULL)
@@ -261,7 +261,7 @@ test_init(void)
 
     for (i = 0, entry = test.entries; i < test.nentry; i++, entry++) {
         list_init(&entry->hook);
-        
+
         entry->str1 = MKSTR("entry-string-%d:1", i);
         entry->int1 = i;
         entry->str2 = MKSTR("entry-string-%d:2", i);
@@ -282,7 +282,7 @@ test_exit(void)
 {
     entry_t *entry;
     int      i;
-    
+
     INFO("cleaning up tests...");
 
     for (i = 0, entry = test.entries; i < test.nentry; i++, entry++) {
@@ -307,8 +307,8 @@ test_run(void)
     hash_tbl_cfg_t  cfg;
     entry_t        *entry;
     int             i, j;
-    
-    
+
+
     /*
      * Create a hash table, run a test loop consisting of
      *
@@ -320,7 +320,7 @@ test_run(void)
      *
      * then delete the hash table
      */
-    
+
     cfg.nbucket = test.size / 4;
     cfg.hash    = hash_func;
     cfg.comp    = cmp_func;
@@ -330,10 +330,10 @@ test_run(void)
     if (test.ht == NULL)
         FATAL("failed to create hash table (#%d, size %zd)",
               test.keyidx, test.size);
-    
+
     for (i = 0, entry = test.entries; i < test.nentry; i++, entry++) {
         populate();
-        
+
         test.pattern = 0;
         for (j = 0; j < NPHASE; j++) {
             INFO("Running test phase #%d...", j);
@@ -341,15 +341,15 @@ test_run(void)
             evict();
             check();
             readd();
-            
+
             test.pattern++;
-            
+
             INFO("done.");
         }
-        
+
         reset();
     }
-    
+
     hash_tbl_delete(test.ht, FALSE);
     test.ht = NULL;
 }
@@ -359,12 +359,12 @@ int
 main(int argc, char *argv[])
 {
     int i;
-    
+
     memset(&test, 0, sizeof(test));
 
     if (argc < 2 || (test.nentry = (int)strtoul(argv[1], NULL, 10)) <= 16)
         test.nentry = 16;
-    
+
     test_init();
 
     for (i = 0; i < NKEY; i++) {
@@ -373,7 +373,7 @@ main(int argc, char *argv[])
         test.size = test.nentry / 2; test_run();
         test.size = test.nentry / 4; test_run();
     }
-    
+
     test_exit();
 
     return 0;

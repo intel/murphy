@@ -56,7 +56,7 @@ int mql_exec_file(const char *file);
  *      printf("the result of the query:\n%s\n", r->mql_result_string_get(r));
  * @endcode
  */
-mql_result_t *mql_exec_string(mql_result_type_t result_type, 
+mql_result_t *mql_exec_string(mql_result_type_t result_type,
                               const char *statement);
 
 /**
@@ -86,7 +86,7 @@ mql_result_t *mql_exec_string(mql_result_type_t result_type,
  *         case the precompilation succeeded or NULL if the precompilation
  *         failed. In the later case errno is set to give a clue what went
  *         wrong.
- *         
+ *
  *         Note that a successfull precompilation do not garantie the
  *         successfull execution of the precompiled statement. For instance
  *         a successfully precompiled of a SELECT statement will fail

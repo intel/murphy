@@ -139,7 +139,7 @@ mql_result_t *mql_result_error_create(int code, const char *fmt, ...)
     result_error_t *rslt;
     char buf[1024];
     int l;
-    
+
     MDB_CHECKARG(code >= 0 && fmt, NULL);
 
     va_start(ap, fmt);
@@ -495,28 +495,28 @@ const char *mql_result_rows_get_string(mql_result_t *r, int colidx, int rowidx,
                 v[len-1] = '\0';
             }
             break;
-            
+
         case mqi_integer:
             if (!v)
                 v = "";
             else
                 snprintf(v, len, "%d", *(int32_t *)addr);
             break;
-            
+
         case mqi_unsignd:
             if (!v)
                 v = "";
             else
                 snprintf(v, len, "%u", *(uint32_t *)addr);
             break;
-            
+
         case mqi_floating:
             if (!v)
                 v = "";
             else
                 snprintf(v, len, "%lf", *(double *)addr);
             break;
-            
+
         default:
             v = "";
             break;
@@ -617,7 +617,7 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
         for (i = 0, first_letter = 0;    i < n;    i++) {
             name  = names[i];
             upper = toupper(name[0]);
-            
+
             if (upper != first_letter) {
                 first_letter = upper;
                 len += 3; /* \n[A-Z]: */
@@ -626,7 +626,7 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
             len += (nlgh[i] = strlen(name)) + 1;
         }
     }
-        
+
     if (!(rslt = calloc(1, sizeof(result_string_t) + len))) {
         errno = ENOMEM;
         return NULL;
@@ -642,26 +642,26 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
             name  = names[i];
             len   = nlgh[i];
             upper = toupper(name[0]);
-            
+
             if (upper != first_letter) {
                 if (first_letter)
                     *p++ = '\n';
-                
+
                 first_letter = upper;
-                
+
                 *p++ = upper;
                 *p++ = ':';
             }
-            
+
             *p++ = ' ';
-            
+
             memcpy(p, name, len);
             p += len;
         }
 
         *p++ = '\n';
     }
-    
+
     return (mql_result_t *)rslt;
 }
 
@@ -719,7 +719,7 @@ mql_result_t *mql_result_string_create_column_change(const char         *table,
     default:             l = PRINT_UNKNOWN;                     break;
     }
 
-#undef PRINT    
+#undef PRINT
 
     len[VALUE] = l;
 
@@ -756,7 +756,7 @@ mql_result_t *mql_result_string_create_column_change(const char         *table,
 
     rslt->type = mql_result_string;
     rslt->length = p - rslt->string;
- 
+
     return (mql_result_t *)rslt;
 
 #undef FLDS
@@ -829,7 +829,7 @@ mql_result_t *mql_result_string_create_row_change(mqi_event_type_t    event,
 
     rslt->type = mql_result_string;
     rslt->length = p - rslt->string;
- 
+
     return (mql_result_t *)rslt;
 
 #undef FLDS
@@ -889,7 +889,7 @@ mql_result_t *mql_result_string_create_table_change(mqi_event_type_t    event,
 
     rslt->type = mql_result_string;
     rslt->length = p - rslt->string;
- 
+
     return (mql_result_t *)rslt;
 
 #undef FLDS
@@ -935,7 +935,7 @@ mql_result_t *mql_result_string_create_transaction_change(mqi_event_type_t evt)
 
     rslt->type = mql_result_string;
     rslt->length = p - rslt->string;
- 
+
     return (mql_result_t *)rslt;
 }
 
@@ -1003,7 +1003,7 @@ mql_result_t *mql_result_string_create_column_list(int               ncol,
      * labels
      */
     for (q = p, j = 0;   j < FLDS;   q += (fldlen[j++] + 1)) {
-        offs = (align[j] < 0) ? 0 : fldlen[j] - hlen[j]; 
+        offs = (align[j] < 0) ? 0 : fldlen[j] - hlen[j];
         memcpy(q + offs, hstr[j], hlen[j]);
     }
 
@@ -1016,8 +1016,8 @@ mql_result_t *mql_result_string_create_column_list(int               ncol,
     memset(p, '-', linlen);
     p += linlen;
     *(p-1) = '\n';
-    
-        
+
+
     /*
      * data lines
      */
@@ -1029,7 +1029,7 @@ mql_result_t *mql_result_string_create_column_list(int               ncol,
                  fldlen[TYPE], typstr[i],
                  fldlen[LENGTH], def->length);
     }
-    
+
     return (mql_result_t *)rslt;
 
 #undef FLDS
@@ -1134,7 +1134,7 @@ mql_result_t *mql_result_string_create_row_list(int                 ncol,
     memset(p, '-', rwidth-1);
     p[rwidth-1] = '\n';
     p += rwidth;
-    
+
     /*
      * data lines
      */
@@ -1147,7 +1147,7 @@ mql_result_t *mql_result_string_create_row_list(int                 ncol,
             for (j = 0;  j < ncol; j++) {
                 column = row + coldescs[j].offset;
                 cwidth = cwidths[j];
-                
+
                 switch (coltypes[j]) {
                 case mqi_varchar:     SPRINT( char *  , "%-*s"   );     break;
                 case mqi_integer:     SPRINT( int32_t , "%*d"    );     break;
@@ -1155,10 +1155,10 @@ mql_result_t *mql_result_string_create_row_list(int                 ncol,
                 case mqi_floating:    SPRINT( double  , "%*.2lf" );     break;
                 default:              memset(p, ' ', cwidth+1    );     break;
                 }
-                
+
                 p += cwidth+1;
             }
-            
+
             *(p-1) = '\n';
         }
         *p = '\0';
@@ -1199,7 +1199,7 @@ mql_result_t *mql_result_list_create(mqi_data_type_t type,
         for (strs = (char **)values, i = 0;  i < length;  i++)
             poollen += (slen[i] = strlen(strs[i]) + 1);
         datalen = sizeof(char *) * length + poollen;
-        break;        
+        break;
     case mqi_integer:
         poollen = 0;
         datalen = sizeof(int32_t) * length;
@@ -1369,7 +1369,7 @@ void mql_result_free(mql_result_t *r)
                     mql_result_free(colchg->select);
             }
         }
-            
+
         free(r);
     }
 }

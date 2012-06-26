@@ -49,7 +49,7 @@ int mdb_index_create(mdb_table_t *tbl, char **index_columns)
             errno = ENOENT;
             return -1;
         }
-                
+
         col = tbl->columns + --idx;
         col->flags |= MQI_COLUMN_KEY;
 
@@ -70,12 +70,12 @@ int mdb_index_create(mdb_table_t *tbl, char **index_columns)
                 break; /* not an adjacent column */
             }
         }
-            
+
         if (!(idxcols = realloc(idxcols, sizeof(int *) * (i+1)))) {
             errno = ENOMEM;
             return -1;
         }
-        
+
         for (j = 0;  j < i;  j++) {
             if (idx == idxcols[j])
                 break;
@@ -140,11 +140,11 @@ void mdb_index_drop(mdb_table_t *tbl)
     if (MDB_INDEX_DEFINED(ix)) {
         INDEX_HASH_DROP(ix);
         INDEX_SEQUENCE_DROP(ix);
-        
+
         free(ix->columns);
-        
+
         memset(ix, 0, sizeof(*ix));
-        
+
         ix->type = mqi_unknown;
     }
 }
@@ -252,7 +252,7 @@ int mdb_index_delete(mdb_table_t *tbl, mdb_row_t *row)
     seq  = ix->sequence;
     lgh  = ix->length;
     key  = (void *)row->data + ix->offset;
-    
+
     if (mdb_hash_delete(hash, lgh,key)    != row ||
         mdb_sequence_delete(seq, lgh,key) != row)
     {
@@ -277,7 +277,7 @@ mdb_row_t *mdb_index_get_row(mdb_table_t *tbl, int idxlen, void *idxval)
 int mdb_index_print(mdb_table_t *tbl, char *buf, int len)
 {
 #define PRINT(args...)  if (e > p) p += snprintf(p, e-p, args)
-    mdb_index_t *ix; 
+    mdb_index_t *ix;
     const char  *sep;
     char        *p, *e;
     int          i;
@@ -294,7 +294,7 @@ int mdb_index_print(mdb_table_t *tbl, char *buf, int len)
 
     for (i = 0, sep = "";   i < ix->ncolumn;   i++, sep = ",")
         PRINT("%s%02d", sep, ix->columns[i]);
-  
+
     PRINT("\n    type    offset length\n    ---------------------"
           "\n    %-7s   %4d   %4d\n",
           mqi_data_type_str(ix->type), ix->offset, ix->length);

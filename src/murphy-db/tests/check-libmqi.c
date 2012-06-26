@@ -118,7 +118,7 @@ int main(int argc, char **argv)
     SRunner *sr = srunner_create(s);
     int      nf;
     int      i;
-    
+
     for (i = 1;  i < argc;  i++) {
         if (!strcmp("-v", argv[i]))
             verbose = 1;
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
                    "  -f  forces no-forking mode\n",
                    basename(argv[0]));
             exit(strcmp("-h", argv[i]) ? 1 : 0);
-        }        
+        }
     }
 
     srunner_set_log(sr, LOGFILE);
@@ -162,7 +162,7 @@ START_TEST(create_table_persons)
 
         persons = MQI_CREATE_TABLE("persons", MQI_TEMPORARY,
                                    persons_coldefs, persons_indexdef);
-        
+
         fail_if(persons == MQI_HANDLE_INVALID, "errno (%s)", strerror(errno));
 
         columns_no_in_persons = MQI_DIMENSION(persons_coldefs) - 1;
@@ -246,7 +246,7 @@ END_TEST
 
 
 START_TEST(insert_into_persons)
-{ 
+{
     int n;
 
     PREREQUISITE(create_table_persons);
@@ -429,7 +429,7 @@ START_TEST(update_in_persons)
     );
 
     static query_t kalle = {1, "Korhonen", "Kalle"};
-    
+
     query_t *r, rows[32];
     int i,n;
     int found;
@@ -569,7 +569,7 @@ START_TEST(table_trigger)
     sts = mqi_create_table_trigger(table_event_cb, TABLE_TRIGGER_DATA);
 
     fail_if(sts < 0, "errno (%s)", strerror(errno));
-    
+
     PREREQUISITE(create_table_persons);
 
     if (verbose)
@@ -774,8 +774,8 @@ static void print_rows(int n, query_t *rows)
     int i;
 
     printf("   id first name      family name     \n");
-    printf("--------------------------------------\n");        
-    
+    printf("--------------------------------------\n");
+
     if (!n)
         printf("no rows\n");
     else {
@@ -818,7 +818,7 @@ static void print_triggers(void)
     else {
         for (i = 0;  i < ntrigger;  i++) {
             trig = triggers + i;
-            
+
             switch (trig->event) {
             case mqi_column_changed:    t = col; ev = "column_changed";  break;
             case mqi_row_inserted:      t = row; ev = "row_inserted";    break;
@@ -837,7 +837,7 @@ static void print_triggers(void)
                 printf("|%8x %-10s", trig->table.handle, trig->table.name);
             else
                 printf("|                   ");
- 
+
             if (t == row || t == col)
                 printf("|%5d %-15s %-15s", trig->row.id, trig->row.first_name,
                        trig->row.family_name);

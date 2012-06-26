@@ -32,11 +32,11 @@ typedef struct mrp_io_watch_s mrp_io_watch_t;
 
 /** I/O watch notification callback type. */
 typedef void (*mrp_io_watch_cb_t)(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-				  mrp_io_event_t events, void *user_data);
+                                  mrp_io_event_t events, void *user_data);
 /** Register a new file descriptor to watch. */
 mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
-				 mrp_io_event_t events,
-				 mrp_io_watch_cb_t cb, void *user_data);
+                                 mrp_io_event_t events,
+                                 mrp_io_watch_cb_t cb, void *user_data);
 /** Unregister an I/O watch. */
 void mrp_del_io_watch(mrp_io_watch_t *watch);
 
@@ -49,12 +49,12 @@ typedef struct mrp_timer_s mrp_timer_t;
 
 /** Timer notification callback type. */
 typedef void (*mrp_timer_cb_t)(mrp_mainloop_t *ml, mrp_timer_t *t,
-			      void *user_data);
+                              void *user_data);
 /** Add a new timer. */
 mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
-			   mrp_timer_cb_t cb, void *user_data);
+                           mrp_timer_cb_t cb, void *user_data);
 /** Delete a timer. */
-void mrp_del_timer(mrp_timer_t *t); 
+void mrp_del_timer(mrp_timer_t *t);
 
 
 /*
@@ -65,10 +65,10 @@ typedef struct mrp_deferred_s mrp_deferred_t;
 
 /** Deferred callback notification callback type. */
 typedef void (*mrp_deferred_cb_t)(mrp_mainloop_t *ml, mrp_deferred_t *d,
-				  void *user_data);
+                                  void *user_data);
 /** Add a deferred callback. */
 mrp_deferred_t *mrp_add_deferred(mrp_mainloop_t *ml, mrp_deferred_cb_t cb,
-				 void *user_data);
+                                 void *user_data);
 /** Remove a deferred callback. */
 void mrp_del_deferred(mrp_deferred_t *d);
 
@@ -86,10 +86,10 @@ typedef struct mrp_sighandler_s mrp_sighandler_t;
 
 /* Signal handler callback type. */
 typedef void (*mrp_sighandler_cb_t)(mrp_mainloop_t *ml, mrp_sighandler_t *h,
-				    int signum, void *user_data);
+                                    int signum, void *user_data);
 /** Register a signal handler. */
 mrp_sighandler_t *mrp_add_sighandler(mrp_mainloop_t *ml, int signum,
-				     mrp_sighandler_cb_t cb, void *user_data);
+                                     mrp_sighandler_cb_t cb, void *user_data);
 /** Unregister a signal handler. */
 void mrp_del_sighandler(mrp_sighandler_t *h);
 
@@ -110,7 +110,7 @@ typedef struct {
 
 /** Register an external mainloop to be pumped by the given mainloop. */
 mrp_subloop_t *mrp_add_subloop(mrp_mainloop_t *ml, mrp_subloop_ops_t *ops,
-			       void *user_data);
+                               void *user_data);
 
 /** Stop pumping a registered external mainloop. */
 void mrp_del_subloop(mrp_subloop_t *sl);
@@ -122,20 +122,20 @@ void mrp_del_subloop(mrp_subloop_t *sl);
 
 typedef struct {
     void *(*add_io)(void *glue_data, int fd, mrp_io_event_t events,
-		    void (*cb)(void *glue_data, void *id, int fd,
-			       mrp_io_event_t events, void *user_data),
-		    void *user_data);
+                    void (*cb)(void *glue_data, void *id, int fd,
+                               mrp_io_event_t events, void *user_data),
+                    void *user_data);
     void (*del_io)(void *glue_data, void *id);
-    
+
     void *(*add_timer)(void *glue_data, unsigned int msecs,
-		       void (*cb)(void *glue_data, void *id, void *user_data),
-		       void *user_data);
+                       void (*cb)(void *glue_data, void *id, void *user_data),
+                       void *user_data);
     void (*del_timer)(void *glue_data, void *id);
     void (*mod_timer)(void *glue_data, void *id, unsigned int msecs);
 
     void *(*add_defer)(void *glue_data,
-		       void (*cb)(void *glue_data, void *id, void *user_data),
-		       void *user_data);
+                       void (*cb)(void *glue_data, void *id, void *user_data),
+                       void *user_data);
     void  (*del_defer)(void *glue_data, void *id);
     void  (*mod_defer)(void *glue_data, void *id, int enabled);
 } mrp_superloop_ops_t;
@@ -143,11 +143,11 @@ typedef struct {
 
 /** Set a superloop to pump the given mainloop. */
 int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
-		      void *loop_data);
+                      void *loop_data);
 
 /** Clear the superloop that pumps the given mainloop. */
 int mrp_clear_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
-			void *loop_data);
+                        void *loop_data);
 
 
 /*

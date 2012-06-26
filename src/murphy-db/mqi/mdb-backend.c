@@ -126,7 +126,7 @@ static int drop_table_trigger(mqi_trigger_cb_t cb, void *data)
 
 static int drop_row_trigger(void *t, mqi_trigger_cb_t cb, void *data)
 {
-    return mdb_trigger_delete_row_callback((mdb_table_t *)t, cb, data); 
+    return mdb_trigger_delete_row_callback((mdb_table_t *)t, cb, data);
 }
 
 static int drop_column_trigger(void *t,
@@ -197,7 +197,7 @@ static int insert_into(void               *t,
                         void              **data)
 {
     return mdb_table_insert((mdb_table_t *)t, ignore, cds, data);
-} 
+}
 
 static int select_general(void              *t,
                           mqi_cond_entry_t  *cond,

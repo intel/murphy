@@ -35,14 +35,14 @@ typedef struct {
 
 
 static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-			mrp_io_event_t events, void *user_data);
+                        mrp_io_event_t events, void *user_data);
 static int strm_disconnect(mrp_transport_t *mt);
 static int open_socket(strm_t *t, int family);
 
 
 
 static int parse_address(const char *str, int *familyp, char *nodep,
-			 size_t nsize, char **servicep, const char **typep)
+                         size_t nsize, char **servicep, const char **typep)
 {
     char       *node, *service;
     const char *type;
@@ -52,157 +52,157 @@ static int parse_address(const char *str, int *familyp, char *nodep,
     node = (char *)str;
 
     if (!strncmp(node, TCP4":", l=TCP4L+1)) {
-	family = AF_INET;
-	type   = TCP4;
-	node  += l;
+        family = AF_INET;
+        type   = TCP4;
+        node  += l;
     }
     else if (!strncmp(node, TCP6":", l=TCP6L+1)) {
-	family = AF_INET6;
-	type   = TCP6;
-	node  += l; 
+        family = AF_INET6;
+        type   = TCP6;
+        node  += l;
     }
     else if (!strncmp(node, UNXS":", l=UNXSL+1)) {
-	family = AF_UNIX;
-	type   = UNXS;
-	node  += l;
+        family = AF_UNIX;
+        type   = UNXS;
+        node  += l;
     }
     else {
-	if      (node[0] == '[') family = AF_INET6;
-	else if (node[0] == '/') family = AF_UNIX;
-	else if (node[0] == '@') family = AF_UNIX;
-	else                     family = AF_UNSPEC;
+        if      (node[0] == '[') family = AF_INET6;
+        else if (node[0] == '/') family = AF_UNIX;
+        else if (node[0] == '@') family = AF_UNIX;
+        else                     family = AF_UNSPEC;
 
-	type = NULL;
+        type = NULL;
     }
 
     switch (family) {
     case AF_INET:
-	service = strrchr(node, ':');
-	if (service == NULL) {
-	    errno = EINVAL;
-	    return -1;
-	}
-	
-	nl = service - node;
-	service++;
+        service = strrchr(node, ':');
+        if (service == NULL) {
+            errno = EINVAL;
+            return -1;
+        }
+
+        nl = service - node;
+        service++;
 
     case AF_INET6:
-	service = strrchr(node, ':');
+        service = strrchr(node, ':');
 
-	if (service == NULL || service == node) {
-	    errno = EINVAL;
-	    return -1;
-	}
-	
-	if (node[0] == '[') {
-	    node++;
+        if (service == NULL || service == node) {
+            errno = EINVAL;
+            return -1;
+        }
 
-	    if (service[-1] != ']') {
-		errno = EINVAL;
-		return -1;
-	    }
-	    
-	    nl = service - node - 1;
-	}
-	else
-	    nl = service - node;
+        if (node[0] == '[') {
+            node++;
 
-	service++;
-	break;
+            if (service[-1] != ']') {
+                errno = EINVAL;
+                return -1;
+            }
+
+            nl = service - node - 1;
+        }
+        else
+            nl = service - node;
+
+        service++;
+        break;
 
     case AF_UNSPEC:
-	if (!strncmp(node, "tcp:", l=4))
-	    node += l;
-	service = strrchr(node, ':');
+        if (!strncmp(node, "tcp:", l=4))
+            node += l;
+        service = strrchr(node, ':');
 
-	if (service == NULL || service == node) {
-	    errno = EINVAL;
-	    return -1;
-	}
+        if (service == NULL || service == node) {
+            errno = EINVAL;
+            return -1;
+        }
 
-	if (node[0] == '[') {
-	    node++;
-	    family = AF_INET6;
-	    
-	    if (service[-1] != ']') {
-		errno = EINVAL;
-		return -1;
-	    }
+        if (node[0] == '[') {
+            node++;
+            family = AF_INET6;
 
-	    nl = service - node - 1;
-	}
-	else {
-	    family = AF_INET;
-	    nl = service - node;
-	}
-	service++;
-	break;
+            if (service[-1] != ']') {
+                errno = EINVAL;
+                return -1;
+            }
+
+            nl = service - node - 1;
+        }
+        else {
+            family = AF_INET;
+            nl = service - node;
+        }
+        service++;
+        break;
 
     case AF_UNIX:
-	service = NULL;
-	nl      = strlen(node);
+        service = NULL;
+        nl      = strlen(node);
     }
-    
+
     if (nl > nsize) {
-	errno = ENOMEM;
-	return -1;
+        errno = ENOMEM;
+        return -1;
     }
-    
+
     strncpy(nodep, node, nl);
     nodep[nl] = '\0';
     *servicep = service;
     *familyp  = family;
     if (typep != NULL)
-	*typep = type;
+        *typep = type;
 
     return 0;
 }
 
 
 static socklen_t strm_resolve(const char *str, mrp_sockaddr_t *addr,
-			      socklen_t size, const char **typep)
+                              socklen_t size, const char **typep)
 {
     struct addrinfo    *ai, hints;
     struct sockaddr_un *un;
     char                node[512], *port;
     socklen_t           len;
-    
-    mrp_clear(&hints);    
-    
+
+    mrp_clear(&hints);
+
     if (parse_address(str, &hints.ai_family, node, sizeof(node),
-		      &port, typep) < 0)
-	return 0;
+                      &port, typep) < 0)
+        return 0;
 
     switch (hints.ai_family) {
     case AF_UNIX:
-	un  = &addr->unx;
-	len = MRP_OFFSET(typeof(*un), sun_path) + strlen(node);
+        un  = &addr->unx;
+        len = MRP_OFFSET(typeof(*un), sun_path) + strlen(node);
 
-	if (size < len)
-	    errno = ENOMEM;
-	else {
-	    un->sun_family = AF_UNIX;
-	    strcpy(un->sun_path, node);
-	    if (un->sun_path[0] == '@')
-		un->sun_path[0] = '\0';
-	}
-	break;
-	
+        if (size < len)
+            errno = ENOMEM;
+        else {
+            un->sun_family = AF_UNIX;
+            strcpy(un->sun_path, node);
+            if (un->sun_path[0] == '@')
+                un->sun_path[0] = '\0';
+        }
+        break;
+
     case AF_INET:
     case AF_INET6:
     default:
-	if (getaddrinfo(node, port, &hints, &ai) == 0) {
-	    if (ai->ai_addrlen <= size) {
-		memcpy(addr, ai->ai_addr, ai->ai_addrlen);
-		len = ai->ai_addrlen;
-	    }
-	    else
-		len = 0;
-	    
-	    freeaddrinfo(ai);
-	}
-	else
-	    len = 0;
+        if (getaddrinfo(node, port, &hints, &ai) == 0) {
+            if (ai->ai_addrlen <= size) {
+                memcpy(addr, ai->ai_addr, ai->ai_addrlen);
+                len = ai->ai_addrlen;
+            }
+            else
+                len = 0;
+
+            freeaddrinfo(ai);
+        }
+        else
+            len = 0;
     }
 
     return len;
@@ -212,7 +212,7 @@ static socklen_t strm_resolve(const char *str, mrp_sockaddr_t *addr,
 static int strm_open(mrp_transport_t *mt)
 {
     strm_t *t = (strm_t *)mt;
-    
+
     t->sock = -1;
 
     return TRUE;
@@ -222,45 +222,45 @@ static int strm_open(mrp_transport_t *mt)
 static int strm_createfrom(mrp_transport_t *mt, void *conn)
 {
     strm_t           *t = (strm_t *)mt;
-    mrp_io_event_t   events;    
+    mrp_io_event_t   events;
     int              on;
     long             nb;
 
     t->sock = *(int *)conn;
 
     if (t->sock >= 0) {
-	if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
-	    on = 1;
-	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-	}
-	if (mt->flags & MRP_TRANSPORT_NONBLOCK) {
-	    nb = 1;
-	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
-	}
+        if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
+            on = 1;
+            setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+        }
+        if (mt->flags & MRP_TRANSPORT_NONBLOCK) {
+            nb = 1;
+            fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+        }
 
-	if (t->connected) {
-	    events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	    t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
-	    
-	    if (t->iow != NULL)
-		return TRUE;
-	}
+        if (t->connected) {
+            events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+            t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
+
+            if (t->iow != NULL)
+                return TRUE;
+        }
     }
-    
+
     return FALSE;
 }
 
 
 static int strm_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
-		     socklen_t addrlen)
+                     socklen_t addrlen)
 {
     strm_t *t = (strm_t *)mt;
-    
+
     if (t->sock != -1 || open_socket(t, addr->any.sa_family)) {
-	if (bind(t->sock, &addr->any, addrlen) == 0)
-	    return TRUE;
+        if (bind(t->sock, &addr->any, addrlen) == 0)
+            return TRUE;
     }
-    
+
     return FALSE;
 }
 
@@ -270,10 +270,10 @@ static int strm_listen(mrp_transport_t *mt, int backlog)
     strm_t *t = (strm_t *)mt;
 
     if (t->sock != -1 && t->iow != NULL && t->evt.connection != NULL) {
-	if (listen(t->sock, backlog) == 0) {
-	    t->listened = TRUE;
-	    return TRUE;
-	}
+        if (listen(t->sock, backlog) == 0) {
+            t->listened = TRUE;
+            return TRUE;
+        }
     }
 
     return FALSE;
@@ -296,30 +296,30 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
     t->sock = accept(lt->sock, &addr.any, &addrlen);
 
     if (t->sock >= 0) {
-	if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
-	    on = 1;
-	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-	}
-	if (mt->flags & MRP_TRANSPORT_NONBLOCK) {
-	    nb = 1;
-	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
-	}
-	if (mt->flags & MRP_TRANSPORT_CLOEXEC) {
-	    on = 1;
-	    fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
-	}
+        if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
+            on = 1;
+            setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+        }
+        if (mt->flags & MRP_TRANSPORT_NONBLOCK) {
+            nb = 1;
+            fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+        }
+        if (mt->flags & MRP_TRANSPORT_CLOEXEC) {
+            on = 1;
+            fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
+        }
 
-	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
-	    
-	if (t->iow != NULL)
-	    return TRUE;
-	else {
-	    close(t->sock);
-	    t->sock = -1;
-	}
+        events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+        t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
+
+        if (t->iow != NULL)
+            return TRUE;
+        else {
+            close(t->sock);
+            t->sock = -1;
+        }
     }
-    
+
     return FALSE;
 }
 
@@ -335,16 +335,16 @@ static void strm_close(mrp_transport_t *mt)
     t->ibuf  = NULL;
     t->isize = 0;
     t->idata = 0;
-    
+
     if (t->sock >= 0){
-	close(t->sock);
-	t->sock = -1;
+        close(t->sock);
+        t->sock = -1;
     }
 }
 
 
 static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-			 mrp_io_event_t events, void *user_data)
+                         mrp_io_event_t events, void *user_data)
 {
     strm_t           *t  = (strm_t *)user_data;
     mrp_transport_t *mt = (mrp_transport_t *)t;
@@ -357,91 +357,91 @@ static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     MRP_UNUSED(w);
 
     if (events & MRP_IO_EVENT_IN) {
-	if (MRP_UNLIKELY(mt->listened != 0)) {
-	    MRP_TRANSPORT_BUSY(mt, {
-		    mt->evt.connection(mt, mt->user_data);
-		});
+        if (MRP_UNLIKELY(mt->listened != 0)) {
+            MRP_TRANSPORT_BUSY(mt, {
+                    mt->evt.connection(mt, mt->user_data);
+                });
 
-	    t->check_destroy(mt);
-	    return;
-	}
+            t->check_destroy(mt);
+            return;
+        }
 
-	/*
-	 * enlarge the buffer if we're out of space
-	 */
+        /*
+         * enlarge the buffer if we're out of space
+         */
     realloc:
-	if (t->idata == t->isize) {
-	    if (t->isize > sizeof(size)) {
-		old       = t->isize;
-		sizep     = t->ibuf;
-		size      = sizeof(size) + ntohl(*sizep);
-		t->isize  = size;
-	    }
-	    else {
-		old      = 0;
-		t->isize = DEFAULT_SIZE;
-	    }
-	    if (!mrp_reallocz(t->ibuf, old, t->isize)) {
-		error = ENOMEM;
-	    fatal_error:
-	    closed:
-		strm_disconnect(mt);
-		
-		if (t->evt.closed != NULL)
-		    MRP_TRANSPORT_BUSY(mt, {
-			    mt->evt.closed(mt, error, mt->user_data);
-			});
-		
-		t->check_destroy(mt);
-		return;
-	    }
-	}
+        if (t->idata == t->isize) {
+            if (t->isize > sizeof(size)) {
+                old       = t->isize;
+                sizep     = t->ibuf;
+                size      = sizeof(size) + ntohl(*sizep);
+                t->isize  = size;
+            }
+            else {
+                old      = 0;
+                t->isize = DEFAULT_SIZE;
+            }
+            if (!mrp_reallocz(t->ibuf, old, t->isize)) {
+                error = ENOMEM;
+            fatal_error:
+            closed:
+                strm_disconnect(mt);
 
-	
-	space = t->isize - t->idata;
-	while ((n = read(fd, t->ibuf + t->idata, space)) > 0) {
-	    t->idata += n;
+                if (t->evt.closed != NULL)
+                    MRP_TRANSPORT_BUSY(mt, {
+                            mt->evt.closed(mt, error, mt->user_data);
+                        });
 
-	    if (t->idata >= sizeof(size)) {
-		sizep = t->ibuf;
-		size  = ntohl(*sizep);
-		
-		while (t->idata >= sizeof(size) + size) {
-		    data  = t->ibuf + sizeof(size);
-		    error = t->recv_data(mt, data, size, NULL, 0);
-		    
-		    if (error)
-			goto fatal_error;
+                t->check_destroy(mt);
+                return;
+            }
+        }
 
-		    if (t->check_destroy(mt))
-			return;
-		    
-		    left = t->idata - (sizeof(size) + size);
-		    memmove(t->ibuf, t->ibuf + sizeof(size) + size, left);
-		    t->idata = left;
-		    
-		    if (t->idata >= sizeof(size)) {
-			sizep = t->ibuf;
-			size = ntohl(*sizep);
-		    }
-		    else
-			size = (uint32_t)-1;
-		}
-	    }
-	    space = t->isize - t->idata;
-	    if (space == 0)
-		goto realloc;
-	}
-	
-	if (n < 0 && errno != EAGAIN) {
-	    error = EIO;
-	    goto fatal_error;
-	}
+
+        space = t->isize - t->idata;
+        while ((n = read(fd, t->ibuf + t->idata, space)) > 0) {
+            t->idata += n;
+
+            if (t->idata >= sizeof(size)) {
+                sizep = t->ibuf;
+                size  = ntohl(*sizep);
+
+                while (t->idata >= sizeof(size) + size) {
+                    data  = t->ibuf + sizeof(size);
+                    error = t->recv_data(mt, data, size, NULL, 0);
+
+                    if (error)
+                        goto fatal_error;
+
+                    if (t->check_destroy(mt))
+                        return;
+
+                    left = t->idata - (sizeof(size) + size);
+                    memmove(t->ibuf, t->ibuf + sizeof(size) + size, left);
+                    t->idata = left;
+
+                    if (t->idata >= sizeof(size)) {
+                        sizep = t->ibuf;
+                        size = ntohl(*sizep);
+                    }
+                    else
+                        size = (uint32_t)-1;
+                }
+            }
+            space = t->isize - t->idata;
+            if (space == 0)
+                goto realloc;
+        }
+
+        if (n < 0 && errno != EAGAIN) {
+            error = EIO;
+            goto fatal_error;
+        }
     }
 
     if (events & MRP_IO_EVENT_HUP) {
-	error = 0;
-	goto closed;
+        error = 0;
+        goto closed;
     }
 }
 
@@ -453,30 +453,30 @@ static int open_socket(strm_t *t, int family)
     long           nb;
 
     t->sock = socket(family, SOCK_STREAM, 0);
-    
+
     if (t->sock != -1) {
-	if (t->flags & MRP_TRANSPORT_REUSEADDR) {
-	    on = 1;
-	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-	}
-	if (t->flags & MRP_TRANSPORT_NONBLOCK) {
-	    nb = 1;
-	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
-	}
-	if (t->flags & MRP_TRANSPORT_CLOEXEC) {
-	    on = 1;
-	    fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
-	}
-	
-	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
-    
-	if (t->iow != NULL)
-	    return TRUE;
-	else {
-	    close(t->sock);
-	    t->sock = -1;
-	}
+        if (t->flags & MRP_TRANSPORT_REUSEADDR) {
+            on = 1;
+            setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+        }
+        if (t->flags & MRP_TRANSPORT_NONBLOCK) {
+            nb = 1;
+            fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+        }
+        if (t->flags & MRP_TRANSPORT_CLOEXEC) {
+            on = 1;
+            fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
+        }
+
+        events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+        t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
+
+        if (t->iow != NULL)
+            return TRUE;
+        else {
+            close(t->sock);
+            t->sock = -1;
+        }
     }
 
     return FALSE;
@@ -484,7 +484,7 @@ static int open_socket(strm_t *t, int family)
 
 
 static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
-			socklen_t addrlen)
+                        socklen_t addrlen)
 {
     strm_t         *t    = (strm_t *)mt;
     int             on;
@@ -494,25 +494,25 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     t->sock = socket(addr->any.sa_family, SOCK_STREAM, 0);
 
     if (t->sock < 0)
-	return FALSE;
+        return FALSE;
 
     if (connect(t->sock, &addr->any, addrlen) == 0) {
-	events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-	t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
-	    
-	if (t->iow != NULL) {
-	    on = 1;
-	    setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-	    nb = 1;
-	    fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
-	    
-	    return TRUE;
-	}
+        events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
+        t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
+
+        if (t->iow != NULL) {
+            on = 1;
+            setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+            nb = 1;
+            fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
+
+            return TRUE;
+        }
     }
-    
+
     if (t->sock != -1) {
-	close(t->sock);
-	t->sock = -1;
+        close(t->sock);
+        t->sock = -1;
     }
 
     return FALSE;
@@ -524,15 +524,15 @@ static int strm_disconnect(mrp_transport_t *mt)
     strm_t *t = (strm_t *)mt;
 
     if (t->connected) {
-	mrp_del_io_watch(t->iow);
-	t->iow = NULL;
+        mrp_del_io_watch(t->iow);
+        t->iow = NULL;
 
-	shutdown(t->sock, SHUT_RDWR);
+        shutdown(t->sock, SHUT_RDWR);
 
-	return TRUE;
+        return TRUE;
     }
     else
-	return FALSE;
+        return FALSE;
 }
 
 
@@ -545,28 +545,28 @@ static int strm_send(mrp_transport_t *mt, mrp_msg_t *msg)
     uint32_t      len;
 
     if (t->connected) {
-	size = mrp_msg_default_encode(msg, &buf);
-    
-	if (size >= 0) {
-	    len = htonl(size);
-	    iov[0].iov_base = &len;
-	    iov[0].iov_len  = sizeof(len);
-	    iov[1].iov_base = buf;
-	    iov[1].iov_len  = size;
-	
-	    n = writev(t->sock, iov, 2);
-	    mrp_free(buf);
+        size = mrp_msg_default_encode(msg, &buf);
 
-	    if (n == (ssize_t)(size + sizeof(len)))
-		return TRUE;
-	    else {
-		if (n == -1 && errno == EAGAIN) {
-		    mrp_log_error("%s(): XXX TODO: this sucks, need to add "
-				  "output queuing for strm-transport.",
-				  __FUNCTION__);
-		}
-	    }
-	}
+        if (size >= 0) {
+            len = htonl(size);
+            iov[0].iov_base = &len;
+            iov[0].iov_len  = sizeof(len);
+            iov[1].iov_base = buf;
+            iov[1].iov_len  = size;
+
+            n = writev(t->sock, iov, 2);
+            mrp_free(buf);
+
+            if (n == (ssize_t)(size + sizeof(len)))
+                return TRUE;
+            else {
+                if (n == -1 && errno == EAGAIN) {
+                    mrp_log_error("%s(): XXX TODO: this sucks, need to add "
+                                  "output queuing for strm-transport.",
+                                  __FUNCTION__);
+                }
+            }
+        }
     }
 
     return FALSE;
@@ -579,19 +579,19 @@ static int strm_sendraw(mrp_transport_t *mt, void *data, size_t size)
     ssize_t  n;
 
     if (t->connected) {
-	n = write(t->sock, data, size);
+        n = write(t->sock, data, size);
 
-	if (n == (ssize_t)size)
-	    return TRUE;
-	else {
-	    if (n == -1 && errno == EAGAIN) {
-		mrp_log_error("%s(): XXX TODO: this sucks, need to add "
-			      "output queuing for strm-transport.",
-			      __FUNCTION__);
-	    }
-	}
+        if (n == (ssize_t)size)
+            return TRUE;
+        else {
+            if (n == -1 && errno == EAGAIN) {
+                mrp_log_error("%s(): XXX TODO: this sucks, need to add "
+                              "output queuing for strm-transport.",
+                              __FUNCTION__);
+            }
+        }
     }
-    
+
     return FALSE;
 }
 
@@ -605,62 +605,62 @@ static int strm_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
     size_t            size, reserve, len;
     uint32_t         *lenp;
     uint16_t         *tagp;
-    
+
     if (t->connected) {
-	type = mrp_msg_find_type(tag);
-	
-	if (type != NULL) {
-	    reserve = sizeof(*lenp) + sizeof(*tagp);
-	    size    = mrp_data_encode(&buf, data, type, reserve);
-	    
-	    if (size > 0) {
-		lenp  = buf;
-		len   = size - sizeof(*lenp);
-		tagp  = buf + sizeof(*lenp);
-		*lenp = htobe32(len);
-		*tagp = htobe16(tag);
-		
-		n = write(t->sock, buf, len + sizeof(*lenp));
-	    
-		mrp_free(buf);
-		
-		if (n == (ssize_t)(len + sizeof(*lenp)))
-		    return TRUE;
-		else {
-		    if (n == -1 && errno == EAGAIN) {
-			mrp_log_error("%s(): XXX TODO: this sucks, need to add"
-				      " output queueing for strm-transport.",
-				      __FUNCTION__);
-		    }
-		}
-	    }
-	}
+        type = mrp_msg_find_type(tag);
+
+        if (type != NULL) {
+            reserve = sizeof(*lenp) + sizeof(*tagp);
+            size    = mrp_data_encode(&buf, data, type, reserve);
+
+            if (size > 0) {
+                lenp  = buf;
+                len   = size - sizeof(*lenp);
+                tagp  = buf + sizeof(*lenp);
+                *lenp = htobe32(len);
+                *tagp = htobe16(tag);
+
+                n = write(t->sock, buf, len + sizeof(*lenp));
+
+                mrp_free(buf);
+
+                if (n == (ssize_t)(len + sizeof(*lenp)))
+                    return TRUE;
+                else {
+                    if (n == -1 && errno == EAGAIN) {
+                        mrp_log_error("%s(): XXX TODO: this sucks, need to add"
+                                      " output queueing for strm-transport.",
+                                      __FUNCTION__);
+                    }
+                }
+            }
+        }
     }
-    
+
     return FALSE;
 }
 
 
 MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
-		       strm_open, strm_createfrom, strm_close,
-		       strm_bind, strm_listen, strm_accept,
-		       strm_connect, strm_disconnect,
-		       strm_send, NULL,
-		       strm_sendraw, NULL,
-		       strm_senddata, NULL);
+                       strm_open, strm_createfrom, strm_close,
+                       strm_bind, strm_listen, strm_accept,
+                       strm_connect, strm_disconnect,
+                       strm_send, NULL,
+                       strm_sendraw, NULL,
+                       strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
-		       strm_open, strm_createfrom, strm_close,
-		       strm_bind, strm_listen, strm_accept,
-		       strm_connect, strm_disconnect,
-		       strm_send, NULL,
-		       strm_sendraw, NULL,
-		       strm_senddata, NULL);
+                       strm_open, strm_createfrom, strm_close,
+                       strm_bind, strm_listen, strm_accept,
+                       strm_connect, strm_disconnect,
+                       strm_send, NULL,
+                       strm_sendraw, NULL,
+                       strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
-		       strm_open, strm_createfrom, strm_close,
-		       strm_bind, strm_listen, strm_accept,
-		       strm_connect, strm_disconnect,
-		       strm_send, NULL,
-		       strm_sendraw, NULL,
-		       strm_senddata, NULL);
+                       strm_open, strm_createfrom, strm_close,
+                       strm_bind, strm_listen, strm_accept,
+                       strm_connect, strm_disconnect,
+                       strm_send, NULL,
+                       strm_sendraw, NULL,
+                       strm_senddata, NULL);
