@@ -25,7 +25,7 @@
     (sizeof(array) / sizeof(array[0]))
 
 #define MQI_OFFSET(structure, member)  \
-    ((int)((void *)((&((structure *)0)->member)) - (void *)0))
+    ((int)((char *)((&((structure *)0)->member)) - (char *)0))
 
 #define MQI_BIT(b)            (((mqi_bitfld_t)1) << (b))
 
@@ -38,6 +38,51 @@
 
 #define MQI_COLUMN_KEY        (1UL << 0)
 #define MQI_COLUMN_AUTOINCR   (1UL << 1)
+
+enum mqi_data_type_e {
+    mqi_error = -1,    /* not a data type; used to return error conditions */
+    mqi_unknown = 0,
+    mqi_varchar,
+    mqi_string = mqi_varchar,
+    mqi_integer,
+    mqi_unsignd,
+    mqi_floating,
+    mqi_blob,
+};
+
+enum mqi_operator_e {
+    mqi_done = 0,
+    mqi_end  = mqi_done,
+    mqi_begin,                  /* expression start */
+    mqi_and,
+    mqi_or,
+    mqi_less,
+    mqi_leq,
+    mqi_eq,
+    mqi_geq,
+    mqi_gt,
+    mqi_not,
+    mqi_operator_max
+};
+
+enum mqi_cond_entry_type_e {
+    mqi_operator,
+    mqi_variable,
+    mqi_column
+};
+
+enum mqi_event_type_e {
+    mqi_event_unknown = 0,
+    mqi_column_changed,
+    mqi_row_inserted,
+    mqi_row_deleted,
+    mqi_table_created,
+    mqi_table_dropped,
+    mqi_transaction_start,
+    mqi_transaction_end
+};
+
+
 
 typedef uint32_t  mqi_handle_t;
 typedef uint32_t  mqi_bitfld_t;
@@ -68,16 +113,6 @@ typedef struct mqi_transact_event_s  mqi_transact_event_t;
 typedef void (*mqi_trigger_cb_t)(mqi_event_t *, void *);
 
 
-enum mqi_data_type_e {
-    mqi_error = -1,    /* not a data type; used to return error conditions */
-    mqi_unknown = 0,
-    mqi_varchar,
-    mqi_string = mqi_varchar,
-    mqi_integer,
-    mqi_unsignd,
-    mqi_floating,
-    mqi_blob,
-};
 
 struct mqi_column_def_s {
     const char      *name;
@@ -90,22 +125,6 @@ struct mqi_column_desc_s {
     int     cindex;              /* column index */
     int     offset;              /* offset within the data struct */
 };
-
-enum mqi_operator_e {
-    mqi_done = 0,
-    mqi_end  = mqi_done,
-    mqi_begin,                  /* expression start */
-    mqi_and,
-    mqi_or,
-    mqi_less,
-    mqi_leq,
-    mqi_eq,
-    mqi_geq,
-    mqi_gt,
-    mqi_not,
-    mqi_operator_max
-};
-
 
 struct mqi_variable_s {
     mqi_data_type_t  type;
@@ -120,11 +139,6 @@ struct mqi_variable_s {
     };
 };
 
-enum mqi_cond_entry_type_e {
-    mqi_operator,
-    mqi_variable,
-    mqi_column
-};
 
 struct mqi_cond_entry_s {
     mqi_cond_entry_type_t  type;
@@ -135,16 +149,6 @@ struct mqi_cond_entry_s {
     };
 };
 
-enum mqi_event_type_e {
-    mqi_event_unknown = 0,
-    mqi_column_changed,
-    mqi_row_inserted,
-    mqi_row_deleted,
-    mqi_table_created,
-    mqi_table_dropped,
-    mqi_transaction_start,
-    mqi_transaction_end
-};
 
 struct mqi_change_table_s {
     mqi_handle_t  handle;

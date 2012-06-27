@@ -1,7 +1,7 @@
 #ifndef __MDB_TRANSACTION_H__
 #define __MDB_TRANSACTION_H__
 
-typedef struct mdb_table_s mdb_table_t;
+#include <murphy-db/mdb.h>
 
 
 int mdb_transaction_drop_table(mdb_table_t *);

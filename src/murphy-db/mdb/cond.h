@@ -2,8 +2,8 @@
 #define __MDB_COND_H__
 
 #include <murphy-db/mqi-types.h>
+#include <murphy-db/mdb.h>
 
-typedef struct mdb_table_s  mdb_table_t;
 
 int mdb_cond_evaluate(mdb_table_t *, mqi_cond_entry_t **, void *);
 

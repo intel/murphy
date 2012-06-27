@@ -2,12 +2,12 @@
 #define __MDB_INDEX_H__
 
 
-typedef struct mdb_table_s mdb_table_t;
-typedef struct mdb_row_s   mdb_row_t;
-
 #include <murphy-db/mqi-types.h>
 #include <murphy-db/hash.h>
 #include <murphy-db/sequence.h>
+#include <murphy-db/mdb.h>
+
+#include "row.h"
 
 #define MDB_INDEX_LENGTH_MAX 8192
 

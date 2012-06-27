@@ -46,10 +46,10 @@ typedef struct {
     indextbl_entry_t *entries;
 } indextbl_t;
 
-typedef struct mdb_handle_map_s {
+struct mdb_handle_map_s {
     freemap_t   freemap;
     indextbl_t  indextbl;
-} mdb_handle_map_t;
+};
 
 
 static mdb_handle_t index_alloc(indextbl_t *, int, void *);

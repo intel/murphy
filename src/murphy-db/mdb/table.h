@@ -11,7 +11,7 @@
 
 #define MDB_TABLE_HAS_INDEX(t)  MDB_INDEX_DEFINED(&t->index)
 
-typedef struct mdb_table_s {
+struct mdb_table_s {
     mqi_handle_t  handle;
     char         *name;
     mdb_index_t   index;
@@ -23,7 +23,7 @@ typedef struct mdb_table_s {
     mdb_dlist_t   rows;
     mdb_dlist_t   logs;         /* transaction logs */
     mdb_trigger_t trigger;      /* must be the last: it has a array[0] @end  */
-} mdb_table_t;
+};
 
 
 #endif /* __MDB_TABLE_H__ */

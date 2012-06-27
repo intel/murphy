@@ -66,7 +66,7 @@ int mqi_data_compare_pointer(int datalen, void *data1, void *data2)
 {
     (void)datalen;
 
-    return (data1 - data2);
+    return ((char *)data1 - (char *)data2);
 }
 
 int mqi_data_compare_varchar(int datalen, void *data1, void *data2)

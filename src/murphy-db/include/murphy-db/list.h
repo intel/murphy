@@ -4,7 +4,7 @@
 #include <murphy-db/mqi-types.h>
 
 #define MDB_LIST_RELOCATE(structure, member, ptr)                       \
-    ((structure *)((void *)ptr - MQI_OFFSET(structure, member)))
+    ((structure *)((char *)ptr - MQI_OFFSET(structure, member)))
 
 
 #define MDB_DLIST_HEAD(name)   mdb_dlist_t name = { &(name), &(name) }

@@ -1,7 +1,8 @@
 #ifndef __MQL_TRIGGER_H__
 #define __MQL_TRIGGER_H__
 
-typedef struct mql_result_s  mql_result_t;
+#include <murphy-db/mql-result.h>
+
 
 typedef void (*mql_trigger_cb_t)(mql_result_t *, void *);
 

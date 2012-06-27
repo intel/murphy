@@ -33,7 +33,7 @@ typedef struct {
 } hash_chain_t;
 
 
-typedef struct mdb_hash_s {
+struct mdb_hash_s {
     int                  bits;
     mdb_hash_function_t  hfunc;
     mdb_hash_compare_t   hcomp;
@@ -47,7 +47,7 @@ typedef struct mdb_hash_s {
     }                    entries;
     int                  nchain;
     hash_chain_t         chains[0];
-} mdb_hash_t;
+};
 
 
 typedef struct {

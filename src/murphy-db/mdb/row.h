@@ -3,13 +3,14 @@
 
 #include <murphy-db/mqi-types.h>
 #include <murphy-db/list.h>
+#include <murphy-db/mdb.h>
 
-typedef struct mdb_table_s  mdb_table_t;
+typedef struct mdb_row_s mdb_row_t;
 
-typedef struct mdb_row_s {
+struct mdb_row_s {
     mdb_dlist_t  link;
     uint8_t      data[0];
-} mdb_row_t;
+};
 
 mdb_row_t *mdb_row_create(mdb_table_t *);
 mdb_row_t *mdb_row_duplicate(mdb_table_t *, mdb_row_t *);

@@ -3,7 +3,6 @@
 
 #include <murphy-db/mql-result.h>
 
-typedef struct mql_result_s mql_result_t;
 
 typedef enum {
     mql_statement_unknown = 0,

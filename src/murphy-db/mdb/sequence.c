@@ -20,7 +20,7 @@ typedef struct mdb_sequence_entry_s {
 } sequence_entry_t;
 
 
-typedef struct mdb_sequence_s {
+struct mdb_sequence_s {
     int                     alloc;
     mdb_sequence_compare_t  scomp;
     mdb_sequence_print_t    sprint;
@@ -30,7 +30,7 @@ typedef struct mdb_sequence_s {
     int                     size;
     int                     nentry;
     sequence_entry_t       *entries;
-} mdb_sequence_t;
+};
 
 
 

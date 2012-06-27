@@ -2,9 +2,9 @@
 #define __MDB_LOG_H__
 
 #include <murphy-db/list.h>
+#include <murphy-db/mdb.h>
 #include "row.h"
 
-typedef struct mdb_table_s  mdb_table_t;
 
 #define MDB_FORWARD  true
 #define MDB_BACKWARD false
