@@ -41,6 +41,11 @@ AM_PROG_LIBTOOL
 AC_PROG_LEX
 AC_PROG_YACC
 
+AC_CHECK_PROG(CTAGS, ctags, "ctags")
+if test "$CTAGS" != "ctags" ; then
+   AC_MSG_ERROR([ctags is required])
+fi
+
 if test "$LEX" != "flex" ; then
    AC_MSG_ERROR([flex is required])
 fi
