@@ -87,7 +87,7 @@ AC_SUBST(GLIB_LIBS)
 
 # Check and enable extra compiler warnings if they are supported.
 AC_ARG_ENABLE(extra-warnings,
-              [  --enable-extra-warnings         enable extra compiler warnings],
+              [  --enable-extra-warnings enable extra compiler warnings],
 	      [extra_warnings=$enableval], [extra_warnings=auto])
 
 WARNING_CFLAGS=""
@@ -105,7 +105,7 @@ AC_SUBST(WARNING_CFLAGS)
 
 # Check if DBUS was enabled.
 AC_ARG_ENABLE(dbus,
-              [  --enable-dbus         enable D-BUS support],
+              [  --enable-dbus           enable D-BUS support],
 	      [enable_dbus=$enableval], [enable_dbus=no])
 
 if test "$enable_dbus" = "yes"; then
@@ -128,7 +128,7 @@ AC_SUBST(DBUS_LIBS)
 
 # Check if PulseAudio mainloop support was enabled.
 AC_ARG_ENABLE(pulse,
-              [  --enable-pulse        enable PulseAudio mainloop support],
+              [  --enable-pulse          enable PulseAudio mainloop support],
 	      [enable_pulse=$enableval], [enable_pulse=auto])
 
 if test "$enable_pulse" != "no"; then
