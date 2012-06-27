@@ -30,9 +30,13 @@ check-git-hooks:
 	            *.sample|*~|*.swp) continue;;                            \
 	        esac;                                                        \
 	        if test -x $$hook -a ! -e .git/hooks/$${hook##*/}; then      \
+	            echo "";                                                 \
 	            echo "WARNING:";                                         \
 	            echo "WARNING: You have an uninstalled git hook $$hook"; \
+	            echo "WARNING: Please, consider taking it into use by";  \
+	            echo "WARNING: running 'make install-git-hooks'...";     \
 	            echo "WARNING:";                                         \
+	            echo "";                                                 \
 	        fi                                                           \
 	    done                                                             \
 	fi
