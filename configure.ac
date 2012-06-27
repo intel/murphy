@@ -151,6 +151,32 @@ AC_SUBST(PULSE_ENABLED)
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 
+# Check if building murphy-console was enabled.
+AC_ARG_ENABLE(console,
+              [  --enable-console        build Murphy console],
+	      [enable_console=$enableval], [enable_console=auto])
+
+if test "$enable_console" != "no"; then
+    AC_HAVE_LIBRARY([readline], [have_readline=yes], [have_readline=no])
+    if test "$have_readline" = "no" -a "$enable_console" = "yes"; then
+        AC_MSG_ERROR([Readline development libraries not found.])
+    else
+        enable_console="$have_readline"
+    fi
+else
+    AC_MSG_NOTICE([Murphy console binary is disabled.])
+fi
+
+if test "$enable_console" = "yes"; then
+    AC_DEFINE([CONSOLE_ENABLED], 1, [Build Murphy console ?])
+    READLINE_CFLAGS=""
+    READLINE_LIBS="-lreadline"
+fi
+AM_CONDITIONAL(CONSOLE_ENABLED, [test "$enable_console" = "yes"])
+AC_SUBST(CONSOLE_ENABLED)
+AC_SUBST(READLINE_CFLAGS)
+AC_SUBST(READLINE_LIBS)
+
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS="$GLIB_CFLAGS $DBUS_CFLAGS"
 MURPHY_LIBS="$GLIB_LIBS $DBUS_LIBS"
@@ -161,6 +187,11 @@ AC_SUBST(MURPHY_LIBS)
 AC_MSG_CHECKING([libdir])
 AC_MSG_RESULT([$libdir])
 AC_SUBST(LIBDIR, [$libdir])
+
+# Check which plugins should be disabled.
+AC_ARG_WITH(disabled-plugins,
+            [  --with-disabled-plugins=<plugin-list> specify which plugins to disable],
+            [disabled_plugins=$withval],[disabled_plugins=none])
 
 
 # Check which plugins should be built in.
@@ -178,25 +209,43 @@ esac
 
 internal=""; it=""
 external=""; et=""
+disabled=""; dt=""
 for plugin in $all_plugins; do 
     type=external
 
     for p in ${builtin_plugins//,/ }; do
         if test "$plugin" = "$p"; then
-            internal="$internal$it$plugin"
             type=internal
-            it=" "
         fi
     done
 
-    if test "$type" = "external"; then
-        external="$external$et$plugin"
-        et=" "
-    fi
+    for p in ${disabled_plugins//,/ }; do
+        if test "$plugin" = "$p"; then
+            type=disabled
+        fi
+    done
+
+    case $type in
+        internal) internal="$internal$it$plugin"; it=" ";;
+        external) external="$external$et$plugin"; et=" ";;
+        disabled) disabled="$disabled$dt$plugin"; dt=" ";;
+    esac
 done
 
+DISABLED_PLUGINS="$disabled"
 INTERNAL_PLUGINS="$internal"
 EXTERNAL_PLUGINS="$external"
+
+
+function check_if_disabled() {
+    for p in $DISABLED_PLUGINS; do
+        if test "$1" = "$p"; then
+            return 0
+        fi
+    done
+
+    return 1
+}
 
 function check_if_internal() {
     for p in $INTERNAL_PLUGINS; do
@@ -208,10 +257,15 @@ function check_if_internal() {
     return 1
 }
 
-AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,    [check_if_internal test])
-AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,    [check_if_internal dbus])
-AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,    [check_if_internal glib])
-AM_CONDITIONAL(BUILTIN_PLUGIN_CONSOLE, [check_if_internal console])
+AM_CONDITIONAL(DISABLED_PLUGIN_TEST,    [check_if_disabled test])
+AM_CONDITIONAL(DISABLED_PLUGIN_DBUS,    [check_if_disabled dbus])
+AM_CONDITIONAL(DISABLED_PLUGIN_GLIB,    [check_if_disabled glib])
+AM_CONDITIONAL(DISABLED_PLUGIN_CONSOLE, [check_if_disabled console])
+
+AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,     [check_if_internal test])
+AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,     [check_if_internal dbus])
+AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,     [check_if_internal glib])
+AM_CONDITIONAL(BUILTIN_PLUGIN_CONSOLE,  [check_if_internal console])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 
@@ -321,13 +375,17 @@ echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
 echo "D-Bus support: $enable_dbus"
 echo "PulseAudio mainloop support: $enable_pulse"
+echo "Murphy console plugin and client: $enable_console"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do
     echo "      $plugin"
 done
-
 echo "  - dynamic:"
 for plugin in ${EXTERNAL_PLUGINS:-none}; do
+    echo "      $plugin"
+done
+echo "  - disabled:"
+for plugin in ${DISABLED_PLUGINS:-none}; do
     echo "      $plugin"
 done

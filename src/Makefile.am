@@ -260,6 +260,7 @@ TEST_PLUGIN_SOURCES = plugins/plugin-test.c
 TEST_PLUGIN_CFLAGS  =
 TEST_PLUGIN_LIBS    =
 
+if !DISABLED_PLUGIN_TEST
 if BUILTIN_PLUGIN_TEST
 BUILTIN_PLUGINS += $(TEST_PLUGIN_SOURCES)
 BUILTIN_CFLAGS  += $(TEST_PLUGIN_CFLAGS)
@@ -272,6 +273,7 @@ plugin_test_la_LIBADD  = $(TEST_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-test.la
 endif
+endif
 
 # dbus plugin
 if DBUS_ENABLED
@@ -279,6 +281,7 @@ DBUS_PLUGIN_SOURCES = plugins/plugin-dbus.c
 DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
 DBUS_PLUGIN_LIBS    = libmurphy-dbus.la
 
+if !DISABLED_PLUGIN_DBUS
 if BUILTIN_PLUGIN_DBUS
 BUILTIN_PLUGINS += $(DBUS_PLUGIN_SOURCES)
 BUILTIN_CFLAGS  += $(DBUS_PLUGIN_CFLAGS)
@@ -292,12 +295,14 @@ plugin_dbus_la_LIBADD  = $(DBUS_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-dbus.la
 endif
 endif
+endif
 
 # glib plugin
 GLIB_PLUGIN_SOURCES = plugins/plugin-glib.c
 GLIB_PLUGIN_CFLAGS  = $(GLIB_CFLAGS)
 GLIB_PLUGIN_LIBS    = $(GLIB_LIBS)
 
+if !DISABLED_PLUGIN_GLIB
 if BUILTIN_PLUGIN_GLIB
 BUILTIN_PLUGINS += $(GLIB_PLUGIN_SOURCES)
 BUILTIN_CFLAGS  += $(GLIB_PLUGIN_CFLAGS)
@@ -310,6 +315,7 @@ plugin_glib_la_LIBADD  = $(GLIB_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-glib.la
 endif
+endif
 
 # console plugin
 CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/plugin-console.c
@@ -318,6 +324,8 @@ CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES) \
 CONSOLE_PLUGIN_CFLAGS  	       =
 CONSOLE_PLUGIN_LIBS    	       =
 
+if CONSOLE_ENABLED
+if !DISABLED_PLUGIN_CONSOLE
 if BUILTIN_PLUGIN_CONSOLE
 BUILTIN_PLUGINS += $(CONSOLE_PLUGIN_SOURCES)
 BUILTIN_CFLAGS  += $(CONSOLE_PLUGIN_CFLAGS)
@@ -331,13 +339,14 @@ plugin_console_la_LIBADD  = $(CONSOLE_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-console.la
 endif
-
+endif
 # debug file:line-function mapping generation
 plugin-console-func-info.c: $(CONSOLE_PLUGIN_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
 
 clean-func-infos::
 	-rm plugin-console-func-info.c
+endif
 
 ###################################
 # murphy daemon
@@ -365,8 +374,7 @@ murphyd_LDFLAGS = -rdynamic
 # murphy console client
 #
 
-#if BUILD_CONSOLE_CLIENT # XXX TODO need to check for libreadline
-
+if CONSOLE_ENABLED
 bin_PROGRAMS += murphy-console
 
 murphy_console_SOURCES =		\
@@ -384,8 +392,7 @@ murphy_console_LDADD +=	libmurphy-dbus.la
 endif
 
 murphy_console_LDFLAGS = -rdynamic -lreadline
-
-#end
+endif
 
 # cleanup
 clean-local:: clean-linker-script clean-func-infos
