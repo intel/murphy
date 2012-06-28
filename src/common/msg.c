@@ -1424,7 +1424,13 @@ void *mrp_data_decode(void **bufp, size_t *sizep, mrp_data_descr_t *descr)
 
             base  = f->type & ~MRP_MSG_FIELD_ARRAY;
             n     = be32toh(MRP_MSGBUF_PULL(&mb, typeof(n), 1, nodata));
-            size  = n;
+
+            if (!f->guard && get_array_size(data, descr, i) != (int)n) {
+                errno = EINVAL;
+                goto fail;
+            }
+
+            size = n;
 
             switch (base) {
             case MRP_MSG_FIELD_STRING: size *= sizeof(*v->astr); break;

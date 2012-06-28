@@ -48,6 +48,7 @@ typedef struct {
     bool       bln;
     char     **astr;
     uint32_t   nstr;
+    uint32_t   fsck;
     uint32_t  *au32;
     char      *rpl;
 } custom_t;
@@ -64,10 +65,30 @@ MRP_DATA_DESCRIPTOR(custom_descr, TAG_CUSTOM, custom_t,
                     MRP_DATA_MEMBER(custom_t,  bln, MRP_MSG_FIELD_BOOL  ),
                     MRP_DATA_MEMBER(custom_t,  rpl, MRP_MSG_FIELD_STRING),
                     MRP_DATA_MEMBER(custom_t, nstr, MRP_MSG_FIELD_UINT32),
+                    MRP_DATA_MEMBER(custom_t, fsck, MRP_MSG_FIELD_UINT32),
                     MRP_DATA_ARRAY_COUNT(custom_t, astr, nstr,
                                          MRP_MSG_FIELD_STRING),
                     MRP_DATA_ARRAY_GUARD(custom_t, au32, u32, U32_GUARD,
                                          MRP_MSG_FIELD_UINT32));
+
+MRP_DATA_DESCRIPTOR(buggy_descr, TAG_CUSTOM, custom_t,
+                    MRP_DATA_MEMBER(custom_t,  seq, MRP_MSG_FIELD_UINT32),
+                    MRP_DATA_MEMBER(custom_t,  msg, MRP_MSG_FIELD_STRING),
+                    MRP_DATA_MEMBER(custom_t,   u8, MRP_MSG_FIELD_UINT8 ),
+                    MRP_DATA_MEMBER(custom_t,   s8, MRP_MSG_FIELD_SINT8 ),
+                    MRP_DATA_MEMBER(custom_t,  u16, MRP_MSG_FIELD_UINT16),
+                    MRP_DATA_MEMBER(custom_t,  s16, MRP_MSG_FIELD_SINT16),
+                    MRP_DATA_MEMBER(custom_t,  dbl, MRP_MSG_FIELD_DOUBLE),
+                    MRP_DATA_MEMBER(custom_t,  bln, MRP_MSG_FIELD_BOOL  ),
+                    MRP_DATA_MEMBER(custom_t,  rpl, MRP_MSG_FIELD_STRING),
+                    MRP_DATA_MEMBER(custom_t, nstr, MRP_MSG_FIELD_UINT32),
+                    MRP_DATA_MEMBER(custom_t, fsck, MRP_MSG_FIELD_UINT32),
+                    MRP_DATA_ARRAY_COUNT(custom_t, astr, fsck,
+                                         MRP_MSG_FIELD_STRING),
+                    MRP_DATA_ARRAY_GUARD(custom_t, au32, u32, U32_GUARD,
+                                         MRP_MSG_FIELD_UINT32));
+
+mrp_data_descr_t *data_descr;
 
 
 typedef struct {
@@ -82,6 +103,7 @@ typedef struct {
     mrp_io_watch_t  *iow;
     mrp_timer_t     *timer;
     int              custom;
+    int              buggy;
     int              connect;
     int              stream;
     int              log_mask;
@@ -158,7 +180,7 @@ void dump_custom(custom_t *msg, FILE *fp)
 {
     uint32_t i;
 
-    mrp_data_dump(msg, &custom_descr, fp);
+    mrp_data_dump(msg, data_descr, fp);
     fprintf(fp, "{\n");
     fprintf(fp, "    seq = %u\n"  , msg->seq);
     fprintf(fp, "    msg = '%s'\n", msg->msg);
@@ -181,7 +203,7 @@ void dump_custom(custom_t *msg, FILE *fp)
 
 void free_custom(custom_t *msg)
 {
-    mrp_data_free(msg, custom_descr.tag);
+    mrp_data_free(msg, data_descr->tag);
 }
 
 
@@ -198,9 +220,9 @@ void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
     mrp_log_info("received custom message of type 0x%x", tag);
     dump_custom(data, stdout);
 
-    if (tag != custom_descr.tag) {
+    if (tag != data_descr->tag) {
         mrp_log_error("Tag 0x%x != our custom type (0x%x).",
-                      tag, custom_descr.tag);
+                      tag, data_descr->tag);
         exit(1);
     }
 
@@ -211,9 +233,9 @@ void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
         rpl.au32 = au32;
 
         if (c->connect)
-            status = mrp_transport_senddata(t, &rpl, custom_descr.tag);
+            status = mrp_transport_senddata(t, &rpl, data_descr->tag);
         else
-            status = mrp_transport_senddatato(t, &rpl, custom_descr.tag,
+            status = mrp_transport_senddatato(t, &rpl, data_descr->tag,
                                               addr, addrlen);
         if (status)
             mrp_log_info("reply successfully sent");
@@ -265,13 +287,21 @@ void connection_evt(mrp_transport_t *lt, void *user_data)
 }
 
 
-void type_init(void)
+void type_init(context_t *c)
 {
-    if (!mrp_msg_register_type(&custom_descr)) {
+    if (c->buggy && c->server) {
+        data_descr = &buggy_descr;
+        mrp_log_info("Deliberately using buggy data descriptor...");
+    }
+    else
+        data_descr = &custom_descr;
+
+    if (!mrp_msg_register_type(data_descr)) {
         mrp_log_error("Failed to register custom data type.");
         exit(1);
     }
 }
+
 
 void server_init(context_t *c)
 {
@@ -284,7 +314,7 @@ void server_init(context_t *c)
 
     int flags;
 
-    type_init();
+    type_init(c);
 
     if (!c->stream) {
         if (c->custom) {
@@ -401,13 +431,14 @@ void send_custom(context_t *c)
     msg.bln  =   seq & 0x1;
     msg.astr = astr;
     msg.nstr = MRP_ARRAY_SIZE(astr);
+    msg.fsck = 1000;
     msg.au32 = au32;
     msg.rpl  = "";
 
     if (c->connect)
-        status = mrp_transport_senddata(c->t, &msg, custom_descr.tag);
+        status = mrp_transport_senddata(c->t, &msg, data_descr->tag);
     else
-        status = mrp_transport_senddatato(c->t, &msg, custom_descr.tag,
+        status = mrp_transport_senddatato(c->t, &msg, data_descr->tag,
                                           &c->addr, c->alen);
 
     if (!status) {
@@ -445,7 +476,7 @@ void client_init(context_t *c)
 
     int flags;
 
-    type_init();
+    type_init(c);
 
     if (c->custom) {
         evt.recvdata     = recv_custom;
@@ -516,6 +547,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -a, --address                  address to use\n"
            "  -c, --custom                   use custom messages\n"
            "  -m, --message                  use generic messages (default)\n"
+           "  -b, --buggy                    use buggy data descriptors\n"
            "  -t, --log-target=TARGET        log target to use\n"
            "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
            "  -l, --log-level=LEVELS         logging level to use\n"
@@ -545,13 +577,14 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "scmCa:l:t:vdh"
+#   define OPTIONS "scmbCa:l:t:vdh"
     struct option options[] = {
         { "server"    , no_argument      , NULL, 's' },
         { "address"   , required_argument, NULL, 'a' },
         { "custom"    , no_argument      , NULL, 'c' },
         { "connect"   , no_argument      , NULL, 'C' },
         { "message"   , no_argument      , NULL, 'm' },
+        { "buggy"     , no_argument      , NULL, 'b' },
         { "log-level" , required_argument, NULL, 'l' },
         { "log-target", required_argument, NULL, 't' },
         { "verbose"   , optional_argument, NULL, 'v' },
@@ -577,6 +610,10 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
 
         case 'm':
             ctx->custom = FALSE;
+            break;
+
+        case 'b':
+            ctx->buggy = TRUE;
             break;
 
         case 'C':

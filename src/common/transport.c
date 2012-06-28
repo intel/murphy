@@ -490,7 +490,7 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
         if (type != NULL) {
             decoded = mrp_data_decode(&data, &size, type);
 
-            if (size == 0) {
+            if (decoded != NULL && size == 0) {
                 if (t->connected && t->evt.recvdata) {
                     MRP_TRANSPORT_BUSY(t, {
                             t->evt.recvdata(t, decoded, tag, t->user_data);
@@ -508,8 +508,12 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
                 return 0;
             }
             else {
-                mrp_free(decoded);
-                return -EMSGSIZE;
+                if (decoded != NULL) {
+                    mrp_free(decoded);
+                    return -EMSGSIZE;
+                }
+                else
+                    return -errno;
             }
         }
         else
