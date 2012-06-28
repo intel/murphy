@@ -24,9 +24,9 @@
         .syntax      = _syntax,                                              \
         .summary     = _summ,                                                \
         .description = _descr,                                               \
-        .tok         = _cb,                                                  \
         .flags       =                                                       \
                       (_selectable ? MRP_CONSOLE_SELECTABLE : 0),            \
+      { .tok         = _cb, }                                                \
     }
 
 #if 0 /* XXX TODO: implement handling of raw input mode commands */
@@ -67,8 +67,8 @@ typedef struct {
     const char         *description;     /* long command description */
     mrp_console_flag_t  flags;           /* command flags */
     union {                              /* tokenized or raw input cb */
-        int    (*raw)(mrp_console_t *c, void *user_data, char *input);
         void   (*tok)(mrp_console_t *c, void *user_data, int argc, char **argv);
+        int    (*raw)(mrp_console_t *c, void *user_data, char *input);
     };
 } mrp_console_cmd_t;
 
