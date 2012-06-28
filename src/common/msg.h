@@ -204,7 +204,7 @@ typedef struct {
         .offs  = MRP_OFFSET(_data_type, _array),                          \
         .type  = MRP_MSG_FIELD_ARRAY | _base_type,                        \
         .guard = FALSE,                                                   \
-        .u32   = MRP_OFFSET(_data_type, _count)                           \
+      { .u32   = MRP_OFFSET(_data_type, _count) }                         \
     }
 
 /** Convenience macro to declare an array data member with a sentinel value. */
@@ -213,7 +213,7 @@ typedef struct {
         .offs          = MRP_OFFSET(_data_type, _array),                    \
         .type          = MRP_MSG_FIELD_ARRAY | _base_type,                  \
         .guard         = TRUE,                                              \
-        ._guard_member = _guard_val                                         \
+      { ._guard_member = _guard_val }                                       \
     }
 
 /** Convenience macro to declare a blob data member with a count field. */
