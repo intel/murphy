@@ -241,7 +241,9 @@ static void send_io(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
                       w->target - w->sent,
                       plural ? "s" : "", plural ? "" : "s");
 
-    write(w->pipe[1], buf, size);
+    if (write(w->pipe[1], buf, size) < 0) {
+        /* just ignore it... */
+    }
     w->sent++;
 
     info("MRPH I/O #%d: sent message %d/%d.", w->id, w->sent, w->target);
@@ -666,7 +668,9 @@ static gboolean glib_send_io(gpointer user_data)
                       t->target - t->sent,
                       plural ? "s" : "", plural ? "" : "s");
 
-    write(t->pipe[1], buf, size);
+    if (write(t->pipe[1], buf, size) < 0) {
+        /* just ignore it... */
+    }
     t->sent++;
 
     info("GLIB I/O #%d: sent message %d/%d.", t->id, t->sent, t->target);
@@ -872,7 +876,9 @@ static void recv_dbus_reply(DBusPendingCall *pending, void *user_data)
         cfg.nrunning--;
 
         /* block until the client is done */
-        read(dbus_test.pipe[0], dummy, sizeof(dummy));
+        if (read(dbus_test.pipe[0], dummy, sizeof(dummy)) < 0) {
+            /* just ignore it... */
+        }
     }
 }
 
@@ -1076,7 +1082,9 @@ static void setup_dbus_server(mrp_mainloop_t *ml)
     if (!dbus_connection_register_fallback(dbus_test.conn, "/", &vtable, NULL))
         fatal("failed to set up method dispatching");
 
-    write(dbus_test.pipe[1], addr, strlen(addr) + 1);
+    if (write(dbus_test.pipe[1], addr, strlen(addr) + 1) < 0) {
+        /* just ignore it... */
+    }
 
     cfg.nrunning++;
 }

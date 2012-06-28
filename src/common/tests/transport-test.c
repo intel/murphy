@@ -276,10 +276,10 @@ void type_init(void)
 void server_init(context_t *c)
 {
     static mrp_transport_evt_t evt = {
-        .closed      = NULL,
-        .recvmsg     = NULL,
-        .recvmsgfrom = NULL,
-        .connection  = NULL,
+        { .recvmsg     = NULL },
+        { .recvmsgfrom = NULL },
+        .closed        = NULL,
+        .connection    = NULL,
     };
 
     int flags;
@@ -437,9 +437,10 @@ void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 void client_init(context_t *c)
 {
     static mrp_transport_evt_t evt = {
-        .closed      = closed_evt,
-        .recvmsg     = NULL,
-        .recvmsgfrom = NULL,
+        { .recvmsg     = NULL },
+        { .recvmsgfrom = NULL },
+        .closed        = closed_evt,
+        .connection    = NULL
     };
 
     int flags;
