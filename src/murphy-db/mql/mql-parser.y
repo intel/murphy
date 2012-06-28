@@ -53,7 +53,6 @@
     input->flags = 0;                                                   \
     input->value.t = (v)
 
-typedef struct mql_callback_s  mql_callback_t;
 typedef enum mql_mode_e        mql_mode_t;
 typedef struct input_s         input_t;
 
@@ -87,8 +86,8 @@ static void print_query_result(mqi_column_desc_t *, mqi_data_type_t *,
 static mqi_handle_t table;
 static uint32_t     table_flags;
 
-static char              *trigger_name;
-static mql_callback_t    *callback;
+static char                  *trigger_name;
+static struct mql_callback_s *callback;
 
 static mqi_column_def_t   coldefs[MQI_COLUMN_MAX + 1];
 static mqi_column_def_t  *coldef = coldefs;
