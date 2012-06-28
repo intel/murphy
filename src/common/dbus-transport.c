@@ -1050,6 +1050,8 @@ static mrp_msg_t *msg_decode(DBusMessage *m, const char **sender_id)
     int              asize;
     const char      *sender;
 
+    msg = NULL;
+
     if (!dbus_message_iter_init(m, &im))
         goto fail;
 
