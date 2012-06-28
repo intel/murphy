@@ -63,9 +63,9 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
     };
 
     mqi_cond_entry_t *cond       = *cond_ptr;
-    cond_stack_t      stack[256] = { [0] = {precedence[mqi_begin],
-                                            .operator = mqi_begin}
-                                   };
+    cond_stack_t      stack[256] = {
+        [0] = { precedence[mqi_begin], { .operator = mqi_begin } }
+    };
     cond_stack_t     *sp         = stack + 1;
     cond_stack_t     *lastop     = stack;
     int               result;
