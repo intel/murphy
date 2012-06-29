@@ -353,6 +353,9 @@ endif
 #
 
 bin_PROGRAMS += murphyd
+EXTRA_DIST   += $(config_DATA)
+configdir     = $(sysconfdir)/murphy
+config_DATA   = daemon/murphy.conf
 
 murphyd_SOURCES =			\
 		daemon/daemon.c		\
