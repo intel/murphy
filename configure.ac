@@ -198,29 +198,28 @@ AC_ARG_WITH(disabled-plugins,
             [  --with-disabled-plugins=<plugin-list> specify which plugins to disable],
             [disabled_plugins=$withval],[disabled_plugins=none])
 
-
-# Check which plugins should be built in.
-AC_ARG_WITH(builtin-plugins,
-            [  --with-builtin-plugins=<plugin-list>  specify which plugins to link in],
-            [builtin_plugins=$withval],[builtin_plugins=all])
+# Check which plugins should be compiled as standalone DSOs.
+AC_ARG_WITH(dynamic-plugins,
+            [  --with-dynamic-plugins=<plugin-list>  specify which plugins compile as DSOs],
+            [dynamic_plugins=$withval],[dynamic_plugins=none])
 
 all_plugins=$(ls src/plugins/*.c 2>/dev/null | \
               sed 's#src/plugins/plugin-##g;s#\.c$##g' | tr '\n' ' ')
 
-case $builtin_plugins in
-    all)  builtin_plugins="$all_plugins";;
-    none) builtin_plugins="";;
+case dynamic_plugins in
+    all)  dynamic_plugins="$all_plugins";;
+    none) dynamic_plugins="";;
 esac
 
 internal=""; it=""
 external=""; et=""
 disabled=""; dt=""
 for plugin in $all_plugins; do 
-    type=external
+    type=internal
 
-    for p in ${builtin_plugins//,/ }; do
+    for p in ${dynamic_plugins//,/ }; do
         if test "$plugin" = "$p"; then
-            type=internal
+            type=external
         fi
     done
 
