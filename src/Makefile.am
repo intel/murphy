@@ -1,5 +1,5 @@
 SUBDIRS         = murphy-db . \
-		  common/tests core/tests daemon/tests resolver/tests
+		  common/tests core/tests daemon/tests resolver/tests plugins/tests
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
@@ -460,6 +460,43 @@ clean-func-infos::
 	-rm plugin-console-func-info.c
 endif
 
+# signalling plugin
+SIGNALLING_PLUGIN_SOURCES = plugins/plugin-signalling.c \
+                            plugins/signalling/transaction.c \
+                            plugins/signalling/util.c \
+                            plugins/signalling/client.c \
+                            plugins/signalling/plugin.h \
+                            plugins/signalling/transaction.h \
+                            plugins/signalling/util.h \
+                            plugins/signalling/client.h
+SIGNALLING_PLUGIN_HEADERS = plugins/signalling/signalling.h
+SIGNALLING_PLUGIN_CFLAGS  =
+SIGNALLING_PLUGIN_LIBS    =
+SIGNALLING_PLUGINdir      = $(includedir)/murphy/plugins/signalling
+
+
+if BUILTIN_PLUGIN_SIGNALLING
+BUILTIN_PLUGINS += $(SIGNALLING_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(SIGNALLING_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(SIGNALLING_PLUGIN_LIBS)
+else
+plugin_signalling_la_SOURCES = $(SIGNALLING_PLUGIN_SOURCES)
+plugin_signalling_la_HEADERS = $(SIGNALLING_PLUGIN_HEADERS)
+plugin_signalling_la_CFLAGS  = $(SIGNALLING_PLUGIN_CFLAGS) \
+                $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_signalling_la_LDFLAGS = -module -Wl,-version-script=linker-script.plugin-signalling \
+                               -version-info @MURPHY_VERSION_INFO@
+plugin_signalling_la_LIBADD  = $(SIGNALLING_PLUGIN_LIBS)
+plugin_signalling_ladir      = $(SIGNALLING_PLUGINdir)
+
+plugin_LTLIBRARIES    += plugin-signalling.la
+endif
+
+# linker script generation
+linker-script.plugin-signalling: $(plugin_signalling_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+plugin_signalling_la_DEPENDENCIES = linker-script.plugin-signalling
 
 ###################################
 # murphy daemon

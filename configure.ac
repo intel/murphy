@@ -292,11 +292,13 @@ AM_CONDITIONAL(DISABLED_PLUGIN_TEST,    [check_if_disabled test])
 AM_CONDITIONAL(DISABLED_PLUGIN_DBUS,    [check_if_disabled dbus])
 AM_CONDITIONAL(DISABLED_PLUGIN_GLIB,    [check_if_disabled glib])
 AM_CONDITIONAL(DISABLED_PLUGIN_CONSOLE, [check_if_disabled console])
+AM_CONDITIONAL(DISABLED_PLUGIN_SIGNALLING, [check_if_disabled signalling])
 
 AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,     [check_if_internal test])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,     [check_if_internal dbus])
 AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,     [check_if_internal glib])
 AM_CONDITIONAL(BUILTIN_PLUGIN_CONSOLE,  [check_if_internal console])
+AM_CONDITIONAL(BUILTIN_PLUGIN_SIGNALLING, [check_if_internal signalling])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 
@@ -380,25 +382,26 @@ AC_CONFIG_FILES([build-aux/shave
 		 build-aux/shave-libtool
 		 Makefile
 		 src/Makefile
+		 src/common/tests/Makefile
+		 src/core/tests/Makefile
+		 src/daemon/tests/Makefile
+		 src/plugins/tests/Makefile
 		 src/common/murphy-common.pc
 		 src/common/murphy-dbus.pc
 		 src/common/murphy-pulse.pc
-		 src/common/tests/Makefile
 		 src/core/murphy-core.pc
-		 src/core/tests/Makefile
-                 src/murphy-db/Makefile
-                 src/murphy-db/mdb/Makefile
-                 src/murphy-db/mqi/Makefile
-                 src/murphy-db/mql/Makefile
-                 src/murphy-db/include/Makefile
-                 src/murphy-db/tests/Makefile
-		 src/daemon/tests/Makefile
+         src/murphy-db/Makefile
+         src/murphy-db/mdb/Makefile
+         src/murphy-db/mqi/Makefile
+         src/murphy-db/mql/Makefile
+         src/murphy-db/include/Makefile
+         src/murphy-db/tests/Makefile
 		 src/resolver/murphy-resolver.pc
 		 src/resolver/tests/Makefile
 		 doc/Makefile
-                 doc/plugin-developer-guide/Makefile
-                 doc/plugin-developer-guide/db/Makefile
-                 doc/plugin-developer-guide/doxml/Makefile
+         doc/plugin-developer-guide/Makefile
+         doc/plugin-developer-guide/db/Makefile
+         doc/plugin-developer-guide/doxml/Makefile
 		 ])
 AC_OUTPUT
 
