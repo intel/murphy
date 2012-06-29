@@ -1,0 +1,32 @@
+{
+    global:
+        mql_bind_value;
+        mql_exec_file;
+        mql_exec_statement;
+        mql_exec_string;
+        mql_precompile;
+        mql_register_callback;
+        mql_result_columns_get_column_count;
+        mql_result_columns_get_length;
+        mql_result_columns_get_name;
+        mql_result_columns_get_type;
+        mql_result_error_get_code;
+        mql_result_error_get_message;
+        mql_result_free;
+        mql_result_is_success;
+        mql_result_list_get_floating;
+        mql_result_list_get_integer;
+        mql_result_list_get_length;
+        mql_result_list_get_string;
+        mql_result_list_get_unsigned;
+        mql_result_rows_get_floating;
+        mql_result_rows_get_integer;
+        mql_result_rows_get_row_count;
+        mql_result_rows_get_string;
+        mql_result_rows_get_unsigned;
+        mql_result_string_get;
+        mql_statement_free;
+        mql_unregister_callback;
+    local:
+        *;
+};

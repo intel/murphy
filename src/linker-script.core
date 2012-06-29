@@ -1,0 +1,24 @@
+{
+    global:
+        mrp_console_add_core_group;
+        mrp_console_add_group;
+        mrp_console_del_core_group;
+        mrp_console_del_group;
+        mrp_console_printf;
+        mrp_context_create;
+        mrp_context_destroy;
+        mrp_create_console;
+        mrp_destroy_console;
+        mrp_load_all_plugins;
+        mrp_load_plugin;
+        mrp_plugin_exists;
+        mrp_register_builtin_plugin;
+        mrp_request_plugin;
+        mrp_set_console_prompt;
+        mrp_start_plugin;
+        mrp_start_plugins;
+        mrp_stop_plugin;
+        mrp_unload_plugin;
+    local:
+        *;
+};

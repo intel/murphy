@@ -44,5 +44,5 @@ clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)
 
 # cleanup
-clean-local:: clean-$(LINKER_SCRIPT)
+clean-local:: # clean-$(LINKER_SCRIPT)
 	-rm -f *~

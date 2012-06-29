@@ -398,5 +398,5 @@ murphy_console_LDFLAGS = -rdynamic -lreadline
 endif
 
 # cleanup
-clean-local:: clean-linker-script clean-func-infos
+clean-local:: # clean-linker-script clean-func-infos
 	-rm -f *~

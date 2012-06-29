@@ -1,0 +1,36 @@
+{
+    global:
+        mqi_begin_transaction;
+        mqi_close;
+        mqi_commit_transaction;
+        mqi_create_column_trigger;
+        mqi_create_index;
+        mqi_create_row_trigger;
+        mqi_create_table;
+        mqi_create_table_trigger;
+        mqi_create_transaction_trigger;
+        mqi_delete_from;
+        mqi_describe;
+        mqi_drop_column_trigger;
+        mqi_drop_row_trigger;
+        mqi_drop_table;
+        mqi_drop_table_trigger;
+        mqi_drop_transaction_trigger;
+        mqi_get_column_index;
+        mqi_get_column_name;
+        mqi_get_column_size;
+        mqi_get_column_type;
+        mqi_get_table_handle;
+        mqi_get_table_size;
+        mqi_get_transaction_handle;
+        mqi_insert_into;
+        mqi_open;
+        mqi_print_rows;
+        mqi_rollback_transaction;
+        mqi_select;
+        mqi_select_by_index;
+        mqi_show_tables;
+        mqi_update;
+    local:
+        *;
+};
