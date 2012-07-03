@@ -3,23 +3,27 @@
 
 /* common/debug.c */
 static mrp_debug_info_t info_0[] = {
-    { .line = 24, .func = "free_rule_cb" },
-    { .line = 32, .func = "init_rules" },
-    { .line = 51, .func = "reset_rules" },
-    { .line = 60, .func = "mrp_debug_reset" },
-    { .line = 67, .func = "mrp_debug_enable" },
-    { .line = 78, .func = "add_rule" },
-    { .line = 134, .func = "del_rule" },
-    { .line = 176, .func = "mrp_debug_set_config" },
-    { .line = 265, .func = "dump_rule_cb" },
-    { .line = 279, .func = "mrp_debug_dump_config" },
-    { .line = 301, .func = "mrp_debug_msg" },
-    { .line = 314, .func = "mrp_debug_check" },
-    { .line = 384, .func = "mrp_debug_register_file" },
-    { .line = 392, .func = "mrp_debug_unregister_file" },
-    { .line = 403, .func = "mrp_debug_site_function" },
-    { .line = 432, .func = "populate_file_table" },
-    { .line = 456, .func = "flush_file_table" },
+    { .line = 28, .func = "free_rule_cb" },
+    { .line = 36, .func = "init_rules" },
+    { .line = 55, .func = "reset_rules" },
+    { .line = 64, .func = "mrp_debug_reset" },
+    { .line = 71, .func = "mrp_debug_enable" },
+    { .line = 82, .func = "add_rule" },
+    { .line = 138, .func = "del_rule" },
+    { .line = 180, .func = "mrp_debug_set_config" },
+    { .line = 269, .func = "dump_rule_cb" },
+    { .line = 283, .func = "mrp_debug_dump_config" },
+    { .line = 307, .func = "segment_type" },
+    { .line = 332, .func = "segment_flags" },
+    { .line = 351, .func = "list_cb" },
+    { .line = 424, .func = "mrp_debug_dump_sites" },
+    { .line = 432, .func = "mrp_debug_msg" },
+    { .line = 445, .func = "mrp_debug_check" },
+    { .line = 515, .func = "mrp_debug_register_file" },
+    { .line = 523, .func = "mrp_debug_unregister_file" },
+    { .line = 534, .func = "mrp_debug_site_function" },
+    { .line = 563, .func = "populate_file_table" },
+    { .line = 587, .func = "flush_file_table" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_0 = {
@@ -348,6 +352,5 @@ static mrp_debug_file_t *debug_files[] = {
     &file_10,
     NULL
 };
-
 
 #include <murphy/common/debug-auto-register.c>
