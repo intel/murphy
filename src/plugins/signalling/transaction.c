@@ -20,6 +20,9 @@ void free_transaction(transaction_t *tx)
 {
     uint i;
 
+    if (tx->timer)
+        mrp_del_timer(tx->timer);
+
     for (i = 0; i < tx->data.n_rows; i++) {
         mrp_free(tx->data.rows[i]);
     }
@@ -95,6 +98,24 @@ static int is_interested(void *key, void *entry, void *user_data)
 }
 
 
+static void signalling_timeout(mrp_mainloop_t *ml, mrp_timer_t *timer,
+                             void *user_data)
+{
+    uint32_t id = p_to_u(user_data);
+    data_t *ctx = signalling_plugin->data;
+    transaction_t *tx;
+
+    MRP_UNUSED(ml);
+    MRP_UNUSED(timer);
+
+    tx = get_transaction(ctx, id);
+
+    if (tx) {
+        complete_transaction(ctx, tx);
+    }
+}
+
+
 int fire_transaction(data_t *ctx, transaction_t *tx)
 {
     /* TODO: make proper queuing */
@@ -107,6 +128,9 @@ int fire_transaction(data_t *ctx, transaction_t *tx)
             signalling_error("Failed to send policy decision to %s", c->name);
         }
     }
+
+    mrp_add_timer(ctx->ctx->ml, tx->timeout, signalling_timeout,
+            u_to_p(tx->id));
 
     return 0;
 }
@@ -140,6 +164,7 @@ static uint32_t mrp_tx_open_signal_with_id(uint32_t id)
     tx->id = id;
     tx->data.row_array_size = 32;
     tx->data.rows = mrp_allocz(tx->data.row_array_size);
+    tx->timeout = MRP_SiGNALLING_DEFAULT_TIMEOUT;
 
     tx->data.domain_array_size = 8;
     tx->data.rows = mrp_allocz(tx->data.domain_array_size);

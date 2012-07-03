@@ -8,6 +8,8 @@
 
 #include "plugin.h"
 
+#define MRP_SiGNALLING_DEFAULT_TIMEOUT 5000 /* msecs */
+
 typedef struct {
     char **domains;
     uint32_t n_domains;
@@ -25,7 +27,10 @@ typedef struct {
 /* an ongoing transaction */
 typedef struct {
     uint32_t id;         /* The real ID. */
-    uint32_t caller_id;  /* Id assigned by caller. */
+    uint32_t caller_id;  /* TODO: id assigned by caller. */
+    uint32_t timeout;
+    mrp_timer_t *timer;
+
     char **acked;
     char **nacked;
     char **not_answered;
