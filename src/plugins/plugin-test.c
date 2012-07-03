@@ -37,11 +37,12 @@
 #include <murphy-db/mql.h>
 #include <murphy-db/mqi.h>
 
+#include <murphy/plugins/signalling/signalling.h>
+
 
 typedef struct {
     mrp_event_watch_t *w;
 } test_data_t;
-
 
 
 enum {
@@ -64,7 +65,7 @@ void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-
+void signalling_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("one"  , one_cb  , TRUE,
@@ -75,7 +76,6 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           "three [args]", "command 3", "description 3"),
         MRP_TOKENIZED_CMD("four" , four_cb , TRUE,
                           "four [args]", "command 4", "description 4"),
-
         MRP_TOKENIZED_CMD("db-script" , db_script_cb , TRUE,
                           "db-script <file>", "run DB script", "run DB script"),
 
@@ -84,7 +84,9 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
 
         MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
                           "update <target>", "update target", "update target"),
-
+        MRP_TOKENIZED_CMD("signalling" , signalling_cb , TRUE,
+                          "signalling [args]", "signalling command",
+                          "Send out a test policy decision")
 });
 
 
@@ -453,6 +455,45 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 
     mrp_del_event_watch(data->w);
     data->w = NULL;
+}
+
+
+static void success_cb(uint32_t tx, void *data)
+{
+    mrp_console_t *c = data;
+
+    mrp_console_printf(c, "%s(): transaction %u\n", __FUNCTION__, tx);
+}
+
+
+static void error_cb(uint32_t tx, mrp_tx_error_t err, void *data)
+{
+    mrp_console_t *c = data;
+
+    mrp_console_printf(c, "%s(): transaction %u error: %s\n", __FUNCTION__,
+            tx, (err == MRP_TX_ERROR_NACKED) ? "NACK" : "no reply");
+}
+
+
+void signalling_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    uint32_t tx;
+
+    MRP_UNUSED(user_data);
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+
+    tx = mrp_tx_open_signal();
+
+    mrp_tx_add_domain(tx, "domain1");
+
+    mrp_tx_add_data(tx, "this is a data row");
+    mrp_tx_add_data(tx, "this is another data row");
+
+    mrp_tx_add_success_cb(tx, success_cb, c);
+    mrp_tx_add_error_cb(tx, error_cb, c);
+
+    mrp_tx_close_signal(tx);
 }
 
 
