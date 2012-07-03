@@ -19,14 +19,14 @@
 
 typedef struct {
     char *ep_name;       /* EP name */
-    uint32_t n_domains;   /* number of domains */
+    uint32_t n_domains;  /* number of domains */
     char **domains;      /* array of domains */
 } ep_register_t;
 
 typedef struct {
     uint32_t id;         /* decision id */
     bool reply_required; /* if the EP must ACK/NACK the message */
-    uint32_t n_rows;      /* number of rows */
+    uint32_t n_rows;     /* number of rows */
     char **rows;         /* murphy-db database rows */
 } ep_decision_t;
 

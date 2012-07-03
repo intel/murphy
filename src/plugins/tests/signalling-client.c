@@ -17,6 +17,20 @@ typedef struct {
 } client_t;
 
 
+static void dump_decision(client_t *c, ep_decision_t *msg)
+{
+    uint i;
+
+    MRP_UNUSED(c);
+
+    printf("Message contents:\n");
+    for (i = 0; i < msg->n_rows; i++) {
+        printf("row %d: '%s'\n", i+1, msg->rows[i]);
+    }
+    printf("%s required.\n\n", msg->reply_required ? "Reply" : "No reply");
+
+}
+
 static int send_registration(client_t *c)
 {
     char *name = "test ep";
@@ -59,7 +73,11 @@ static int send_reply(client_t *c, ep_decision_t *msg, uint32_t success)
 static void handle_decision(client_t *c, ep_decision_t *msg)
 {
     printf("Handle decision\n");
-    send_reply(c, msg, EP_ACK);
+
+    dump_decision(c, msg);
+
+    if (msg->reply_required)
+        send_reply(c, msg, EP_ACK);
 
     return;
 }

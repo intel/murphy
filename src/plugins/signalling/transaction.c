@@ -141,13 +141,16 @@ void complete_transaction(data_t *ctx, transaction_t *tx)
     /* call the transaction callbacks */
 
     if (tx->n_not_answered == 0 && tx->n_acked == tx->n_total) {
-        tx->data.success_cb(tx->id, tx->data.success_data);
+        if (tx->data.success_cb)
+            tx->data.success_cb(tx->id, tx->data.success_data);
     }
     else if (tx->n_nacked > 0 ){
-        tx->data.error_cb(tx->id, MRP_TX_ERROR_NACKED, tx->data.error_data);
+        if (tx->data.error_cb)
+            tx->data.error_cb(tx->id, MRP_TX_ERROR_NACKED, tx->data.error_data);
     }
     else {
-        tx->data.error_cb(tx->id, MRP_TX_ERROR_NOT_ANSWERED, tx->data.error_data);
+        if (tx->data.error_cb)
+            tx->data.error_cb(tx->id, MRP_TX_ERROR_NOT_ANSWERED, tx->data.error_data);
     }
 
     /* remove the transaction from the list */
@@ -167,7 +170,7 @@ static uint32_t mrp_tx_open_signal_with_id(uint32_t id)
     tx->timeout = MRP_SiGNALLING_DEFAULT_TIMEOUT;
 
     tx->data.domain_array_size = 8;
-    tx->data.rows = mrp_allocz(tx->data.domain_array_size);
+    tx->data.domains = mrp_allocz(tx->data.domain_array_size);
 
     put_transaction(ctx, tx);
 

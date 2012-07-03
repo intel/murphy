@@ -73,7 +73,7 @@ int send_policy_decision(data_t *ctx, client_t *c, transaction_t *tx)
 
 static int handle_ack(client_t *c, data_t *ctx, ep_ack_t *data)
 {
-    signalling_info("register message");
+    signalling_info("acknowledgement message");
 
     transaction_t *tx = get_transaction(ctx, data->id);
 
@@ -87,6 +87,9 @@ static int handle_ack(client_t *c, data_t *ctx, ep_ack_t *data)
         case EP_ACK:
         {
             uint i, found = 0;
+
+            signalling_info("received ACK from EP %s", c->name);
+
             /* go through the not_answered array */
             for (i = 0; i < tx->n_total; i++) {
                 if (strcmp(c->name, tx->not_answered[i]) == 0) {
@@ -106,7 +109,9 @@ static int handle_ack(client_t *c, data_t *ctx, ep_ack_t *data)
         case EP_NOT_READY:
         {
             uint i, found = 0;
-            /* go through the not_answered array */
+
+            signalling_info("received NACK from EP %s", c->name);
+
             for (i = 0; i < tx->n_total; i++) {
                 if (strcmp(c->name, tx->not_answered[i]) == 0) {
                     found = 1;
