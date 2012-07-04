@@ -122,10 +122,20 @@ int fire_transaction(data_t *ctx, transaction_t *tx)
 
     uint i;
 
+    if (tx->n_not_answered == 0) {
+        /* no-one is interested in the decision */
+        complete_transaction(ctx, tx);
+        return 0;
+    }
+
     for (i = 0; i < tx->n_not_answered; i++) {
         client_t *c = mrp_htbl_lookup(ctx->clients, tx->not_answered[i]);
         if (send_policy_decision(ctx, c, tx) < 0) {
             signalling_error("Failed to send policy decision to %s", c->name);
+#if 0
+            complete_transaction(ctx, tx);
+            return -1;
+#endif
         }
     }
 
@@ -256,7 +266,7 @@ void mrp_tx_add_error_cb(uint32_t id, mrp_tx_error_cb cb, void *data)
 }
 
 
-void mrp_tx_close_signal(uint32_t id)
+int mrp_tx_close_signal(uint32_t id)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
@@ -273,8 +283,9 @@ void mrp_tx_close_signal(uint32_t id)
         mrp_htbl_foreach(ctx->clients, is_interested, tx);
 
         tx->n_total = tx->n_not_answered;
-        fire_transaction(ctx, tx);
+        return fire_transaction(ctx, tx);
     }
+    return -1;
 }
 
 

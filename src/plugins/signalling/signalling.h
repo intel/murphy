@@ -49,9 +49,9 @@ void mrp_tx_add_success_cb(uint32_t tx, mrp_tx_success_cb cb, void *data);
 void mrp_tx_add_error_cb(uint32_t tx, mrp_tx_error_cb cb, void *data);
 
 /** Closes the signal identified by 'tx' and sends it onward to the enforcement
-    points.*/
+    points. Returns a negative value if the transaction cannot be found. */
 
-void mrp_tx_close_signal(uint32_t tx);
+int mrp_tx_close_signal(uint32_t tx);
 
 /** Cancels a signal identified by 'tx'.*/
 
