@@ -109,12 +109,20 @@ fi
 
 AC_SUBST(WARNING_CFLAGS)
 
+# Check if potentially GPL bits are allowed to be enabled.
+AC_ARG_ENABLE(gpl,
+              [  --enable-gpl            enable linking against GPL code],
+	      [enable_gpl=$enableval], [enable_gpl=no])
+
 # Check if DBUS was enabled.
 AC_ARG_ENABLE(dbus,
               [  --enable-dbus           enable D-BUS support],
 	      [enable_dbus=$enableval], [enable_dbus=no])
 
 if test "$enable_dbus" = "yes"; then
+    if test "$enable_gpl" = "no"; then
+        AC_MSG_ERROR([D-Bus support requires the --enable-gpl option.])
+    fi
     PKG_CHECK_MODULES(DBUS, dbus-1 >= 0.70)
 
     DBUS_SESSION_DIR="`pkg-config --variable session_bus_services_dir dbus-1`"
@@ -142,6 +150,14 @@ if test "$enable_pulse" != "no"; then
     			     [have_pulse=yes], [have_pulse=no])
     if test "$have_pulse" = "no" -a "$enable_pulse" != "yes"; then
         AC_MSG_ERROR([PulseAudio development libraries not found.])
+    fi
+
+    if test "$enable_gpl" = "no"; then
+        if test "$enable_pulse" = "yes"; then
+           AC_MSG_ERROR([PulseAudio support requires the --enable-gpl option.])
+        else
+           enable_pulse="no"
+        fi
     else
         enable_pulse="$have_pulse"
     fi
@@ -166,6 +182,14 @@ if test "$enable_console" != "no"; then
     AC_HAVE_LIBRARY([readline], [have_readline=yes], [have_readline=no])
     if test "$have_readline" = "no" -a "$enable_console" = "yes"; then
         AC_MSG_ERROR([Readline development libraries not found.])
+    fi
+
+    if test "$enable_gpl" = "no"; then
+        if test "$enable_console" = "yes"; then
+           AC_MSG_ERROR([Console support requires the --enable-gpl option.])
+        else
+           enable_console="no"
+        fi
     else
         enable_console="$have_readline"
     fi
