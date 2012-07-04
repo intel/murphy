@@ -65,7 +65,10 @@ void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void signalling_cb_1(mrp_console_t *c, void *user_data, int argc, char **argv);
+void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv);
+void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv);
+
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("one"  , one_cb  , TRUE,
@@ -84,9 +87,15 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
 
         MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
                           "update <target>", "update target", "update target"),
-        MRP_TOKENIZED_CMD("signalling" , signalling_cb , TRUE,
-                          "signalling [args]", "signalling command",
-                          "Send out a test policy decision")
+        MRP_TOKENIZED_CMD("signalling_1" , signalling_cb_1 , TRUE,
+                          "signalling_1 [args]", "signalling command",
+                          "Signalling test case 1"),
+        MRP_TOKENIZED_CMD("signalling_2" , signalling_cb_2 , TRUE,
+                          "signalling_2 [args]", "signalling command",
+                          "Signalling test case 2"),
+        MRP_TOKENIZED_CMD("signalling_3" , signalling_cb_3 , TRUE,
+                          "signalling_3 [args]", "signalling command",
+                          "Signalling test case 3")
 });
 
 
@@ -475,7 +484,7 @@ static void error_cb(uint32_t tx, mrp_tx_error_t err, void *data)
 }
 
 
-void signalling_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+void signalling_cb_1(mrp_console_t *c, void *user_data, int argc, char **argv)
 {
     uint32_t tx;
 
@@ -494,6 +503,56 @@ void signalling_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     mrp_tx_add_error_cb(tx, error_cb, c);
 
     mrp_tx_close_signal(tx);
+}
+
+
+void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    uint32_t tx;
+
+    MRP_UNUSED(user_data);
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+
+    tx = mrp_tx_open_signal();
+
+    mrp_tx_add_domain(tx, "domain_nonexistent");
+
+    mrp_tx_add_data(tx, "this is a data row");
+    mrp_tx_add_data(tx, "this is another data row");
+
+    mrp_tx_add_success_cb(tx, success_cb, c);
+    mrp_tx_add_error_cb(tx, error_cb, c);
+
+    mrp_tx_close_signal(tx);
+}
+
+void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    uint32_t tx;
+    int ret;
+
+    MRP_UNUSED(user_data);
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+
+    tx = mrp_tx_open_signal();
+
+    mrp_tx_add_domain(tx, "domain1");
+
+    mrp_tx_add_data(tx, "this is a data row");
+    mrp_tx_add_data(tx, "this is another data row");
+
+    mrp_tx_add_success_cb(tx, success_cb, c);
+    mrp_tx_add_error_cb(tx, error_cb, c);
+
+    /* try cancelling the signal first */
+    mrp_tx_cancel_signal(tx);
+
+    ret = mrp_tx_close_signal(tx);
+
+    mrp_console_printf(c, "%s(): tried to send a cancelled transction %u -- success %i\n",
+            __FUNCTION__, tx, ret);
 }
 
 
