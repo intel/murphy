@@ -27,35 +27,61 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_SIGNALLING_CLIENT_H__
-#define __MURPHY_SIGNALLING_CLIENT_H__
+#ifndef __MURPHY_SIGNALLING_ENDPOINT_H__
+#define __MURPHY_SIGNALLING_ENDPOINT_H__
 
 #include <stdint.h>
 
-#include "plugin.h"
-#include "transaction.h"
-#include "endpoint.h"
+#include <murphy/common.h>
+
+/* The different transport types require different hacks to make them work.
+   This is a "sin bin" to handle them. */
+
+/* We don't have any security, so we don't allow any network connections etc.
+   coming from outside of the device. */
+
+ typedef enum {
+    TPORT_UNKNOWN,
+    TPORT_UNXS,
+    TPORT_DBUS,
+    TPORT_INTERNAL,
+    TPORT_MAX
+ } signalling_transport_t;
 
 typedef struct {
-    char *name;
-    uint32_t ndomains;
-    char **domains;
-    mrp_transport_t *t;   /* associated transport */
+    char *address;          /* endpoint address */
+    signalling_transport_t type;  /* endpoint type */
+    bool connection_oriented; /* if the endpoint is connection-oriented */
 
-    bool registered;      /* if the client is registered to server */
-    endpoint_t *e; /* connection endpoint that the client is using */
-    data_t *u;
-} client_t;
+    const char *stype;
+    mrp_sockaddr_t addr;
+    socklen_t addrlen;
+    mrp_mainloop_t *ml;
+    mrp_transport_t *t;
 
+    mrp_list_hook_t hook; /* es */
+    mrp_list_hook_t clients;
 
-void deregister_and_free_client(client_t *c, data_t *ctx);
-int send_policy_decision(data_t *ctx, client_t *c, transaction_t *tx);
+    void *user_data;
+    mrp_transport_evt_t proxy_evt; /* the proxy callbacks */
+    mrp_transport_evt_t evt; /* the real callbacks to call */
+} endpoint_t;
 
-void free_client(client_t *c);
+typedef struct {
+    mrp_list_hook_t hook; /* for clients */
+    endpoint_t *e;
+    void *client;
+} endpoint_tport_t;
 
+endpoint_t *create_endpoint(const char *address, mrp_mainloop_t *ml);
 
-int server_setup(endpoint_t *e, data_t *data);
-int type_init(void);
+int clean_endpoint(endpoint_t *e);
 
+int start_endpoint(endpoint_t *e, mrp_transport_evt_t *evt, void *userdata);
 
-#endif /* __MURPHY_SIGNALLING_CLIENT_H__ */
+void delete_endpoint(endpoint_t *e);
+
+mrp_transport_t *accept_connection(endpoint_t *e, mrp_transport_t *lt,
+        void *client);
+
+#endif /* __MURPHY_SIGNALLING_ENDPOINT_H__ */

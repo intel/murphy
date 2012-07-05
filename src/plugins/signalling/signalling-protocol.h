@@ -38,7 +38,8 @@
 #define TAG_UNREGISTER       0x2 /* implicit with unix domain sockets */
 #define TAG_POLICY_DECISION  0x3
 #define TAG_ACK              0x4
-#define TAG_ERROR            0x5
+#define TAG_INFO             0x5
+#define TAG_ERROR            0x6
 
 /* decision status */
 
@@ -64,6 +65,10 @@ typedef struct {
     uint32_t success;    /* ACK/NACK/... */
 } ep_ack_t;
 
+typedef struct {
+    char *msg;
+} ep_info_t;
+
 
 MRP_DATA_DESCRIPTOR(ep_register_descr, TAG_REGISTER, ep_register_t,
         MRP_DATA_MEMBER(ep_register_t, ep_name, MRP_MSG_FIELD_STRING),
@@ -81,5 +86,8 @@ MRP_DATA_DESCRIPTOR(ep_decision_descr, TAG_POLICY_DECISION, ep_decision_t,
 MRP_DATA_DESCRIPTOR(ep_ack_descr, TAG_ACK, ep_ack_t,
         MRP_DATA_MEMBER(ep_ack_t, id, MRP_MSG_FIELD_UINT32),
         MRP_DATA_MEMBER(ep_ack_t, success, MRP_MSG_FIELD_UINT32));
+
+MRP_DATA_DESCRIPTOR(ep_info_descr, TAG_INFO, ep_info_t,
+        MRP_DATA_MEMBER(ep_info_t, msg, MRP_MSG_FIELD_STRING));
 
 #endif /* __MURPHY_SIGNALLING_PROTOCOL_H__ */

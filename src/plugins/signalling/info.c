@@ -27,35 +27,65 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_SIGNALLING_CLIENT_H__
-#define __MURPHY_SIGNALLING_CLIENT_H__
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 
-#include <stdint.h>
+#include <murphy/common.h>
+#include <murphy/core.h>
+#include <murphy/plugins/signalling/signalling-protocol.h>
 
 #include "plugin.h"
-#include "transaction.h"
-#include "endpoint.h"
+#include "info.h"
 
-typedef struct {
-    char *name;
-    uint32_t ndomains;
-    char **domains;
-    mrp_transport_t *t;   /* associated transport */
-
-    bool registered;      /* if the client is registered to server */
-    endpoint_t *e; /* connection endpoint that the client is using */
-    data_t *u;
-} client_t;
+extern mrp_plugin_t *signalling_plugin;
 
 
-void deregister_and_free_client(client_t *c, data_t *ctx);
-int send_policy_decision(data_t *ctx, client_t *c, transaction_t *tx);
-
-void free_client(client_t *c);
-
-
-int server_setup(endpoint_t *e, data_t *data);
-int type_init(void);
+void free_backchannel(backchannel_t *b)
+{
+    mrp_free(b->client_id);
+    mrp_free(b);
+}
 
 
-#endif /* __MURPHY_SIGNALLING_CLIENT_H__ */
+int mrp_info_register(char *client_id, mrp_info_cb cb, void *data)
+{
+    data_t *ctx = signalling_plugin->data;
+    backchannel_t *b;
+
+    b = mrp_htbl_lookup(ctx->backchannels, client_id);
+
+    if (b) {
+        /* someone is already handling this signal */
+        return -1;
+    }
+
+    b = mrp_allocz(sizeof(backchannel_t));
+
+    if (!b) {
+        return -1;
+    }
+
+    b->cb = cb;
+    b->data = data;
+
+    /* for hash table memory management */
+    b->client_id = mrp_strdup(client_id);
+
+    mrp_htbl_insert(ctx->backchannels, b->client_id, b);
+
+    return 0;
+}
+
+
+void mrp_info_unregister(char *client_id)
+{
+    data_t *ctx = signalling_plugin->data;
+    backchannel_t *b;
+
+    b = mrp_htbl_lookup(ctx->backchannels, client_id);
+
+    if (b) {
+        mrp_htbl_remove(ctx->backchannels, client_id, TRUE);
+    }
+}

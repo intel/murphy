@@ -68,6 +68,8 @@ void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_cb_1(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv);
+void signalling_info_register_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void signalling_info_unregister_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
@@ -95,7 +97,17 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           "Signalling test case 2"),
         MRP_TOKENIZED_CMD("signalling_3" , signalling_cb_3 , TRUE,
                           "signalling_3 [args]", "signalling command",
-                          "Signalling test case 3")
+                          "Signalling test case 3"),
+        MRP_TOKENIZED_CMD("signalling_info_register",
+                          signalling_info_register_cb , TRUE,
+                          "signalling_info_register [args]",
+                          "signalling back channel registration command",
+                          "Signalling back channel registration"),
+        MRP_TOKENIZED_CMD("signalling_info_unregister",
+                          signalling_info_unregister_cb , TRUE,
+                          "signalling_info_unregister [args]",
+                          "signalling back channel unregistration command",
+                          "Signalling back channel unregistration")
 });
 
 
@@ -553,6 +565,53 @@ void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     mrp_console_printf(c, "%s(): tried to send a cancelled transction %u -- success %i\n",
             __FUNCTION__, tx, ret);
+}
+
+static void info_cb(char *msg, void *data)
+{
+    mrp_console_t *c = data;
+
+    mrp_console_printf(c, "received msg '%s'\n", msg);
+}
+
+void signalling_info_register_cb(mrp_console_t *c, void *user_data,
+            int argc, char **argv)
+{
+    /* create the back channel to the test ep */
+
+    char *ep = "foobar";
+    int ret;
+
+    MRP_UNUSED(user_data);
+
+    if (argc == 1)
+        ep = argv[0];
+
+
+    ret = mrp_info_register(ep, info_cb, c);
+
+    if (ret < 0)
+        mrp_console_printf(c, "Failed to register back channel to EP '%s'\n", ep);
+    else
+        mrp_console_printf(c, "Registered back channel to EP '%s'\n", ep);
+}
+
+
+void signalling_info_unregister_cb(mrp_console_t *c, void *user_data,
+            int argc, char **argv)
+{
+    /* create the back channel to the test ep */
+
+    char *ep = "foobar";
+
+    MRP_UNUSED(user_data);
+
+    if (argc == 1)
+        ep = argv[0];
+
+    mrp_info_unregister(ep);
+
+    mrp_console_printf(c, "Unregistered back channel to EP '%s'\n", ep);
 }
 
 

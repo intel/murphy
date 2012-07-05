@@ -50,6 +50,7 @@ typedef struct {
     mrp_mainloop_t *ml;
 
     char *name;
+    char *info;
     char *domains[MAX_DOMAINS];
     uint n_domains;
     bool ack;
@@ -68,6 +69,26 @@ static void dump_decision(client_t *c, ep_decision_t *msg)
     }
     printf("%s required.\n\n", msg->reply_required ? "Reply" : "No reply");
 }
+
+
+static int send_info(client_t *c, char *data)
+{
+    ep_info_t msg;
+    int ret;
+
+    printf("sending info message '%s'\n", data);
+
+    msg.msg = data;
+
+    ret = mrp_transport_senddata(c->t, &msg, TAG_INFO);
+
+    if (!ret) {
+        printf("failed to send info message\n");
+    }
+
+    return ret;
+}
+
 
 static int send_registration(client_t *c)
 {
@@ -114,15 +135,20 @@ static void handle_decision(client_t *c, ep_decision_t *msg)
 
     if (msg->reply_required)
         send_reply(c, msg, c->ack ? EP_ACK: EP_NACK);
+
+    /* try sending an info signal here */
+    if (c->info) {
+        send_info(c, c->info);
+    }
 }
 
 
 static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 {
-    (void) t;
-    (void) error;
-
     client_t *c = user_data;
+
+    MRP_UNUSED(t);
+    MRP_UNUSED(error);
 
     printf("Received closed event\n");
 
@@ -186,11 +212,12 @@ static int add_domain(client_t *c, char *domain)
 
 static int parse_cmdline(client_t *c, int argc, char **argv)
 {
-#   define OPTIONS "nd:i:h"
+#   define OPTIONS "nd:i:I:h"
     struct option options[] = {
         { "nack"  , no_argument      , NULL, 'n' },
         { "domain", required_argument, NULL, 'd' },
         { "id"    , required_argument, NULL, 'i' },
+        { "info"  , required_argument, NULL, 'I' },
         { "help"  , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
@@ -213,6 +240,10 @@ static int parse_cmdline(client_t *c, int argc, char **argv)
             c->name = mrp_strdup(optarg);
             break;
 
+        case 'I':
+            c->info = mrp_strdup(optarg);
+            break;
+
         case 'h':
             print_usage(argv[0]);
             exit(0);
@@ -227,6 +258,7 @@ static int parse_cmdline(client_t *c, int argc, char **argv)
     return TRUE;
 }
 
+
 static void free_client(client_t *c)
 {
     /* TODO: delete the transport */
@@ -234,8 +266,10 @@ static void free_client(client_t *c)
     for (; c->n_domains > 0; c->n_domains--)
         mrp_free(c->domains[c->n_domains-1]);
 
+    mrp_free(c->info);
     mrp_free(c->name);
 }
+
 
 int main(int argc, char **argv)
 {
@@ -247,6 +281,7 @@ int main(int argc, char **argv)
     static mrp_transport_evt_t evt; /* static members are initialized to zero */
 
     client.name = NULL;
+    client.info = NULL;
     client.n_domains = 0;
     client.ack = TRUE;
 
@@ -266,7 +301,8 @@ int main(int argc, char **argv)
 
     if (!mrp_msg_register_type(&ep_register_descr) ||
         !mrp_msg_register_type(&ep_decision_descr) ||
-        !mrp_msg_register_type(&ep_ack_descr)) {
+        !mrp_msg_register_type(&ep_ack_descr) ||
+        !mrp_msg_register_type(&ep_info_descr)) {
         printf("Error: registering data types failed!\n");
         goto error;
     }

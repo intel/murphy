@@ -42,6 +42,8 @@ typedef enum {
 
 typedef void (*mrp_tx_success_cb) (uint32_t tx, void *data);
 typedef void (*mrp_tx_error_cb) (uint32_t tx, mrp_tx_error_t err, void *data);
+typedef void (*mrp_info_cb) (char *msg, void *data);
+
 
 #if 0
 /** Opens a new signal with given 'tx'. */
@@ -85,6 +87,17 @@ int mrp_tx_close_signal(uint32_t tx);
 /** Cancels a signal identified by 'tx'.*/
 
 void mrp_tx_cancel_signal(uint32_t tx);
+
+/** Register a backchannel handler for extra messages coming from the
+    enforcement point identified by 'client_id'. Returns negative value
+    if the handler was already registered. */
+
+int mrp_info_register(char *client_id, mrp_info_cb cb, void *data);
+
+/** Unregister a backchannel handler for enforcement point identified by
+    'client_id'. */
+
+void mrp_info_unregister(char *client_id);
 
 
 #endif /* __MURPHY_SIGNALLING_H__ */

@@ -41,12 +41,21 @@
 #include "signalling/transaction.h"
 #include "signalling/client.h"
 #include "signalling/util.h"
+#include "signalling/endpoint.h"
+#include "signalling/info.h"
 
 mrp_plugin_t *signalling_plugin;
 
 enum {
-    ARG_ADDRESS /* signalling socket address, 'address:port' */
+    ARG_ADDRESS /* signalling socket address, 'addr1:port;addr2:port' */
 };
+
+
+static void htbl_free_backchannel(void *key, void *object)
+{
+    MRP_UNUSED(key);
+    free_backchannel(object);
+}
 
 
 static void htbl_free_client(void *key, void *object)
@@ -66,15 +75,18 @@ static void htbl_free_transaction(void *key, void *object)
 static int signalling_init(mrp_plugin_t *plugin)
 {
     data_t *data;
-    mrp_htbl_config_t client_conf, tx_conf;
+    mrp_htbl_config_t client_conf, tx_conf, backchannel_conf;
+    char *address;
+    int len = strlen(plugin->args[ARG_ADDRESS].str);
+    char buf[len+1];
+    char *tmp = buf;
 
     signalling_info("> init()");
 
     if ((data = mrp_allocz(sizeof(*data))) == NULL)
         return FALSE;
 
-    data->ctx     = plugin->ctx;
-    data->address = plugin->args[ARG_ADDRESS].str;
+    data->ctx = plugin->ctx;
 
     type_init();
 
@@ -94,24 +106,52 @@ static int signalling_init(mrp_plugin_t *plugin)
 
     data->txs = mrp_htbl_create(&tx_conf);
 
-    /* we only support unix domain sockets for the time being */
+    backchannel_conf.comp = mrp_string_comp;
+    backchannel_conf.hash = mrp_string_hash;
+    backchannel_conf.free = htbl_free_backchannel;
+    backchannel_conf.nbucket = 0;
+    backchannel_conf.nentry = 5;
 
-    if (!strncmp(data->address, "unxs:", 5)) {
-        data->path = data->address + 5;
-        if (socket_setup(data)) {
-            plugin->data = data;
-            signalling_info("set up at address '%s'.", data->address);
+    data->backchannels = mrp_htbl_create(&backchannel_conf);
 
-            signalling_plugin = plugin;
+    /* parse here the address line */
 
-            return TRUE;
+    mrp_list_init(&data->es);
+
+    memcpy(buf, plugin->args[ARG_ADDRESS].str, len);
+    buf[len] = '\0';
+
+    signalling_info("address config: '%s'", tmp);
+
+    do {
+        address = strtok(tmp, ";");
+        if (address) {
+            endpoint_t *e;
+            signalling_info("address: '%s'", address);
+            e = create_endpoint(address, plugin->ctx->ml);
+            if (!e) {
+                goto error;
+            }
+            clean_endpoint(e);
+            if (server_setup(e, data) < 0) {
+                goto error;
+            }
+            mrp_list_append(&data->es, &e->hook);
         }
-    }
+        tmp = NULL;
+    } while (address);
 
+    plugin->data = data;
+    signalling_plugin = plugin;
+
+    return TRUE;
+
+error:
     mrp_free(data);
-
     signalling_error("failed to set up signalling at address '%s'.",
             plugin->args[ARG_ADDRESS].str);
+
+    signalling_plugin = NULL;
 
     return FALSE;
 }
@@ -120,13 +160,22 @@ static int signalling_init(mrp_plugin_t *plugin)
 static void signalling_exit(mrp_plugin_t *plugin)
 {
     data_t *ctx = plugin->data;
+    mrp_list_hook_t *p, *n;
+    endpoint_t *e;
 
     signalling_info("cleaning up instance '%s'...", plugin->instance);
 
-    /* FIXME: call error callbacks of all active transactions? */
+    /* go through the client data list */
+
+    mrp_list_foreach(&ctx->es, p, n) {
+        e = mrp_list_entry(p, typeof(*e), hook);
+        mrp_list_delete(&e->hook);
+        delete_endpoint(e);
+    }
 
     mrp_htbl_destroy(ctx->clients, TRUE);
     mrp_htbl_destroy(ctx->txs, TRUE);
+    mrp_htbl_destroy(ctx->backchannels, TRUE);
 }
 
 

@@ -465,10 +465,14 @@ SIGNALLING_PLUGIN_SOURCES = plugins/plugin-signalling.c \
                             plugins/signalling/transaction.c \
                             plugins/signalling/util.c \
                             plugins/signalling/client.c \
+                            plugins/signalling/info.c \
+                            plugins/signalling/endpoint.c \
                             plugins/signalling/plugin.h \
                             plugins/signalling/transaction.h \
                             plugins/signalling/util.h \
-                            plugins/signalling/client.h
+                            plugins/signalling/client.h \
+                            plugins/signalling/info.h \
+                            plugins/signalling/endpoint.h
 SIGNALLING_PLUGIN_HEADERS = plugins/signalling/signalling.h
 SIGNALLING_PLUGIN_CFLAGS  =
 SIGNALLING_PLUGIN_LIBS    =

@@ -27,35 +27,23 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_SIGNALLING_CLIENT_H__
-#define __MURPHY_SIGNALLING_CLIENT_H__
+#ifndef __MURPHY_SIGNALLING_INFO_H__
+#define __MURPHY_SIGNALLING_INFO_H__
 
 #include <stdint.h>
 
+#include <murphy/common.h>
+#include <murphy/plugins/signalling/signalling.h>
+
 #include "plugin.h"
-#include "transaction.h"
-#include "endpoint.h"
 
 typedef struct {
-    char *name;
-    uint32_t ndomains;
-    char **domains;
-    mrp_transport_t *t;   /* associated transport */
-
-    bool registered;      /* if the client is registered to server */
-    endpoint_t *e; /* connection endpoint that the client is using */
-    data_t *u;
-} client_t;
+    char *client_id;
+    mrp_info_cb cb;
+    void *data;
+} backchannel_t;
 
 
-void deregister_and_free_client(client_t *c, data_t *ctx);
-int send_policy_decision(data_t *ctx, client_t *c, transaction_t *tx);
+void free_backchannel(backchannel_t *b);
 
-void free_client(client_t *c);
-
-
-int server_setup(endpoint_t *e, data_t *data);
-int type_init(void);
-
-
-#endif /* __MURPHY_SIGNALLING_CLIENT_H__ */
+#endif /* __MURPHY_SIGNALLING_INFO_H__ */

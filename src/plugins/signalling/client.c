@@ -43,6 +43,9 @@
 #include "client.h"
 #include "transaction.h"
 #include "util.h"
+#include "endpoint.h"
+#include "signalling.h"
+#include "info.h"
 
 
 void free_client(client_t *c)
@@ -111,6 +114,9 @@ static int handle_ack(client_t *c, data_t *ctx, ep_ack_t *data)
             data->id);
         return 0;
     }
+
+    if (!c->registered)
+        return -1;
 
     switch(data->success) {
         case EP_ACK:
@@ -211,6 +217,28 @@ static int handle_register(client_t *c, data_t *ctx, ep_register_t *data)
 }
 
 
+static int handle_info(client_t *c, data_t *ctx, ep_info_t *data)
+{
+    backchannel_t *b;
+
+    signalling_info("info message from '%s'", c->name);
+
+    if (!c->registered)
+        return -1;
+
+    /* see if someone is interested in the info message */
+
+    b = mrp_htbl_lookup(ctx->backchannels, c->name);
+
+    if (b) {
+        signalling_info("found an interested party for the message");
+        b->cb(data->msg, b->data);
+    }
+
+    return 0;
+}
+
+
 static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
              mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
 {
@@ -232,6 +260,10 @@ static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
             ret = handle_ack(c, c->u, data);
             break;
         case TAG_UNREGISTER:
+            /* not supported ATM, we just wait for the close */
+            break;
+        case TAG_INFO:
+            ret = handle_info(c, c->u, data);
             break;
         default:
             signalling_warn("Unhandled message type");
@@ -242,6 +274,8 @@ static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
     if (ret < 0) {
         signalling_error("Malformed message");
     }
+
+    mrp_free(data);
 }
 
 
@@ -266,7 +300,7 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
         mrp_transport_destroy(t);
         c->t = NULL;
 
-        if (c->registered)
+        if (ctx && c->registered)
             deregister_and_free_client(c, ctx);
     }
 }
@@ -274,21 +308,21 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 static void connection_evt(mrp_transport_t *lt, void *user_data)
 {
-    data_t *ctx = (data_t *) user_data;
-    int flags;
+    endpoint_t *e = (endpoint_t *) user_data;
+    data_t *ctx = e->user_data;
     client_t *c;
 
-    signalling_info("Connection from peer.");
+    signalling_info("Connection from peer (using %s).", e->address);
 
     if ((c = mrp_allocz(sizeof(*c))) != NULL) {
-        flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_NONBLOCK;
-        c->t  = mrp_transport_accept(lt, c, flags);
+        c->t  = accept_connection(e, lt, c);
         c->u = ctx;
         c->registered = FALSE;
 
         if (c->t != NULL) {
             signalling_info("Connection accepted.");
             /* TODO: maybe remove the client if no registration in some time */
+
             return;
         }
 
@@ -297,69 +331,28 @@ static void connection_evt(mrp_transport_t *lt, void *user_data)
     }
 }
 
-
-int socket_setup(data_t *data)
+int server_setup(endpoint_t *e, data_t *data)
 {
-    static mrp_transport_evt_t evt; /* static members are initialized to zero */
+    mrp_transport_evt_t evt;
 
     evt.connection = connection_evt;
     evt.closed = closed_evt;
     evt.recvdatafrom = recvfrom_evt;
     evt.recvdata = recv_evt;
 
-    mrp_transport_t *t = NULL;
-    mrp_sockaddr_t addr;
-    socklen_t addrlen;
-    int flags;
-    int ret;
-    const char *type;
-
-    ret = unlink(data->path);
-    if (!(ret == 0 || ret == ENOENT)) {
-        signalling_error("Could not unlink the socket at %s: %s",
-            data->address, strerror(errno));
-        return FALSE;
+    if (start_endpoint(e, &evt, data) < 0) {
+        signalling_error("Error: couldn't set up the listening transport");
+        return -1;
     }
-
-    addrlen = mrp_transport_resolve(NULL, data->address,
-            &addr, sizeof(addr), &type);
-
-    if (addrlen > 0) {
-
-        signalling_info("Address: %s, type: %s", data->address, type);
-
-        flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_MODE_CUSTOM;
-        t = mrp_transport_create(data->ctx->ml, type, &evt, data, flags);
-
-        if (t != NULL) {
-
-            if (mrp_transport_bind(t, &addr, addrlen)) {
-                if (mrp_transport_listen(t, 4)) {
-                    data->t = t;
-                    return TRUE;
-                }
-                else
-                    signalling_error("Failed to listen on server transport.");
-            }
-            else
-                signalling_error("Failed to bind to address %s.", data->address);
-        }
-        else
-            signalling_error("Failed to create listening socket transport.");
-    }
-    else
-        signalling_error("Invalid address '%s'.", data->address);
-
-    mrp_transport_destroy(t);
-
-    return FALSE;
+    return 0;
 }
 
 int type_init(void)
 {
     if (!mrp_msg_register_type(&ep_register_descr) ||
         !mrp_msg_register_type(&ep_decision_descr) ||
-        !mrp_msg_register_type(&ep_ack_descr)) {
+        !mrp_msg_register_type(&ep_ack_descr) ||
+        !mrp_msg_register_type(&ep_info_descr)) {
         mrp_log_error("Failed to register custom data type.");
         return -1;
     }
