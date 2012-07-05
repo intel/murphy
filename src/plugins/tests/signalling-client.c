@@ -40,9 +40,19 @@
 #include <murphy/core.h>
 #include <murphy/plugins/signalling/signalling-protocol.h>
 
+#define _GNU_SOURCE
+#include <getopt.h>
+
+#define MAX_DOMAINS 32
+
 typedef struct {
     mrp_transport_t *t;
     mrp_mainloop_t *ml;
+
+    char *name;
+    char *domains[MAX_DOMAINS];
+    uint n_domains;
+    bool ack;
 } client_t;
 
 
@@ -57,19 +67,16 @@ static void dump_decision(client_t *c, ep_decision_t *msg)
         printf("row %d: '%s'\n", i+1, msg->rows[i]);
     }
     printf("%s required.\n\n", msg->reply_required ? "Reply" : "No reply");
-
 }
 
 static int send_registration(client_t *c)
 {
-    char *name = "test ep";
-    char *domains[] = { "domain1", "domain2" };
     ep_register_t msg;
     int ret;
 
-    msg.ep_name = name;
-    msg.domains = domains;
-    msg.n_domains = 2;
+    msg.ep_name = c->name;
+    msg.domains = c->domains;
+    msg.n_domains = c->n_domains;
 
     ret = mrp_transport_senddata(c->t, &msg, TAG_REGISTER);
 
@@ -106,9 +113,7 @@ static void handle_decision(client_t *c, ep_decision_t *msg)
     dump_decision(c, msg);
 
     if (msg->reply_required)
-        send_reply(c, msg, EP_ACK);
-
-    return;
+        send_reply(c, msg, c->ack ? EP_ACK: EP_NACK);
 }
 
 
@@ -116,8 +121,12 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 {
     (void) t;
     (void) error;
-    (void) user_data;
+
+    client_t *c = user_data;
+
     printf("Received closed event\n");
+
+    mrp_mainloop_quit(c->ml, 0);
 }
 
 
@@ -144,7 +153,6 @@ static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
             /* no other messages supported ATM */
             break;
     }
-
 }
 
 
@@ -154,14 +162,103 @@ static void recv_evt(mrp_transport_t *t, void *data, uint16_t tag, void *user_da
 }
 
 
-int main()
+static void print_usage(const char *argv0)
+{
+    printf("usage: %s -i <id> [options]\n\n"
+           "The possible options are:\n"
+           "  -n, --nack                     send NACKs instead of ACKs\n"
+           "  -d, --domain                   specify a policy domain\n"
+           "  -h, --help                     show help on usage\n",
+           argv0);
+}
+
+
+static int add_domain(client_t *c, char *domain)
+{
+     if (c->n_domains >= MAX_DOMAINS)
+        return -1;
+
+    c->domains[c->n_domains++] = mrp_strdup(domain);
+
+    return 0;
+}
+
+
+static int parse_cmdline(client_t *c, int argc, char **argv)
+{
+#   define OPTIONS "nd:i:h"
+    struct option options[] = {
+        { "nack"  , no_argument      , NULL, 'n' },
+        { "domain", required_argument, NULL, 'd' },
+        { "id"    , required_argument, NULL, 'i' },
+        { "help"  , no_argument      , NULL, 'h' },
+        { NULL, 0, NULL, 0 }
+    };
+
+    int opt;
+
+    while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
+        switch (opt) {
+        case 'n':
+            c->ack = FALSE;
+            break;
+
+        case 'd':
+            if (add_domain(c, optarg) < 0) {
+                return FALSE;
+            }
+            break;
+
+        case 'i':
+            c->name = mrp_strdup(optarg);
+            break;
+
+        case 'h':
+            print_usage(argv[0]);
+            exit(0);
+            break;
+
+        default:
+            print_usage(argv[0]);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static void free_client(client_t *c)
+{
+    /* TODO: delete the transport */
+
+    for (; c->n_domains > 0; c->n_domains--)
+        mrp_free(c->domains[c->n_domains-1]);
+
+    mrp_free(c->name);
+}
+
+int main(int argc, char **argv)
 {
     socklen_t alen;
     mrp_sockaddr_t addr;
     int ret, flags;
 
-    static client_t client;
+    client_t client;
     static mrp_transport_evt_t evt; /* static members are initialized to zero */
+
+    client.name = NULL;
+    client.n_domains = 0;
+    client.ack = TRUE;
+
+    if (!parse_cmdline(&client, argc, argv)) {
+        goto error;
+    }
+
+    if (!client.name) {
+        printf("Error: 'id' is a mandatory argument!\n");
+        print_usage(argv[0]);
+        goto error;
+    }
 
     evt.closed = closed_evt;
     evt.recvdatafrom = recvfrom_evt;
@@ -170,8 +267,8 @@ int main()
     if (!mrp_msg_register_type(&ep_register_descr) ||
         !mrp_msg_register_type(&ep_decision_descr) ||
         !mrp_msg_register_type(&ep_ack_descr)) {
-        printf("Registering data type failed!\n");
-        exit(1);
+        printf("Error: registering data types failed!\n");
+        goto error;
     }
 
     client.ml = mrp_mainloop_create();
@@ -180,26 +277,32 @@ int main()
 
     client.t = mrp_transport_create(client.ml, "unxs", &evt, &client, flags);
     if (client.t == NULL) {
-        printf("Error creating a new transport!\n");
-        exit(1);
+        printf("Error: creating a new transport failed!\n");
+        goto error;
     }
 
     alen = mrp_transport_resolve(NULL, "unxs:/tmp/murphy/signalling", &addr, sizeof(addr), NULL);
     if (alen <= 0) {
-        printf("Error resolving address! Maybe the host is not running?\n");
-        exit(1);
+        printf("Error: resolving address failed!\n");
+        goto error;
     }
 
 
     ret = mrp_transport_connect(client.t, &addr, alen);
     if (ret == 0) {
-        printf("Connect failed!\n");
-        exit(1);
+        printf("Error: connect failed!\n");
+        goto error;
     }
 
     send_registration(&client);
 
     mrp_mainloop_run(client.ml);
 
+    free_client(&client);
+
     return 0;
+
+error:
+    free_client(&client);
+    return 1;
 }
