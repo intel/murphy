@@ -59,6 +59,7 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/msg.c			\
 		common/transport.c		\
 		common/stream-transport.c	\
+		common/internal-transport.c	\
 		common/dgram-transport.c
 
 libmurphy_common_la_SOURCES =				\
