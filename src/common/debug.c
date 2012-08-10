@@ -348,22 +348,26 @@ int mrp_debug_check(const char *func, const char *file, int line)
     if (!debug_enabled || rules_on == NULL)
         return FALSE;
 
-    key = (void *)func;
+    base = NULL;
+    key  = (void *)func;
     if (mrp_htbl_lookup(rules_on, key) != NULL)
         goto check_suppress;
 
     base = strrchr(file, '/');
-    if (base != NULL) {
-        key = base + 1;
-        if (mrp_htbl_lookup(rules_on, key) != NULL)
-            goto check_suppress;
-    }
+    if (base != NULL)
+        base++;
 
     key = buf;
 
     snprintf(buf, sizeof(buf), "@%s", file);
     if (mrp_htbl_lookup(rules_on, key) != NULL)
         goto check_suppress;
+
+    if (base != NULL) {
+        snprintf(buf, sizeof(buf), "@%s", base);
+        if (mrp_htbl_lookup(rules_on, key) != NULL)
+            goto check_suppress;
+    }
 
     snprintf(buf, sizeof(buf), "%s@%s", func, file);
     if (mrp_htbl_lookup(rules_on, key) != NULL)
@@ -385,18 +389,17 @@ int mrp_debug_check(const char *func, const char *file, int line)
     if (mrp_htbl_lookup(rules_off, key) != NULL)
         return FALSE;
 
-    base = strrchr(file, '/');
-    if (base != NULL) {
-        key = base + 1;
-        if (mrp_htbl_lookup(rules_on, key) != NULL)
-            return FALSE;
-    }
-
     key = buf;
 
     snprintf(buf, sizeof(buf), "@%s", file);
     if (mrp_htbl_lookup(rules_off, key) != NULL)
         return FALSE;
+
+    if (base != NULL) {
+        snprintf(buf, sizeof(buf), "@%s", base);
+        if (mrp_htbl_lookup(rules_off, key) != NULL)
+            return FALSE;
+    }
 
     snprintf(buf, sizeof(buf), "%s@%s", func, file);
     if (mrp_htbl_lookup(rules_off, key) != NULL)
