@@ -695,8 +695,6 @@ int main(int argc, char *argv[])
 {
     context_t c;
 
-    mrp_clear(&c);
-
     if (!parse_cmdline(&c, argc, argv))
         exit(1);
 
