@@ -45,7 +45,6 @@ emit_preamble() {
 }
 
 emit_postamble() {
-    emit
     emit "#include <murphy/common/debug-auto-register.c>"
 }
 
@@ -70,13 +69,15 @@ emit_function_info() {
         fi
         emit "    { .line = $line, .func = \"$func\" },"
     done
-    emit "    { .line = 0, .func = NULL }"
-    emit "};"
-    emit "static mrp_debug_file_t file_$(($cnt - 1)) = {"
-    emit "    .file = \"$prev\","
-    emit "    .info = info_$(($cnt - 1))"
-    emit "};"
-    emit ""
+    if [ $cnt -gt 0 ]; then
+        emit "    { .line = 0, .func = NULL }"
+        emit "};"
+        emit "static mrp_debug_file_t file_$(($cnt - 1)) = {"
+        emit "    .file = \"$prev\","
+        emit "    .info = info_$(($cnt - 1))"
+        emit "};"
+        emit ""
+    fi
     emit "/* table of all files */"
     emit "static mrp_debug_file_t *debug_files[] = {"
     i=0
