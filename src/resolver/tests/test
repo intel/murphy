@@ -1,0 +1,19 @@
+target all
+    depends on target1 target2
+
+target target1
+    depends on target3
+
+target target2
+    depends on target4 target5
+
+target target3
+    depends on $fact1
+
+target target4
+    depends on $fact2 $fact3
+
+target target5
+    depends on target6
+
+target target6

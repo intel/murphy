@@ -1,0 +1,24 @@
+target audio_route
+    depends on $audio_device_selectable $audio_output_configuration \
+               $resource_owner
+    update script
+        Script for updating audio routing...
+    end script
+
+target audio_volume
+    depends on $resource_owner $resource_set
+    update script
+        Script for updating audio_volume
+    end script
+
+target audio_cork
+    depends on $resource_owner
+    update script
+        $audio_cork[group] |= set_volume_limits()
+    end script
+
+target audio_mute
+    depends on $mute
+    update script
+        $audio_mute[device] |= set_mute()
+    end script

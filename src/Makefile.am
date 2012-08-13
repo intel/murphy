@@ -1,4 +1,5 @@
-SUBDIRS         = . murphy-db common/tests core/tests daemon/tests
+SUBDIRS         = . murphy-db \
+		  common/tests core/tests daemon/tests resolver/tests
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
@@ -102,7 +103,7 @@ libmurphy_coreh_ladir      =		\
 libmurphy_coreh_la_HEADERS =		\
 		core.h
 
-libmurphy_core_ladir      =		\
+libmurphy_core_ladir =			\
 		$(includedir)/murphy/core
 
 libmurphy_core_la_HEADERS =		\
@@ -242,6 +243,75 @@ linker-script.pulse: $(libmurphy_pulse_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.pulse
 endif
+
+###################################
+# murphy resolver library
+#
+
+PARSER_PREFIX    = yy_res_
+AM_YFLAGS        = -p $(PARSER_PREFIX)
+AM_LFLAGS        = -P $(PARSER_PREFIX)
+LEXCOMPILE       = $(LEX) $(LFLAGS) $(AM_LFLAGS)
+YACCCOMPILE      = $(YACC) $(YFLAGS) $(AM_YFLAGS)
+
+lib_LTLIBRARIES += libmurphy-resolver.la
+EXTRA_DIST      += resolver/murphy-resolver.pc
+pkgconfig_DATA  += resolver/murphy-resolver.pc
+
+libmurphy_resolver_ladir =			\
+		$(includedir)/murphy/resolver
+
+libmurphy_resolver_la_HEADERS =			\
+		resolver/resolver.h
+
+libmurphy_resolver_la_REGULAR_SOURCES =		\
+		resolver/resolver.c		\
+		resolver/parser.c		\
+		resolver/scanner.c      	\
+		resolver/target.c		\
+		resolver/target-sorter.c	\
+		resolver/fact.c			\
+		resolver/script.c
+
+libmurphy_resolver_la_SOURCES =			\
+		$(libmurphy_resolver_la_REGULAR_SOURCES)	\
+		resolver-func-info.c
+
+libmurphy_resolver_la_CFLAGS =			\
+		$(AM_CFLAGS)
+
+libmurphy_resolver_la_LDFLAGS =			\
+		-Wl,-version-script=linker-script.resolver \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_resolver_la_LIBADD =	\
+		libmurphy-common.la
+
+libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver libmurphy-common.la
+
+# lexical analyser generation
+resolver/scanner.c: resolver/scanner.l resolver/parser.h
+	$(LEXCOMPILE) $<
+	mv lex.$(PARSER_PREFIX).c $@
+
+resolver/parser.h resolver/parser.c: resolver/parser.y
+	$(YACCCOMPILE) $<
+	mv -f y.tab.h resolver/parser.h
+	mv -f y.tab.c resolver/parser.c
+
+# resolver linker script generation
+linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.resolver
+
+# debug file:line-function mapping generation
+resolver-func-info.c: $(libmurphy_resolver_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm resolver-func-info.c
 
 ###################################
 # murphy plugins

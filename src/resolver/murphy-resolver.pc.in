@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: murphy-resolver
+Description: Murphy policy framework, resolver library.
+Requires: murphy-common @PACKAGE_VERSION@
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lmurphy-common
+Cflags: -I${includedir}

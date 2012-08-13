@@ -40,6 +40,8 @@ AM_PROG_CC_C_O
 AM_PROG_LIBTOOL
 AC_PROG_LEX
 AC_PROG_YACC
+AM_PROG_LEX
+AC_SUBST(LEXLIB)
 
 # Don't require ctags (we keep linker scripts and debug files in the repo now).
 #AC_CHECK_PROG(CTAGS, ctags, "ctags")
@@ -378,19 +380,21 @@ AC_CONFIG_FILES([build-aux/shave
 		 build-aux/shave-libtool
 		 Makefile
 		 src/Makefile
-		 src/common/tests/Makefile
-		 src/core/tests/Makefile
-		 src/daemon/tests/Makefile
 		 src/common/murphy-common.pc
 		 src/common/murphy-dbus.pc
 		 src/common/murphy-pulse.pc
+		 src/common/tests/Makefile
 		 src/core/murphy-core.pc
+		 src/core/tests/Makefile
                  src/murphy-db/Makefile
                  src/murphy-db/mdb/Makefile
                  src/murphy-db/mqi/Makefile
                  src/murphy-db/mql/Makefile
                  src/murphy-db/include/Makefile
                  src/murphy-db/tests/Makefile
+		 src/daemon/tests/Makefile
+		 src/resolver/murphy-resolver.pc
+		 src/resolver/tests/Makefile
 		 doc/Makefile
                  doc/plugin-developer-guide/Makefile
                  doc/plugin-developer-guide/db/Makefile
