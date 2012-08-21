@@ -128,6 +128,19 @@ static inline void mrp_list_delete(mrp_list_hook_t *item)
     }
 }
 
+/** Reattach a list to a new hook. Initialize old hook to be empty. */
+static inline void mrp_list_move(mrp_list_hook_t *new_hook,
+                                 mrp_list_hook_t *old_hook)
+{
+    *new_hook = *old_hook;
+
+    new_hook->next->prev = new_hook;
+    new_hook->prev->next = new_hook;
+
+    mrp_list_init(old_hook);
+}
+
+
 /** Macro to iterate through a list (current item safe to remove). */
 #define mrp_list_foreach(list, p, n)                                      \
     if ((list)->next != NULL)                                             \
