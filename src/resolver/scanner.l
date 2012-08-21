@@ -230,6 +230,7 @@ typedef enum {
 WS                    [ \t]+
 ESCAPED_EOL           \\\n
 EOL                   \n
+COMMENT               #.*
 
 INCLUDE               ^include{WS}\"[^\"]*\"
 
@@ -245,21 +246,21 @@ SCRIPT_LINE           ^{WS}.*
 
 %%
 
-{TARGET}              { KEYWORD_TOKEN(TARGET);                        }
-{DEPENDS_ON}          { KEYWORD_TOKEN(DEPENDS_ON);                    }
-{IDENT}               { STRING_TOKEN(IDENT);                          }
-{FACT}                { STRING_TOKEN(FACT);                           }
+{TARGET}              { KEYWORD_TOKEN(TARGET);                         }
+{DEPENDS_ON}          { KEYWORD_TOKEN(DEPENDS_ON);                     }
+{IDENT}               { STRING_TOKEN(IDENT);                           }
+{FACT}                { STRING_TOKEN(FACT);                            }
 
-{UPDATE_SCRIPT}       { BEGIN(SCRIPT);  KEYWORD_TOKEN(UPDATE_SCRIPT); }
-<SCRIPT>{END_SCRIPT}  { BEGIN(INITIAL); KEYWORD_TOKEN(END_SCRIPT);    }
-<SCRIPT>{SCRIPT_LINE} { STRING_TOKEN(SCRIPT_LINE);                    }
+{UPDATE_SCRIPT}       { BEGIN(SCRIPT);  KEYWORD_TOKEN(UPDATE_SCRIPT);  }
+<SCRIPT>{END_SCRIPT}  { BEGIN(INITIAL); KEYWORD_TOKEN(END_SCRIPT);     }
+<SCRIPT>{SCRIPT_LINE} { STRING_TOKEN(SCRIPT_LINE);                     }
 
-<*>{WS}               { /*IGNORE_TOKEN(WS);*/                         }
-<*>{EOL}              { parser->in->line++; /*IGNORE_TOKEN(EOL);*/    }
-{ESCAPED_EOL}         { parser->in->line++;                           }
-
-{INCLUDE}             { INCLUDE_FILE();                               }
-<<EOF>>               { CHECK_EOF();                                  }
+<*>{WS}               { /*IGNORE_TOKEN(WS);*/                          }
+<*>{EOL}              { parser->in->line++; /*IGNORE_TOKEN(EOL);*/     }
+{ESCAPED_EOL}         { parser->in->line++; /*IGNORE_TOKEN(EOL);*/     }
+<INITIAL>{COMMENT}    { parser->in->line++; /*IGNORE_TOKEN(COMMENT);*/ }
+{INCLUDE}             { INCLUDE_FILE();                                }
+<<EOF>>               { CHECK_EOF();                                   }
 
 .                     { mrp_log_error("Unhandled token '%s'",
-                                      yy_res_text);                   }
+                                      yy_res_text);                    }

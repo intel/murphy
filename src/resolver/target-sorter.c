@@ -1,11 +1,18 @@
+#include <errno.h>
+
 #include <murphy/common/mm.h>
 #include <murphy/common/debug.h>
+#include <murphy/common/log.h>
 
 #include "scanner.h"
 #include "resolver.h"
 #include "resolver-types.h"
 #include "target-sorter.h"
 
+
+/*
+ * dependency graph used to determine target update orders
+ */
 
 typedef struct {
     mrp_resolver_t *r;                   /* resolver context */
@@ -23,25 +30,34 @@ static void dump_graph(graph_t *g, FILE *fp);
 int sort_targets(mrp_resolver_t *r)
 {
     graph_t *g;
-    int      i, success;
+    int      i, status;
 
     g = build_graph(r);
 
     if (g != NULL) {
         dump_graph(g, stdout);
 
-        success = TRUE;
-        for (i = 0; i < r->ntarget && success; i++) {
-            if (!sort_graph(g, i))
-                success = FALSE;
+        status = 0;
+        for (i = 0; i < r->ntarget; i++) {
+            if (sort_graph(g, i) < 0) {
+                mrp_log_error("Failed to determine update order for "
+                              "resolver target '%s'.", r->targets[i].name);
+
+                if (errno == ELOOP)
+                    mrp_log_error("Cyclic dependency detected.");
+
+                status = -1;
+                break;
+            }
         }
 
         free_graph(g);
     }
+    else
+        status = -1;
 
-    return success;
+    return status;
 }
-
 
 
 static inline int fact_id(graph_t *g, char *fact)
@@ -95,13 +111,13 @@ static inline int *edge_markp(graph_t *g, int n1, int n2)
 }
 
 
-static inline void undelete_node(graph_t *g, int node)
+static inline void mark_node(graph_t *g, int node)
 {
     *edge_markp(g, node, node) = 1;
 }
 
 
-static inline void delete_node(graph_t *g, int node)
+static inline void unmark_node(graph_t *g, int node)
 {
     *edge_markp(g, node, node) = 0;
 }
@@ -156,16 +172,7 @@ static graph_t *build_graph(mrp_resolver_t *r)
 }
 
 
-static inline void delete_nodes(graph_t *g)
-{
-    int i;
-
-    for (i = 0; i < g->nnode; i++)
-        g->edges[i * g->nnode + i] = 0;
-}
-
-
-static int undelete_present_nodes(graph_t *g, int target_idx)
+static int mark_present_nodes(graph_t *g, int target_idx)
 {
     int       tid, did, i;
     target_t *t;
@@ -176,7 +183,7 @@ static int undelete_present_nodes(graph_t *g, int target_idx)
     if (node_present(g, tid))
         return TRUE;
 
-    undelete_node(g, tid);
+    mark_node(g, tid);
 
     for (i = 0; i < t->ndepend; i++) {
         did = node_id(g, t->depends[i]);
@@ -185,9 +192,9 @@ static int undelete_present_nodes(graph_t *g, int target_idx)
             return FALSE;
 
         if (*t->depends[i] == '$')
-            undelete_node(g, did);
+            mark_node(g, did);
         else {
-            if (!undelete_present_nodes(g, did - g->r->nfact))
+            if (!mark_present_nodes(g, did - g->r->nfact))
                 return FALSE;
         }
     }
@@ -196,12 +203,18 @@ static int undelete_present_nodes(graph_t *g, int target_idx)
 }
 
 
+/*
+ * queues we use for topological sorting
+ */
+
 typedef struct {
-    int  size;
-    int *items;
-    int  head;
-    int  tail;
+    int  size;                           /* max queue capacity */
+    int *items;                          /* queue item buffer */
+    int  head;                           /* push index */
+    int  tail;                           /* pop index */
 } que_t;
+
+#define EMPTY_QUE {.items = NULL }       /* initializer for empty queue */
 
 
 static int que_init(que_t *q, int size)
@@ -221,23 +234,6 @@ static int que_init(que_t *q, int size)
         return FALSE;
 }
 
-#if 0
-static que_t *que_alloc(int size)
-{
-    que_t *q;
-
-    q = mrp_allocz(sizeof(*q));
-
-    if (q != NULL) {
-        if (que_init(q, size))
-            return q;
-        else
-            mrp_free(q);
-    }
-
-    return NULL;
-}
-#endif
 
 static void que_cleanup(que_t *q)
 {
@@ -245,20 +241,12 @@ static void que_cleanup(que_t *q)
     q->items = NULL;
 }
 
-#if 0
-static void que_free(que_t *q)
-{
-    que_cleanup(q);
-    mrp_free(q);
-}
-#endif
 
-static int que_push(que_t *q, int item)
+static void que_push(que_t *q, int item)
 {
+    /* we know the max size, so we don't check for overflow here */
     q->items[q->tail++] = item;
     q->tail            %= q->size;
-
-    return TRUE;
 }
 
 
@@ -279,53 +267,81 @@ static int que_pop(que_t *q, int *itemp)
 
 static int sort_graph(graph_t *g, int target_idx)
 {
+    /*
+     * Notes:
+     *
+     *   We perform a topological sort of the dependency graph here
+     *   for our target with the given idx. We include only nodes
+     *   for facts and targets which are relevant for our target.
+     *   These are the ones which our target directly or indirectly
+     *   depends on. We use the otherwise unused diagonal (no target
+     *   can depend on itself) of our edge matrix to mark which nodes
+     *   are present in the graph. Then we use the following algorithm
+     *   to sort the subgraph of relevant nodes:
+     *
+     *       initialize que L to be empty
+     *       initialize que Q with all nodes without incoming edges
+     *       while Q is not empty
+     *           pop a node <n> from Q
+     *           push <n> to L
+     *           remove all edges that start from <n>
+     *           for all nodes <m> where we removed an incoming node
+     *               if <m> has no more incoming edges
+     *                   push <m> to Q
+     *
+     *       if there are any remaining edges
+     *           return an error about cyclic dependency
+     *       else
+     *           L is the sorted subgraph (our target is the last item in L)
+     *
+     *   The resulted sort order of our target is then used as the
+     *   dependency check/update order when the resolver is asked to
+     *   update that target.
+     */
+
     target_t *target;
     int       edges[g->nnode * g->nnode];
-    que_t     L = { .items = NULL}, Q = { .items = NULL };
+    que_t     L = EMPTY_QUE, Q = EMPTY_QUE;
     int       i, j, m, id, node, nedge, nfact, ntarget;
 
     target = g->r->targets + target_idx;
 
+    /* save full graph */
     memcpy(edges, g->edges, sizeof(edges));
 
     if (!que_init(&L, g->nnode + 1) || !que_init(&Q, g->nnode))
         goto fail;
 
-    undelete_present_nodes(g, target_idx);
+    /* find and mark relevant nodes in the graph */
+    mark_present_nodes(g, target_idx);
 
     mrp_debug("-- target %s --", target->name);
     /*dump_graph(g, stdout);*/
 
-    /* push all present facts, they don't depend on anything */
+    /* push all relevant facts, they do not depend on anything */
     for (i = 0; i < g->r->nfact; i++) {
         id = i;
         if (node_present(g, id)) {
             que_push(&Q, id);
-            delete_node(g, id);
+            unmark_node(g, id);
         }
     }
 
-    /* push all present targets that have no dependencies */
+    /* push all relevant targets that have no dependencies */
     for (i = 0; i < g->r->ntarget; i++) {
         id = g->r->nfact + i;
         if (g->r->targets[i].depends == NULL && node_present(g, id)) {
             que_push(&Q, id);
-            delete_node(g, id);
+            unmark_node(g, id);
         }
     }
 
-    /* try a topological sort of the nodes present in the graph */
+    /* try sorting the marked subgraph */
     while (que_pop(&Q, &node)) {
         que_push(&L, node);
 
         mrp_debug("popped node %s", node_name(g, node));
 
-        /*
-         * for each node m with an edge e from node to m do
-         *     remove edge e from the graph
-         *     if m has no other incoming edges then
-         *         insert m into Q
-         */
         for (m = 0; m < g->nnode; m++) {
             if (m == node || !node_present(g, m))
                 continue;
@@ -340,14 +356,14 @@ static int sort_graph(graph_t *g, int target_idx)
             if (nedge == 0) {
                 mrp_debug("node %s empty, pushing it", node_name(g, m));
                 que_push(&Q, m);
-                delete_node(g, m);
+                unmark_node(g, m);
             }
             else
                 mrp_debug("node %s not empty yet", node_name(g, m));
         }
     }
 
-    /* check if graph has still edges */
+    /* check if the subgraph has any remaining edges */
     nedge = 0;
     for (node = 0; node < g->nnode; node++) {
         if (!node_present(g, node))
@@ -356,9 +372,7 @@ static int sort_graph(graph_t *g, int target_idx)
             if (m == node || !node_present(g, m))
                 continue;
             if (*edge_markp(g, node, m) == 1) {
-                printf("error: graph has cycles\n");
-                printf("error: edge %s <- %s still in graph\n",
-                       node_name(g, m), node_name(g, node));
+                errno = ELOOP;
                 goto fail;
             }
         }
@@ -370,9 +384,11 @@ static int sort_graph(graph_t *g, int target_idx)
         mrp_debug(" %s", node_name(g, L.items[i]));
     mrp_debug("-----");
 
+    /* save the result in the given target */
     if (L.tail > 0) {
         nfact   = 0;
         ntarget = 0;
+
         for (i = 0; i < L.tail; i++) {
             if (L.items[i] < g->r->nfact)
                 nfact++;
@@ -403,18 +419,21 @@ static int sort_graph(graph_t *g, int target_idx)
         }
     }
 
-    memcpy(g->edges, edges, sizeof(edges));
     que_cleanup(&L);
     que_cleanup(&Q);
 
-    return TRUE;
+    /* restore the original full graph */
+    memcpy(g->edges, edges, sizeof(edges));
+
+    return 0;
 
  fail:
-    memcpy(g->edges, edges, sizeof(edges));
     que_cleanup(&L);
     que_cleanup(&Q);
 
-    return FALSE;
+    memcpy(g->edges, edges, sizeof(edges));
+
+    return -1;
 }
 
 

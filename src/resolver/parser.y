@@ -23,6 +23,7 @@ static tkn_strarr_t *strarr_append(tkn_strarr_t *arr, char *str);
     tkn_s32_t        s32;
     tkn_u32_t        u32;
     yy_res_target_t *target;
+    yy_res_script_t  script;
     tkn_strarr_t    *strarr;
 }
 
@@ -43,8 +44,8 @@ static tkn_strarr_t *strarr_append(tkn_strarr_t *arr, char *str);
 %type  <target> target
 %type  <strarr> optional_dependencies
 %type  <strarr> dependencies
-%type  <string> optional_script
-%type  <string> script
+%type  <script> optional_script
+%type  <string> script_source
 
 
 %%
@@ -72,7 +73,11 @@ target: KEY_TARGET TKN_IDENT optional_dependencies optional_script {
             t->depends = $3->strs;
             t->ndepend = $3->nstr;
         }
-        t->script = $4.value;
+
+        if ($4.source != NULL) {
+            t->script_type   = mrp_strdup($4.type);
+            t->script_source = mrp_strdup($4.source);
+        }
 
         if (t->name != NULL) {
             mrp_list_append(&parser->targets, &t->hook);
@@ -91,8 +96,10 @@ target: KEY_TARGET TKN_IDENT optional_dependencies optional_script {
     else
         mrp_log_info("    no dependencies");
 
-    mrp_log_info("    update script: %s%s",
-                 $4.value ? "\n" : "", $4.value ? $4.value : "none");
+    if ($4.source != NULL)
+        mrp_log_info("    update script (%s): %s", $4.type, $4.source);
+    else
+        mrp_log_info("    no update script");
   }
 ;
 
@@ -119,11 +126,17 @@ dependencies:
 ;
 
 optional_script:
-  /* no script */                         { $$.value = NULL;     }
-| KEY_UPDATE_SCRIPT script KEY_END_SCRIPT { $$.value = $2.value; }
+  /* no script */ {
+    $$.type   = NULL;
+    $$.source = NULL;
+  }
+| KEY_UPDATE_SCRIPT script_source KEY_END_SCRIPT {
+    $$.type   = "default";
+    $$.source = $2.value;
+  }
 ;
 
-script:
+script_source:
   TKN_SCRIPT_LINE {
       int n;
 
@@ -138,7 +151,7 @@ script:
       else
           YYABORT;
   }
-| script TKN_SCRIPT_LINE {
+| script_source TKN_SCRIPT_LINE {
     int o, n;
 
     o = strlen($1.value);
@@ -219,7 +232,8 @@ void parser_cleanup(yy_res_parser_t *parser)
         t = mrp_list_entry(tp, typeof(*t), hook);
 
         mrp_free(t->name);
-        mrp_free(t->script);
+        mrp_free(t->script_type);
+        mrp_free(t->script_source);
 
         if (t->depends != NULL) {
             for (i = 0, dep = t->depends; i < t->ndepend; i++, dep++)

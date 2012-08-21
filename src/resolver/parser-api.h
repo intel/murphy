@@ -12,11 +12,17 @@
  */
 
 typedef struct {
+    char *type;                                   /* script type */
+    char *source;                                 /* script source */
+} yy_res_script_t;
+
+typedef struct {
     mrp_list_hook_t  hook;                        /* to list of targets */
     char            *name;                        /* target name */
     char           **depends;                     /* target dependencies */
     int              ndepend;                     /* number of dependencies */
-    char            *script;                      /* update script */
+    char            *script_type;                 /* update script type */
+    char            *script_source;               /* update script source */
 } yy_res_target_t;
 
 

@@ -46,10 +46,30 @@ int create_fact(mrp_resolver_t *r, char *fact)
 }
 
 
+void destroy_facts(mrp_resolver_t *r)
+{
+    fact_t *f;
+    int     i;
+
+    for (i = 0, f = r->facts; i < r->nfact; i++, f++)
+        mrp_free(f->name);
+
+    mrp_free(r->facts);
+}
+
+
 int fact_changed(mrp_resolver_t *r, int id)
 {
     MRP_UNUSED(r);
     MRP_UNUSED(id);
 
     return TRUE;
+}
+
+
+uint32_t fact_stamp(mrp_resolver_t *r, int id)
+{
+    fact_t *fact = r->facts + id;
+
+    return fact->stamp;
 }

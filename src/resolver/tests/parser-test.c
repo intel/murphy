@@ -145,15 +145,15 @@ int main(int argc, char *argv[])
         mrp_log_info("Input file '%s' parsed successfully.", c.file);
         mrp_resolver_dump_targets(c.r, stdout);
         mrp_resolver_dump_facts(c.r, stdout);
-    }
 
-    for (i = optind; i < argc; i++) {
-        target = argv[i];
-        printf("========== Target %s ==========\n", target);
-        if (mrp_resolver_update(c.r, argv[i], NULL))
-            printf("Resolved OK.\n");
-        else
-            printf("Resolving FAILED.\n");
+        for (i = optind; i < argc; i++) {
+            target = argv[i];
+            printf("========== Target %s ==========\n", target);
+            if (mrp_resolver_update(c.r, argv[i], NULL))
+                printf("Resolved OK.\n");
+            else
+                printf("Resolving FAILED.\n");
+        }
     }
 
     mrp_resolver_cleanup(c.r);

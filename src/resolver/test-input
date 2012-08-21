@@ -3,17 +3,7 @@ target all
                audio_volume audio_cork audio_mute \
                $vibra $backlight
     update script
-
-
-        This is the update script
-        for target all. As you can see, the main parser
-        does not understand jack squat about it. Instead
-        it is parsed by a language-specific script parser
-        after all the target definitions have been parsed.
-        This makes it also possible in theory to use different
-        scripting languages and to make them dynamically registrable.
-
-
+        signal_enforcement_points(&target='all', 'audio', 'video', 1, -2, +3)
     end script
 
 include "/u/src/work/murphy/src/resolver/test-input-video"

@@ -2,11 +2,13 @@
 
 #include <murphy/common/mm.h>
 #include <murphy/common/debug.h>
+#include <murphy/common/log.h>
 
 #include "scanner.h"
 #include "resolver-types.h"
 #include "target.h"
 #include "target-sorter.h"
+#include "fact.h"
 #include "resolver.h"
 
 mrp_resolver_t *mrp_resolver_parse(const char *path)
@@ -19,12 +21,15 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
 
     if (r != NULL) {
         if (parser_parse_file(&parser, path)) {
-            if (create_targets(r, &parser) && sort_targets(r)) {
+            if (create_targets(r, &parser) == 0 &&
+                sort_targets(r)            == 0 &&
+                compile_target_scripts(r)  == 0) {
                 parser_cleanup(&parser);
-
                 return r;
             }
         }
+        else
+            mrp_log_error("Failed to parse resolver input.");
     }
 
     mrp_resolver_cleanup(r);
@@ -36,34 +41,12 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
 
 void mrp_resolver_cleanup(mrp_resolver_t *r)
 {
-    int       i, j;
-    target_t *t;
-    fact_t   *f;
-
     if (r != NULL) {
-        for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
-            mrp_free(t->name);
+        destroy_targets(r);
+        destroy_facts(r);
 
-            for (j = 0; j < t->ndepend; j++)
-                mrp_free(t->depends[j]);
-            mrp_free(t->depends);
-
-            mrp_free(t->update_facts);
-            mrp_free(t->update_targets);
-
-            mrp_free(t->script);
-        }
-
-        mrp_free(r->targets);
-
-        for (i = 0, f = r->facts; i < r->nfact; i++, f++) {
-            mrp_free(f->name);
-        }
-
-        mrp_free(r->facts);
+        mrp_free(r);
     }
-
-    mrp_free(r);
 }
 
 
@@ -98,4 +81,27 @@ void mrp_resolver_dump_facts(mrp_resolver_t *r, FILE *fp)
         f = r->facts + i;
         fprintf(fp, "  #%d: %s\n", i, f->name);
     }
+}
+
+
+int mrp_resolver_register_interpreter(mrp_interpreter_t *i)
+{
+    return register_interpreter(i);
+}
+
+
+int mrp_resolver_unregister_interpreter(const char *name)
+{
+    mrp_interpreter_t *i;
+
+    i = lookup_interpreter(name);
+
+    if (i != NULL) {
+        unregister_interpreter(i);
+
+        return TRUE;
+    }
+    else
+        return FALSE;
+
 }
