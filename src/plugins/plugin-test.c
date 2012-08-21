@@ -38,6 +38,8 @@
 #include <murphy-db/mqi.h>
 
 #include <murphy/plugins/signalling/signalling.h>
+#include <murphy/plugins/signalling/signalling-protocol.h>
+
 
 
 typedef struct {
@@ -70,6 +72,7 @@ void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_info_register_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_info_unregister_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void signalling_create_ep_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
@@ -83,10 +86,8 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           "four [args]", "command 4", "description 4"),
         MRP_TOKENIZED_CMD("db-script" , db_script_cb , TRUE,
                           "db-script <file>", "run DB script", "run DB script"),
-
         MRP_TOKENIZED_CMD("db-cmd" , db_cmd_cb , TRUE,
                           "db-cmd <DB command>", "run DB command", "run DB command"),
-
         MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
                           "update <target>", "update target", "update target"),
         MRP_TOKENIZED_CMD("signalling_1" , signalling_cb_1 , TRUE,
@@ -107,7 +108,13 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           signalling_info_unregister_cb , TRUE,
                           "signalling_info_unregister [args]",
                           "signalling back channel unregistration command",
-                          "Signalling back channel unregistration")
+                          "Signalling back channel unregistration"),
+        MRP_TOKENIZED_CMD("signalling_create_ep_cb",
+                          signalling_create_ep_cb, TRUE,
+                          "signalling_create_ep_cb [args]",
+                          "signalling internal EP creation command",
+                          "Create internal enforcement point for signalling")
+
 });
 
 
@@ -612,6 +619,134 @@ void signalling_info_unregister_cb(mrp_console_t *c, void *user_data,
     mrp_info_unregister(ep);
 
     mrp_console_printf(c, "Unregistered back channel to EP '%s'\n", ep);
+}
+
+
+static void dump_decision(mrp_console_t *c, ep_decision_t *msg)
+{
+    uint i;
+
+    mrp_console_printf(c, "Message contents:\n");
+    for (i = 0; i < msg->n_rows; i++) {
+        mrp_console_printf(c, "row %d: '%s'\n", i+1, msg->rows[i]);
+    }
+    mrp_console_printf(c, "%s required.\n\n",
+                msg->reply_required ? "Reply" : "No reply");
+}
+
+
+static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
+             mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
+{
+    mrp_console_t *c = user_data;
+
+    MRP_UNUSED(addr);
+    MRP_UNUSED(addrlen);
+
+    mrp_console_printf(c, "Received message (0x%02x)\n", tag);
+
+    switch (tag) {
+        case TAG_POLICY_DECISION:
+        {
+            ep_decision_t *msg = data;
+            dump_decision(c, msg);
+
+
+            if (msg->reply_required) {
+                ep_ack_t reply;
+
+                reply.id = msg->id;
+                reply.success = EP_ACK;
+                mrp_transport_senddata(t, &reply, TAG_ACK);
+            }
+            break;
+        }
+        case TAG_ERROR:
+            printf("Server sends an error message!\n");
+            break;
+        default:
+            /* no other messages supported ATM */
+            break;
+    }
+
+    mrp_free(data);
+}
+
+
+static void recv_evt(mrp_transport_t *t, void *data, uint16_t tag, void *user_data)
+{
+    recvfrom_evt(t, data, tag, NULL, 0, user_data);
+}
+
+
+static void closed_evt(mrp_transport_t *t, int error, void *user_data)
+{
+    mrp_console_t *c = user_data;
+
+    MRP_UNUSED(t);
+    MRP_UNUSED(error);
+
+    mrp_console_printf(c, "Received closed event\n");
+}
+
+
+void signalling_create_ep_cb(mrp_console_t *c, void *user_data,
+            int argc, char **argv)
+{
+    mrp_transport_t *t;
+    static mrp_transport_evt_t evt;
+    int ret, flags;
+    char *domains[] = { "domain1" };
+
+    ep_register_t msg;
+
+    socklen_t alen;
+    mrp_sockaddr_t addr;
+
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+
+    evt.closed = closed_evt;
+    evt.recvdata = recv_evt;
+    evt.recvdatafrom = recvfrom_evt;
+
+#if 0
+    if (!mrp_msg_register_type(&ep_register_descr) ||
+        !mrp_msg_register_type(&ep_decision_descr) ||
+        !mrp_msg_register_type(&ep_ack_descr) ||
+        !mrp_msg_register_type(&ep_info_descr)) {
+        mrp_console_printf(c, "Error: registering data types failed!\n");
+        return;
+    }
+#endif
+
+    flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_MODE_CUSTOM;
+
+    t = mrp_transport_create(c->ctx->ml, "internal", &evt, c, flags);
+
+    alen = mrp_transport_resolve(NULL, "internal:signalling", &addr, sizeof(addr), NULL);
+
+    if (alen <= 0) {
+        mrp_console_printf(c, "Error: resolving address failed!\n");
+        return;
+    }
+
+    ret = mrp_transport_connect(t, &addr, alen);
+    if (ret == 0) {
+        mrp_console_printf(c, "Error: connect failed!\n");
+        return;
+    }
+
+    msg.ep_name = "ep_name";
+    msg.domains = domains;
+    msg.n_domains = 1;
+
+    ret = mrp_transport_senddata(t, &msg, TAG_REGISTER);
+
+    if (!ret) {
+        mrp_console_printf(c, "Failed to send register message\n");
+        return;
+    }
 }
 
 
