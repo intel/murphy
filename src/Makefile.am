@@ -11,6 +11,10 @@ EXTRA_DIST      =
 
 QUIET_GEN       = $(Q:@=@echo '  GEN   '$@;)
 
+LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
+YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
+
+
 ###################################
 # murphy common library
 #
@@ -248,12 +252,6 @@ endif
 # murphy resolver library
 #
 
-PARSER_PREFIX    = yy_res_
-AM_YFLAGS        = -p $(PARSER_PREFIX)
-AM_LFLAGS        = -P $(PARSER_PREFIX)
-LEXCOMPILE       = $(LEX) $(LFLAGS) $(AM_LFLAGS)
-YACCCOMPILE      = $(YACC) $(YFLAGS) $(AM_YFLAGS)
-
 lib_LTLIBRARIES += libmurphy-resolver.la
 EXTRA_DIST      += resolver/murphy-resolver.pc
 pkgconfig_DATA  += resolver/murphy-resolver.pc
@@ -262,16 +260,26 @@ libmurphy_resolver_ladir =			\
 		$(includedir)/murphy/resolver
 
 libmurphy_resolver_la_HEADERS =			\
-		resolver/resolver.h
+		resolver/resolver.h		\
+		resolver/script.h
 
-libmurphy_resolver_la_REGULAR_SOURCES =		\
-		resolver/resolver.c		\
-		resolver/parser.c		\
-		resolver/scanner.c      	\
-		resolver/target.c		\
-		resolver/target-sorter.c	\
-		resolver/fact.c			\
-		resolver/script.c
+SIMPLE_SCRIPT_SOURCES = 					\
+		resolver/scripting/simple/simple-script.c	\
+		resolver/scripting/simple/simple-scanner.c	\
+		resolver/scripting/simple/simple-parser.c	\
+		resolver/scripting/simple/call.c
+
+libmurphy_resolver_la_REGULAR_SOURCES =				\
+		resolver/resolver.c				\
+		resolver/parser.c				\
+		resolver/scanner.c      			\
+		resolver/target.c				\
+		resolver/target-sorter.c			\
+		resolver/db.c					\
+		resolver/fact.c					\
+		resolver/script.c				\
+		resolver/context.c                              \
+		$(SIMPLE_SCRIPT_SOURCES)
 
 libmurphy_resolver_la_SOURCES =			\
 		$(libmurphy_resolver_la_REGULAR_SOURCES)	\
@@ -289,15 +297,24 @@ libmurphy_resolver_la_LIBADD =	\
 
 libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver libmurphy-common.la
 
-# lexical analyser generation
+# resolver lexical analyser and parser generation
+RESOLVER_PARSER_PREFIX = yy_res_
+
 resolver/scanner.c: resolver/scanner.l resolver/parser.h
-	$(LEXCOMPILE) $<
-	mv lex.$(PARSER_PREFIX).c $@
+	$(LEXCOMPILE) -P $(RESOLVER_PARSER_PREFIX) $<
+	mv lex.$(RESOLVER_PARSER_PREFIX).c $@
 
 resolver/parser.h resolver/parser.c: resolver/parser.y
-	$(YACCCOMPILE) $<
+	$(YACCCOMPILE) -p $(RESOLVER_PARSER_PREFIX) $<
 	mv -f y.tab.h resolver/parser.h
 	mv -f y.tab.c resolver/parser.c
+
+# debug file:line-function mapping generation
+resolver-func-info.c: $(libmurphy_resolver_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm resolver-func-info.c
 
 # resolver linker script generation
 linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
@@ -306,12 +323,23 @@ linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.resolver
 
-# debug file:line-function mapping generation
-resolver-func-info.c: $(libmurphy_resolver_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+# simple interpreter lexical analyser and parser generation
+SIMPLE_PARSER_PREFIX = yy_smpl_
 
-clean-func-infos::
-	-rm resolver-func-info.c
+resolver/scripting/simple/simple-scanner.c:		\
+    resolver/scripting/simple/simple-scanner.l		\
+    resolver/scripting/simple/simple-parser.h
+	$(LEXCOMPILE) -P $(SIMPLE_PARSER_PREFIX) $<
+	mv lex.$(SIMPLE_PARSER_PREFIX).c $@
+
+# simple interpreter parser generation
+resolver/scripting/simple/simple-parser.h 	\
+resolver/scripting/simple/simple-parser.c:	\
+    resolver/scripting/simple/simple-parser.y
+	$(YACCCOMPILE) -p $(SIMPLE_PARSER_PREFIX) $<
+	mv -f y.tab.h resolver/scripting/simple/simple-parser.h
+	mv -f y.tab.c resolver/scripting/simple/simple-parser.c
+
 
 ###################################
 # murphy plugins
@@ -417,6 +445,7 @@ plugin-console-func-info.c: $(CONSOLE_PLUGIN_REGULAR_SOURCES)
 clean-func-infos::
 	-rm plugin-console-func-info.c
 endif
+
 
 ###################################
 # murphy daemon
