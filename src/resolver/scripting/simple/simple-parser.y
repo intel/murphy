@@ -130,17 +130,14 @@ arguments:
 
 expression:
   constant_expression {
-      mrp_debug("expression(constant_expression)");
       $$.cst.type  = EXPR_CONSTANT;
       $$.cst.value = $1.value;
   }
 | context_value {
-      mrp_debug("expression(context_value)");
       $$.val.type  = EXPR_CONTEXT_VALUE;
       $$.val.name  = $1.value;
   }
 | context_assign {
-      mrp_debug("expression(context_assign)");
       $$ = $1;
   }
   ;

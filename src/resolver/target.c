@@ -197,7 +197,7 @@ static void restore_target_stamps(mrp_resolver_t *r, target_t *t, uint32_t *buf)
 }
 
 
-static int update_target(mrp_resolver_t *r, target_t *t, va_list ap)
+static int update_target(mrp_resolver_t *r, target_t *t)
 {
     target_t *dep;
     uint32_t  stamps[r->ntarget];
@@ -223,7 +223,7 @@ static int update_target(mrp_resolver_t *r, target_t *t, va_list ap)
         /*                              hmm... is this really needed? */
         if (older_than_facts(r, dep) || older_than_targets(r, dep)) {
             needs_update = TRUE;
-            status       = execute_script(r, dep->script, ap);
+            status       = execute_script(r, dep->script);
 
             if (status <= 0)
                 break;
@@ -233,7 +233,7 @@ static int update_target(mrp_resolver_t *r, target_t *t, va_list ap)
     }
 
     if (needs_update && status > 0) {
-        status = execute_script(r, t->script, ap);
+        status = execute_script(r, t->script);
 
         if (status > 0)
             t->stamp = r->stamp;
@@ -249,24 +249,24 @@ static int update_target(mrp_resolver_t *r, target_t *t, va_list ap)
 }
 
 
-int update_target_by_name(mrp_resolver_t *r, const char *name, va_list ap)
+int update_target_by_name(mrp_resolver_t *r, const char *name)
 {
     target_t *t;
     int       i;
 
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
         if (!strcmp(t->name, name))
-            return update_target(r, t, ap);
+            return update_target(r, t);
     }
 
     return FALSE;
 }
 
 
-int update_target_by_id(mrp_resolver_t *r, int id, va_list ap)
+int update_target_by_id(mrp_resolver_t *r, int id)
 {
     if (id < r->ntarget)
-        return update_target(r, r->targets + id, ap);
+        return update_target(r, r->targets + id);
     else
         return FALSE;
 }

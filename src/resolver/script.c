@@ -108,10 +108,9 @@ int compile_script(mrp_script_t *s)
 }
 
 
-int execute_script(mrp_resolver_t *r, mrp_script_t *s, va_list ap)
+int execute_script(mrp_resolver_t *r, mrp_script_t *s)
 {
     MRP_UNUSED(r);
-    MRP_UNUSED(ap);
 
     if (s != NULL)
         return s->interpreter->execute(s);
@@ -120,10 +119,9 @@ int execute_script(mrp_resolver_t *r, mrp_script_t *s, va_list ap)
 }
 
 
-int eval_script(mrp_resolver_t *r, char *script, va_list ap)
+int eval_script(mrp_resolver_t *r, char *script)
 {
     MRP_UNUSED(r);
-    MRP_UNUSED(ap);
 
     if (script == NULL)
         return TRUE;
@@ -134,4 +132,34 @@ int eval_script(mrp_resolver_t *r, char *script, va_list ap)
 
         return TRUE;
     }
+}
+
+
+char *mrp_print_value(char *buf, size_t size, mrp_script_value_t *value)
+{
+#define HANDLE_TYPE(type, fmt, val)                     \
+        case MRP_SCRIPT_TYPE_##type:                    \
+            snprintf(buf, size, fmt, val);              \
+            break
+
+    switch (value->type) {
+        HANDLE_TYPE(UNKNOWN, "%s"     , "<unknown/invalid type>");
+        HANDLE_TYPE(STRING , "'%s'"   , value->str);
+        HANDLE_TYPE(BOOL   , "%s"     , value->bln ? "true" : "false");
+        HANDLE_TYPE(UINT8  , "%uU8"   , value->u8);
+        HANDLE_TYPE(SINT8  , "%dS8"   , value->s8);
+        HANDLE_TYPE(UINT16 , "%uU16"  , value->u16);
+        HANDLE_TYPE(SINT16 , "%dS16"  , value->s16);
+        HANDLE_TYPE(UINT32 , "%uU32"  , value->u32);
+        HANDLE_TYPE(SINT32 , "%dS32"  , value->s32);
+        HANDLE_TYPE(UINT64 , "%lluU64", (unsigned long long)value->u64);
+        HANDLE_TYPE(SINT64 , "%lldS64", (  signed long long)value->s64);
+        HANDLE_TYPE(DOUBLE , "%f"     , value->dbl);
+    default:
+        snprintf(buf, size, "<invalid type 0x%x>", value->type);
+    }
+
+#undef HANDLE_TYPE
+
+    return buf;
 }

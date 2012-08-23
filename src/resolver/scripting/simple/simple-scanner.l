@@ -172,10 +172,22 @@ typedef enum {
             return TKN_##tkn;                                          \
         }                                                              \
         else {                                                         \
-            yy_smpl_lval.error.value = "couldn't parse integer";       \
-            mrp_debug("TKN_ERROR: failed to parse integer.");          \
+            if ((_end[0] == 'S' || _end[0] == 'U') &&                  \
+                ((_end[1] == '8' && !_end[2])                    ||    \
+                 (_end[1] == '1' && _end[2] == '6' && !_end[3])  ||    \
+                 (_end[1] == '3' && _end[2] == '2' && !_end[3])  ||    \
+                 (_end[1] == '6' && _end[2] == '4' && !_end[3]))) {    \
+                yy_smpl_lval.type.value = _value;                      \
+                mrp_debug("TKN_%s: '%s'", #tkn, _tkn);                 \
                                                                        \
-            return TKN_ERROR;                                          \
+                return TKN_##tkn;                                      \
+            }                                                          \
+            else {                                                     \
+                yy_smpl_lval.error.value = "couldn't parse integer";   \
+                mrp_debug("TKN_ERROR: failed to parse integer.");      \
+                                                                       \
+                return TKN_ERROR;                                      \
+            }                                                          \
         }                                                              \
     } while (0)
 
@@ -237,14 +249,14 @@ STRING                ('[^\n']*')|(\"[^\n\"]*\")
 INTEGER               [+-]?[0-9]+
 HEXAINT               [+-]?0x[0-9a-fA-F]+
 DOUBLE                [+-]?[0-9]+\.[0-9]+
-SINT8                 {INTEGER}S8
-UINT8                 {INTEGER}U8
-SINT16                {INTEGER}S16
-UINT16                {INTEGER}U16
-SINT32                {INTEGER}S32
-UINT32                {INTEGER}U32
-SINT64                {INTEGER}S64
-UINT64                {INTEGER}U64
+SINT8                 ({INTEGER}|{HEXAINT})S8
+UINT8                 ({INTEGER}|{HEXAINT})U8
+SINT16                ({INTEGER}|{HEXAINT})S16
+UINT16                ({INTEGER}|{HEXAINT})U16
+SINT32                ({INTEGER}|{HEXAINT})S32
+UINT32                ({INTEGER}|{HEXAINT})U32
+SINT64                ({INTEGER}|{HEXAINT})S64
+UINT64                ({INTEGER}|{HEXAINT})U64
 
 %%
 
@@ -252,7 +264,6 @@ UINT64                {INTEGER}U64
 {CONTEXT_VAR}         { STRING_TOKEN(CONTEXT_VAR);     }
 {STRING}              { STRING_TOKEN(STRING);          }
 
-{INTEGER}             { INTEGER_TOKEN(SINT32, sint32); }
 {SINT8}               { INTEGER_TOKEN(SINT8 , sint8 ); }
 {UINT8}               { INTEGER_TOKEN(UINT8 , uint8 ); }
 {SINT16}              { INTEGER_TOKEN(SINT16, sint16); }
@@ -261,7 +272,10 @@ UINT64                {INTEGER}U64
 {UINT32}              { INTEGER_TOKEN(UINT32, uint32); }
 {SINT64}              { INTEGER_TOKEN(SINT64, sint64); }
 {UINT64}              { INTEGER_TOKEN(UINT64, uint64); }
+{INTEGER}             { INTEGER_TOKEN(SINT32, sint32); }
+{HEXAINT}             { INTEGER_TOKEN(SINT32, sint32); }
 {DOUBLE}              { DOUBLE_TOKEN();                }
+
 
 \(                    { OTHER_TOKEN(PARENTH_OPEN);     }
 \)                    { OTHER_TOKEN(PARENTH_CLOSE);    }

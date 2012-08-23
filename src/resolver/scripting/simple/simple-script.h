@@ -17,8 +17,8 @@ typedef enum {
 
 
 typedef struct {
-    arg_type_t               type;       /* ARG_CONST_VALUE */
-    mrp_script_typed_value_t value;      /* actual value */
+    arg_type_t         type;             /* ARG_CONST_VALUE */
+    mrp_script_value_t value;            /* actual value */
 } const_arg_t;
 
 

@@ -4,6 +4,8 @@ target all
                $vibra $backlight
     update script
         signal_enforcement_points(&target='all', 'audio', 'video', 1, -2, +3)
+        foobar(&just='a test', +1, -2, 3.141, -1U8, 0xffffffffffU64)
+        hex(-0xf)
     end script
 
 include "/u/src/work/murphy/src/resolver/test-input-video"

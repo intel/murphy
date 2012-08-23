@@ -146,10 +146,25 @@ int main(int argc, char *argv[])
         mrp_resolver_dump_targets(c.r, stdout);
         mrp_resolver_dump_facts(c.r, stdout);
 
+        mrp_resolver_declare_variable(c.r, "var1", MRP_SCRIPT_TYPE_STRING);
+        mrp_resolver_declare_variable(c.r, "var2", MRP_SCRIPT_TYPE_STRING);
+        mrp_resolver_declare_variable(c.r, "var3", MRP_SCRIPT_TYPE_BOOL);
+        mrp_resolver_declare_variable(c.r, "var4", MRP_SCRIPT_TYPE_SINT32);
+        mrp_resolver_declare_variable(c.r, "var5", MRP_SCRIPT_TYPE_UINT32);
+        mrp_resolver_declare_variable(c.r, "var6", MRP_SCRIPT_TYPE_UNKNOWN);
+
         for (i = optind; i < argc; i++) {
             target = argv[i];
             printf("========== Target %s ==========\n", target);
-            if (mrp_resolver_update(c.r, argv[i], NULL))
+
+            if (mrp_resolver_update_targetl(c.r, argv[i],
+                                            "var1", MRP_SCRIPT_STRING("foo"),
+                                            "var2", MRP_SCRIPT_STRING("bar"),
+                                            "var3", MRP_SCRIPT_BOOL(TRUE),
+                                            "var4", MRP_SCRIPT_SINT32(-1),
+                                            "var5", MRP_SCRIPT_UINT32(123),
+                                            "var6", MRP_SCRIPT_DOUBLE(3.141),
+                                            NULL) > 0)
                 printf("Resolved OK.\n");
             else
                 printf("Resolving FAILED.\n");

@@ -32,7 +32,7 @@ static int simple_compile(mrp_script_t *script)
         ss = mrp_allocz(sizeof(*ss));
 
         if (ss != NULL) {
-            script->data = ss;
+            script->compiled = ss;
 
             mrp_list_move(&ss->statements, &parser.statements);
             simple_parser_cleanup(&parser);
@@ -49,7 +49,7 @@ static int simple_compile(mrp_script_t *script)
 
 static int simple_execute(mrp_script_t *s)
 {
-    simple_script_t *ss = s->data;
+    simple_script_t *ss = s->compiled;
 
     if (ss != NULL) {
         printf("----- should execute simple script -----\n");

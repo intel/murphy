@@ -102,7 +102,7 @@ typedef struct {
 
 typedef struct {
     SIMPLE_TOKEN_FIELDS;
-    mrp_script_typed_value_t value;
+    mrp_script_value_t value;
 } tkn_value_t;
 
 /*
@@ -118,8 +118,8 @@ typedef enum {
 
 
 typedef struct {
-    expr_type_t              type;       /* EXPR_CONSTANT */
-    mrp_script_typed_value_t value;      /* constant value with a type */
+    expr_type_t        type;             /* EXPR_CONSTANT */
+    mrp_script_value_t value;            /* constant value with a type */
 } const_expr_t;
 
 typedef struct {
@@ -128,9 +128,9 @@ typedef struct {
 } ctx_val_expr_t;
 
 typedef struct {
-    expr_type_t               type;      /* EXPR_CONTEXT_SET */
-    char                     *name;      /* context variable name */
-    mrp_script_typed_value_t  value;     /* value to set */
+    expr_type_t         type;            /* EXPR_CONTEXT_SET */
+    char               *name;            /* context variable name */
+    mrp_script_value_t  value;           /* value to set */
 } ctx_set_expr_t;
 
 typedef union {

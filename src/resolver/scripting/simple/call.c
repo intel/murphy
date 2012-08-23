@@ -37,7 +37,7 @@ void destroy_call(function_call_t *c)
 }
 
 
-int set_constant_value_arg(arg_t *arg, mrp_script_typed_value_t *value)
+int set_constant_value_arg(arg_t *arg, mrp_script_value_t *value)
 {
     arg->cst.type  = ARG_CONST_VALUE;
     arg->cst.value = *value;
@@ -67,7 +67,7 @@ int set_context_value_arg(arg_t *arg, char *name)
 }
 
 
-int set_context_set_arg(arg_t *arg, char *name, mrp_script_typed_value_t *value)
+int set_context_set_arg(arg_t *arg, char *name, mrp_script_value_t *value)
 {
     arg->set.type  = ARG_CONTEXT_SET;
     arg->set.name  = mrp_strdup(name);
@@ -108,29 +108,13 @@ void destroy_arguments(arg_t *args, int narg)
 
 static void dump_arg(FILE *fp, arg_t *arg)
 {
-    mrp_script_typed_value_t *val;
+    mrp_script_value_t *val;
+    char                vbuf[64];
 
     switch (arg->type) {
     case ARG_CONST_VALUE:
         val = &arg->cst.value;
-        switch (arg->cst.value.type) {
-#define HANDLE_TYPE(t, fmt, v)                                  \
-            case MRP_SCRIPT_TYPE_##t:                           \
-                fprintf(fp, fmt, v);                            \
-                break
-            HANDLE_TYPE(STRING, "'%s'", val->str);
-            HANDLE_TYPE(BOOL  , "%s"  , val->bln ? "true" : "false");
-            HANDLE_TYPE(UINT8 , "%u"  , val->u8 );
-            HANDLE_TYPE(SINT8 , "%d"  , val->s8 );
-            HANDLE_TYPE(UINT16, "%u"  , val->u16);
-            HANDLE_TYPE(SINT16, "%d"  , val->s16);
-            HANDLE_TYPE(UINT32, "%u"  , val->u32);
-            HANDLE_TYPE(SINT32, "%d"  , val->s32);
-            HANDLE_TYPE(UINT64, "%llu", (unsigned long long)val->u64);
-            HANDLE_TYPE(SINT64, "%lld", (  signed long long)val->s64);
-        default:
-            fprintf(fp, "<unknown/unhandled value type>");
-        }
+        fprintf(fp, "%s", mrp_print_value(vbuf, sizeof(vbuf), val));
         break;
 
     case ARG_CONTEXT_VAR:
@@ -138,27 +122,9 @@ static void dump_arg(FILE *fp, arg_t *arg)
         break;
 
     case ARG_CONTEXT_SET:
-        fprintf(fp, "&%s=", arg->set.name);
         val = &arg->set.value;
-        switch (arg->set.value.type) {
-#define HANDLE_TYPE(t, fmt, v)                                  \
-            case MRP_SCRIPT_TYPE_##t:                           \
-                fprintf(fp, fmt, v);                            \
-                break
-            HANDLE_TYPE(STRING, "'%s'", val->str);
-            HANDLE_TYPE(BOOL  , "%s"  , val->bln ? "true" : "false");
-            HANDLE_TYPE(UINT8 , "%u"  , val->u8 );
-            HANDLE_TYPE(SINT8 , "%d"  , val->s8 );
-            HANDLE_TYPE(UINT16, "%u"  , val->u16);
-            HANDLE_TYPE(SINT16, "%d"  , val->s16);
-            HANDLE_TYPE(UINT32, "%u"  , val->u32);
-            HANDLE_TYPE(SINT32, "%d"  , val->s32);
-            HANDLE_TYPE(UINT64, "%llu", (unsigned long long)val->u64);
-            HANDLE_TYPE(SINT64, "%lld", (  signed long long)val->s64);
-#undef HANDLE_TYPE
-        default:
-            fprintf(fp, "<unknown/unhandled value type>");
-        }
+        fprintf(fp, "&%s=%s", arg->set.name,
+                mrp_print_value(vbuf, sizeof(vbuf), val));
         break;
 
     default:
