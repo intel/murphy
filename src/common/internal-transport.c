@@ -36,13 +36,6 @@
 
 #define INTERNAL "internal"
 
-/* storage for the global data, TODO: refactor away */
-static mrp_htbl_t *servers = NULL;
-static mrp_htbl_t *connections = NULL;
-static mrp_list_hook_t msg_queue;
-static mrp_deferred_t *d;
-static uint32_t cid;
-
 typedef struct internal_s internal_t;
 
 struct internal_s {
@@ -64,9 +57,19 @@ typedef struct {
     socklen_t addrlen;
     bool free_data;
     int offset;
+    bool custom;
+    uint16_t tag;
 
     mrp_list_hook_t hook;
 } internal_message_t;
+
+
+/* storage for the global data, TODO: refactor away */
+static mrp_htbl_t *servers = NULL;
+static mrp_htbl_t *connections = NULL;
+static mrp_list_hook_t msg_queue;
+static mrp_deferred_t *d;
+static uint32_t cid;
 
 
 static void process_queue(mrp_mainloop_t *ml, mrp_deferred_t *d,
@@ -132,8 +135,14 @@ static void process_queue(mrp_mainloop_t *ml, mrp_deferred_t *d,
 end:
         if (msg) {
 
-            if (msg->free_data)
-                mrp_free(msg->data);
+            if (msg->free_data) {
+                if (msg->custom) {
+                    /* FIXME: should be mrp_data_free(msg->data, msg->tag); */
+                    mrp_free(msg->data);
+                }
+                else
+                    mrp_msg_unref(msg->data);
+            }
 
             mrp_list_delete(&msg->hook);
             mrp_free(msg);
@@ -192,8 +201,12 @@ error:
     if (servers)
         mrp_htbl_destroy(servers, FALSE);
 
+    servers = NULL;
+
     if (connections)
         mrp_htbl_destroy(connections, FALSE);
+
+    connections = NULL;
 
     return -1;
 }
@@ -318,8 +331,14 @@ static void remove_messages(internal_t *u)
         if (strcmp(msg->addr->data, u->name) == 0
             || strcmp(msg->addr->data, u->address.data) == 0) {
 
-            if (msg->free_data)
-                mrp_free(msg->data);
+            if (msg->free_data) {
+                if (msg->custom) {
+                    /* FIXME: should be mrp_data_free(msg->data, msg->tag); */
+                    mrp_free(msg->data);
+                }
+                else
+                    mrp_msg_unref(msg->data);
+            }
 
             mrp_list_delete(&msg->hook);
             mrp_free(msg);
@@ -432,6 +451,7 @@ static int internal_sendto(mrp_transport_t *mu, mrp_msg_t *data,
     msg->offset = 0;
     msg->size = size;
     msg->u = u;
+    msg->custom = FALSE;
 
     mrp_list_init(&msg->hook);
     mrp_list_append(&msg_queue, &msg->hook);
@@ -471,6 +491,7 @@ static int internal_sendrawto(mrp_transport_t *mu, void *data, size_t size,
     msg->offset = 0;
     msg->size = size;
     msg->u = u;
+    msg->custom = FALSE;
 
     mrp_list_init(&msg->hook);
     mrp_list_append(&msg_queue, &msg->hook);
@@ -521,7 +542,6 @@ static size_t encode_custom_data(void *data, void **newdata, uint16_t tag)
     len = size - sizeof(*lenp);
     tagp = buf + sizeof(*lenp);
 
-    /* *lenp = htobe32(len); */ /* Not used */
     *tagp = htobe16(tag);
 
     *newdata = buf;
@@ -560,6 +580,8 @@ static int internal_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
     msg->offset = 4;
     msg->size = size;
     msg->u = u;
+    msg->custom = TRUE;
+    msg->tag = tag;
 
     mrp_list_init(&msg->hook);
     mrp_list_append(&msg_queue, &msg->hook);

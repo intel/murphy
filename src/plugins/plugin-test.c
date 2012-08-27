@@ -669,7 +669,7 @@ static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
             break;
     }
 
-    mrp_free(data);
+    mrp_data_free(data, tag);
 }
 
 
@@ -698,6 +698,8 @@ void signalling_create_ep_cb(mrp_console_t *c, void *user_data,
     int ret, flags;
     char *domains[] = { "domain1" };
 
+    MRP_UNUSED(user_data);
+
     ep_register_t msg;
 
     socklen_t alen;
@@ -709,16 +711,6 @@ void signalling_create_ep_cb(mrp_console_t *c, void *user_data,
     evt.closed = closed_evt;
     evt.recvdata = recv_evt;
     evt.recvdatafrom = recvfrom_evt;
-
-#if 0
-    if (!mrp_msg_register_type(&ep_register_descr) ||
-        !mrp_msg_register_type(&ep_decision_descr) ||
-        !mrp_msg_register_type(&ep_ack_descr) ||
-        !mrp_msg_register_type(&ep_info_descr)) {
-        mrp_console_printf(c, "Error: registering data types failed!\n");
-        return;
-    }
-#endif
 
     flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_MODE_CUSTOM;
 

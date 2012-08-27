@@ -179,6 +179,8 @@ static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
             /* no other messages supported ATM */
             break;
     }
+
+    mrp_data_free(data, tag);
 }
 
 
