@@ -320,6 +320,7 @@ static void delete_io_watch(mrp_io_watch_t *w)
     if (was_master) {
         if (mrp_list_empty(&w->slave)) {
             op = EPOLL_CTL_DEL;
+            mrp_list_append(&ml->deleted, &w->hook);
         }
         else {
             /* relink first slave as new master to mainloop */
