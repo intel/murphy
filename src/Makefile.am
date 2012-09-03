@@ -264,8 +264,7 @@ libmurphy_resolver_ladir =			\
 		$(includedir)/murphy/resolver
 
 libmurphy_resolver_la_HEADERS =			\
-		resolver/resolver.h		\
-		resolver/script.h
+		resolver/resolver.h
 
 SIMPLE_SCRIPT_SOURCES = 					\
 		resolver/scripting/simple/simple-script.c	\
