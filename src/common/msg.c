@@ -58,9 +58,7 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
     uint32_t         size;
     void            *blb;
 
-    if ((f = mrp_allocz(sizeof(*f))) != NULL) {
-        mrp_list_init(&f->hook);
-        type = va_arg(*ap, uint32_t);
+    type = va_arg(*ap, uint32_t);
 
 #define CREATE(_f, _tag, _type, _fldtype, _fld, _last, _errlbl) do {      \
                                                                           \
@@ -68,6 +66,7 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
                               sizeof(_f->_last));                         \
                                                                           \
             if ((_f) != NULL) {                                           \
+                mrp_list_init(&(_f)->hook);                             \
                 (_f)->tag  = _tag;                                        \
                 (_f)->type = _type;                                       \
                 (_f)->_fld = va_arg(*ap, _fldtype);                       \
@@ -110,110 +109,109 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
                 goto _errlbl;                                             \
         } while (0)
 
-        f = NULL;
+    f = NULL;
 
-        switch (type) {
+    switch (type) {
+    case MRP_MSG_FIELD_STRING:
+        CREATE(f, tag, type, char *, str, str, fail);
+        f->str = mrp_strdup(f->str);
+        if (f->str == NULL)
+            goto fail;
+        break;
+    case MRP_MSG_FIELD_BOOL:
+        CREATE(f, tag, type, int, bln, bln, fail);
+        break;
+    case MRP_MSG_FIELD_UINT8:
+        CREATE(f, tag, type, unsigned int, u8, u8, fail);
+        break;
+    case MRP_MSG_FIELD_SINT8:
+        CREATE(f, tag, type, signed int, s8, s8, fail);
+        break;
+    case MRP_MSG_FIELD_UINT16:
+        CREATE(f, tag, type, unsigned int, u16, u16, fail);
+        break;
+    case MRP_MSG_FIELD_SINT16:
+        CREATE(f, tag, type, signed int, s16, s16, fail);
+        break;
+    case MRP_MSG_FIELD_UINT32:
+        CREATE(f, tag, type, unsigned int, u32, u32, fail);
+        break;
+    case MRP_MSG_FIELD_SINT32:
+        CREATE(f, tag, type, signed int, s32, s32, fail);
+        break;
+    case MRP_MSG_FIELD_UINT64:
+        CREATE(f, tag, type, uint64_t, u64, u64, fail);
+        break;
+    case MRP_MSG_FIELD_SINT64:
+        CREATE(f, tag, type, int64_t, s64, s64, fail);
+        break;
+    case MRP_MSG_FIELD_DOUBLE:
+        CREATE(f, tag, type, double, dbl, dbl, fail);
+        break;
+
+    case MRP_MSG_FIELD_BLOB:
+        size = va_arg(*ap, uint32_t);
+        CREATE(f, tag, type, void *, blb, size[0], fail);
+
+        blb        = f->blb;
+        f->size[0] = size;
+        f->blb     = mrp_allocz(size);
+
+        if (f->blb != NULL) {
+            memcpy(f->blb, blb, size);
+            f->size[0] = size;
+        }
+        else
+            goto fail;
+        break;
+
+    default:
+        if (!(type & MRP_MSG_FIELD_ARRAY)) {
+            errno = EINVAL;
+            goto fail;
+        }
+
+        base = type & ~MRP_MSG_FIELD_ARRAY;
+
+        switch (base) {
         case MRP_MSG_FIELD_STRING:
-            CREATE(f, tag, type, char *, str, str, fail);
-            f->str = mrp_strdup(f->str);
-            if (f->str == NULL)
-                goto fail;
+            CREATE_ARRAY(f, tag, base, astr, char *, fail);
             break;
         case MRP_MSG_FIELD_BOOL:
-            CREATE(f, tag, type, int, bln, bln, fail);
+            CREATE_ARRAY(f, tag, base, abln, int, fail);
             break;
         case MRP_MSG_FIELD_UINT8:
-            CREATE(f, tag, type, unsigned int, u8, u8, fail);
+            CREATE_ARRAY(f, tag, base, au8, unsigned int, fail);
             break;
         case MRP_MSG_FIELD_SINT8:
-            CREATE(f, tag, type, signed int, s8, s8, fail);
+            CREATE_ARRAY(f, tag, base, as8, int, fail);
             break;
         case MRP_MSG_FIELD_UINT16:
-            CREATE(f, tag, type, unsigned int, u16, u16, fail);
+            CREATE_ARRAY(f, tag, base, au16, unsigned int, fail);
             break;
         case MRP_MSG_FIELD_SINT16:
-            CREATE(f, tag, type, signed int, s16, s16, fail);
+            CREATE_ARRAY(f, tag, base, as16, int, fail);
             break;
         case MRP_MSG_FIELD_UINT32:
-            CREATE(f, tag, type, unsigned int, u32, u32, fail);
+            CREATE_ARRAY(f, tag, base, au32, unsigned int, fail);
             break;
         case MRP_MSG_FIELD_SINT32:
-            CREATE(f, tag, type, signed int, s32, s32, fail);
+            CREATE_ARRAY(f, tag, base, as32, int, fail);
             break;
         case MRP_MSG_FIELD_UINT64:
-            CREATE(f, tag, type, uint64_t, u64, u64, fail);
+            CREATE_ARRAY(f, tag, base, au64, unsigned long long, fail);
             break;
         case MRP_MSG_FIELD_SINT64:
-            CREATE(f, tag, type, int64_t, s64, s64, fail);
+            CREATE_ARRAY(f, tag, base, as64, long long, fail);
             break;
         case MRP_MSG_FIELD_DOUBLE:
-            CREATE(f, tag, type, double, dbl, dbl, fail);
+            CREATE_ARRAY(f, tag, base, adbl, double, fail);
             break;
-
-        case MRP_MSG_FIELD_BLOB:
-            size = va_arg(*ap, uint32_t);
-            CREATE(f, tag, type, void *, blb, size[0], fail);
-
-            blb        = f->blb;
-            f->size[0] = size;
-            f->blb     = mrp_allocz(size);
-
-            if (f->blb != NULL) {
-                memcpy(f->blb, blb, size);
-                f->size[0] = size;
-            }
-            else
-                goto fail;
-            break;
-
         default:
-            if (!(type & MRP_MSG_FIELD_ARRAY)) {
-                errno = EINVAL;
-                goto fail;
-            }
-
-            base = type & ~MRP_MSG_FIELD_ARRAY;
-
-            switch (base) {
-            case MRP_MSG_FIELD_STRING:
-                CREATE_ARRAY(f, tag, base, astr, char *, fail);
-                break;
-            case MRP_MSG_FIELD_BOOL:
-                CREATE_ARRAY(f, tag, base, abln, int, fail);
-                break;
-            case MRP_MSG_FIELD_UINT8:
-                CREATE_ARRAY(f, tag, base, au8, unsigned int, fail);
-                break;
-            case MRP_MSG_FIELD_SINT8:
-                CREATE_ARRAY(f, tag, base, as8, int, fail);
-                break;
-            case MRP_MSG_FIELD_UINT16:
-                CREATE_ARRAY(f, tag, base, au16, unsigned int, fail);
-                break;
-            case MRP_MSG_FIELD_SINT16:
-                CREATE_ARRAY(f, tag, base, as16, int, fail);
-                break;
-            case MRP_MSG_FIELD_UINT32:
-                CREATE_ARRAY(f, tag, base, au32, unsigned int, fail);
-                break;
-            case MRP_MSG_FIELD_SINT32:
-                CREATE_ARRAY(f, tag, base, as32, int, fail);
-                break;
-            case MRP_MSG_FIELD_UINT64:
-                CREATE_ARRAY(f, tag, base, au64, unsigned long long, fail);
-                break;
-            case MRP_MSG_FIELD_SINT64:
-                CREATE_ARRAY(f, tag, base, as64, long long, fail);
-                break;
-            case MRP_MSG_FIELD_DOUBLE:
-                CREATE_ARRAY(f, tag, base, adbl, double, fail);
-                break;
-            default:
-                errno = EINVAL;
-                goto fail;
-            }
-            break;
+            errno = EINVAL;
+            goto fail;
         }
+        break;
     }
 
     return f;
