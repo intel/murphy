@@ -1,5 +1,6 @@
 {
     global:
+        mrp_compile_script;
         mrp_console_add_core_group;
         mrp_console_add_group;
         mrp_console_del_core_group;
@@ -8,17 +9,38 @@
         mrp_context_create;
         mrp_context_destroy;
         mrp_create_console;
+        mrp_create_context_table;
+        mrp_create_script;
+        mrp_declare_context_variable;
         mrp_destroy_console;
+        mrp_destroy_context_table;
+        mrp_destroy_script;
+        mrp_execute_script;
+        mrp_export_method;
+        mrp_get_context_id;
+        mrp_get_context_value;
+        mrp_get_context_value_by_name;
+        mrp_import_method;
         mrp_load_all_plugins;
         mrp_load_plugin;
+        mrp_lookup_interpreter;
         mrp_plugin_exists;
+        mrp_pop_context_frame;
+        mrp_print_value;
+        mrp_push_context_frame;
         mrp_register_builtin_plugin;
+        mrp_register_interpreter;
+        mrp_release_method;
+        mrp_remove_method;
         mrp_request_plugin;
         mrp_set_console_prompt;
+        mrp_set_context_value;
+        mrp_set_context_value_by_name;
         mrp_start_plugin;
         mrp_start_plugins;
         mrp_stop_plugin;
         mrp_unload_plugin;
+        mrp_unregister_interpreter;
     local:
         *;
 };

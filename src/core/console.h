@@ -132,7 +132,7 @@ struct mrp_console_s {
         if (MRP_UNLIKELY(!__checked)) {                                   \
             __checked = TRUE;                                             \
             if (MRP_UNLIKELY(!__warned &&                                 \
-                             strstr(#__VA_ARGS__, "return") != NULL)) {          \
+                             strstr(#__VA_ARGS__, "return") != NULL)) {   \
                 W("********************* WARNING *********************"); \
                 W("* You seem to directly do a return from a block   *"); \
                 W("* of code protected by MRP_CONSOLE_BUSY. Are      *"); \
