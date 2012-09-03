@@ -297,6 +297,7 @@ typedef enum {                           /* action types */
     ACTION_LOAD,                         /* load a plugin */
     ACTION_TRYLOAD,                      /* load a plugin, ignore errors */
     ACTION_IF,                           /* if-else branch */
+    ACTION_SETCFG,                       /* set a config variable */
     ACTION_INFO,                         /* emit an info message */
     ACTION_WARNING,                      /* emit a warning message */
     ACTION_ERROR,                        /* emit and error message and exit */
@@ -340,6 +341,16 @@ typedef struct {                         /* a branch test action */
     char            *message;            /* message to show */
 } message_action_t;
 
+typedef enum {
+    CFGVAR_UNKNOWN = 0,
+    CFGVAR_RESOLVER_RULES,               /* resolver ruleset file */
+} cfgvar_t;
+
+typedef struct {
+    COMMON_ACTION_FIELDS;
+    cfgvar_t  id;                        /* confguration variable */
+    char     *value;                     /* value for variable */
+} setcfg_action_t;
 
 typedef struct {
     const char   *keyword;
@@ -353,14 +364,17 @@ typedef struct {
 static any_action_t *parse_action(input_t *in, char **args, int narg);
 static any_action_t *parse_load(input_t *in, char **argv, int argc);
 static any_action_t *parse_if_else(input_t *in, char **argv, int argc);
+static any_action_t *parse_setcfg(input_t *in, char **argv, int argc);
 static any_action_t *parse_message(input_t *in, char **argv, int argc);
 static int exec_action(mrp_context_t *ctx, any_action_t *action);
 static int exec_load(mrp_context_t *ctx, any_action_t *action);
 static int exec_if_else(mrp_context_t *ctx, any_action_t *action);
+static int exec_setcfg(mrp_context_t *ctx, any_action_t *action);
 static int exec_message(mrp_context_t *ctx, any_action_t *action);
 static void free_action(any_action_t *action);
 static void free_if_else(any_action_t *action);
 static void free_load(any_action_t *action);
+static void free_setcfg(any_action_t *action);
 static void free_message(any_action_t *action);
 
 static char *get_next_token(input_t *in);
@@ -376,6 +390,7 @@ static action_descr_t actions[] = {
     A(LOAD   , LOAD   , parse_load   , exec_load   , free_load),
     A(TRYLOAD, TRYLOAD, parse_load   , exec_load   , free_load),
     A(IF     , IF     , parse_if_else, exec_if_else, free_if_else),
+    A(SETCFG , SETCFG , parse_setcfg , exec_setcfg , free_setcfg),
     A(INFO   , INFO   , parse_message, exec_message, free_message),
     A(WARNING, WARNING, parse_message, exec_message, free_message),
     A(ERROR  , ERROR  , parse_message, exec_message, free_message),
@@ -768,6 +783,92 @@ static int exec_if_else(mrp_context_t *ctx, any_action_t *action)
     }
 
     return TRUE;
+}
+
+
+static any_action_t *parse_setcfg(input_t *in, char **argv, int argc)
+{
+    setcfg_action_t *action;
+    struct {
+        const char *name;
+        cfgvar_t    id;
+    } *var, vartbl[] = {
+        { MRP_CFGVAR_RESOLVER, CFGVAR_RESOLVER_RULES },
+        { NULL               , 0                     },
+    };
+
+    if (argc < 3) {
+        mrp_log_error("%s:%d: configuration directive %s requires two "
+                      "arguments, %d given.", in->file, in->line,
+                      MRP_KEYWORD_SETCFG, argc - 1);
+        return NULL;
+    }
+
+    for (var = vartbl; var->name != NULL; var++)
+        if (!strcmp(var->name, argv[1]))
+            break;
+
+    if (var->name == NULL) {
+        mrp_log_error("%s:%d: unknown configuration variable '%s'.",
+                      in->file, in->line, argv[1]);
+        return NULL;
+    }
+
+    if ((action = mrp_allocz(sizeof(*action))) == NULL) {
+        mrp_log_error("Failed to allocate %s %s configuration action.",
+                      MRP_KEYWORD_SETCFG, argv[1]);
+        return NULL;
+    }
+
+    mrp_list_init(&action->hook);
+    action->type  = ACTION_SETCFG;
+    action->id    = var->id;
+    action->value = mrp_strdup(argv[2]);
+
+    if (action->value == NULL) {
+        mrp_log_error("Failed to allocate %s %s configuration action.",
+                      MRP_KEYWORD_SETCFG, argv[1]);
+        mrp_free(action);
+        return NULL;
+    }
+
+    return (any_action_t *)action;
+}
+
+
+static int exec_setcfg(mrp_context_t *ctx, any_action_t *action)
+{
+    setcfg_action_t *setcfg = (setcfg_action_t *)action;
+
+    switch (setcfg->id) {
+    case CFGVAR_RESOLVER_RULES:
+        if (ctx->resolver_ruleset == NULL) {
+            ctx->resolver_ruleset = setcfg->value;
+            setcfg->value = NULL;
+            return TRUE;
+        }
+        else {
+            mrp_log_error("Multiple resolver rulesets specified (%s, %s).",
+                          ctx->resolver_ruleset, setcfg->value);
+            return FALSE;
+        }
+        break;
+    default:
+        mrp_log_error("Invalid configuration setting.");
+    }
+
+    return FALSE;
+}
+
+
+static void free_setcfg(any_action_t *action)
+{
+    setcfg_action_t *setcfg = (setcfg_action_t *)action;
+
+    if (setcfg != NULL) {
+        mrp_free(setcfg->value);
+        mrp_free(setcfg);
+    }
 }
 
 

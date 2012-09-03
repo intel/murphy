@@ -27,6 +27,7 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv);
 #define MRP_CFG_MAXLINE 4096             /* input line length limit */
 #define MRP_CFG_MAXARGS   64             /* command argument limit */
 
+/* configuration keywords */
 #define MRP_KEYWORD_LOAD    "load-plugin"
 #define MRP_KEYWORD_TRYLOAD "try-load-plugin"
 #define MRP_KEYWORD_AS      "as"
@@ -34,11 +35,14 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv);
 #define MRP_KEYWORD_ELSE    "else"
 #define MRP_KEYWORD_END     "end"
 #define MRP_KEYWORD_EXISTS  "plugin-exists"
+#define MRP_KEYWORD_SETCFG  "set"
 #define MRP_KEYWORD_ERROR   "error"
 #define MRP_KEYWORD_WARNING "warning"
 #define MRP_KEYWORD_INFO    "info"
 #define MRP_START_COMMENT   '#'
 
+/* known configuration variables for 'set' command */
+#define MRP_CFGVAR_RESOLVER "resolver-ruleset"
 
 typedef struct {
     mrp_list_hook_t actions;
