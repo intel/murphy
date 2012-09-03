@@ -114,12 +114,16 @@ libmurphy_core_la_HEADERS =		\
 		core/context.h		\
 		core/plugin.h		\
 		core/console-command.h	\
-		core/console.h
+		core/console.h		\
+		core/scripting.h	\
+		core/method.h
 
 libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
 		core/plugin.c		\
-		core/console.c
+		core/console.c		\
+		core/scripting.c	\
+		core/method.c
 
 libmurphy_core_la_SOURCES =		\
 		$(libmurphy_core_la_REGULAR_SOURCES) \
@@ -277,8 +281,6 @@ libmurphy_resolver_la_REGULAR_SOURCES =				\
 		resolver/target-sorter.c			\
 		resolver/db.c					\
 		resolver/fact.c					\
-		resolver/script.c				\
-		resolver/context.c                              \
 		$(SIMPLE_SCRIPT_SOURCES)
 
 libmurphy_resolver_la_SOURCES =			\
@@ -292,10 +294,13 @@ libmurphy_resolver_la_LDFLAGS =			\
 		-Wl,-version-script=linker-script.resolver \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_resolver_la_LIBADD =	\
+libmurphy_resolver_la_LIBADD =	    \
+		libmurphy-core.la   \
 		libmurphy-common.la
 
-libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver libmurphy-common.la
+libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver \
+				     libmurphy-core.la      \
+				     libmurphy-common.la
 
 # resolver lexical analyser and parser generation
 RESOLVER_PARSER_PREFIX = yy_res_
