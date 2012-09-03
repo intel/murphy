@@ -1,7 +1,8 @@
 #ifndef __MURPHY_SIMPLE_SCRIPT_H__
 #define __MURPHY_SIMPLE_SCRIPT_H__
 
-#include <murphy/resolver/script.h>
+#include <murphy/core/plugin.h>
+#include <murphy/core/scripting.h>
 
 typedef struct {
     mrp_list_hook_t statements;          /* list of (call) statements */
@@ -30,10 +31,10 @@ typedef struct {
 
 
 typedef struct {
-    arg_type_t                type;      /* ARG_CONTEXT_SET */
-    char                     *name;      /* name of variable */
-    int                       id;        /* variable id */
-    mrp_script_typed_value_t  value;     /* value to set to */
+    arg_type_t          type;            /* ARG_CONTEXT_SET */
+    char               *name;            /* name of variable */
+    int                 id;              /* variable id */
+    mrp_script_value_t  value;           /* value to set to */
 } ctx_set_arg_t;
 
 
@@ -50,6 +51,10 @@ typedef struct {
     arg_t                    *args;      /* arguments to pass */
     int                       narg;      /* number of arguments */
     mrp_list_hook_t           hook;      /* to list of statements */
+
+    int          (*script_ptr)(mrp_plugin_t *plugin, const char *name,
+                               mrp_script_env_t *env);
+    mrp_plugin_t  *plugin;
 } function_call_t;
 
 

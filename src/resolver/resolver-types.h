@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include <murphy/common/hashtbl.h>
-#include <murphy/resolver/script.h>
+#include <murphy/core/scripting.h>
 
 typedef struct target_s target_t;        /* opaque type for resolver targets */
 typedef struct fact_s   fact_t;          /* opaque type for tracked facts */
@@ -13,13 +13,13 @@ typedef struct fact_s   fact_t;          /* opaque type for tracked facts */
  * a resolver target
  */
 struct target_s {
-    char         *name;                  /* target name */
-    uint32_t      stamp;                 /* touch-stamp */
-    char        **depends;               /* dependencies stated in the input */
-    int           ndepend;               /* number of dependencies */
-    int          *update_facts;          /* facts to check when updating */
-    int          *update_targets;        /* targets to check when updating */
-    mrp_script_t *script;                /* update script if any, or NULL */
+    char            *name;               /* target name */
+    uint32_t         stamp;              /* touch-stamp */
+    char           **depends;            /* dependencies stated in the input */
+    int              ndepend;            /* number of dependencies */
+    int             *update_facts;       /* facts to check when updating */
+    int             *update_targets;     /* targets to check when updating */
+    mrp_scriptlet_t *script;             /* update script if any, or NULL */
 };
 
 
@@ -59,21 +59,21 @@ struct context_frame_s {
 };
 
 
-typedef struct {
+struct mrp_context_tbl_s {
     context_var_t   *variables;          /* known/declared context variables */
     int              nvariable;          /* number of variables */
     mrp_htbl_t      *names;              /* variable name to id mapping */
     context_frame_t *frame;              /* active frame */
-} context_tbl_t;
+};
 
 
 struct mrp_resolver_s {
-    target_t      *targets;              /* targets defined in the ruleset */
-    int            ntarget;              /* number of targets */
-    fact_t        *facts;                /* facts tracked as dependencies */
-    int            nfact;                /* number of tracked facts */
-    uint32_t       stamp;                /* update stamp */
-    context_tbl_t *ctbl;                 /* context variable table */
+    target_t          *targets;          /* targets defined in the ruleset */
+    int                ntarget;          /* number of targets */
+    fact_t            *facts;            /* facts tracked as dependencies */
+    int                nfact;            /* number of tracked facts */
+    uint32_t           stamp;            /* update stamp */
+    mrp_context_tbl_t *ctbl;             /* context variable table */
 };
 
 

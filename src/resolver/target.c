@@ -5,12 +5,13 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/list.h>
 
+#include <murphy/core/scripting.h>
+
 #include "resolver-types.h"
 #include "resolver.h"
 #include "db.h"
 #include "fact.h"
 #include "target.h"
-#include "script.h"
 
 
 int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
@@ -39,12 +40,12 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
         pt->ndepend = 0;
 
         if (pt->script_source != NULL) {
-            t->script = create_script(pt->script_type, pt->script_source);
+            t->script = mrp_create_script(pt->script_type, pt->script_source);
 
             if (t->script == NULL) {
                 if (errno == ENOENT)
                     mrp_log_error("Unsupported script type '%s' used in "
-                                  "target '%s'.", t->name, pt->script_type);
+                                  "target '%s'.", pt->script_type, t->name);
                 else
                     mrp_log_error("Failed to set up script for target '%s'.",
                                   t->name);
@@ -78,7 +79,7 @@ void destroy_targets(mrp_resolver_t *r)
             mrp_free(t->depends[j]);
         mrp_free(t->depends);
 
-        destroy_script(t->script);
+        mrp_destroy_script(t->script);
     }
 
     mrp_free(r->targets);
@@ -91,12 +92,9 @@ int compile_target_scripts(mrp_resolver_t *r)
     int       i;
 
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
-        if (t->script != NULL) {
-            if (compile_script(t->script) < 0) {
-                mrp_log_error("Failed to compile script for target '%s'.",
-                              t->name);
-                return -1;
-            }
+        if (mrp_compile_script(t->script) < 0) {
+            mrp_log_error("Failed to compile script for target '%s'.", t->name);
+            return -1;
         }
     }
 
@@ -223,7 +221,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
         /*                              hmm... is this really needed? */
         if (older_than_facts(r, dep) || older_than_targets(r, dep)) {
             needs_update = TRUE;
-            status       = execute_script(r, dep->script);
+            status       = mrp_execute_script(dep->script, r->ctbl);
 
             if (status <= 0)
                 break;
@@ -233,7 +231,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
     }
 
     if (needs_update && status > 0) {
-        status = execute_script(r, t->script);
+        status = mrp_execute_script(t->script, r->ctbl);
 
         if (status > 0)
             t->stamp = r->stamp;

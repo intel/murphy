@@ -2,23 +2,23 @@ target audio_route
     depends on $audio_device_selectable $audio_output_configuration \
                $resource_owner
     update script
-        update_audio_routing()
+        echo('Running audio_route actions...', 3, 2, 1, 0)
     end script
 
 target audio_volume
     depends on $resource_owner $resource_set
     update script
-        update_audio_volume()
+        echo('Running actions for target "audio_volume"...')
     end script
 
 target audio_cork
     depends on $resource_owner
     update script
-        cork_audio_stream('telephony')
+        echo('Running actions for target "audio_cork"...')
     end script
 
 target audio_mute
     depends on $mute
     update script
-        mute_audio_input_devices()
+        echo('Running actions for target "audio_mute"...')
     end script

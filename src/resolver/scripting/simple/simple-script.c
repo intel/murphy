@@ -23,7 +23,7 @@ static void simple_dump(FILE *fp, simple_script_t *ss)
 }
 
 
-static int simple_compile(mrp_script_t *script)
+static int simple_compile(mrp_scriptlet_t *script)
 {
     yy_smpl_parser_t  parser;
     simple_script_t  *ss;
@@ -47,21 +47,29 @@ static int simple_compile(mrp_script_t *script)
 }
 
 
-static int simple_execute(mrp_script_t *s)
+static int simple_execute(mrp_scriptlet_t *s, mrp_context_tbl_t *tbl)
 {
     simple_script_t *ss = s->compiled;
+    mrp_list_hook_t *p, *n;
+    function_call_t *c;
+    int              status;
 
     if (ss != NULL) {
-        printf("----- should execute simple script -----\n");
-        simple_dump(stdout, ss);
-        printf("----------------------------------------\n");
+        mrp_list_foreach(&ss->statements, p, n) {
+            c = mrp_list_entry(p, typeof(*c), hook);
+
+            status = execute_call(c, tbl);
+
+            if (status <= 0)
+                return status;
+        }
     }
 
     return TRUE;
 }
 
 
-static void simple_cleanup(mrp_script_t *s)
+static void simple_cleanup(mrp_scriptlet_t *s)
 {
     MRP_UNUSED(s);
 

@@ -1,4 +1,8 @@
+#include <errno.h>
+
 #include <murphy/common/mm.h>
+#include <murphy/core/plugin.h>       /* XXX TODO, needed for method.h */
+#include <murphy/core/method.h>
 
 #include "call.h"
 
@@ -103,6 +107,76 @@ void destroy_arguments(arg_t *args, int narg)
     }
 
     mrp_free(args);
+}
+
+
+static int resolve_function(function_call_t *c)
+{
+    mrp_plugin_t  *plugin;
+    int          (*script_ptr)(mrp_plugin_t *plugin, const char *name,
+                               mrp_script_env_t *env);
+
+    if (mrp_import_method(c->name, NULL, NULL, &script_ptr, &plugin) < 0)
+        return FALSE;
+    else {
+        c->script_ptr = script_ptr;
+        c->plugin     = plugin;
+
+        return TRUE;
+    }
+}
+
+int execute_call(function_call_t *c, mrp_context_tbl_t *tbl)
+{
+    mrp_script_env_t   env;
+    mrp_script_value_t args[c->narg];
+    arg_t             *a;
+    int                narg, n, status;
+
+    if (MRP_UNLIKELY(c->script_ptr == NULL)) {
+        if (!resolve_function(c))
+            return -ENOENT;
+    }
+
+    mrp_push_context_frame(tbl);
+
+    for (n = narg = 0, a = c->args; n < (int)MRP_ARRAY_SIZE(args); n++, a++) {
+        switch (a->type) {
+        case ARG_CONST_VALUE:
+            args[narg++] = a->cst.value;
+            break;
+        case ARG_CONTEXT_VAR:
+            if (a->val.id <= 0)
+                a->val.id = mrp_get_context_id(tbl, a->val.name);
+            if (mrp_get_context_value(tbl, a->val.id, args + narg) < 0) {
+                status = -ENOENT;
+                goto pop_frame;
+            }
+            narg++;
+            break;
+        case ARG_CONTEXT_SET:
+            if (a->set.id <= 0)
+                a->set.id = mrp_get_context_id(tbl, a->set.name);
+            if (mrp_set_context_value(tbl, a->set.id, &a->set.value) < 0) {
+                status = -errno;
+                goto pop_frame;
+            }
+        default:
+            status = -EINVAL;
+            goto pop_frame;
+        }
+    }
+
+    env.args = args;
+    env.narg = narg;
+    env.ctbl = tbl;
+
+    status = c->script_ptr(c->plugin, c->name, &env);
+
+ pop_frame:
+    mrp_pop_context_frame(tbl);
+
+    return status;
 }
 
 

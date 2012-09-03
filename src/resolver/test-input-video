@@ -1,5 +1,5 @@
 target video_route
     depends on $video_device_selectable $gconf
     update script
-        prolog('set_video_routes')
+        echo('Running actions for target "video_route"...')
     end script

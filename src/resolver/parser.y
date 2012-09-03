@@ -131,7 +131,7 @@ optional_script:
     $$.source = NULL;
   }
 | KEY_UPDATE_SCRIPT script_source KEY_END_SCRIPT {
-    $$.type   = "default";
+    $$.type   = "simple"; /* "default"; */
     $$.source = $2.value;
   }
 ;

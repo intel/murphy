@@ -10,7 +10,6 @@
 #include "target.h"
 #include "target-sorter.h"
 #include "fact.h"
-#include "context.h"
 #include "resolver.h"
 
 mrp_resolver_t *mrp_resolver_parse(const char *path)
@@ -26,7 +25,7 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
             if (create_targets(r, &parser) == 0 &&
                 sort_targets(r)            == 0 &&
                 compile_target_scripts(r)  == 0 &&
-                init_context_table(r)      == 0) {
+                (r->ctbl = mrp_create_context_table()) != NULL) {
                 parser_cleanup(&parser);
                 return r;
             }
@@ -45,7 +44,7 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
 void mrp_resolver_cleanup(mrp_resolver_t *r)
 {
     if (r != NULL) {
-        cleanup_context_table(r);
+        mrp_destroy_context_table(r->ctbl);
         destroy_targets(r);
         destroy_facts(r);
 
@@ -61,10 +60,10 @@ int mrp_resolver_update_targetl(mrp_resolver_t *r, const char *target, ...)
     va_list             ap;
     int                 id, status;
 
-    if (push_context_frame(r) == 0) {
+    if (mrp_push_context_frame(r->ctbl) == 0) {
         va_start(ap, target);
         while ((name = va_arg(ap, char *)) != NULL) {
-            id = get_context_id(r, name);
+            id = mrp_get_context_id(r->ctbl, name);
 
             if (id > 0) {
                 value.type = va_arg(ap, int);
@@ -94,7 +93,7 @@ int mrp_resolver_update_targetl(mrp_resolver_t *r, const char *target, ...)
                 }
 #undef          HANDLE_TYPE
 
-                if (set_context_value(r, id, &value) < 0) {
+                if (mrp_set_context_value(r->ctbl, id, &value) < 0) {
                     status = -1;
                     goto pop_frame;
                 }
@@ -109,7 +108,7 @@ int mrp_resolver_update_targetl(mrp_resolver_t *r, const char *target, ...)
         status = update_target_by_name(r, target);
 
     pop_frame:
-        pop_context_frame(r);
+        mrp_pop_context_frame(r->ctbl);
         va_end(ap);
     }
     else
@@ -128,14 +127,14 @@ int mrp_resolver_update_targetv(mrp_resolver_t *r, const char *target,
     mrp_script_value_t *value;
     int                 id, i, status;
 
-    if (push_context_frame(r) == 0) {
+    if (mrp_push_context_frame(r->ctbl) == 0) {
         for (i = 0; i < nvariable; i++) {
             name  = variables[i];
             value = values + i;
-            id    = get_context_id(r, name);
+            id    = mrp_get_context_id(r->ctbl, name);
 
             if (id > 0) {
-                if (set_context_value(r, id, value) < 0) {
+                if (mrp_set_context_value(r->ctbl, id, value) < 0) {
                     status = -1;
                     goto pop_frame;
                 }
@@ -150,7 +149,7 @@ int mrp_resolver_update_targetv(mrp_resolver_t *r, const char *target,
         status = update_target_by_name(r, target);
 
     pop_frame:
-        pop_context_frame(r);
+        mrp_pop_context_frame(r->ctbl);
     }
     else
         status = -1;
@@ -180,42 +179,31 @@ void mrp_resolver_dump_facts(mrp_resolver_t *r, FILE *fp)
 
 int mrp_resolver_register_interpreter(mrp_interpreter_t *i)
 {
-    return register_interpreter(i);
+    return mrp_register_interpreter(i);
 }
 
 
 int mrp_resolver_unregister_interpreter(const char *name)
 {
-    mrp_interpreter_t *i;
-
-    i = lookup_interpreter(name);
-
-    if (i != NULL) {
-        unregister_interpreter(i);
-
-        return TRUE;
-    }
-    else
-        return FALSE;
-
+    return mrp_unregister_interpreter(name);
 }
 
 
 int mrp_resolver_declare_variable(mrp_resolver_t *r, const char *name,
                                   mrp_script_type_t type)
 {
-    return declare_context_variable(r, name, type);
+    return mrp_declare_context_variable(r->ctbl, name, type);
 }
 
 
 int mrp_resolver_get_value(mrp_resolver_t *r, int id, mrp_script_value_t *v)
 {
-    return get_context_value(r, id, v);
+    return mrp_get_context_value(r->ctbl, id, v);
 }
 
 
 int mrp_resolver_get_value_by_name(mrp_resolver_t *r, const char *name,
                                    mrp_script_value_t *v)
 {
-    return get_context_value(r, get_context_id(r, name), v);
+    return mrp_get_context_value(r->ctbl, mrp_get_context_id(r->ctbl, name), v);
 }
