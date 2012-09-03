@@ -46,31 +46,94 @@ static mrp_debug_file_t file_1 = {
     .info = info_1
 };
 
-/* core/plugin.c */
+/* core/method.c */
 static mrp_debug_info_t info_2[] = {
-    { .line = 26, .func = "mrp_register_builtin_plugin" },
-    { .line = 48, .func = "mrp_plugin_exists" },
-    { .line = 66, .func = "check_plugin_version" },
-    { .line = 84, .func = "check_plugin_singleton" },
-    { .line = 96, .func = "mrp_load_plugin" },
-    { .line = 216, .func = "load_plugin_cb" },
-    { .line = 238, .func = "mrp_load_all_plugins" },
-    { .line = 260, .func = "mrp_request_plugin" },
-    { .line = 277, .func = "mrp_unload_plugin" },
-    { .line = 323, .func = "mrp_start_plugins" },
-    { .line = 347, .func = "mrp_start_plugin" },
-    { .line = 356, .func = "mrp_stop_plugin" },
-    { .line = 373, .func = "find_plugin_instance" },
-    { .line = 390, .func = "find_plugin" },
-    { .line = 406, .func = "open_dynamic" },
-    { .line = 451, .func = "open_builtin" },
-    { .line = 467, .func = "parse_plugin_arg" },
-    { .line = 517, .func = "parse_plugin_args" },
+    { .line = 32, .func = "create_method_table" },
+    { .line = 50, .func = "destroy_method_table" },
+    { .line = 57, .func = "free_method" },
+    { .line = 67, .func = "alloc_method" },
+    { .line = 94, .func = "create_method_list" },
+    { .line = 122, .func = "free_method_list" },
+    { .line = 141, .func = "purge_method_list" },
+    { .line = 149, .func = "lookup_method_list" },
+    { .line = 162, .func = "check_signatures" },
+    { .line = 173, .func = "lookup_method" },
+    { .line = 203, .func = "find_method" },
+    { .line = 248, .func = "export_method" },
+    { .line = 268, .func = "remove_method" },
+    { .line = 293, .func = "mrp_export_method" },
+    { .line = 326, .func = "mrp_remove_method" },
+    { .line = 334, .func = "mrp_import_method" },
+    { .line = 374, .func = "mrp_release_method" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_2 = {
-    .file = "core/plugin.c",
+    .file = "core/method.c",
     .info = info_2
+};
+
+/* core/plugin.c */
+static mrp_debug_info_t info_3[] = {
+    { .line = 30, .func = "mrp_register_builtin_plugin" },
+    { .line = 52, .func = "mrp_plugin_exists" },
+    { .line = 70, .func = "check_plugin_version" },
+    { .line = 88, .func = "check_plugin_singleton" },
+    { .line = 100, .func = "mrp_load_plugin" },
+    { .line = 224, .func = "load_plugin_cb" },
+    { .line = 246, .func = "mrp_load_all_plugins" },
+    { .line = 268, .func = "mrp_request_plugin" },
+    { .line = 285, .func = "mrp_unload_plugin" },
+    { .line = 334, .func = "mrp_start_plugins" },
+    { .line = 365, .func = "mrp_start_plugin" },
+    { .line = 374, .func = "mrp_stop_plugin" },
+    { .line = 391, .func = "find_plugin_instance" },
+    { .line = 408, .func = "find_plugin" },
+    { .line = 424, .func = "open_dynamic" },
+    { .line = 469, .func = "open_builtin" },
+    { .line = 485, .func = "parse_plugin_arg" },
+    { .line = 535, .func = "parse_plugin_args" },
+    { .line = 592, .func = "export_plugin_methods" },
+    { .line = 610, .func = "remove_plugin_methods" },
+    { .line = 629, .func = "import_plugin_methods" },
+    { .line = 647, .func = "release_plugin_methods" },
+    { .line = 0, .func = NULL }
+};
+static mrp_debug_file_t file_3 = {
+    .file = "core/plugin.c",
+    .info = info_3
+};
+
+/* core/scripting.c */
+static mrp_debug_info_t info_4[] = {
+    { .line = 62, .func = "mrp_register_interpreter" },
+    { .line = 70, .func = "unregister_interpreter" },
+    { .line = 76, .func = "mrp_unregister_interpreter" },
+    { .line = 93, .func = "mrp_lookup_interpreter" },
+    { .line = 108, .func = "mrp_create_script" },
+    { .line = 138, .func = "mrp_destroy_script" },
+    { .line = 149, .func = "mrp_compile_script" },
+    { .line = 158, .func = "mrp_execute_script" },
+    { .line = 167, .func = "mrp_print_value" },
+    { .line = 197, .func = "mrp_create_context_table" },
+    { .line = 223, .func = "mrp_destroy_context_table" },
+    { .line = 235, .func = "lookup_context_var" },
+    { .line = 249, .func = "mrp_declare_context_variable" },
+    { .line = 294, .func = "mrp_push_context_frame" },
+    { .line = 314, .func = "mrp_pop_context_frame" },
+    { .line = 346, .func = "get_context_id" },
+    { .line = 352, .func = "get_context_value" },
+    { .line = 375, .func = "set_context_value" },
+    { .line = 422, .func = "set_context_values" },
+    { .line = 436, .func = "mrp_get_context_id" },
+    { .line = 448, .func = "mrp_get_context_value" },
+    { .line = 455, .func = "mrp_set_context_value" },
+    { .line = 462, .func = "mrp_get_context_value_by_name" },
+    { .line = 469, .func = "mrp_set_context_value_by_name" },
+    { .line = 0, .func = NULL }
+};
+static mrp_debug_file_t file_4 = {
+    .file = "core/scripting.c",
+    .info = info_4
 };
 
 /* table of all files */
@@ -78,8 +141,9 @@ static mrp_debug_file_t *debug_files[] = {
     &file_0,
     &file_1,
     &file_2,
+    &file_3,
+    &file_4,
     NULL
 };
-
 
 #include <murphy/common/debug-auto-register.c>

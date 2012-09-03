@@ -29,5 +29,4 @@ static mrp_debug_file_t *debug_files[] = {
     NULL
 };
 
-
 #include <murphy/common/debug-auto-register.c>
