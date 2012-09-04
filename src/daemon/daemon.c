@@ -7,7 +7,34 @@
 #include <murphy/common/utils.h>
 #include <murphy/core/context.h>
 #include <murphy/core/plugin.h>
+#include <murphy/core/event.h>
 #include <murphy/daemon/config.h>
+#include <murphy/daemon/daemon.h>
+
+
+/*
+ * daemon-related events
+ */
+
+enum {
+    DAEMON_EVENT_LOADING  = 0,           /* daemon loading configuration */
+    DAEMON_EVENT_STARTING,               /* daemon starting plugins */
+    DAEMON_EVENT_RUNNING,                /* daemon entering mainloop */
+    DAEMON_EVENT_STOPPING                /* daemon shutting down */
+};
+
+
+MRP_REGISTER_EVENTS(events,
+                    { MRP_DAEMON_LOADING , DAEMON_EVENT_LOADING  },
+                    { MRP_DAEMON_STARTING, DAEMON_EVENT_STARTING },
+                    { MRP_DAEMON_RUNNING , DAEMON_EVENT_RUNNING  },
+                    { MRP_DAEMON_STOPPING, DAEMON_EVENT_STOPPING });
+
+
+static int emit_daemon_event(int idx)
+{
+    return mrp_emit_event(events[idx].id, MRP_MSG_END);
+}
 
 
 static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
@@ -51,6 +78,8 @@ int main(int argc, char *argv[])
         mrp_log_set_mask(ctx->log_mask);
         mrp_log_set_target(ctx->log_target);
 
+        emit_daemon_event(DAEMON_EVENT_LOADING);
+
         cfg = mrp_parse_cfgfile(ctx->config_file);
 
         if (cfg == NULL) {
@@ -64,6 +93,8 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
+        emit_daemon_event(DAEMON_EVENT_STARTING);
+
         if (!mrp_start_plugins(ctx))
             exit(1);
 
@@ -72,7 +103,11 @@ int main(int argc, char *argv[])
                 exit(1);
         }
 
+        emit_daemon_event(DAEMON_EVENT_RUNNING);
+
         mrp_mainloop_run(ctx->ml);
+
+        emit_daemon_event(DAEMON_EVENT_STOPPING);
 
         mrp_log_info("Exiting...");
         mrp_context_destroy(ctx);

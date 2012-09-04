@@ -70,6 +70,7 @@
         mrp_msgbuf_reserve;
         mrp_msgbuf_write;
         mrp_msg_create;
+        mrp_msg_createv;
         mrp_msg_default_decode;
         mrp_msg_default_encode;
         mrp_msg_dump;

@@ -24,6 +24,26 @@ typedef struct mrp_plugin_s mrp_plugin_t;
 
 
 /*
+ * names of plugin-related events we emit
+ */
+
+#define MRP_PLUGIN_EVENT_LOADED   "plugin-loaded"
+#define MRP_PLUGIN_EVENT_STARTED  "plugin-started"
+#define MRP_PLUGIN_EVENT_FAILED   "plugin-failed"
+#define MRP_PLUGIN_EVENT_STOPPING "plugin-stopping"
+#define MRP_PLUGIN_EVENT_STOPPED  "plugin-stopped"
+#define MRP_PLUGIN_EVENT_UNLOADED "plugin-unloaded"
+
+
+/*
+ * event message data tags
+ */
+
+#define MRP_PLUGIN_TAG_PLUGIN     ((uint16_t)1)  /* plugin name string */
+#define MRP_PLUGIN_TAG_INSTANCE   ((uint16_t)2)  /* plugin instance string */
+
+
+/*
  * plugin arguments
  */
 

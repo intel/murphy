@@ -1,6 +1,14 @@
 #include <murphy/common/macros.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
+#include <murphy/core/event.h>
+
+
+typedef struct {
+    mrp_event_watch_t *w;
+} test_data_t;
+
+
 
 enum {
     ARG_STRING1,
@@ -280,9 +288,52 @@ int test_imports(void)
 }
 
 
+static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
+                     void *user_data)
+{
+    mrp_plugin_t *plugin = (mrp_plugin_t *)user_data;
+
+    MRP_UNUSED(w);
+
+    mrp_log_info("%s: got event 0x%x (%s):", plugin->instance, id,
+                 mrp_get_event_name(id));
+    mrp_msg_dump(event_data, stdout);
+}
+
+
+static int subscribe_events(mrp_plugin_t *plugin)
+{
+    test_data_t      *data = (test_data_t *)plugin->data;
+    mrp_event_mask_t  events;
+
+    mrp_set_named_events(&events,
+                         MRP_PLUGIN_EVENT_LOADED,
+                         MRP_PLUGIN_EVENT_STARTED,
+                         MRP_PLUGIN_EVENT_FAILED,
+                         MRP_PLUGIN_EVENT_STOPPING,
+                         MRP_PLUGIN_EVENT_STOPPED,
+                         MRP_PLUGIN_EVENT_UNLOADED,
+                         NULL);
+
+    data->w = mrp_add_event_watch(&events, event_cb, plugin);
+
+    return (data->w != NULL);
+}
+
+
+static void unsubscribe_events(mrp_plugin_t *plugin)
+{
+    test_data_t *data = (test_data_t *)plugin->data;
+
+    mrp_del_event_watch(data->w);
+    data->w = NULL;
+}
+
+
 static int test_init(mrp_plugin_t *plugin)
 {
     mrp_plugin_arg_t *args;
+    test_data_t      *data;
 
     mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
                  plugin->instance);
@@ -306,8 +357,19 @@ static int test_init(mrp_plugin_t *plugin)
         return FALSE;
 #endif
 
+    data = mrp_allocz(sizeof(*data));
+
+    if (data == NULL) {
+        mrp_log_error("Failed to allocate private data for test plugin "
+                      "instance %s.", plugin->instance);
+        return FALSE;
+    }
+    else
+        plugin->data = data;
+
     test_imports();
 
+    subscribe_events(plugin);
 
     return !args[ARG_FAILINIT].bln;
 }
@@ -317,6 +379,8 @@ static void test_exit(mrp_plugin_t *plugin)
 {
     mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
                  plugin->instance);
+
+    unsubscribe_events(plugin);
 
 #if 0
     release_methods(plugin);

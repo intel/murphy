@@ -1,12 +1,15 @@
 #include <unistd.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include <murphy/common/list.h>
 #include <murphy/common/file-utils.h>
+#include <murphy/core/event.h>
 #include <murphy/core/plugin.h>
+
 
 #define PLUGIN_PREFIX "plugin-"
 
@@ -23,8 +26,51 @@ static int remove_plugin_methods(mrp_plugin_t *plugin);
 static int import_plugin_methods(mrp_plugin_t *plugin);
 static int release_plugin_methods(mrp_plugin_t *plugin);
 
-static MRP_LIST_HOOK(builtin_plugins);    /* list of built-in plugins */
 
+/*
+ * list of built-in in plugins
+ *
+ * Descriptors of built-in plugins, ie. plugins that are linked to
+ * the daemon, get collected to this list during startup.
+ */
+
+static MRP_LIST_HOOK(builtin_plugins);
+
+
+/*
+ * plugin-related events
+ */
+
+enum {
+    PLUGIN_EVENT_LOADED = 0,             /* plugin has been loaded */
+    PLUGIN_EVENT_STARTED,                /* plugin has been started */
+    PLUGIN_EVENT_FAILED,                 /* plugin failed to start */
+    PLUGIN_EVENT_STOPPING,               /* plugin being stopped */
+    PLUGIN_EVENT_STOPPED,                /* plugin has been stopped */
+    PLUGIN_EVENT_UNLOADED,               /* plugin has been unloaded */
+    PLUGIN_EVENT_MAX,
+};
+
+
+MRP_REGISTER_EVENTS(events,
+                    { MRP_PLUGIN_EVENT_LOADED  , PLUGIN_EVENT_LOADED   },
+                    { MRP_PLUGIN_EVENT_STARTED , PLUGIN_EVENT_STARTED  },
+                    { MRP_PLUGIN_EVENT_FAILED  , PLUGIN_EVENT_FAILED   },
+                    { MRP_PLUGIN_EVENT_STOPPING, PLUGIN_EVENT_STOPPING },
+                    { MRP_PLUGIN_EVENT_STOPPED , PLUGIN_EVENT_STOPPED  },
+                    { MRP_PLUGIN_EVENT_UNLOADED, PLUGIN_EVENT_UNLOADED });
+
+
+static int emit_plugin_event(int idx, mrp_plugin_t *plugin)
+{
+    uint16_t name = MRP_PLUGIN_TAG_PLUGIN;
+    uint16_t inst = MRP_PLUGIN_TAG_INSTANCE;
+
+    return mrp_emit_event(events[idx].id,
+                          MRP_MSG_TAG_STRING(name, plugin->descriptor->name),
+                          MRP_MSG_TAG_STRING(inst, plugin->instance),
+                          MRP_MSG_END);
+}
 
 
 int mrp_register_builtin_plugin(mrp_plugin_descr_t *descriptor)
@@ -209,6 +255,8 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 
         mrp_list_append(&ctx->plugins, &plugin->hook);
 
+        emit_plugin_event(PLUGIN_EVENT_LOADED, plugin);
+
         return plugin;
     }
     else {
@@ -304,6 +352,8 @@ int mrp_unload_plugin(mrp_plugin_t *plugin)
 
             plugin->descriptor->ninstance--;
 
+            emit_plugin_event(PLUGIN_EVENT_UNLOADED, plugin);
+
             if (plugin->handle != NULL)
                 dlclose(plugin->handle);
 
@@ -349,6 +399,9 @@ int mrp_start_plugins(mrp_context_t *ctx)
         if (!mrp_start_plugin(plugin)) {
             mrp_log_error("Failed to start plugin %s (%s).",
                           plugin->instance, plugin->descriptor->name);
+
+            emit_plugin_event(PLUGIN_EVENT_FAILED, plugin);
+
             if (!plugin->may_fail)
                 return FALSE;
             else {
@@ -356,6 +409,8 @@ int mrp_start_plugins(mrp_context_t *ctx)
                 mrp_unload_plugin(plugin);
             }
         }
+        else
+            emit_plugin_event(PLUGIN_EVENT_STARTED, plugin);
     }
 
     return TRUE;
@@ -375,8 +430,10 @@ int mrp_stop_plugin(mrp_plugin_t *plugin)
 {
     if (plugin != NULL) {
         if (plugin->refcnt <= 1) {
+            emit_plugin_event(PLUGIN_EVENT_STOPPING, plugin);
             plugin->descriptor->exit(plugin);
             plugin->refcnt = 0;
+            emit_plugin_event(PLUGIN_EVENT_STOPPED, plugin);
 
             return TRUE;
         }

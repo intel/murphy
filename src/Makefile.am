@@ -116,14 +116,16 @@ libmurphy_core_la_HEADERS =		\
 		core/console-command.h	\
 		core/console.h		\
 		core/scripting.h	\
-		core/method.h
+		core/method.h		\
+		core/event.h
 
 libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
 		core/plugin.c		\
 		core/console.c		\
 		core/scripting.c	\
-		core/method.c
+		core/method.c		\
+		core/event.c
 
 libmurphy_core_la_SOURCES =		\
 		$(libmurphy_core_la_REGULAR_SOURCES) \

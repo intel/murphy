@@ -1,5 +1,6 @@
 {
     global:
+        mrp_add_event_watch;
         mrp_compile_script;
         mrp_console_add_core_group;
         mrp_console_add_group;
@@ -12,14 +13,19 @@
         mrp_create_context_table;
         mrp_create_script;
         mrp_declare_context_variable;
+        mrp_del_event_watch;
         mrp_destroy_console;
         mrp_destroy_context_table;
         mrp_destroy_script;
+        mrp_emit_event;
+        mrp_emit_event_msg;
         mrp_execute_script;
         mrp_export_method;
         mrp_get_context_id;
         mrp_get_context_value;
         mrp_get_context_value_by_name;
+        mrp_get_event_id;
+        mrp_get_event_name;
         mrp_import_method;
         mrp_load_all_plugins;
         mrp_load_plugin;
@@ -36,6 +42,8 @@
         mrp_set_console_prompt;
         mrp_set_context_value;
         mrp_set_context_value_by_name;
+        mrp_set_events;
+        mrp_set_named_events;
         mrp_start_plugin;
         mrp_start_plugins;
         mrp_stop_plugin;
