@@ -112,6 +112,22 @@ static inline void mrp_list_move(mrp_list_hook_t *new_hook,
 }
 
 
+/** Update a list when the address of a hook has changed (eg. by realloc). */
+static inline void mrp_list_update_address(mrp_list_hook_t *new_addr,
+                                           mrp_list_hook_t *old_addr)
+{
+    mrp_list_hook_t *prev, *next;
+    ptrdiff_t        diff;
+
+    diff = new_addr - old_addr;
+    prev = new_addr->prev;
+    next = new_addr->next;
+
+    prev->next += diff;
+    next->prev += diff;
+}
+
+
 /** Macro to iterate through a list (current item safe to remove). */
 #define mrp_list_foreach(list, p, n)                                      \
     if ((list)->next != NULL)                                             \
