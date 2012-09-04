@@ -10,6 +10,7 @@
 #include <murphy/common/refcnt.h>
 
 
+
 /*
  * message field types
  */
@@ -35,10 +36,51 @@ typedef enum {
     MRP_MSG_FIELD_BLOB    = 0x0c,        /* a blob (not allowed in arrays) */
     MRP_MSG_FIELD_MAX     = 0x0c,
     MRP_MSG_FIELD_ARRAY   = 0x80,        /* bit-mask to mark arrays */
+    MRP_MSG_END           = MRP_MSG_FIELD_INVALID
 } mrp_msg_field_type_t;
 #undef A
 
 #define MRP_MSG_FIELD_ARRAY_OF(t) (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##t)
+
+#define MRP_MSG_TAG_STRING(tag, arg) (tag), MRP_MSG_FIELD_STRING, (arg)
+#define MRP_MSG_TAG_BOOL(tag, arg)   (tag), MRP_MSG_FIELD_BOOL  , (arg)
+#define MRP_MSG_TAG_UINT8(tag, arg)  (tag), MRP_MSG_FIELD_UINT8 , (arg)
+#define MRP_MSG_TAG_SINT8(tag, arg)  (tag), MRP_MSG_FIELD_SINT8 , (arg)
+#define MRP_MSG_TAG_UINT16(tag, arg) (tag), MRP_MSG_FIELD_UINT16, (arg)
+#define MRP_MSG_TAG_SINT16(tag, arg) (tag), MRP_MSG_FIELD_SINT16, (arg)
+#define MRP_MSG_TAG_UINT32(tag, arg) (tag), MRP_MSG_FIELD_UINT32, (arg)
+#define MRP_MSG_TAG_SINT32(tag, arg) (tag), MRP_MSG_FIELD_SINT32, (arg)
+#define MRP_MSG_TAG_UINT64(tag, arg) (tag), MRP_MSG_FIELD_UINT64, (arg)
+#define MRP_MSG_TAG_SINT64(tag, arg) (tag), MRP_MSG_FIELD_SINT64, (arg)
+#define MRP_MSG_TAG_DOUBLE(tag, arg) (tag), MRP_MSG_FIELD_DOUBLE, (arg)
+#define MRP_MSG_TAG_BLOB(tag, arg)   (tag), MRP_MSG_FIELD_BLOB  , (arg)
+
+#define MRP_MSG_TAG_ARRAY(tag, type, cnt, arr)                        \
+    ((tag), MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##type, (cnt), (arr))
+#define MRP_MSG_TAG_STRING_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), STRING, (cnt), (arr))
+#define MRP_MSG_TAG_BOOL_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), BOOL, (cnt), (arr))
+#define MRP_MSG_TAG_UINT8_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), UINT8, (cnt), (arr))
+#define MRP_MSG_TAG_SINT8_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), SINT8, (cnt), (arr))
+#define MRP_MSG_TAG_UINT16_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), UINT16, (cnt), (arr))
+#define MRP_MSG_TAG_SINT16_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), SINT16, (cnt), (arr))
+#define MRP_MSG_TAG_UINT32_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), UINT32, (cnt), (arr))
+#define MRP_MSG_TAG_SINT32_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), SINT32, (cnt), (arr))
+#define MRP_MSG_TAG_UINT64_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), UINT64, (cnt), (arr))
+#define MRP_MSG_TAG_SINT64_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), SINT64, (cnt), (arr))
+#define MRP_MSG_TAG_DOUBLE_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), DOUBLE, (cnt), (arr))
+#define MRP_MSG_TAG_BLOB_ARRAY(tag, cnt, arr) \
+    MRP_MSG_TAG_ARRAY((tag), BLOB, (cnt), (arr))
 
 /** Sentinel to pass in as the last argument to mrp_msg_create. */
 #define MRP_MSG_FIELD_END NULL
@@ -109,6 +151,9 @@ typedef struct {
 
 /** Create a new message. */
 mrp_msg_t *mrp_msg_create(uint16_t tag, ...) MRP_NULLTERM;
+
+/** Create a new message. */
+mrp_msg_t *mrp_msg_createv(uint16_t tag, va_list ap);
 
 /** Macro to create an empty message. */
 #define mrp_msg_create_empty() mrp_msg_create(MRP_MSG_FIELD_INVALID, NULL)

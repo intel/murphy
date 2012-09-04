@@ -241,19 +241,19 @@ static void msg_destroy(mrp_msg_t *msg)
 }
 
 
-mrp_msg_t *mrp_msg_create(uint16_t tag, ...)
+mrp_msg_t *mrp_msg_createv(uint16_t tag, va_list ap)
 {
     mrp_msg_t       *msg;
     mrp_msg_field_t *f;
-    va_list          ap;
+    va_list          aq;
 
-    va_start(ap, tag);
+    va_copy(aq, ap);
     if ((msg = mrp_allocz(sizeof(*msg))) != NULL) {
         mrp_list_init(&msg->fields);
-        msg->refcnt = 1;
+        mrp_refcnt_init(&msg->refcnt);
 
         while (tag != MRP_MSG_FIELD_INVALID) {
-            f = create_field(tag, &ap);
+            f = create_field(tag, &aq);
 
             if (f != NULL) {
                 mrp_list_append(&msg->fields, &f->hook);
@@ -264,10 +264,23 @@ mrp_msg_t *mrp_msg_create(uint16_t tag, ...)
                 msg = NULL;
                 goto out;
             }
-            tag = va_arg(ap, uint32_t);
+            tag = va_arg(aq, uint32_t);
         }
     }
  out:
+    va_end(aq);
+
+    return msg;
+}
+
+
+mrp_msg_t *mrp_msg_create(uint16_t tag, ...)
+{
+    mrp_msg_t *msg;
+    va_list    ap;
+
+    va_start(ap, tag);
+    msg = mrp_msg_createv(tag, ap);
     va_end(ap);
 
     return msg;
@@ -276,21 +289,14 @@ mrp_msg_t *mrp_msg_create(uint16_t tag, ...)
 
 mrp_msg_t *mrp_msg_ref(mrp_msg_t *msg)
 {
-    if (msg != NULL)
-        msg->refcnt++;
-
-    return msg;
+    return mrp_ref_obj(msg, refcnt);
 }
 
 
 void mrp_msg_unref(mrp_msg_t *msg)
 {
-    if (msg != NULL) {
-        msg->refcnt--;
-
-        if (msg->refcnt <= 0)
+    if (mrp_unref_obj(msg, refcnt))
             msg_destroy(msg);
-    }
 }
 
 
@@ -408,6 +414,9 @@ int mrp_msg_dump(mrp_msg_t *msg, FILE *fp)
     uint32_t         i;
     uint16_t         base;
     const char      *tname;
+
+    if (msg == NULL)
+        return fprintf(fp, "{\n    <no message>\n}\n");
 
     l = fprintf(fp, "{\n");
     mrp_list_foreach(&msg->fields, p, n) {
