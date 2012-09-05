@@ -5,7 +5,6 @@
 #include <getopt.h>
 
 #include <murphy/common.h>
-#include <murphy/core/plugin.h>          /* XXX TODO, needed before method.h */
 #include <murphy/core/method.h>
 #include <murphy/resolver/resolver.h>
 

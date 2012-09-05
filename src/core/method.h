@@ -1,6 +1,8 @@
 #ifndef __MURPHY_CORE_METHOD_H__
 #define __MURPHY_CORE_METHOD_H__
 
+typedef struct mrp_method_descr_s mrp_method_descr_t;
+
 #include <murphy/core/plugin.h>
 #include <murphy/core/scripting.h>
 
@@ -18,9 +20,9 @@
                               mrp_script_env_t *env);                        \
     mrp_plugin_t *plugin                 /* exporting plugin (or NULL) */    \
 
-typedef struct {
+struct mrp_method_descr_s {
     __MRP_METHOD_FIELDS(const);
-} mrp_method_descr_t;
+};
 
 
 /*
