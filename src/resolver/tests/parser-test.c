@@ -123,47 +123,6 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
 }
 
 
-static int echo_function(mrp_plugin_t *plugin, const char *name,
-                         mrp_script_env_t *env)
-{
-    mrp_script_value_t *arg;
-    int                 i;
-    char                buf[512], *t;
-
-    MRP_UNUSED(plugin);
-    MRP_UNUSED(name);
-
-    for (i = 0, arg = env->args, t = ""; i < env->narg; i++, arg++, t=" ")
-        printf("%s%s", t, mrp_print_value(buf, sizeof(buf), arg));
-
-    printf("\n");
-
-    return TRUE;
-}
-
-
-void export_test_functions(void)
-{
-    mrp_method_descr_t methods[] = {
-        {
-            .name       = "echo",
-            .signature  = NULL  ,
-            .native_ptr = NULL  ,
-            .script_ptr = echo_function,
-            .plugin     = NULL
-        },
-        { NULL, NULL, NULL, NULL, NULL }
-    }, *m;
-
-    for (m = methods; m->name != NULL; m++) {
-        if (mrp_export_method(m) < 0) {
-            mrp_log_error("Failed to export function '%s'.", m->name);
-            exit(1);
-        }
-    }
-}
-
-
 int main(int argc, char *argv[])
 {
     context_t  c;
@@ -184,8 +143,6 @@ int main(int argc, char *argv[])
     if (c.r == NULL)
         mrp_log_error("Failed to parse input file '%s'.", c.file);
     else {
-        export_test_functions();
-
         mrp_log_info("Input file '%s' parsed successfully.", c.file);
         mrp_resolver_dump_targets(c.r, stdout);
         mrp_resolver_dump_facts(c.r, stdout);

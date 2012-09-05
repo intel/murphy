@@ -6,6 +6,7 @@
 #include <murphy/resolver/resolver.h>
 #include "simple-parser-api.h"
 #include "call.h"
+#include "builtins.h"
 
 
 static void simple_dump(FILE *fp, simple_script_t *ss)
@@ -25,8 +26,17 @@ static void simple_dump(FILE *fp, simple_script_t *ss)
 
 static int simple_compile(mrp_scriptlet_t *script)
 {
+    static int builtins_exported = FALSE;
+
     yy_smpl_parser_t  parser;
     simple_script_t  *ss;
+
+    if (!builtins_exported) {
+        if (!export_builtins())
+            return -1;
+        else
+            builtins_exported = TRUE;
+    }
 
     if (simple_parser_parse(&parser, script->source)) {
         ss = mrp_allocz(sizeof(*ss));

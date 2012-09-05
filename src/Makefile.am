@@ -272,7 +272,8 @@ SIMPLE_SCRIPT_SOURCES = 					\
 		resolver/scripting/simple/simple-script.c	\
 		resolver/scripting/simple/simple-scanner.c	\
 		resolver/scripting/simple/simple-parser.c	\
-		resolver/scripting/simple/call.c
+		resolver/scripting/simple/call.c                \
+		resolver/scripting/simple/builtins.c
 
 libmurphy_resolver_la_REGULAR_SOURCES =				\
 		resolver/resolver.c				\
