@@ -304,7 +304,8 @@ int mrp_export_method(mrp_method_descr_t *method)
         if (m != NULL) {
             if (export_method(m) == 0) {
                 mrp_log_info("exported method %s (%s) %s%s.",
-                             method->name, method->signature,
+                             method->name,
+                             method->signature ? method->signature : "-",
                              method->plugin ? "from plugin " : "",
                              method->plugin ? method->plugin->instance : "");
                 return 0;
