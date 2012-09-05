@@ -10,5 +10,5 @@ target all
         echo('foo', 'bar', 'foobar...', 1, 2, 3.141, -9.81)
     end script
 
-include "/u/src/work/murphy/src/resolver/test-input-video"
-include "/u/src/work/murphy/src/resolver/test-input-audio"
+include "test-input-video"
+include "test-input-audio"

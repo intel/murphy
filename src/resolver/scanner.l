@@ -3,6 +3,7 @@
 #define YY_DECL int yy_res_lex(yy_res_parser_t *parser)
 
 #include <stdio.h>
+#include <limits.h>
 
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
@@ -37,10 +38,27 @@
  * circular inclusion loops...
  */
 
-int scanner_push_file(yy_res_parser_t *parser, const char *path)
+int scanner_push_file(yy_res_parser_t *parser, const char *file)
 {
     yy_res_input_t *in;
+    char            buf[PATH_MAX], *base;
+    const char     *path;
+    int             len;
     FILE           *fp;
+
+    if (*file != '/' && parser->in != NULL) {
+        base = strrchr(parser->in->name, '/');
+        if (base != NULL) {
+            len = base - parser->in->name;
+            snprintf(buf, sizeof(buf), "%*.*s/%s",
+                     len, len, parser->in->name, file);
+            path = buf;
+        }
+        else
+            path = file;
+    }
+    else
+        path = file;
 
     fp = fopen(path, "r");
 
@@ -63,6 +81,9 @@ int scanner_push_file(yy_res_parser_t *parser, const char *path)
         else
             fclose(fp);
     }
+    else
+        mrp_log_error("Failed to open input file '%s' ('%s', error: %s).",
+                      file, path, strerror(errno));
 
     return FALSE;
 }
