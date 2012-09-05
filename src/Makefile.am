@@ -472,6 +472,7 @@ murphyd_CFLAGS  =			\
 		$(BUILTIN_CFLAGS)
 
 murphyd_LDADD  =			\
+		libmurphy-resolver.la	\
 		libmurphy-core.la	\
 		libmurphy-common.la	\
 		$(BUILTIN_LIBS)

@@ -8,6 +8,7 @@
 #include <murphy/core/context.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/event.h>
+#include <murphy/resolver/resolver.h>
 #include <murphy/daemon/config.h>
 #include <murphy/daemon/daemon.h>
 
@@ -91,6 +92,16 @@ int main(int argc, char *argv[])
         if (!mrp_exec_cfgfile(ctx, cfg)) {
             mrp_log_error("Failed to execute configuration.");
             exit(1);
+        }
+
+        if (ctx->resolver_ruleset != NULL) {
+            ctx->r = mrp_resolver_parse(ctx->resolver_ruleset);
+
+            if (ctx->r == NULL) {
+                mrp_log_error("Failed to parse resolver file '%s'.",
+                              ctx->resolver_ruleset);
+                exit(1);
+            }
         }
 
         emit_daemon_event(DAEMON_EVENT_STARTING);
