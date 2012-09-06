@@ -34,14 +34,14 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
             mrp_log_error("Failed to parse resolver input.");
     }
 
-    mrp_resolver_cleanup(r);
+    mrp_resolver_destroy(r);
     parser_cleanup(&parser);
 
     return NULL;
 }
 
 
-void mrp_resolver_cleanup(mrp_resolver_t *r)
+void mrp_resolver_destroy(mrp_resolver_t *r)
 {
     if (r != NULL) {
         mrp_destroy_context_table(r->ctbl);

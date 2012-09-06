@@ -15,13 +15,15 @@ typedef struct mrp_resolver_s mrp_resolver_t;
 mrp_resolver_t *mrp_resolver_parse(const char *path);
 
 /** Destroy the given resolver context, freeing all associated resources. */
-void mrp_resolver_cleanup(mrp_resolver_t *r);
+void mrp_resolver_destroy(mrp_resolver_t *r);
 
 /** Update the given target. The NULL-terminated variable argument list
     after the target name sepcifies the resolver context variables to
     set during the update. Use a single NULL to omit variables. */
 int mrp_resolver_update_targetl(mrp_resolver_t *r,
                                 const char *target, ...) MRP_NULLTERM;
+
+#define mrp_resolver_update_target mrp_resolver_update_targetl
 
 /** Update the given target. The variable name and type/value arrays
     specify the resolver context variables to set during the update. */

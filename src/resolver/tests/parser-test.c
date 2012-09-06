@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    mrp_resolver_cleanup(c.r);
+    mrp_resolver_destroy(c.r);
     c.r = NULL;
 
     return 0;
