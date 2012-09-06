@@ -760,7 +760,7 @@ static int delete_conditional(mdb_table_t *tbl, mqi_cond_entry_t *cond)
 static int delete_all(mdb_table_t *tbl)
 {
     mdb_row_t *row, *n;
-    int        ndelete;
+    int        ndelete = 0;
 
     mdb_index_reset(tbl);
 
