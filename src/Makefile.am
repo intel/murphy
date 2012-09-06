@@ -40,12 +40,14 @@ libmurphy_common_la_HEADERS =		\
 		common/list.h		\
 		common/log.h		\
 		common/debug.h 		\
+		common/debug-info.h	\
 		common/mm.h		\
 		common/hashtbl.h	\
 		common/mainloop.h	\
 		common/utils.h		\
 		common/file-utils.h	\
 		common/msg.h		\
+		common/refcnt.h		\
 		common/transport.h
 
 libmurphy_common_la_REGULAR_SOURCES =		\
