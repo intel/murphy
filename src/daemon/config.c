@@ -32,9 +32,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 
     printf("usage: %s [options]\n\n"
            "The possible options are:\n"
-           "  -C, --config-file=PATH         main configuration file to use\n"
+           "  -c, --config-file=PATH         main configuration file to use\n"
            "      The default configuration file is '%s'.\n"
-           "  -D, --config-dir=PATH          configuration directory to use\n"
+           "  -C, --config-dir=PATH          configuration directory to use\n"
            "      If omitted, defaults to '%s'.\n"
            "  -P, --plugin-dir=PATH          load plugins from DIR\n"
            "      The default plugin directory is '%s'.\n"
@@ -43,12 +43,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -l, --log-level=LEVELS         logging level to use\n"
            "      LEVELS is a comma separated list of info, error and warning\n"
            "  -v, --verbose                  increase logging verbosity\n"
+           "  -d, --debug                    enable given debug confguration\n"
+           "  -D, --list-debug               list known debug sites\n"
            "  -f, --foreground               don't daemonize\n"
-#if 0
-           "  -a, --plugin=name:key=value    set plugin config variable\n"
-           "      E.g -a foo:bar=xyzzy sets the value of configuration key\n"
-           "      'bar' to the value 'xyzzy' for plugin 'foo'.\n"
-#endif
            "  -h, --help                     show help on usage\n"
            "  -q, --query-plugins            show detailed information about\n"
            "                                 all the available plugins\n",
@@ -157,39 +154,35 @@ static void config_set_defaults(mrp_context_t *ctx)
 
 int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
 {
-    #define OPTIONS "C:D:l:t:fP:a:vdhq"
+    #define OPTIONS "c:C:l:t:fP:a:vd:Dhq"
     struct option options[] = {
-        { "config-file"  , required_argument, NULL, 'C' },
-        { "config-dir"   , required_argument, NULL, 'D' },
+        { "config-file"  , required_argument, NULL, 'c' },
+        { "config-dir"   , required_argument, NULL, 'C' },
         { "plugin-dir"   , required_argument, NULL, 'P' },
         { "log-level"    , required_argument, NULL, 'l' },
         { "log-target"   , required_argument, NULL, 't' },
         { "verbose"      , optional_argument, NULL, 'v' },
-        { "debug"        , no_argument      , NULL, 'd' },
+        { "debug"        , required_argument, NULL, 'd' },
+        { "list-debug"   , no_argument      , NULL, 'D' },
         { "foreground"   , no_argument      , NULL, 'f' },
-#if 0
-        { "plugin"       , required_argument, NULL, 'a' },
-#endif
         { "help"         , no_argument      , NULL, 'h' },
         { "query-plugins", no_argument      , NULL, 'q' },
         { NULL, 0, NULL, 0 }
     };
 
-    int  opt, debug;
-#if 0
-    char arg[256], *plugin, *key, *value;
-#endif
+    int  opt;
 
-    debug = FALSE;
     config_set_defaults(ctx);
+    mrp_log_set_mask(ctx->log_mask);
+    mrp_log_set_target(ctx->log_target);
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
         switch (opt) {
-        case 'C':
+        case 'c':
             ctx->config_file = optarg;
             break;
 
-        case 'D':
+        case 'C':
             ctx->config_dir = optarg;
             break;
 
@@ -200,52 +193,40 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
         case 'v':
             ctx->log_mask <<= 1;
             ctx->log_mask  |= 1;
+            mrp_log_set_mask(ctx->log_mask);
             break;
 
         case 'l':
             ctx->log_mask = mrp_log_parse_levels(optarg);
             if (ctx->log_mask < 0)
                 print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
+            else
+                mrp_log_set_target(ctx->log_target);
             break;
 
         case 't':
             ctx->log_target = mrp_log_parse_target(optarg);
             if (!ctx->log_target)
                 print_usage(argv[0], EINVAL, "invalid log target '%s'", optarg);
+            else
+                mrp_log_set_target(ctx->log_target);
             break;
 
         case 'd':
-            debug = TRUE;
+            ctx->log_mask |= MRP_LOG_MASK_DEBUG;
+            mrp_log_set_mask(ctx->log_mask);
+            mrp_debug_set_config(optarg);
+            break;
+
+        case 'D':
+            printf("Known debug sites:\n");
+            mrp_debug_dump_sites(stdout, 4);
+            exit(0);
             break;
 
         case 'f':
             ctx->foreground = TRUE;
             break;
-
-#if 0
-        case 'a':
-            strncpy(arg, optarg, sizeof(arg) - 1);
-            arg[sizeof(arg) - 1] = '\0';
-
-            plugin = arg;
-
-            key = strchr(plugin, ':');
-            if (key == NULL)
-                print_usage(argv[0], EINVAL, "invalid plugin arg '%s'", optarg);
-            else
-                *key++ = '\0';
-
-            value = strchr(key, '=');
-            if (value != NULL)
-                *value++ = '\0';
-            else
-                value = "TRUE";
-
-            if (!mrp_plugin_set(ctx, plugin, key, value))
-                si_log_error("failed to set '%s' = '%s' for plugin '%s'",
-                             key, value, plugin);
-            break;
-#endif
 
         case 'h':
             print_usage(argv[0], -1, "");
@@ -261,9 +242,6 @@ int mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
             print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
-
-    if (debug)
-        ctx->log_mask |= MRP_LOG_MASK_DEBUG;
 
     return TRUE;
 }
