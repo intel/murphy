@@ -45,6 +45,7 @@ int mdb_table_get_size(mdb_table_t *);
 char *mdb_table_get_column_name(mdb_table_t *, int);
 mqi_data_type_t mdb_table_get_column_type(mdb_table_t *, int);
 int mdb_table_get_column_size(mdb_table_t *, int);
+uint32_t mdb_table_get_stamp(mdb_table_t *);
 int mdb_table_print_rows(mdb_table_t *, char *, int);
 
 

@@ -92,7 +92,7 @@ static record_t *artists[] = {&chuck, &gary, &elvis, &tom, &greta, &rita,NULL};
 
 
 static int          verbose;
-static mqi_handle_t transactions[10];
+static mqi_handle_t transactions[MQI_TXDEPTH_MAX - 1];
 static int          txdepth;
 static mqi_handle_t persons = MQI_HANDLE_INVALID;
 static int          columns_no_in_persons = -1;
@@ -100,6 +100,8 @@ static int          rows_no_in_persons = -1;
 
 static int          ntrigger;
 static trigger_t    triggers[256];
+static int          nseq = 32;
+static int          nnest = MQI_TXDEPTH_MAX - 1;
 
 
 static Suite *libmqi_suite(void);
@@ -122,14 +124,24 @@ int main(int argc, char **argv)
     for (i = 1;  i < argc;  i++) {
         if (!strcmp("-v", argv[i]))
             verbose = 1;
-        else if (!strcmp("-f", argv[1]))
+        else if (!strcmp("-f", argv[i]))
             srunner_set_fork_status(sr, CK_NOFORK);
+        else if (!strcmp("-nseq", argv[i]) && i < argc - 1) {
+            nseq = atoi(argv[i + 1]);
+            i++;
+        }
+        else if (!strcmp("-nnest", argv[i]) && i < argc - 1) {
+            nnest = atoi(argv[i + 1]);
+            i++;
+        }
         else {
             printf("Usage: %s [-h] [-v] [-f]\n"
-                   "  -h  prints this message\n"
-                   "  -v  sets verbose mode\n"
-                   "  -f  forces no-forking mode\n",
-                   basename(argv[0]));
+                   "  -h     prints this message\n"
+                   "  -v     sets verbose mode\n"
+                   "  -f     forces no-forking mode\n"
+                   "  -nseq  number of sequential transactions\n"
+                   "  -nnest number of nested transactions (1 - %d)\n",
+                   basename(argv[0]), MQI_TXDEPTH_MAX - 1);
             exit(strcmp("-h", argv[i]) ? 1 : 0);
         }
     }
@@ -511,6 +523,22 @@ START_TEST(delete_from_persons)
 END_TEST
 
 
+START_TEST(delete_all_persons)
+{
+    query_t rows[32];
+    int     nrow, n;
+
+    nrow = MQI_SELECT(persons_select_columns, persons, MQI_ALL, rows);
+    fail_if(nrow < 0, "select for checking failed (%s)", strerror(errno));
+
+    n = MQI_DELETE(persons, MQI_ALL);
+    fail_if(n != nrow, "deleted %d rows instead of the expected %d", n, nrow);
+
+    n = MQI_SELECT(persons_select_columns, persons, MQI_ALL, rows);
+    fail_if(n != 0, "verification select failed (%s)", strerror(errno));
+}
+END_TEST
+
 
 START_TEST(transaction_rollback)
 {
@@ -731,6 +759,87 @@ START_TEST(column_trigger)
 }
 END_TEST
 
+START_TEST(sequential_transactions)
+{
+    mqi_handle_t  trh;
+    int           sts, i;
+    const char   *kind;
+
+    PREREQUISITE(create_table_persons);
+
+    for (i = 0; i < nseq; i++) {
+        trh = mqi_begin_transaction();
+
+        fail_if(trh == MQI_HANDLE_INVALID,
+                "failed to create %d. transaction : errno (%s)",
+                i + 1, strerror(errno));
+
+        if (i & 0x1)
+            PREREQUISITE(delete_all_persons);
+        else
+            PREREQUISITE(insert_into_persons);
+
+        if (!(i & 0x3)) {
+            kind = "rollback";
+            sts  = mqi_rollback_transaction(trh);
+        }
+        else {
+            kind = "commit";
+            sts  = mqi_commit_transaction(trh);
+        }
+
+        fail_if(sts < 0, "%s failed: errno (%s)", kind, strerror(errno));
+    }
+}
+END_TEST
+
+
+START_TEST(nested_transactions)
+{
+    mqi_handle_t  txids[MQI_TXDEPTH_MAX - 1];
+    mqi_handle_t  trh;
+    int           sts, tx, i, cnt;
+    const char   *kind;
+
+    PREREQUISITE(create_table_persons);
+
+    if (nnest > sizeof(txids) / sizeof(txids[0]))
+        nnest = sizeof(txids) / sizeof(txids[0]);
+
+    for (cnt = 0; cnt < 16; cnt++) {
+        for (tx = 0; tx < nnest; tx++) {
+            trh = txids[tx] = mqi_begin_transaction();
+
+            fail_if(trh == MQI_HANDLE_INVALID,
+                    "couldn't create transaction: errno (%s)", strerror(errno));
+
+            for (i = 0; i < nseq; i++) {
+                if (i & 0x1)
+                    PREREQUISITE(delete_all_persons);
+                else
+                    PREREQUISITE(insert_into_persons);
+            }
+        }
+
+        for (tx = nnest - 1; tx >= 0; tx--) {
+            trh = txids[tx];
+
+            if (!(tx & 0x1) && 0) {
+                kind = "rollback";
+                sts = mqi_rollback_transaction(trh);
+            }
+            else {
+                kind = "commit";
+                sts = mqi_commit_transaction(trh);
+            }
+
+            fail_if(sts < 0, "%s %u failed: errno (%s)", kind, trh,
+                    strerror(errno));
+        }
+    }
+}
+END_TEST
+
 
 
 static Suite *libmqi_suite(void)
@@ -764,6 +873,8 @@ static TCase *basic_tests(void)
     tcase_add_test(tc, table_trigger);
     tcase_add_test(tc, row_trigger);
     tcase_add_test(tc, column_trigger);
+    tcase_add_test(tc, sequential_transactions);
+    tcase_add_test(tc, nested_transactions);
 
     return tc;
 }

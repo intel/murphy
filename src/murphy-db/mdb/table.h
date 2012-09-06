@@ -14,6 +14,7 @@
 struct mdb_table_s {
     mqi_handle_t  handle;
     char         *name;
+    uint32_t      stamp;
     mdb_index_t   index;
     mdb_hash_t   *chash;         /* hash table for column names */
     int           ncolumn;

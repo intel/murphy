@@ -163,6 +163,7 @@ int mqi_get_table_size(mqi_handle_t);
 char *mqi_get_column_name(mqi_handle_t, int);
 mqi_data_type_t mqi_get_column_type(mqi_handle_t, int);
 int mqi_get_column_size(mqi_handle_t, int);
+uint32_t mqi_get_table_stamp(mqi_handle_t);
 int mqi_print_rows(mqi_handle_t, char *, int);
 
 

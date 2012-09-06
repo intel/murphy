@@ -22,6 +22,7 @@
         mqi_get_column_type;
         mqi_get_table_handle;
         mqi_get_table_size;
+        mqi_get_table_stamp;
         mqi_get_transaction_handle;
         mqi_insert_into;
         mqi_open;

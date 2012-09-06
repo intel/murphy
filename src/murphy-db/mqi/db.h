@@ -31,6 +31,7 @@ typedef struct {
     void *(*find_table)(char *);
     int (*get_column_index)(void *, char *);
     int (*get_table_size)(void *);
+    uint32_t (*get_table_stamp)(void *);
     char *(*get_column_name)(void *, int);
     mqi_data_type_t (*get_column_type)(void *, int);
     int (*get_column_size)(void *, int);

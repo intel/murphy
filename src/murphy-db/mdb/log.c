@@ -41,7 +41,10 @@ typedef struct {
     mdb_dlist_t     link;
     mdb_log_type_t  type;
     mqi_bitfld_t    colmask;
-    mdb_row_t      *before;
+    union {
+        mdb_row_t  *before;
+        uint32_t    stamp;
+    };
     mdb_row_t      *after;
 } change_t;
 
@@ -375,11 +378,22 @@ static tbl_log_t *get_tbl_log(mdb_dlist_t *vhead,
                               mdb_table_t *tbl)
 {
     tbl_log_t *log;
+    change_t  *change;
 
     if (!(log = (tbl_log_t *)get_last_vlog(vhead)) || depth > log->depth) {
         if ((log = (tbl_log_t *)new_log(vhead, hhead, depth, sizeof(*log)))) {
             log->table = tbl;
             MDB_DLIST_INIT(log->changes);
+
+            if (!(change = calloc(1, sizeof(change_t)))) {
+                errno = ENOMEM;
+                return NULL;
+            }
+
+            change->type  = mdb_log_stamp;
+            change->stamp = tbl->stamp++;
+
+            MDB_DLIST_PREPEND(change_t, link, change, &log->changes);
         }
     }
 

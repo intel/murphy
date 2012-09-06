@@ -26,13 +26,17 @@ typedef enum {
     mdb_log_insert,
     mdb_log_delete,
     mdb_log_update,
+    mdb_log_stamp
 } mdb_log_type_t;
 
 typedef struct {
     mdb_table_t    *table;
     mdb_log_type_t  change;
     mqi_bitfld_t    colmask;
-    mdb_row_t      *before;
+    union {
+        mdb_row_t  *before;
+        uint32_t    stamp;
+    };
     mdb_row_t      *after;
 } mdb_log_entry_t;
 

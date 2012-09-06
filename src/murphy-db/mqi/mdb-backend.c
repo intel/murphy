@@ -42,6 +42,7 @@ static int      delete_from(void *, mqi_cond_entry_t *);
 static void *   find_table(char *);
 static int      get_column_index(void *, char *);
 static int      get_table_size(void *);
+static uint32_t get_table_stamp(void *);
 static char *   get_column_name(void *, int);
 static mqi_data_type_t get_column_type(void *, int);
 static int      get_column_size(void *, int);
@@ -73,6 +74,7 @@ static mqi_db_functbl_t functbl = {
     find_table,
     get_column_index,
     get_table_size,
+    get_table_stamp,
     get_column_name,
     get_column_type,
     get_column_size,
@@ -246,6 +248,11 @@ static int get_column_index(void *t, char *column_name)
 static int get_table_size(void *t)
 {
     return  mdb_table_get_size((mdb_table_t *)t);
+}
+
+static uint32_t get_table_stamp(void *t)
+{
+    return mdb_table_get_stamp((mdb_table_t *)t);
 }
 
 static char *get_column_name(void *t, int colidx)
