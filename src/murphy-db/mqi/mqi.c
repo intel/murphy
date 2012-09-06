@@ -383,7 +383,7 @@ int mqi_commit_transaction(mqi_handle_t h)
 
     MDB_CHECKARG(h != MQI_HANDLE_INVALID && depth < MQI_TXDEPTH_MAX, -1);
     MDB_PREREQUISITE(dbs && ndb > 0, -1);
-    MDB_ASSERT(depth == txdepth - 1, EBADSLT, -1);
+    MDB_ASSERT(txdepth > 0 && depth == txdepth - 1, EBADSLT, -1);
 
     tx = txstack + depth;
 
@@ -396,6 +396,8 @@ int mqi_commit_transaction(mqi_handle_t h)
         if (ftb->commit_transaction(tx->txid[i]) < 0)
             err = -1;
     }
+
+    txdepth--;
 
     return err;
 }
@@ -425,6 +427,8 @@ int mqi_rollback_transaction(mqi_handle_t h)
         if (ftb->rollback_transaction(tx->txid[i]) < 0)
             err = -1;
     }
+
+    txdepth--;
 
     return err;
 }

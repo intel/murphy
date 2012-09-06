@@ -91,6 +91,8 @@ int mdb_transaction_commit(uint32_t depth)
     if (start_triggered)
         mdb_trigger_transaction_end();
 
+    txdepth--;
+
     return sts;
 
 #undef DATA_MAX
@@ -121,6 +123,8 @@ int mdb_transaction_rollback(uint32_t depth)
         if (sts == 0)
             sts = s;
     }
+
+    txdepth--;
 
     return sts;
 }
