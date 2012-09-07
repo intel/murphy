@@ -491,19 +491,12 @@ plugin_signalling_la_SOURCES = $(SIGNALLING_PLUGIN_SOURCES)
 plugin_signalling_la_HEADERS = $(SIGNALLING_PLUGIN_HEADERS)
 plugin_signalling_la_CFLAGS  = $(SIGNALLING_PLUGIN_CFLAGS) \
                 $(MURPHY_CFLAGS) $(AM_CFLAGS)
-plugin_signalling_la_LDFLAGS = -module -Wl,-version-script=linker-script.plugin-signalling \
-                               -version-info @MURPHY_VERSION_INFO@
+plugin_signalling_la_LDFLAGS = -module -avoid-version
 plugin_signalling_la_LIBADD  = $(SIGNALLING_PLUGIN_LIBS)
 plugin_signalling_ladir      = $(SIGNALLING_PLUGINdir)
 
 plugin_LTLIBRARIES    += plugin-signalling.la
 endif
-
-# linker script generation
-linker-script.plugin-signalling: $(plugin_signalling_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
-
-plugin_signalling_la_DEPENDENCIES = linker-script.plugin-signalling
 
 ###################################
 # murphy daemon
