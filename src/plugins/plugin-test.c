@@ -185,7 +185,7 @@ void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
-MRP_EXPORTABLE(static char *, method1, (int arg1, char *arg2, double arg3))
+MRP_EXPORTABLE(char *, method1, (int arg1, char *arg2, double arg3))
 {
     MRP_UNUSED(arg1);
     MRP_UNUSED(arg2);
@@ -206,7 +206,7 @@ static int boilerplate1(mrp_plugin_t *plugin,
     return -1;
 }
 
-MRP_EXPORTABLE(static int,  method2, (char *arg1, double arg2, int arg3))
+MRP_EXPORTABLE(int, method2, (char *arg1, double arg2, int arg3))
 {
     MRP_UNUSED(arg1);
     MRP_UNUSED(arg2);

@@ -30,10 +30,10 @@ struct mrp_method_descr_s {
  */
 
 #define MRP_EXPORTABLE(_return_type, _func, _arglist)     \
-    const char _func##_method_signature[] =               \
+    static const char _func##_method_signature[] =        \
         #_return_type" __ "#_arglist;                     \
                                                           \
-    _return_type _func _arglist
+    static _return_type _func _arglist
 
 /** Declare a method along with a boilerplate to call from scripts. */
 #define MRP_GENERIC_METHOD(_name, _func, _boilerplate) {  \
@@ -68,10 +68,10 @@ struct mrp_method_descr_s {
  */
 
 #define MRP_IMPORTABLE(_return_type, _funcptr, _arglist) \
-    const char _funcptr##_method_signature[] =           \
+    static const char _funcptr##_method_signature[] =    \
         #_return_type" __ "#_arglist;                    \
                                                          \
-    _return_type (*_funcptr) _arglist
+    static _return_type (*_funcptr) _arglist
 
 #define MRP_IMPORT_METHOD(_name, _funcptr) {             \
         .name       = _name,                             \
