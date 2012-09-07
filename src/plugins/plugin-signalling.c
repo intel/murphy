@@ -197,4 +197,5 @@ static mrp_plugin_arg_t signalling_args[] = {
 MURPHY_REGISTER_CORE_PLUGIN("signalling",
         SIGNALLING_VERSION, SIGNALLING_DESCRIPTION,
         SIGNALLING_AUTHORS, SIGNALLING_HELP, MRP_SINGLETON,
-        signalling_init, signalling_exit, signalling_args, NULL);
+        signalling_init, signalling_exit, signalling_args,
+        MRP_ARRAY_SIZE(signalling_args), NULL, 0, NULL, 0, NULL);
