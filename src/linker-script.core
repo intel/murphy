@@ -32,6 +32,7 @@
         mrp_lookup_interpreter;
         mrp_plugin_exists;
         mrp_pop_context_frame;
+        mrp_prepare_script;
         mrp_print_value;
         mrp_push_context_frame;
         mrp_register_builtin_plugin;

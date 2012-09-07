@@ -108,6 +108,7 @@ struct mrp_script_value_s {
 #define MRP_SCRIPT_VALUE_SINT64(v) __MRP_SCRIPT_VALUE(SINT64, s64, v)
 #define MRP_SCRIPT_VALUE_DOUBLE(v) __MRP_SCRIPT_VALUE(DOUBLE, dbl, v)
 
+/** Print the given value to the given buffer. */
 char *mrp_print_value(char *buf, size_t size, mrp_script_value_t *value);
 
 
@@ -121,12 +122,14 @@ struct mrp_interpreter_s {
     void              *data;             /* opaque global interpreter data */
     /*                                      interpreter operations */
     int  (*compile)(mrp_scriptlet_t *script);
+    int  (*prepare)(mrp_scriptlet_t *script);
     int  (*execute)(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl);
     void (*cleanup)(mrp_scriptlet_t *script);
 };
 
 /** Macro to automatically register an interpreter on startup. */
-#define MRP_REGISTER_INTERPRETER(_type, _compile, _execute, _cleanup)   \
+#define MRP_REGISTER_INTERPRETER(_type, _compile, _prepare, _execute,   \
+                                 _cleanup)                              \
     static void auto_register_interpreter(void)                         \
          __attribute__((constructor));                                  \
                                                                         \
@@ -134,6 +137,7 @@ struct mrp_interpreter_s {
         static mrp_interpreter_t interpreter = {                        \
             .name    = _type,                                           \
             .compile = _compile,                                        \
+            .prepare = _prepare,                                        \
             .execute = _execute,                                        \
             .cleanup = _cleanup                                         \
         };                                                              \
@@ -149,9 +153,14 @@ struct mrp_interpreter_s {
     struct mrp_allow_trailing_semicolon
 
 
+/** Register a new scriptlet interpreter. */
 int mrp_register_interpreter(mrp_interpreter_t *i);
-int mrp_unregister_interpreter(const char *name);
-mrp_interpreter_t *mrp_lookup_interpreter(const char *name);
+
+/** Unregister a scriptlet interpreter. */
+int mrp_unregister_interpreter(const char *type);
+
+/** Find a scriptlet interpreter by type. */
+mrp_interpreter_t *mrp_lookup_interpreter(const char *type);
 
 
 /*
@@ -165,11 +174,20 @@ struct mrp_scriptlet_s {
     void              *compiled;         /* compiled scriptlet */
 };
 
+/** Create a scriptlet of the given type and source. */
 mrp_scriptlet_t *mrp_create_script(char *type, const char *source);
-void mrp_destroy_script(mrp_scriptlet_t *script);
-int mrp_compile_script(mrp_scriptlet_t *s);
-int mrp_execute_script(mrp_scriptlet_t *s, mrp_context_tbl_t *ctbl);
 
+/** Destroy the given scriptlet, freeing all of its resources. */
+void mrp_destroy_script(mrp_scriptlet_t *script);
+
+/** Compile the given scriptlet. */
+int mrp_compile_script(mrp_scriptlet_t *s);
+
+/** Prepare the given scriptlet for execution. */
+int mrp_prepare_script(mrp_scriptlet_t *s);
+
+/** Execute the given scriptlet with the given context variables. */
+int mrp_execute_script(mrp_scriptlet_t *s, mrp_context_tbl_t *ctbl);
 
 
 

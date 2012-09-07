@@ -155,6 +155,15 @@ int mrp_compile_script(mrp_scriptlet_t *s)
 }
 
 
+int mrp_prepare_script(mrp_scriptlet_t *s)
+{
+    if (s != NULL && s->interpreter->prepare != NULL)
+        return s->interpreter->prepare(s);
+    else
+        return 0;
+}
+
+
 int mrp_execute_script(mrp_scriptlet_t *s, mrp_context_tbl_t *ctbl)
 {
     if (s != NULL)
