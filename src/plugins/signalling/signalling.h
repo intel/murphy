@@ -46,10 +46,11 @@ typedef void (*mrp_info_cb) (char *msg, void *data);
 
 
 #if 0
-/** Opens a new signal with given 'tx'. */
+/* These functions are exported via Murphy method export interface.
+ * The function definitions are commented away so that they wouldn't
+ * interfere with the importing functionality.
+ */
 
-int mrp_tx_open_signal_with_id(uint32_t tx);
-#endif
 
 /** Opens a new signal. Returns the assigned signal 'tx'. */
 
@@ -98,6 +99,7 @@ int mrp_info_register(char *client_id, mrp_info_cb cb, void *data);
     'client_id'. */
 
 void mrp_info_unregister(char *client_id);
+#endif
 
 
 #endif /* __MURPHY_SIGNALLING_H__ */

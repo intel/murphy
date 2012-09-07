@@ -48,12 +48,12 @@ void free_backchannel(backchannel_t *b)
 }
 
 
-int mrp_info_register(char *client_id, mrp_info_cb cb, void *data)
+int _mrp_info_register(const char *client_id, mrp_info_cb cb, void *data)
 {
     data_t *ctx = signalling_plugin->data;
     backchannel_t *b;
 
-    b = mrp_htbl_lookup(ctx->backchannels, client_id);
+    b = mrp_htbl_lookup(ctx->backchannels, (void *) client_id);
 
     if (b) {
         /* someone is already handling this signal */
@@ -78,14 +78,14 @@ int mrp_info_register(char *client_id, mrp_info_cb cb, void *data)
 }
 
 
-void mrp_info_unregister(char *client_id)
+void _mrp_info_unregister(const char *client_id)
 {
     data_t *ctx = signalling_plugin->data;
     backchannel_t *b;
 
-    b = mrp_htbl_lookup(ctx->backchannels, client_id);
+    b = mrp_htbl_lookup(ctx->backchannels, (void *) client_id);
 
     if (b) {
-        mrp_htbl_remove(ctx->backchannels, client_id, TRUE);
+        mrp_htbl_remove(ctx->backchannels, (void *) client_id, TRUE);
     }
 }

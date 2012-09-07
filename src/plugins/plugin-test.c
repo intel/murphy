@@ -293,6 +293,16 @@ static int boilerplate2(mrp_plugin_t *plugin,
 MRP_IMPORTABLE(char *, method1ptr, (int arg1, char *arg2, double arg3));
 MRP_IMPORTABLE(int, method2ptr, (char *arg1, double arg2, int arg3));
 
+MRP_IMPORTABLE(uint32_t, mrp_tx_open_signal, ());
+MRP_IMPORTABLE(int, mrp_tx_add_domain, (uint32_t id, const char *domain));
+MRP_IMPORTABLE(int, mrp_tx_add_data, (uint32_t id, const char *row));
+MRP_IMPORTABLE(void, mrp_tx_add_success_cb, (uint32_t id, mrp_tx_success_cb cb, void *data));
+MRP_IMPORTABLE(void, mrp_tx_add_error_cb, (uint32_t id, mrp_tx_error_cb cb, void *data));
+MRP_IMPORTABLE(int, mrp_tx_close_signal, (uint32_t id));
+MRP_IMPORTABLE(void, mrp_tx_cancel_signal, (uint32_t id));
+
+MRP_IMPORTABLE(int, mrp_info_register, (const char *client_id, mrp_info_cb cb, void *data));
+MRP_IMPORTABLE(int, mrp_info_unregister, (const char *client_id));
 
 #if 0
 static int export_methods(mrp_plugin_t *plugin)
@@ -828,6 +838,13 @@ static mrp_method_descr_t exports[] = {
 static mrp_method_descr_t imports[] = {
     MRP_IMPORT_METHOD("method1", method1ptr),
     MRP_IMPORT_METHOD("method2", method2ptr),
+    MRP_IMPORT_METHOD("mrp_tx_open_signal", mrp_tx_open_signal),
+    MRP_IMPORT_METHOD("mrp_tx_add_domain", mrp_tx_add_domain),
+    MRP_IMPORT_METHOD("mrp_tx_add_data", mrp_tx_add_data),
+    MRP_IMPORT_METHOD("mrp_tx_add_success_cb", mrp_tx_add_success_cb),
+    MRP_IMPORT_METHOD("mrp_tx_add_error_cb", mrp_tx_add_error_cb),
+    MRP_IMPORT_METHOD("mrp_tx_close_signal", mrp_tx_close_signal),
+    MRP_IMPORT_METHOD("mrp_tx_cancel_signal", mrp_tx_cancel_signal),
 };
 
 

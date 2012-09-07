@@ -179,6 +179,17 @@ static void signalling_exit(mrp_plugin_t *plugin)
 }
 
 
+static int boilerplate(mrp_plugin_t *plugin,
+                        const char *name, mrp_script_env_t *env)
+{
+    MRP_UNUSED(plugin);
+    MRP_UNUSED(name);
+    MRP_UNUSED(env);
+
+    return -1;
+}
+
+
 #define SIGNALLING_DESCRIPTION "A decision signalling plugin for Murphy."
 #define SIGNALLING_HELP \
     "The signalling plugin provides one-to-many communication from Murphy\n"  \
@@ -194,8 +205,66 @@ static mrp_plugin_arg_t signalling_args[] = {
     MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "unxs:/tmp/murphy/signalling"),
 };
 
+MRP_EXPORTABLE(uint32_t, mrp_tx_open_signal, ())
+{
+    return _mrp_tx_open_signal();
+}
+
+MRP_EXPORTABLE(int, mrp_tx_add_domain, (uint32_t id, const char *domain))
+{
+    return _mrp_tx_add_domain(id, domain);
+}
+
+MRP_EXPORTABLE(int, mrp_tx_add_data, (uint32_t id, const char *row))
+{
+    return _mrp_tx_add_domain(id, row);
+}
+
+MRP_EXPORTABLE(void, mrp_tx_add_success_cb, (uint32_t id, mrp_tx_success_cb cb, void *data))
+{
+    _mrp_tx_add_success_cb(id, cb, data);
+}
+
+MRP_EXPORTABLE(void, mrp_tx_add_error_cb, (uint32_t id, mrp_tx_error_cb cb, void *data))
+{
+    _mrp_tx_add_error_cb(id, cb, data);
+}
+
+MRP_EXPORTABLE(int, mrp_tx_close_signal, (uint32_t id))
+{
+    return _mrp_tx_close_signal(id);
+}
+
+MRP_EXPORTABLE(void, mrp_tx_cancel_signal, (uint32_t id))
+{
+    _mrp_tx_cancel_signal(id);
+}
+
+MRP_EXPORTABLE(int, mrp_info_register, (const char *client_id, mrp_info_cb cb, void *data))
+{
+    return _mrp_info_register(client_id, cb, data);
+}
+
+MRP_EXPORTABLE(void, mrp_info_unregister, (const char *client_id))
+{
+    _mrp_info_unregister(client_id);
+}
+
+static mrp_method_descr_t exports[] = {
+    MRP_GENERIC_METHOD("mrp_tx_open_signal", mrp_tx_open_signal, boilerplate),
+    MRP_GENERIC_METHOD("mrp_tx_add_domain", mrp_tx_add_domain, boilerplate),
+    MRP_GENERIC_METHOD("mrp_tx_add_data", mrp_tx_add_data, boilerplate),
+    MRP_GENERIC_METHOD("mrp_tx_add_success_cb", mrp_tx_add_success_cb, boilerplate),
+    MRP_GENERIC_METHOD("mrp_tx_add_error_cb", mrp_tx_add_error_cb, boilerplate),
+    MRP_GENERIC_METHOD("mrp_tx_close_signal", mrp_tx_close_signal, boilerplate),
+    MRP_GENERIC_METHOD("mrp_tx_cancel_signal", mrp_tx_cancel_signal, boilerplate),
+    MRP_GENERIC_METHOD("mrp_info_register", mrp_info_register, boilerplate),
+    MRP_GENERIC_METHOD("mrp_info_unregister", mrp_info_unregister, boilerplate),
+};
+
 MURPHY_REGISTER_CORE_PLUGIN("signalling",
         SIGNALLING_VERSION, SIGNALLING_DESCRIPTION,
         SIGNALLING_AUTHORS, SIGNALLING_HELP, MRP_SINGLETON,
         signalling_init, signalling_exit, signalling_args,
-        MRP_ARRAY_SIZE(signalling_args), NULL, 0, NULL, 0, NULL);
+        MRP_ARRAY_SIZE(signalling_args), exports, MRP_ARRAY_SIZE(exports),
+        NULL, 0, NULL);

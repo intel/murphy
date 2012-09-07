@@ -46,4 +46,8 @@ typedef struct {
 
 void free_backchannel(backchannel_t *b);
 
+/* exported functions */
+int _mrp_info_register(const char *client_id, mrp_info_cb cb, void *data);
+void _mrp_info_unregister(const char *client_id);
+
 #endif /* __MURPHY_SIGNALLING_INFO_H__ */

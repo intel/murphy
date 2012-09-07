@@ -82,6 +82,14 @@ transaction_t *get_transaction(data_t *ctx, uint32_t id);
 void put_transaction(data_t *ctx, transaction_t *tx);
 void remove_transaction(data_t *ctx, transaction_t *tx);
 
+/* exported functions */
+uint32_t _mrp_tx_open_signal();
+int _mrp_tx_add_domain(uint32_t id, const char *domain);
+int _mrp_tx_add_data(uint32_t id, const char *row);
+void _mrp_tx_add_success_cb(uint32_t id, mrp_tx_success_cb cb, void *data);
+void _mrp_tx_add_error_cb(uint32_t id, mrp_tx_error_cb cb, void *data);
+int _mrp_tx_close_signal(uint32_t id);
+void _mrp_tx_cancel_signal(uint32_t id);
 
 
 #endif /* __MURPHY_SIGNALLING_TRANSACTION_H__ */

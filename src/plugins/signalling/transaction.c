@@ -217,7 +217,7 @@ static uint32_t mrp_tx_open_signal_with_id(uint32_t id)
 }
 
 
-uint32_t mrp_tx_open_signal()
+uint32_t _mrp_tx_open_signal()
 {
     data_t *ctx = signalling_plugin->data;
 
@@ -225,7 +225,7 @@ uint32_t mrp_tx_open_signal()
 }
 
 
-int mrp_tx_add_domain(uint32_t id, const char *domain)
+int _mrp_tx_add_domain(uint32_t id, const char *domain)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
@@ -246,7 +246,7 @@ int mrp_tx_add_domain(uint32_t id, const char *domain)
 }
 
 
-int mrp_tx_add_data(uint32_t id, const char *row)
+int _mrp_tx_add_data(uint32_t id, const char *row)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
@@ -267,7 +267,7 @@ int mrp_tx_add_data(uint32_t id, const char *row)
 }
 
 
-void mrp_tx_add_success_cb(uint32_t id, mrp_tx_success_cb cb, void *data)
+void _mrp_tx_add_success_cb(uint32_t id, mrp_tx_success_cb cb, void *data)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
@@ -281,7 +281,7 @@ void mrp_tx_add_success_cb(uint32_t id, mrp_tx_success_cb cb, void *data)
 }
 
 
-void mrp_tx_add_error_cb(uint32_t id, mrp_tx_error_cb cb, void *data)
+void _mrp_tx_add_error_cb(uint32_t id, mrp_tx_error_cb cb, void *data)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
@@ -295,7 +295,7 @@ void mrp_tx_add_error_cb(uint32_t id, mrp_tx_error_cb cb, void *data)
 }
 
 
-int mrp_tx_close_signal(uint32_t id)
+int _mrp_tx_close_signal(uint32_t id)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
@@ -318,7 +318,7 @@ int mrp_tx_close_signal(uint32_t id)
 }
 
 
-void mrp_tx_cancel_signal(uint32_t id)
+void _mrp_tx_cancel_signal(uint32_t id)
 {
     data_t *ctx = signalling_plugin->data;
     transaction_t *tx;
