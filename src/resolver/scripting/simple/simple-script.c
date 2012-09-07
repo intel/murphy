@@ -1,3 +1,5 @@
+#include <errno.h>
+
 #include <murphy/common/macros.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
@@ -57,6 +59,31 @@ static int simple_compile(mrp_scriptlet_t *script)
 }
 
 
+static int simple_prepare(mrp_scriptlet_t *s)
+{
+    simple_script_t *ss = s->compiled;
+    mrp_list_hook_t *p, *n;
+    function_call_t *c;
+
+    if (ss != NULL) {
+        mrp_list_foreach(&ss->statements, p, n) {
+            c = mrp_list_entry(p, typeof(*c), hook);
+
+            if (!link_call(c)) {
+                errno = ENOENT;
+                return -1;
+            }
+        }
+
+        return 0;
+    }
+    else {
+        errno = EINVAL;
+        return -1;
+    }
+}
+
+
 static int simple_execute(mrp_scriptlet_t *s, mrp_context_tbl_t *tbl)
 {
     simple_script_t *ss = s->compiled;
@@ -87,4 +114,5 @@ static void simple_cleanup(mrp_scriptlet_t *s)
 }
 
 MRP_REGISTER_INTERPRETER("simple",
-                         simple_compile, simple_execute, simple_cleanup);
+                         simple_compile, simple_prepare,
+                         simple_execute, simple_cleanup);

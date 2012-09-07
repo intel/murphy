@@ -1,3 +1,5 @@
+auto-update-target all
+
 target all
     depends on video_route audio_route \
                audio_volume audio_cork audio_mute \

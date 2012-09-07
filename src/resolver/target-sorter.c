@@ -398,7 +398,9 @@ static int sort_graph(graph_t *g, int target_idx)
 
         if (nfact > 0) {
             target->update_facts = mrp_alloc_array(int, nfact + 1);
-            if (target->update_facts != NULL) {
+            target->fact_stamps  = mrp_allocz_array(uint32_t, nfact);
+
+            if (target->update_facts != NULL && target->fact_stamps != NULL) {
                 for (i = 0; i < nfact; i++)
                     target->update_facts[i] = L.items[i];
                 target->update_facts[i] = -1;

@@ -9,7 +9,6 @@
 
 #include "resolver-types.h"
 #include "resolver.h"
-#include "db.h"
 #include "fact.h"
 #include "target.h"
 
@@ -19,10 +18,12 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
     mrp_list_hook_t *lp, *ln;
     yy_res_target_t *pt;
     target_t        *t;
-    int              i;
+    int              auto_update, i;
 
-    r->ntarget = 0;
-    r->targets = NULL;
+    auto_update = -1;
+    r->ntarget  = 0;
+    r->targets  = NULL;
+
     mrp_list_foreach(&parser->targets, lp, ln) {
         if (!mrp_reallocz(r->targets, r->ntarget * sizeof(*r->targets),
                           (r->ntarget + 1) * sizeof(*r->targets)))
@@ -59,6 +60,22 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
                 if (!create_fact(r, t->depends[i]))
                     return -1;
         }
+
+        if (parser->auto_update != NULL) {
+            if (!strcmp(parser->auto_update, t->name))
+                auto_update = t - r->targets;
+        }
+    }
+
+    if (auto_update >= 0)
+        r->auto_update = r->targets + auto_update;
+    else {
+        if (parser->auto_update != NULL) {
+            mrp_log_error("Auto-update target '%s' does not exist.",
+                          parser->auto_update);
+            errno = ENOENT;
+            return -1;
+        }
     }
 
     return 0;
@@ -74,6 +91,7 @@ void destroy_targets(mrp_resolver_t *r)
         mrp_free(t->name);
         mrp_free(t->update_facts);
         mrp_free(t->update_targets);
+        mrp_free(t->fact_stamps);
 
         for (j = 0; j < t->ndepend; j++)
             mrp_free(t->depends[j]);
@@ -102,6 +120,22 @@ int compile_target_scripts(mrp_resolver_t *r)
 }
 
 
+int prepare_target_scripts(mrp_resolver_t *r)
+{
+    target_t *t;
+    int       i;
+
+    for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
+        if (mrp_prepare_script(t->script) < 0) {
+            mrp_log_error("Failed to prepare script for target '%s'.", t->name);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
 static int older_than_facts(mrp_resolver_t *r, target_t *t)
 {
     int i, id;
@@ -115,11 +149,11 @@ static int older_than_facts(mrp_resolver_t *r, target_t *t)
      * facts have a newer stamp than the target.
      */
 
-    if (t->update_facts != NULL)
+    if (t->update_facts == NULL)
         return TRUE;
     else {
         for (i = 0; (id = t->update_facts[i]) >= 0; i++) {
-            if (fact_stamp(r, id) > t->stamp)
+            if (fact_stamp(r, id) > t->fact_stamps[i])
                 return TRUE;
         }
     }
@@ -151,24 +185,42 @@ static int older_than_targets(mrp_resolver_t *r, target_t *t)
 }
 
 
+static void save_fact_stamps(mrp_resolver_t *r, target_t *t, uint32_t *buf)
+{
+    int id, idx, i;
+
+    if (t->update_facts != NULL) {
+        id  = t - r->targets;
+        idx = id * r->nfact;
+
+        for (i = 0; (id = t->update_facts[i]) >= 0; i++, idx++)
+            buf[idx] = t->fact_stamps[i];
+    }
+}
+
+
+static void restore_fact_stamps(mrp_resolver_t *r, target_t *t, uint32_t *buf)
+{
+    int id, idx, i;
+
+    if (t->update_facts != NULL) {
+        id  = t - r->targets;
+        idx = id * r->nfact;
+
+        for (i = 0; (id = t->update_facts[i]) >= 0; i++, idx++)
+            t->fact_stamps[i] = buf[idx];
+    }
+}
+
+
 static void save_target_stamps(mrp_resolver_t *r, target_t *t, uint32_t *buf)
 {
     target_t *dep;
     int       i, id;
 
-    if (t != NULL) {
-        memset(buf, (uint32_t)-1, r->ntarget * sizeof(*buf));
-
-        for (i = 0; (id = t->update_targets[i]) >= 0; i++) {
-            dep     = r->targets + id;
-            buf[id] = dep->stamp;
-        }
-    }
-    else {
-        for (id = 0; id < r->ntarget; id++) {
-            dep     = r->targets + id;
-            buf[id] = dep->stamp;
-        }
+    for (i = 0; (id = t->update_targets[i]) >= 0; i++) {
+        dep = r->targets + id;
+        save_fact_stamps(r, dep, buf);
     }
 }
 
@@ -178,36 +230,40 @@ static void restore_target_stamps(mrp_resolver_t *r, target_t *t, uint32_t *buf)
     target_t *dep;
     int       i, id;
 
-    if (t != NULL) {
-        memset(buf, (uint32_t)-1, r->ntarget * sizeof(*buf));
+    for (i = 0; (id = t->update_targets[i]) >= 0; i++) {
+        dep = r->targets + id;
+        restore_fact_stamps(r, dep, buf);
+    }
+}
 
-        for (i = 0; (id = t->update_targets[i]) >= 0; i++) {
-            dep        = r->targets + id;
-            dep->stamp = buf[id];
-        }
-    }
-    else {
-        for (id = 0; id < r->ntarget; id++) {
-            dep        = r->targets + id;
-            dep->stamp = buf[id];
-        }
-    }
+
+static void update_target_stamps(mrp_resolver_t *r, target_t *t)
+{
+    int i, id;
+
+    if (t->update_facts != NULL)
+        for (i = 0; (id = t->update_facts[i]) >= 0; i++)
+            t->fact_stamps[i] = fact_stamp(r, id);
 }
 
 
 static int update_target(mrp_resolver_t *r, target_t *t)
 {
-    target_t *dep;
-    uint32_t  stamps[r->ntarget];
-    int       i, id, status, needs_update, tx_owner;
+    mqi_handle_t  tx;
+    target_t     *dep;
+    uint32_t      stamps[r->ntarget * r->nfact];
+    int           i, id, status, needs_update;
+
+    tx = start_transaction(r);
+
+    if (tx == MQI_HANDLE_INVALID) {
+        if (errno != 0)
+            return -errno;
+        else
+            return -EINVAL;
+    }
 
     save_target_stamps(r, t, stamps);
-    if (r->stamp == INVALID_TX) {
-        r->stamp = start_transaction(r);
-        tx_owner = TRUE;
-    }
-    else
-        tx_owner = FALSE;
 
     status       = TRUE;
     needs_update = older_than_facts(r, t);
@@ -226,7 +282,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
             if (status <= 0)
                 break;
             else
-                dep->stamp = r->stamp;
+                update_target_stamps(r, dep);
         }
     }
 
@@ -234,13 +290,21 @@ static int update_target(mrp_resolver_t *r, target_t *t)
         status = mrp_execute_script(t->script, r->ctbl);
 
         if (status > 0)
-            t->stamp = r->stamp;
+            update_target_stamps(r, t);
     }
 
     if (status <= 0) {
+        rollback_transaction(r, tx);
         restore_target_stamps(r, t, stamps);
-        if (tx_owner)
-            rollback_transaction(r);
+    }
+    else {
+        if (!commit_transaction(r, tx)) {
+            restore_target_stamps(r, t, stamps);
+            if (errno != 0)
+                status = -errno;
+            else
+                status = -EINVAL;
+        }
     }
 
     return status;
@@ -267,6 +331,15 @@ int update_target_by_id(mrp_resolver_t *r, int id)
         return update_target(r, r->targets + id);
     else
         return FALSE;
+}
+
+
+int autoupdate_target(mrp_resolver_t *r)
+{
+    if (r->auto_update != NULL)
+        return mrp_resolver_update_targetl(r, r->auto_update->name, NULL);
+    else
+        return TRUE;
 }
 
 

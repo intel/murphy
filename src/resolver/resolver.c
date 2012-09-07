@@ -41,6 +41,12 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
 }
 
 
+int mrp_resolver_prepare(mrp_resolver_t *r)
+{
+    return (prepare_target_scripts(r) == 0);
+}
+
+
 void mrp_resolver_destroy(mrp_resolver_t *r)
 {
     if (r != NULL) {

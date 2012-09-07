@@ -6,6 +6,7 @@
 #include "simple-script.h"
 
 function_call_t *create_call(char *name, arg_t *args, int narg);
+int link_call(function_call_t *c);
 void destroy_call(function_call_t *c);
 void dump_call(FILE *fp, function_call_t *c);
 

@@ -17,6 +17,9 @@ mrp_resolver_t *mrp_resolver_parse(const char *path);
 /** Destroy the given resolver context, freeing all associated resources. */
 void mrp_resolver_destroy(mrp_resolver_t *r);
 
+/** Prepare the targets for resolution (link scriptlets, etc.). */
+int mrp_resolver_prepare(mrp_resolver_t *r);
+
 /** Update the given target. The NULL-terminated variable argument list
     after the target name sepcifies the resolver context variables to
     set during the update. Use a single NULL to omit variables. */

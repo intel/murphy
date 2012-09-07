@@ -39,6 +39,7 @@ struct yy_res_input_s {
 
 typedef struct {
     mrp_list_hook_t targets;                      /* list of targets */
+    char           *auto_update;                  /* auto-update target */
     char            ringbuf[YY_RES_RINGBUF_SIZE]; /* token ringbuffer */
     int             offs;                         /* buffer insert offset */
     yy_res_input_t *in;                           /* current input */

@@ -35,6 +35,7 @@ static tkn_strarr_t *strarr_append(tkn_strarr_t *arr, char *str);
 %token          KEY_DEPENDS_ON
 %token          KEY_UPDATE_SCRIPT
 %token          KEY_END_SCRIPT
+%token          KEY_AUTOUPDATE
 %token <string> TKN_IDENT
 %token <string> TKN_FACT
 %token <string> TKN_SCRIPT_LINE
@@ -47,11 +48,15 @@ static tkn_strarr_t *strarr_append(tkn_strarr_t *arr, char *str);
 %type  <script> optional_script
 %type  <string> script_source
 
-
 %%
 
-input: targets
+input: optional_autoupdate targets
     ;
+
+optional_autoupdate:
+/* no autoupdate target */ { parser->auto_update = NULL;                 }
+| KEY_AUTOUPDATE TKN_IDENT { parser->auto_update = mrp_strdup($2.value); }
+;
 
 targets:
   target         { mrp_list_append(&parser->targets, &$1->hook); }
@@ -258,6 +263,8 @@ void parser_cleanup(yy_res_parser_t *parser)
         scanner_free_input(ip);
         ip = in;
     }
+
+    mrp_free(parser->auto_update);
 }
 
 

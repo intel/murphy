@@ -256,6 +256,7 @@ COMMENT               #.*
 INCLUDE               ^include{WS}\"[^\"]*\"
 
 TARGET                ^target
+AUTOUPDATE            ^auto-update-target
 DEPENDS_ON            depends\ on
 IDENT                 [a-zA-Z_][a-zA-Z0-9_]+
 FACT                  \${IDENT}(\.{IDENT})*
@@ -268,6 +269,7 @@ SCRIPT_LINE           ^{WS}.*
 %%
 
 {TARGET}              { KEYWORD_TOKEN(TARGET);                         }
+{AUTOUPDATE}          { KEYWORD_TOKEN(AUTOUPDATE);                     }
 {DEPENDS_ON}          { KEYWORD_TOKEN(DEPENDS_ON);                     }
 {IDENT}               { STRING_TOKEN(IDENT);                           }
 {FACT}                { STRING_TOKEN(FACT);                            }

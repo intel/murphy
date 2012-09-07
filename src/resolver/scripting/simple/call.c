@@ -110,20 +110,24 @@ void destroy_arguments(arg_t *args, int narg)
 }
 
 
-static int resolve_function(function_call_t *c)
+int link_call(function_call_t *c)
 {
     mrp_plugin_t  *plugin;
     int          (*script_ptr)(mrp_plugin_t *plugin, const char *name,
                                mrp_script_env_t *env);
 
-    if (mrp_import_method(c->name, NULL, NULL, &script_ptr, &plugin) < 0)
-        return FALSE;
-    else {
-        c->script_ptr = script_ptr;
-        c->plugin     = plugin;
-
-        return TRUE;
+    if (c->script_ptr == NULL) {
+        if (mrp_import_method(c->name, NULL, NULL, &script_ptr, &plugin) < 0) {
+            mrp_log_error("Failed to find method '%s'.", c->name);
+            return FALSE;
+        }
+        else {
+            c->script_ptr = script_ptr;
+            c->plugin     = plugin;
+        }
     }
+
+    return TRUE;
 }
 
 int execute_call(function_call_t *c, mrp_context_tbl_t *tbl)
@@ -134,7 +138,7 @@ int execute_call(function_call_t *c, mrp_context_tbl_t *tbl)
     int                narg, n, status;
 
     if (MRP_UNLIKELY(c->script_ptr == NULL)) {
-        if (!resolve_function(c))
+        if (!link_call(c))
             return -ENOENT;
     }
 
