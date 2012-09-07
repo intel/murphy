@@ -60,73 +60,151 @@ static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
 }
 
 
-int main(int argc, char *argv[])
+static mrp_context_t *create_context(void)
 {
     mrp_context_t *ctx;
-    mrp_cfgfile_t *cfg;
 
     ctx = mrp_context_create();
 
-    if (ctx != NULL) {
-        if (!mrp_parse_cmdline(ctx, argc, argv)) {
-            mrp_log_error("Failed to parse command line.");
-            exit(1);
-        }
+    if (ctx != NULL)
+        return ctx;
+    else
+        mrp_log_error("Failed to create murphy main context.");
 
-        mrp_add_sighandler(ctx->ml, SIGINT , signal_handler, ctx);
-        mrp_add_sighandler(ctx->ml, SIGTERM, signal_handler, ctx);
+    exit(1);
+}
 
-        mrp_log_set_mask(ctx->log_mask);
-        mrp_log_set_target(ctx->log_target);
 
-        emit_daemon_event(DAEMON_EVENT_LOADING);
+static void setup_signals(mrp_context_t *ctx)
+{
+    mrp_add_sighandler(ctx->ml, SIGINT , signal_handler, ctx);
+    mrp_add_sighandler(ctx->ml, SIGTERM, signal_handler, ctx);
+}
 
-        cfg = mrp_parse_cfgfile(ctx->config_file);
 
-        if (cfg == NULL) {
-            mrp_log_error("Failed to parse configuration file '%s'.",
-                          ctx->config_file);
-            exit(1);
-        }
+static void parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
+{
+    mrp_parse_cmdline(ctx, argc, argv);
+}
 
+
+static void load_configuration(mrp_context_t *ctx)
+{
+    mrp_cfgfile_t *cfg;
+
+    emit_daemon_event(DAEMON_EVENT_LOADING);
+
+    cfg = mrp_parse_cfgfile(ctx->config_file);
+
+    if (cfg != NULL) {
         if (!mrp_exec_cfgfile(ctx, cfg)) {
             mrp_log_error("Failed to execute configuration.");
             exit(1);
         }
-
-        if (ctx->resolver_ruleset != NULL) {
-            ctx->r = mrp_resolver_parse(ctx->resolver_ruleset);
-
-            if (ctx->r == NULL) {
-                mrp_log_error("Failed to parse resolver file '%s'.",
-                              ctx->resolver_ruleset);
-                exit(1);
-            }
-        }
-
-        emit_daemon_event(DAEMON_EVENT_STARTING);
-
-        if (!mrp_start_plugins(ctx))
-            exit(1);
-
-        if (!ctx->foreground) {
-            if (!mrp_daemonize("/", "/dev/null", "/dev/null"))
-                exit(1);
-        }
-
-        emit_daemon_event(DAEMON_EVENT_RUNNING);
-
-        mrp_mainloop_run(ctx->ml);
-
-        emit_daemon_event(DAEMON_EVENT_STOPPING);
-
-        mrp_log_info("Exiting...");
-        mrp_context_destroy(ctx);
     }
     else {
-        mrp_log_error("Failed to create murphy context.");
+        mrp_log_error("Failed to parse configuration file '%s'.",
+                      ctx->config_file);
         exit(1);
     }
+}
+
+
+static void load_ruleset(mrp_context_t *ctx)
+{
+    if (ctx->resolver_ruleset != NULL) {
+        ctx->r = mrp_resolver_parse(ctx->resolver_ruleset);
+
+        if (ctx->r != NULL)
+            mrp_log_info("Loaded resolver ruleset '%s'.",
+                         ctx->resolver_ruleset);
+        else {
+            mrp_log_error("Failed to load resolver ruleset '%s'.",
+                          ctx->resolver_ruleset);
+            exit(1);
+        }
+    }
+}
+
+
+static void start_plugins(mrp_context_t *ctx)
+{
+    emit_daemon_event(DAEMON_EVENT_STARTING);
+
+    if (mrp_start_plugins(ctx))
+        mrp_log_info("Successfully started all loaded plugins.");
+    else {
+        mrp_log_error("Some plugins failed to start.");
+        exit(1);
+    }
+}
+
+
+static void daemonize(mrp_context_t *ctx)
+{
+    if (!ctx->foreground) {
+        mrp_log_info("Switching to daemon mode.");
+
+        if (!mrp_daemonize("/", "/dev/null", "/dev/null")) {
+            mrp_log_error("Failed to daemonize.");
+            exit(1);
+        }
+    }
+}
+
+
+static void prepare_ruleset(mrp_context_t *ctx)
+{
+    if (ctx->r != NULL) {
+        if (mrp_resolver_prepare(ctx->r))
+            mrp_log_info("Ruleset prepared for resolution.");
+        else {
+            mrp_log_error("Failed to prepare ruleset for execution.");
+            exit(1);
+        }
+    }
+}
+
+
+static void run_mainloop(mrp_context_t *ctx)
+{
+    emit_daemon_event(DAEMON_EVENT_RUNNING);
+    mrp_mainloop_run(ctx->ml);
+}
+
+
+static void stop_plugins(mrp_context_t *ctx)
+{
+    MRP_UNUSED(ctx);
+
+    emit_daemon_event(DAEMON_EVENT_STOPPING);
+}
+
+
+static void cleanup_context(mrp_context_t *ctx)
+{
+    mrp_log_info("Shutting down...");
+    mrp_context_destroy(ctx);
+}
+
+
+int main(int argc, char *argv[])
+{
+    mrp_context_t *ctx;
+
+    ctx = create_context();
+
+    setup_signals(ctx);
+    parse_cmdline(ctx, argc, argv);
+    load_configuration(ctx);
+    load_ruleset(ctx);
+    start_plugins(ctx);
+    prepare_ruleset(ctx);
+    daemonize(ctx);
+    run_mainloop(ctx);
+    stop_plugins(ctx);
+
+    cleanup_context(ctx);
 
     return 0;
 }
