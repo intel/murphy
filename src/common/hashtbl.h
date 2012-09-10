@@ -31,6 +31,8 @@
 #define __MURPHY_HASHTBL_H__
 
 
+#include <murphy/common/macros.h>
+
 MRP_CDECL_BEGIN
 
 typedef struct mrp_htbl_s mrp_htbl_t;
