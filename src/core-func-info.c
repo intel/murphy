@@ -56,12 +56,12 @@ static mrp_debug_info_t info_2[] = {
     { .line = 160, .func = "mrp_get_event_id" },
     { .line = 188, .func = "mrp_get_event_name" },
     { .line = 202, .func = "mrp_emit_event_msg" },
-    { .line = 248, .func = "mrp_emit_event" },
-    { .line = 270, .func = "mrp_set_events" },
-    { .line = 287, .func = "mrp_set_named_events" },
-    { .line = 308, .func = "event_count" },
-    { .line = 316, .func = "lowest_bit" },
-    { .line = 324, .func = "single_event" },
+    { .line = 247, .func = "mrp_emit_event" },
+    { .line = 269, .func = "mrp_set_events" },
+    { .line = 286, .func = "mrp_set_named_events" },
+    { .line = 307, .func = "event_count" },
+    { .line = 315, .func = "lowest_bit" },
+    { .line = 323, .func = "single_event" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_2 = {
