@@ -283,6 +283,7 @@ libmurphy_resolver_la_REGULAR_SOURCES =				\
 		resolver/target.c				\
 		resolver/target-sorter.c			\
 		resolver/fact.c					\
+		resolver/events.c				\
 		$(SIMPLE_SCRIPT_SOURCES)
 
 libmurphy_resolver_la_SOURCES =			\
