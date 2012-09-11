@@ -65,9 +65,10 @@ typedef enum {
     MRP_MSG_FIELD_BLOB    = 0x0c,        /* a blob (not allowed in arrays) */
     MRP_MSG_FIELD_MAX     = 0x0c,
     MRP_MSG_FIELD_ARRAY   = 0x80,        /* bit-mask to mark arrays */
-    MRP_MSG_END           = MRP_MSG_FIELD_INVALID
 } mrp_msg_field_type_t;
 #undef A
+
+#define MRP_MSG_END ((char *)MRP_MSG_FIELD_INVALID) /* NULL */
 
 #define MRP_MSG_FIELD_ARRAY_OF(t) (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##t)
 

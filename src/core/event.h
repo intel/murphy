@@ -2,6 +2,7 @@
 #define __MURPHY_EVENT_H__
 
 #include <murphy/common/macros.h>
+#include <murphy/common/log.h>
 #include <murphy/common/list.h>
 #include <murphy/common/msg.h>
 
@@ -93,7 +94,7 @@ const char *mrp_get_event_name(int id);
 int mrp_emit_event_msg(int id, mrp_msg_t *event_data);
 
 /** Emit an event with a message constructed from the given parameters. */
-int mrp_emit_event(int id, ...);
+int mrp_emit_event(int id, ...) MRP_NULLTERM;
 
 /** Initialize an event mask to be empty. */
 static inline void mrp_reset_event_mask(mrp_event_mask_t *mask)

@@ -212,10 +212,9 @@ int mrp_emit_event_msg(int id, mrp_msg_t *event_data)
             nemit++;
             mrp_msg_ref(event_data);
 
+            mrp_debug("emitting event 0x%x (%s)", def->id, def->name);
 #if 0
-            printf("emitting event 0x%x ('%s')\n", def->id, def->name);
-            if (event_data != NULL)
-                mrp_msg_dump(event_data, stdout);
+            mrp_msg_dump(event_data, stdout);
 #endif
 
             mrp_list_foreach(&def->watches, p, n) {
@@ -254,7 +253,7 @@ int mrp_emit_event(int id, ...)
 
     va_start(ap, id);
     tag = va_arg(ap, unsigned int);
-    if (tag != MRP_MSG_END)
+    if (tag != MRP_MSG_FIELD_INVALID)
         msg = mrp_msg_createv(tag, ap);
     else
         msg = NULL;
