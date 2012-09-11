@@ -82,15 +82,11 @@ static void process_queue(mrp_mainloop_t *ml, mrp_deferred_t *d,
     MRP_UNUSED(ml);
     MRP_UNUSED(user_data);
 
-    mrp_log_info("process_queue");
-
     mrp_disable_deferred(d);
 
     mrp_list_foreach(&msg_queue, p, n) {
 
         msg = mrp_list_entry(p, typeof(*msg), hook);
-
-        mrp_log_info("processing msg %p", msg);
 
         if (!msg) {
             mrp_log_error("no message!");
@@ -110,12 +106,6 @@ static void process_queue(mrp_mainloop_t *ml, mrp_deferred_t *d,
 
                 /* Look next from the general connections table. */
                 endpoint = mrp_htbl_lookup(connections, msg->addr->data);
-                mrp_log_info("sending message to connection '%s'",
-                    msg->addr->data);
-            }
-            else {
-                mrp_log_info("sending message to server '%s'",
-                    msg->addr->data);
             }
         }
         else {
@@ -219,8 +209,6 @@ static socklen_t internal_resolve(const char *str, mrp_sockaddr_t *addr,
 
     MRP_UNUSED(size);
 
-    mrp_log_info("> internal_resolve");
-
     if (!str)
         return 0;
 
@@ -237,8 +225,6 @@ static socklen_t internal_resolve(const char *str, mrp_sockaddr_t *addr,
 
     memcpy(addr->data, str+9, len-9+1);
 
-    mrp_log_info("resolved %s from %s", addr->data, str);
-
     return len-9;
 }
 
@@ -246,8 +232,6 @@ static socklen_t internal_resolve(const char *str, mrp_sockaddr_t *addr,
 static int internal_open(mrp_transport_t *mu)
 {
     internal_t *u = (internal_t *)mu;
-
-    mrp_log_info("> internal_open");
 
     if (internal_initialize_table(u) < 0)
         return FALSE;
@@ -269,8 +253,6 @@ static int internal_bind(mrp_transport_t *mu, mrp_sockaddr_t *addr,
                      socklen_t addrlen)
 {
     internal_t *u = (internal_t *)mu;
-
-    mrp_log_info("> internal_bind");
 
     if (internal_initialize_table(u) < 0)
         return FALSE;
@@ -295,8 +277,6 @@ static int internal_listen(mrp_transport_t *mu, int backlog)
     if (!u->bound)
         return FALSE;
 
-    mrp_log_info("> internal_listen");
-
     u->listening = TRUE;
 
     return TRUE;
@@ -308,8 +288,6 @@ static int internal_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
     internal_t *t = (internal_t *) mt;
     internal_t *lt = (internal_t *) mlt;
     internal_t *client = lt->endpoint;
-
-    mrp_log_info("> internal_accept");
 
     t->endpoint = client;
     client->endpoint = t;
@@ -351,8 +329,6 @@ static void internal_close(mrp_transport_t *mu)
 {
     internal_t *u = (internal_t *)mu;
 
-    mrp_log_info("> internal_close");
-
     /* Is this client or server? If server, go remove the connection from
      * servers table. */
 
@@ -378,8 +354,6 @@ static int internal_connect(mrp_transport_t *mu, mrp_sockaddr_t *addr,
     mrp_transport_t *mt;
 
     MRP_UNUSED(addrlen);
-
-    mrp_log_info("> internal_connect");
 
     /* client connecting */
 
@@ -409,8 +383,6 @@ static int internal_disconnect(mrp_transport_t *mu)
 {
     internal_t *u = (internal_t *)mu;
 
-    mrp_log_info("> internal_disconnect");
-
     if (u->connected) {
         internal_t *endpoint = u->endpoint;
 
@@ -432,9 +404,6 @@ static int internal_sendto(mrp_transport_t *mu, mrp_msg_t *data,
     void *buf;
     size_t size;
     internal_message_t *msg;
-
-
-    mrp_log_info("> internal_sendto");
 
     size = mrp_msg_default_encode(data, &buf);
 
@@ -464,8 +433,6 @@ static int internal_sendto(mrp_transport_t *mu, mrp_msg_t *data,
 
 static int internal_send(mrp_transport_t *mu, mrp_msg_t *msg)
 {
-    mrp_log_info("> internal_send");
-
     if (!mu->connected) {
         return FALSE;
     }
@@ -479,8 +446,6 @@ static int internal_sendrawto(mrp_transport_t *mu, void *data, size_t size,
 {
     internal_t *u = (internal_t *)mu;
     internal_message_t *msg;
-
-    mrp_log_info("> internal_sendrawto");
 
     msg = mrp_allocz(sizeof(internal_message_t));
 
@@ -504,8 +469,6 @@ static int internal_sendrawto(mrp_transport_t *mu, void *data, size_t size,
 
 static int internal_sendraw(mrp_transport_t *mu, void *data, size_t size)
 {
-    mrp_log_info("> internal_sendraw");
-
     if (!mu->connected) {
         return FALSE;
     }
@@ -559,8 +522,6 @@ static int internal_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
     size_t size;
     internal_message_t *msg;
 
-    mrp_log_info("> internal_senddatato");
-
     if (type == NULL)
         return FALSE;
 
@@ -594,8 +555,6 @@ static int internal_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
 
 static int internal_senddata(mrp_transport_t *mu, void *data, uint16_t tag)
 {
-    mrp_log_info("> internal_senddata");
-
     if (!mu->connected) {
         return FALSE;
     }
