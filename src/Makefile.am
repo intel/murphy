@@ -399,6 +399,64 @@ resolver/scripting/simple/simple-parser.c:	\
 	mv -f y.tab.h resolver/scripting/simple/simple-parser.h
 	mv -f y.tab.c resolver/scripting/simple/simple-parser.c
 
+###################################
+# murphy resource library
+#
+
+lib_LTLIBRARIES += libmurphy-resource.la
+EXTRA_DIST      += resource/murphy-resource.pc
+pkgconfig_DATA  += resource/murphy-resource.pc
+
+libmurphy_resource_ladir =			\
+		$(includedir)/murphy/resource
+
+libmurphy_resource_la_HEADERS =			\
+		resource/data-types.h           \
+		resource/resource-api.h
+
+libmurphy_resource_la_REGULAR_SOURCES =		\
+		resource/attribute.c		\
+		resource/resource.c		\
+		resource/resource-set.c		\
+		resource/resource-class.c	\
+		resource/resource-owner.c	\
+		resource/resource-client.c	\
+		resource/zone.c
+
+libmurphy_resource_la_SOURCES =			\
+		$(libmurphy_resource_la_REGULAR_SOURCES)	\
+		resource-func-info.c
+
+libmurphy_resource_la_CFLAGS =			\
+		$(AM_CFLAGS)			\
+		-Imurphy-db/include
+
+libmurphy_resource_la_LDFLAGS =			\
+		-Wl,-version-script=linker-script.resource \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_resource_la_LIBADD =	    \
+		libmurphy-core.la   \
+		libmurphy-common.la
+
+libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
+				     libmurphy-core.la      \
+				     libmurphy-common.la
+
+# debug file:line-function mapping generation
+resource-func-info.c: $(libmurphy_resource_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm resource-func-info.c
+
+# resource linker script generation
+linker-script.resource: $(libmurphy_resource_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.resource
+
 
 ###################################
 # murphy plugins
@@ -609,6 +667,7 @@ murphyd_CFLAGS  =			\
 
 murphyd_LDADD  =			\
 		$(BUILTIN_LIBS)         \
+		libmurphy-resource.la   \
 		libmurphy-resolver.la	\
 		libmurphy-core.la	\
 		libmurphy-common.la
