@@ -63,6 +63,8 @@ void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("one"  , one_cb  , TRUE,
@@ -79,6 +81,9 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
 
         MRP_TOKENIZED_CMD("db-cmd" , db_cmd_cb , TRUE,
                           "db-cmd <DB command>", "run DB command", "run DB command"),
+
+        MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
+                          "update <target>", "update target", "update target"),
 
 });
 
@@ -185,6 +190,31 @@ void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
+void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    mrp_context_t  *ctx = c->ctx;
+    const char     *target;
+
+    MRP_UNUSED(user_data);
+
+    if (argc == 3) {
+        target = argv[2];
+
+        if (ctx->r != NULL) {
+            if (mrp_resolver_update_target(ctx->r, target, NULL) > 0)
+                mrp_console_printf(c, "'%s' updated OK.\n", target);
+            else
+                mrp_console_printf(c, "Failed to update '%s'.\n", target);
+        }
+        else
+            mrp_console_printf(c, "Resolver/ruleset is not available.\n");
+    }
+    else {
+        mrp_console_printf(c, "Usage: %s %s <target-name>\n", argv[0], argv[1]);
+    }
+}
+
+
 MRP_EXPORTABLE(char *, method1, (int arg1, char *arg2, double arg3))
 {
     MRP_UNUSED(arg1);
@@ -203,7 +233,9 @@ static int boilerplate1(mrp_plugin_t *plugin,
     MRP_UNUSED(name);
     MRP_UNUSED(env);
 
-    return -1;
+    method1(1, "foo", 9.81);
+
+    return TRUE;
 }
 
 MRP_EXPORTABLE(int, method2, (char *arg1, double arg2, int arg3))
