@@ -33,18 +33,14 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/hashtbl.h>
 #include <murphy/common/utils.h>
+#include <murphy/common/log.h>
 
-#include <resource/resource-api.h>
+#include <murphy/resource/resource-api.h>
 
 #include "resource-set.h"
 #include "resource-class.h"
 #include "resource.h"
 #include "resource-owner.h"
-
-/* temporary!!! */
-#define mrp_log_warning(fmt, args...) printf(fmt "\n" , ##args) 
-#define mrp_log_error(fmt, args...) printf(fmt "\n" , ##args) 
-#define mrp_log_info(fmt, args...) printf(fmt "\n" , ##args) 
 
 
 #define STAMP_MAX     ((uint32_t)1 << MRP_KEY_STAMP_BITS)
@@ -167,7 +163,7 @@ void mrp_resource_set_release(mrp_resource_set_t *rset)
 }
 
 
-int mrp_resource_set_print(mrp_resource_set_t *rset, int indent,
+int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
                            char *buf, int len)
 {
 #define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
@@ -178,16 +174,18 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, int indent,
     char gap[] = "                         ";
     char *p, *e;
 
-    MRP_ASSERT(rset && indent >= 0 && indent < sizeof(gap)-1 && buf && len > 0,
+    MRP_ASSERT(rset && indent < sizeof(gap)-1 && buf && len > 0,
                "invalid argument");
 
     gap[indent] = '\0';
 
     e = (p = buf) + len;
 
+    mandatory = rset->resource.mask.mandatory;
+
     PRINT("%s%3u - 0x%02x/0x%02x 0x%02x/0x%02x 0x%08x %d %s %s\n",
           gap, rset->id,
-          rset->resource.mask.all, (mandatory = rset->resource.mask.mandatory),
+          rset->resource.mask.all, mandatory,
           rset->resource.mask.grant, rset->resource.mask.advice,
           mrp_resource_class_get_sorting_key(rset), rset->class.priority,
           rset->resource.share ? "shared   ":"exclusive",

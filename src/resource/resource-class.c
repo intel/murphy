@@ -33,16 +33,13 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/hashtbl.h>
 #include <murphy/common/utils.h>
+#include <murphy/common/log.h>
 
-#include <resource/resource-api.h>
+#include <murphy/resource/resource-api.h>
 
 #include "resource-class.h"
 #include "resource-set.h"
 #include "zone.h"
-
-/* temporary!!! */
-#define mrp_log_warning(fmt, args...) printf(fmt "\n" , ##args) 
-#define mrp_log_error(fmt, args...) printf(fmt "\n" , ##args) 
 
 
 /*

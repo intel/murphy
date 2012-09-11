@@ -31,14 +31,12 @@
 #include <string.h>
 
 #include <murphy/common/mm.h>
+#include <murphy/common/log.h>
 
-#include <resource/resource-api.h>
+#include <murphy/resource/resource-api.h>
 
 #include "zone.h"
 
-/* temporary!!! */
-#define mrp_log_warning(fmt, args...) printf(fmt "\n", ## args) 
-#define mrp_log_error(fmt, args...) printf(fmt "\n", ## args) 
 
 #define ATTRIBUTE_MAX  32
 

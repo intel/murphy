@@ -31,14 +31,12 @@
 #include <string.h>
 
 #include <murphy/common/mm.h>
+#include <murphy/common/log.h>
 
-#include <resource/resource-api.h>
+#include <murphy/resource/resource-api.h>
 
 #include "resource.h"
 
-/* temporary!!! */
-#define mrp_log_warning(fmt, args...) printf(fmt "\n", ## args) 
-#define mrp_log_error(fmt, args...) printf(fmt "\n", ## args) 
 
 #define RESOURCE_MAX   (sizeof(mrp_resource_mask_t) * 8)
 #define ATTRIBUTE_MAX  32
@@ -224,7 +222,7 @@ bool mrp_resource_is_shared(mrp_resource_t *res)
 
 
 int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
-                       int indent, char *buf, int len)
+                       size_t indent, char *buf, int len)
 {
 #define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
 
@@ -233,7 +231,7 @@ int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
     char *p, *e;
     uint32_t m;
 
-    MRP_ASSERT(res && indent >= 0 && indent < sizeof(gap)-1 && buf && len > 0,
+    MRP_ASSERT(res && indent < sizeof(gap)-1 && buf && len > 0,
                "invalid argument");
 
     rdef = res->def;

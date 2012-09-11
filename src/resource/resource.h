@@ -62,7 +62,8 @@ void                mrp_resource_destroy(mrp_resource_t *);
 uint32_t            mrp_resource_get_mask(mrp_resource_t *);
 bool                mrp_resource_is_shared(mrp_resource_t *);
 
-int                 mrp_resource_print(mrp_resource_t*,uint32_t,int,char*,int);
+int                 mrp_resource_print(mrp_resource_t*, uint32_t,
+                                       size_t, char *, int);
 int                 mrp_resource_attribute_print(mrp_resource_t *, char *,int);
 
 

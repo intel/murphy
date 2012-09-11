@@ -32,12 +32,10 @@
 #include <string.h>
 
 #include <murphy/common/mm.h>
+#include <murphy/common/log.h>
 
 #include "attribute.h"
 
-/* temporary!!! */
-#define mrp_log_warning(fmt, args...) printf(fmt "\n", ## args) 
-#define mrp_log_error(fmt, args...) printf(fmt "\n", ## args) 
 
 static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_def_t *,
                                                   const char*,mqi_data_type_t);

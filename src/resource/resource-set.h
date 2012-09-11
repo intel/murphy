@@ -76,7 +76,7 @@ struct mrp_resource_set_s {
 mrp_resource_set_t *mrp_resource_set_create(uint32_t, void *, uint32_t);
 mrp_resource_t     *mrp_resource_set_iterate_resources(mrp_resource_set_t *,
                                                        void **);
-int                 mrp_resource_set_print(mrp_resource_set_t *, int,
+int                 mrp_resource_set_print(mrp_resource_set_t *, size_t,
                                            char *, int);
 
 

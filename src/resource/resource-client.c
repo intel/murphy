@@ -31,15 +31,13 @@
 #include <string.h>
 
 #include <murphy/common/mm.h>
+#include <murphy/common/log.h>
 
 #include <resource/resource-api.h>
 
 #include "resource-client.h"
 #include "resource-set.h"
 
-/* temporary!!! */
-#define mrp_log_warning(fmt, args...) printf(fmt "\n", ## args) 
-#define mrp_log_error(fmt, args...) printf(fmt "\n", ## args) 
 
 
 static MRP_LIST_HOOK(client_list);
