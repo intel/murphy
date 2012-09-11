@@ -28,7 +28,7 @@ int create_fact(mrp_resolver_t *r, char *fact)
 
     f = r->facts + r->nfact++;
     f->name  = mrp_strdup(fact);
-    f->table = MQI_HANDLE_INVALID;
+    f->table = mqi_get_table_handle(f->name + 1);
 
     if (f->name != NULL)
         return TRUE;
@@ -103,8 +103,6 @@ static void check_fact_tables(mrp_resolver_t *r)
             mrp_debug("Fact table '%s' stamp: %u.",
                       f->name, mqi_get_table_stamp(f->table));
     }
-
-    autoupdate_target(r);
 }
 
 
@@ -124,12 +122,12 @@ static void table_event(mqi_event_t *e, void *user_data)
 
     switch (e->event) {
     case mqi_table_created:
-        mrp_debug("Received table-created (%s, %u) DB event.",
+        mrp_debug("DB table created (%s, %u).",
                   e->table.table.name, e->table.table.handle);
         update_fact_table(r, e->table.table.name, e->table.table.handle);
         break;
     case mqi_table_dropped:
-        mrp_debug("Received table-dropped (%s, %u) DB event.",
+        mrp_debug("DB table dropped (%s, %u).",
                   e->table.table.name, e->table.table.handle);
         update_fact_table(r, e->table.table.name, MQI_HANDLE_INVALID);
         break;
@@ -147,11 +145,12 @@ static void transaction_event(mqi_event_t *e, void *user_data)
 
     switch (e->event) {
     case mqi_transaction_end:
-        mrp_debug("Received transaction-end DB event.");
+        mrp_debug("DB transaction ended.");
         check_fact_tables(r);
+        schedule_target_autoupdate(r);
         break;
     case mqi_transaction_start:
-        mrp_debug("Received transaction-start DB event.");
+        mrp_debug("DB transaction started.");
         break;
     default:
         break;

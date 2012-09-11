@@ -4,15 +4,29 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+typedef struct mrp_resolver_s mrp_resolver_t;
+
 #include <murphy/common/macros.h>
+#include <murphy/core/context.h>
 #include <murphy/core/scripting.h>
 
 MRP_CDECL_BEGIN
 
-typedef struct mrp_resolver_s mrp_resolver_t;
+
+/*
+ * tags and names of resolver-related events we emit
+ */
+
+#define MRP_RESOLVER_EVENT_STARTED "resolver-update-start"
+#define MRP_RESOLVER_EVENT_FAILED  "resolver-update-failed"
+#define MRP_RESOLVER_EVENT_DONE    "resolver-update-done"
+
+#define MRP_RESOLVER_TAG_TARGET ((uint16_t)1)
+#define MRP_RESOLVER_TAG_LEVEL  ((uint16_t)2)
+
 
 /** Parse the given resolver input file into a resolver context. */
-mrp_resolver_t *mrp_resolver_parse(const char *path);
+mrp_resolver_t *mrp_resolver_parse(mrp_context_t *ctx, const char *path);
 
 /** Destroy the given resolver context, freeing all associated resources. */
 void mrp_resolver_destroy(mrp_resolver_t *r);

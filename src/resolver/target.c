@@ -10,6 +10,7 @@
 #include "resolver-types.h"
 #include "resolver.h"
 #include "fact.h"
+#include "events.h"
 #include "target.h"
 
 
@@ -101,6 +102,11 @@ void destroy_targets(mrp_resolver_t *r)
     }
 
     mrp_free(r->targets);
+
+    if (r->auto_scheduled != NULL) {
+        mrp_del_deferred(r->auto_scheduled);
+        r->auto_scheduled = NULL;
+    }
 }
 
 
@@ -252,7 +258,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
     mqi_handle_t  tx;
     target_t     *dep;
     uint32_t      stamps[r->ntarget * r->nfact];
-    int           i, id, status, needs_update;
+    int           i, id, status, needs_update, level;
 
     tx = start_transaction(r);
 
@@ -262,6 +268,9 @@ static int update_target(mrp_resolver_t *r, target_t *t)
         else
             return -EINVAL;
     }
+
+    level = r->level++;
+    emit_resolver_event(RESOLVER_UPDATE_STARTED, t->name, level);
 
     save_target_stamps(r, t, stamps);
 
@@ -296,6 +305,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
     if (status <= 0) {
         rollback_transaction(r, tx);
         restore_target_stamps(r, t, stamps);
+        emit_resolver_event(RESOLVER_UPDATE_FAILED, t->name, level);
     }
     else {
         if (!commit_transaction(r, tx)) {
@@ -306,6 +316,13 @@ static int update_target(mrp_resolver_t *r, target_t *t)
                 status = -EINVAL;
         }
     }
+
+    if (status <= 0)
+        emit_resolver_event(RESOLVER_UPDATE_FAILED, t->name, level);
+    else
+        emit_resolver_event(RESOLVER_UPDATE_DONE  , t->name, level);
+
+    r->level--;
 
     return status;
 }
@@ -334,12 +351,43 @@ int update_target_by_id(mrp_resolver_t *r, int id)
 }
 
 
-int autoupdate_target(mrp_resolver_t *r)
+static int autoupdate_target(mrp_resolver_t *r)
 {
     if (r->auto_update != NULL)
         return mrp_resolver_update_targetl(r, r->auto_update->name, NULL);
     else
         return TRUE;
+}
+
+
+static void autoupdate_cb(mrp_mainloop_t *ml, mrp_deferred_t *d,
+                          void *user_data)
+{
+    mrp_resolver_t *r = (mrp_resolver_t *)user_data;
+
+    MRP_UNUSED(ml);
+
+    mrp_debug("running scheduled target autoupdate");
+    mrp_disable_deferred(d);
+    autoupdate_target(r);
+}
+
+
+int schedule_target_autoupdate(mrp_resolver_t *r)
+{
+    if (r->auto_update != NULL) {
+        if (r->ctx != NULL && r->auto_scheduled == NULL)
+            r->auto_scheduled = mrp_add_deferred(r->ctx->ml, autoupdate_cb, r);
+
+        if (r->auto_scheduled != NULL)
+            mrp_enable_deferred(r->auto_scheduled);
+        else
+            return FALSE;
+
+        mrp_debug("scheduled target autoupdate (%s)", r->auto_update->name);
+    }
+
+    return TRUE;
 }
 
 

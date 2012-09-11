@@ -142,7 +142,7 @@ static void load_configuration(mrp_context_t *ctx)
 static void load_ruleset(mrp_context_t *ctx)
 {
     if (ctx->resolver_ruleset != NULL) {
-        ctx->r = mrp_resolver_parse(ctx->resolver_ruleset);
+        ctx->r = mrp_resolver_parse(ctx, ctx->resolver_ruleset);
 
         if (ctx->r != NULL)
             mrp_log_info("Loaded resolver ruleset '%s'.",

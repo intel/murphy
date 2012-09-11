@@ -12,7 +12,7 @@
 #include "fact.h"
 #include "resolver.h"
 
-mrp_resolver_t *mrp_resolver_parse(const char *path)
+mrp_resolver_t *mrp_resolver_parse(mrp_context_t *ctx, const char *path)
 {
     yy_res_parser_t  parser;
     mrp_resolver_t  *r;
@@ -21,6 +21,7 @@ mrp_resolver_t *mrp_resolver_parse(const char *path)
     r = mrp_allocz(sizeof(*r));
 
     if (r != NULL) {
+        r->ctx = ctx;
         if (parser_parse_file(&parser, path)) {
             if (create_targets(r, &parser) == 0 &&
                 sort_targets(r)            == 0 &&

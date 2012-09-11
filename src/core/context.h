@@ -32,12 +32,14 @@
 
 #include <stdbool.h>
 
+typedef struct mrp_context_s mrp_context_t;
+
 #include <murphy/common/list.h>
 #include <murphy/common/mainloop.h>
 #include <murphy/resolver/resolver.h>
 
 
-typedef struct {
+struct mrp_context_s {
     /* logging settings, path configuration, etc. */
     int         log_mask;                  /* what to log */
     const char *log_target;                /* and where to log to */
@@ -55,7 +57,7 @@ typedef struct {
     mrp_list_hook_t  cmd_groups;           /* console command groups */
     mrp_list_hook_t  consoles;             /* active consoles */
     mrp_resolver_t  *r;                    /* resolver context */
-} mrp_context_t;
+};
 
 /** Create a new murphy context. */
 mrp_context_t *mrp_context_create(void);

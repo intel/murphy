@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
+#include <murphy/common/mainloop.h>
 #include <murphy/common/hashtbl.h>
+#include <murphy/core/context.h>
 #include <murphy/core/scripting.h>
 
 #include <murphy-db/mqi.h>
@@ -37,13 +39,16 @@ struct fact_s {
 
 
 struct mrp_resolver_s {
+    mrp_context_t     *ctx;              /* murphy context we're running in */
     target_t          *targets;          /* targets defined in the ruleset */
     int                ntarget;          /* number of targets */
     fact_t            *facts;            /* facts tracked as dependencies */
     int                nfact;            /* number of tracked facts */
     target_t          *auto_update;      /* target to resolve on fact changes */
+    mrp_deferred_t    *auto_scheduled;   /* scheduled auto_update */
     uint32_t           stamp;            /* update stamp */
     mrp_context_tbl_t *ctbl;             /* context variable table */
+    int                level;            /* target update nesting level */
 };
 
 

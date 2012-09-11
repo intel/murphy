@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
     if (c.debug)
         mrp_debug_enable(TRUE);
 
-    c.r = mrp_resolver_parse(c.file);
+    c.r = mrp_resolver_parse(NULL, c.file);
 
     if (c.r == NULL)
         mrp_log_error("Failed to parse input file '%s'.", c.file);
