@@ -303,7 +303,7 @@ libmurphy_resolver_la_LDFLAGS =			\
 libmurphy_resolver_la_LIBADD =	    	\
 		libmurphy-core.la   	\
 		libmurphy-common.la 	\
-	        murphy-db/mql/libmql.la \
+		murphy-db/mql/libmql.la \
 		murphy-db/mqi/libmqi.la \
 		murphy-db/mdb/libmdb.la
 

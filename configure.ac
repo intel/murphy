@@ -390,18 +390,18 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-dbus.pc
 		 src/common/murphy-pulse.pc
 		 src/core/murphy-core.pc
-         src/murphy-db/Makefile
-         src/murphy-db/mdb/Makefile
-         src/murphy-db/mqi/Makefile
-         src/murphy-db/mql/Makefile
-         src/murphy-db/include/Makefile
-         src/murphy-db/tests/Makefile
+		 src/murphy-db/Makefile
+		 src/murphy-db/mdb/Makefile
+		 src/murphy-db/mqi/Makefile
+		 src/murphy-db/mql/Makefile
+		 src/murphy-db/include/Makefile
+		 src/murphy-db/tests/Makefile
 		 src/resolver/murphy-resolver.pc
 		 src/resolver/tests/Makefile
 		 doc/Makefile
-         doc/plugin-developer-guide/Makefile
-         doc/plugin-developer-guide/db/Makefile
-         doc/plugin-developer-guide/doxml/Makefile
+		 doc/plugin-developer-guide/Makefile
+		 doc/plugin-developer-guide/db/Makefile
+		 doc/plugin-developer-guide/doxml/Makefile
 		 ])
 AC_OUTPUT
 
