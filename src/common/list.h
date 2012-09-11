@@ -112,6 +112,20 @@ static inline void mrp_list_prepend(mrp_list_hook_t *list,
     }
 }
 
+/** Insert a new item to the list before a given item. */
+static inline void mrp_list_insert_before(mrp_list_hook_t *next,
+                                          mrp_list_hook_t *item)
+{
+    mrp_list_append(next, item);
+}
+
+/** Insert a new item to the list after a given item. */
+static inline void mrp_list_insert_after(mrp_list_hook_t *prev,
+                                         mrp_list_hook_t *item)
+{
+    mrp_list_prepend(prev, item);
+}
+
 /** Delete the given item from the list. */
 static inline void mrp_list_delete(mrp_list_hook_t *item)
 {
