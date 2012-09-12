@@ -203,6 +203,9 @@ int mrp_msg_prepend(mrp_msg_t *msg, uint16_t tag, ...);
 /** Find a field in a message. */
 mrp_msg_field_t *mrp_msg_find(mrp_msg_t *msg, uint16_t tag);
 
+/** Get the given fields (with matching tags and types) from the message. */
+int mrp_msg_get(mrp_msg_t *msg, ...) MRP_NULLTERM;
+
 /** Dump a message. */
 int mrp_msg_dump(mrp_msg_t *msg, FILE *fp);
 

@@ -470,10 +470,131 @@ void test_custom_encode_decode(void)
 }
 
 
+static void test_basic(void)
+{
+    mrp_msg_t *msg;
+    char      *str1, *str2;
+    uint16_t   u16;
+    int16_t    s16;
+    uint32_t   u32;
+    int32_t    s32;
+    double     dbl1, dbl2;
+    int        i;
+
+    struct field_t {
+        uint16_t  tag;
+        uint16_t  type;
+        void     *ptr;
+    } f[] = {
+        { 0x1, MRP_MSG_FIELD_STRING, &str1 },
+        { 0x2, MRP_MSG_FIELD_STRING, &str2 },
+        { 0x3, MRP_MSG_FIELD_UINT16, &u16  },
+        { 0x4, MRP_MSG_FIELD_SINT16, &s16  },
+        { 0x5, MRP_MSG_FIELD_UINT32, &u32  },
+        { 0x6, MRP_MSG_FIELD_SINT32, &s32  },
+        { 0x7, MRP_MSG_FIELD_DOUBLE, &dbl1 },
+        { 0x8, MRP_MSG_FIELD_DOUBLE, &dbl2 }
+    };
+
+    msg = mrp_msg_create(MRP_MSG_TAG_STRING(0x1, "string 0x1"),
+                         MRP_MSG_TAG_STRING(0x2, "string 0x2"),
+                         MRP_MSG_TAG_UINT16(0x3,  3),
+                         MRP_MSG_TAG_SINT16(0x4, -4),
+                         MRP_MSG_TAG_UINT32(0x5,  5),
+                         MRP_MSG_TAG_SINT32(0x6, -6),
+                         MRP_MSG_TAG_DOUBLE(0x7,  3.14),
+                         MRP_MSG_TAG_DOUBLE(0x8, -9.81),
+                         MRP_MSG_END);
+
+    if (msg == NULL) {
+        mrp_log_error("Failed to create message.");
+        exit(1);
+    }
+    else
+        mrp_log_info("Message created OK.");
+
+
+    if (!mrp_msg_get(msg,
+                     0x1, MRP_MSG_FIELD_STRING, &str1,
+                     0x2, MRP_MSG_FIELD_STRING, &str2,
+                     0x3, MRP_MSG_FIELD_UINT16, &u16,
+                     0x4, MRP_MSG_FIELD_SINT16, &s16,
+                     0x5, MRP_MSG_FIELD_UINT32, &u32,
+                     0x6, MRP_MSG_FIELD_SINT32, &s32,
+                     0x7, MRP_MSG_FIELD_DOUBLE, &dbl1,
+                     0x8, MRP_MSG_FIELD_DOUBLE, &dbl2,
+                     MRP_MSG_END)) {
+        mrp_log_error("Failed to get message fields.");
+        exit(1);
+    }
+    else {
+        mrp_log_info("Got message fields:");
+        mrp_log_info("  str1='%s', str2='%s'", str1, str2);
+        mrp_log_info("  u16=%u, s16=%d", u16, s16);
+        mrp_log_info("  u32=%u, s32=%d", u32, s32);
+        mrp_log_info("  dbl1=%f, dbl2=%f", dbl1, dbl2);
+    }
+
+    if (!mrp_msg_get(msg,
+                     0x8, MRP_MSG_FIELD_DOUBLE, &dbl2,
+                     0x7, MRP_MSG_FIELD_DOUBLE, &dbl1,
+                     0x6, MRP_MSG_FIELD_SINT32, &s32,
+                     0x5, MRP_MSG_FIELD_UINT32, &u32,
+                     0x4, MRP_MSG_FIELD_SINT16, &s16,
+                     0x3, MRP_MSG_FIELD_UINT16, &u16,
+                     0x2, MRP_MSG_FIELD_STRING, &str2,
+                     0x1, MRP_MSG_FIELD_STRING, &str1,
+                     MRP_MSG_END)) {
+        mrp_log_error("Failed to get message fields.");
+        exit(1);
+    }
+    else {
+        mrp_log_info("Got message fields:");
+        mrp_log_info("  str1='%s', str2='%s'", str1, str2);
+        mrp_log_info("  u16=%u, s16=%d", u16, s16);
+        mrp_log_info("  u32=%u, s32=%d", u32, s32);
+        mrp_log_info("  dbl1=%f, dbl2=%f", dbl1, dbl2);
+    }
+
+
+#define TAG(idx) f[(idx) & 0x7].tag
+#define TYPE(idx) f[(idx) & 0x7].type
+#define PTR(idx) f[(idx) & 0x7].ptr
+#define FIELD(idx) TAG((idx)), TYPE((idx)), PTR((idx))
+
+    for (i = 0; i < (int)MRP_ARRAY_SIZE(f); i++) {
+        if (!mrp_msg_get(msg,
+                         FIELD(i+0), FIELD(i+1), FIELD(i+2), FIELD(i+3),
+                         FIELD(i+4), FIELD(i+5), FIELD(i+6), FIELD(i+7),
+                         MRP_MSG_END)) {
+            mrp_log_error("Failed to get message fields for offset %d.", i);
+            exit(1);
+        }
+        else {
+            mrp_log_info("Got message fields for offset %d:", i);
+            mrp_log_info("  str1='%s', str2='%s'", str1, str2);
+            mrp_log_info("  u16=%u, s16=%d", u16, s16);
+            mrp_log_info("  u32=%u, s32=%d", u32, s32);
+            mrp_log_info("  dbl1=%f, dbl2=%f", dbl1, dbl2);
+        }
+    }
+
+    if (mrp_msg_get(msg,
+                    0x9, MRP_MSG_FIELD_STRING, &str1, MRP_MSG_END)) {
+        mrp_log_error("Hmm... non-existent field found.");
+        exit(1);
+    }
+    else
+        mrp_log_info("Ok, non-existent field not found...");
+}
+
+
 int main(int argc, char *argv[])
 {
     mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_DEBUG));
     mrp_log_set_target(MRP_LOG_TO_STDOUT);
+
+    test_basic();
 
     test_default_encode_decode(argc, argv);
     test_custom_encode_decode();
