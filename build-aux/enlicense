@@ -1,0 +1,118 @@
+#!/bin/bash
+
+TOP="${0%/*}/.."
+LICENSE="$TOP/LICENSE-BSD"
+
+show_usage () {
+    echo "usage: $0 [options]"
+    echo "The possible options are:"
+    echo "  --dry-run|-n         Just find files lacking license info."
+    echo "  --license|-L <file>  Use file to obtain license text."
+    echo "  --git|-g             Add license only to files in the repository."
+    echo "  --help|-h            Show this help and exit."
+}
+
+fatal () {
+    local _err _msg
+
+    _err="$1"
+    shift
+    _msg="$*"
+
+    echo "fatal error: $_msg"
+    exit $_err
+}
+
+enlicense () {
+    local _file _in _out
+
+    case $1 in
+        *-func-info.c)
+            return 0
+            ;;
+    esac
+
+    _file="$1"
+    _in="$1.no-license"
+    _out="$1.license"
+
+    cp $_file $_in
+    echo "Inserting licensing information to $_file..."
+    echo "/*"                                    > $_out
+    cat $LICENSE | sed 's/^    /  /g;s/^/ * /g' \
+                 | sed 's/ *$//g'               >> $_out
+    echo " */"                                  >> $_out
+    echo ""                                     >> $_out
+    cat $_in                                    >> $_out
+    cp $_out $_file
+}
+
+find_missing_licenses () {
+    local _lacking _files _f
+
+    _lacking=""
+    _files="`find . -name '*.[hc]'`"
+
+    for _f in $_files; do
+        _f="${_f#./}"
+        grep -ql 'Copyright .*Intel .*' $_f
+        if [ $? != 0 ]; then
+            if [ "$GIT" = "y" ]; then
+                git ls-files | grep -q "$_f\$" && _lacking="$_lacking $_f" || :
+            else
+                _lacking="$_lacking $_f"
+            fi
+        fi
+    done
+
+    echo "$_lacking"
+}
+
+
+DRY_RUN=""
+GIT=""
+
+while [ "${1#-}" != "$1" -a -n "$1" ]; do
+    case $1 in
+        --dry-run|-n)
+            DRY_RUN="y"
+            ;;
+        --license|-L)
+            if [ -n "$2" ]; then
+                shift
+                LICENSE="$1"
+            else
+                fatal 1 "missing license argument"
+            fi
+            ;;
+        --git|-g)
+            GIT="y"
+            ;;
+        --help|-h)
+            show_usage
+            exit 0
+            ;;
+         *)
+            echo "Unknown command line option \'$1\'."
+            show_usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ ! -f "$LICENSE" ]; then
+    fatal 1 "license file \'$LICENSE\' missing"
+fi
+
+pushd $TOP >& /dev/null
+
+lacking="`find_missing_licenses`"
+
+for f in $lacking; do
+    if [ "$DRY_RUN" != "y" ]; then
+        enlicense $f
+    else
+        echo "$f is lacking licensing information."
+    fi
+done
