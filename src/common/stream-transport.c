@@ -457,6 +457,11 @@ static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
                         size = (uint32_t)-1;
                 }
             }
+
+            /* no more data to read in this frame */
+            if (left == 0)
+                break;
+
             space = t->isize - t->idata;
             if (space == 0)
                 goto realloc;
