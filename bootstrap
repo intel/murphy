@@ -9,11 +9,13 @@ aclocal -I m4 && \
 status=$?
 
 if [ $status == 0 ]; then
-    if [ "$1" == "configure" ]; then
-        shift
+    if [ -n "$1" ]; then
+        [ "$1" == "configure" ] && shift || :
         ./configure $*
         status=$?
     fi
+else
+    echo "Failed to bootstrap."
 fi
 
 exit $status
