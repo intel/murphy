@@ -125,9 +125,9 @@ mrp_resource_def_t *mrp_resource_definition_find_by_id(uint32_t id)
 }
 
 
-mrp_resource_t *mrp_resource_create(const char     *name,
-                                    bool            shared,
-                                    mrp_attr_def_t *attrs)
+mrp_resource_t *mrp_resource_create(const char *name,
+                                    bool        shared,
+                                    mrp_attr_t *attrs)
 {
     mrp_resource_t *res = NULL;
     mrp_resource_def_t *rdef;

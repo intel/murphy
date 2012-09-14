@@ -81,7 +81,7 @@ uint32_t mrp_zone_count(void)
     return zone_count;
 }
 
-uint32_t mrp_zone_create(const char *name, mrp_attr_def_t *attrs)
+uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs)
 {
     uint32_t id;
     size_t size;

@@ -37,8 +37,8 @@
 #include "attribute.h"
 
 
-static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_def_t *,
-                                                  const char*,mqi_data_type_t);
+static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_t *, const char *,
+                                                  mqi_data_type_t);
 
 
 int mrp_attribute_copy_definitions(mrp_attr_def_t *from, mrp_attr_def_t *to)
@@ -52,7 +52,9 @@ int mrp_attribute_copy_definitions(mrp_attr_def_t *from, mrp_attr_def_t *to)
 
             if (!(d->name = mrp_strdup(s->name)))
                 goto no_memory;
-            
+
+            d->access = s->access;
+ 
             if ((d->type = s->type) != mqi_string)
                 d->value = s->value;
             else {
@@ -73,7 +75,82 @@ int mrp_attribute_copy_definitions(mrp_attr_def_t *from, mrp_attr_def_t *to)
 }
 
 
-int mrp_attribute_set_values(mrp_attr_def_t   *values,
+mrp_attr_t *mrp_attribute_get_value(uint32_t          idx,
+                                    mrp_attr_t       *value,
+                                    uint32_t          nattr,
+                                    mrp_attr_def_t   *defs,
+                                    mrp_attr_value_t *attrs)
+{
+    mrp_attr_t *vdst;
+    mrp_attr_def_t *adef;
+
+    MRP_ASSERT(!nattr || (nattr > 0 && defs && attrs), "invalid argument");
+    MRP_ASSERT(idx < nattr, "invalid argument");
+
+    if ((vdst = value) || (vdst = mrp_alloc(sizeof(mrp_attr_t)))) {
+        adef = defs + idx;
+
+        if (!(adef->access & MRP_RESOURCE_READ))
+            memset(vdst, 0, sizeof(mrp_attr_t));
+        else {
+            vdst->name  = adef->name;
+            vdst->type  = adef->type;
+            vdst->value = attrs[idx];
+        }
+    }
+
+    return vdst;
+}
+
+
+mrp_attr_t *mrp_attribute_get_values(uint32_t          nvalue,
+                                     mrp_attr_t       *values,
+                                     uint32_t          nattr,
+                                     mrp_attr_def_t   *defs,
+                                     mrp_attr_value_t *attrs)
+{
+    mrp_attr_def_t *adef;
+    mrp_attr_t *vdst, *vend;
+    uint32_t i;
+
+    MRP_ASSERT(!nvalue || (nvalue > 0 && values), "invalid argument");
+    MRP_ASSERT(!nattr  || (nattr  > 0 && defs && attrs), "invalid argument");
+
+    if (nvalue)
+        nvalue--;
+    else {
+        for (i = 0;  i < nattr;  i++) {
+            if ((defs[i].access & MRP_RESOURCE_READ))
+                nvalue++;
+        }
+
+        if (!(values = mrp_allocz(sizeof(mrp_attr_t) * (nvalue + 1)))) {
+            mrp_log_error("Memory alloc failure. Can't get attributes");
+            return NULL;
+        }
+    }
+
+    vend = (vdst = values) + nvalue;
+
+    for (i = 0;     i < nattr && vdst < vend;    i++) {
+        adef = defs  + i;
+
+        if (!(adef->access && MRP_RESOURCE_READ))
+            continue;
+
+        vdst->name   =  adef->name;
+        vdst->type   =  adef->type;
+        vdst->value  =  attrs[i];
+
+        vdst++;
+    }
+
+    memset(vdst, 0, sizeof(*vdst));
+
+    return values;
+}
+
+int mrp_attribute_set_values(mrp_attr_t      *values,
                              uint32_t          nattr,
                              mrp_attr_def_t   *defs,
                              mrp_attr_value_t *attrs)
@@ -83,17 +160,22 @@ int mrp_attribute_set_values(mrp_attr_def_t   *values,
     mrp_attr_value_t *vdst;
     uint32_t i;
 
+
+    MRP_ASSERT(!nattr || (nattr > 0 && defs && attrs),
+               "invlaid arguments");
     
     for (i = 0;  i < nattr;  i++) {
         adef = defs  + i;
         vdst = attrs + i;
 
-        if (!(vsrc = get_attr_value_from_list(values, adef->name, adef->type)))
+        if (!(adef->access & MRP_RESOURCE_WRITE) ||
+            !(vsrc = get_attr_value_from_list(values, adef->name, adef->type)))
             vsrc = &adef->value; /* default value */
 
         if (adef->type !=  mqi_string)
             *vdst = *vsrc;
         else {
+            mrp_free((void *)vdst->string);
             if (!(vdst->string = mrp_strdup(vsrc->string)))
                 return -1;
         }
@@ -142,18 +224,18 @@ int mrp_attribute_print(uint32_t          nattr,
 }
 
 
-static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_def_t *list,
+static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_t     *list,
                                                   const char     *name,
                                                   mqi_data_type_t type)
 {
-    mrp_attr_def_t *adef;
+    mrp_attr_t *attr;
 
     MRP_ASSERT(name, "invalid argument");
 
     if (list) {
-        for (adef = list;   adef->name;   adef++) {
-            if (!strcasecmp(name, adef->name) && type == adef->type)
-                return &adef->value;
+        for (attr = list;   attr->name;   attr++) {
+            if (!strcasecmp(name, attr->name) && type == attr->type)
+                return &attr->value;
         }
     }
         

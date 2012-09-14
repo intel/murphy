@@ -47,9 +47,13 @@
 #define MRP_RESOURCE_REQNO_INVALID (~(uint32_t)0)
 
 
+
+typedef enum   mrp_resource_event_e    mrp_resource_event_t;
+typedef enum   mrp_resource_access_e   mrp_resource_access_t;
 typedef struct mrp_resource_client_s   mrp_resource_client_t;
 typedef union  mrp_attr_value_u        mrp_attr_value_t;
 typedef struct mrp_attr_def_s          mrp_attr_def_t;
+typedef struct mrp_attr_s              mrp_attr_t;
 typedef struct mrp_zone_def_s          mrp_zone_def_t;
 typedef struct mrp_zone_s              mrp_zone_t;
 typedef struct mrp_resource_owner_s    mrp_resource_owner_t;
@@ -59,6 +63,21 @@ typedef struct mrp_resource_def_s      mrp_resource_def_t;
 typedef struct mrp_resource_s          mrp_resource_t;
 typedef uint32_t                       mrp_resource_mask_t;
 
+
+enum mrp_resource_event_e {
+    MRP_RESOURCE_EVENT_UNKNOWN = 0,
+    MRP_RESOURCE_EVENT_GRANT,
+    MRP_RESOURCE_EVENT_ADVICE,
+};
+
+
+enum mrp_resource_access_e {
+    MRP_RESOURCE_ACCESS_NONE  = 0,
+    MRP_RESOURCE_READ  = 1,
+    MRP_RESOURCE_WRITE = 2,
+    MRP_RESOURCE_RW    = (MRP_RESOURCE_READ | MRP_RESOURCE_WRITE)
+};
+
 union mrp_attr_value_u {
     const char  *string;
     int32_t      integer;
@@ -67,11 +86,17 @@ union mrp_attr_value_u {
 };
 
 struct mrp_attr_def_s {
+    const char            *name;
+    mrp_resource_access_t  access;
+    mqi_data_type_t        type;
+    mrp_attr_value_t       value;
+};
+
+struct mrp_attr_s {
     const char      *name;
     mqi_data_type_t  type;
     mrp_attr_value_t value;
 };
-
 
 #endif  /* __MURPHY_DATA_TYPES_H__ */
 

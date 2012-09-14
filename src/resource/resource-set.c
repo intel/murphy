@@ -110,7 +110,7 @@ mrp_resource_t *mrp_resource_set_iterate_resources(mrp_resource_set_t *rset,
 int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
                                   const char         *name,
                                   bool                shared,
-                                  mrp_attr_def_t     *attrdefs,
+                                  mrp_attr_t         *attrs,
                                   bool                mandatory)
 {
     uint32_t mask;
@@ -118,7 +118,7 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
 
     MRP_ASSERT(rset && name, "invalid argument");
 
-    if (!(res = mrp_resource_create(name, shared, attrdefs))) {
+    if (!(res = mrp_resource_create(name, shared, attrs))) {
         mrp_log_error("Can't add resource '%s' name to resource set %u",
                       name, rset->id);
         return -1;
