@@ -813,7 +813,7 @@ mrp_msg_t *mrp_msg_default_decode(void *buf, size_t size)
     mrp_msg_value_t  v;
     void            *value;
     uint16_t         nfield, tag, type, base;
-    uint32_t         len, n, i;
+    uint32_t         len, n, i, j;
 
     msg = mrp_msg_create_empty();
 
@@ -927,63 +927,63 @@ mrp_msg_t *mrp_msg_default_decode(void *buf, size_t size)
                 int64_t  as64[n];
                 double   adbl[n];
 
-                for (i = 0; i < n; i++) {
+                for (j = 0; j < n; j++) {
 
                     switch (base) {
                     case MRP_MSG_FIELD_STRING:
                         len = be32toh(MRP_MSGBUF_PULL(&mb, typeof(len),
                                                       1, nodata));
                         if (len > 0)
-                            astr[i] = MRP_MSGBUF_PULL_DATA(&mb, len, 1, nodata);
+                            astr[j] = MRP_MSGBUF_PULL_DATA(&mb, len, 1, nodata);
                         else
-                            astr[i] = "";
+                            astr[j] = "";
                         break;
 
                     case MRP_MSG_FIELD_BOOL:
-                        abln[i] = be32toh(MRP_MSGBUF_PULL(&mb, uint32_t, 1,
+                        abln[j] = be32toh(MRP_MSGBUF_PULL(&mb, uint32_t, 1,
                                                           nodata));
                         break;
 
                     case MRP_MSG_FIELD_UINT8:
-                        au8[i] = MRP_MSGBUF_PULL(&mb, typeof(v.u8), 1, nodata);
+                        au8[j] = MRP_MSGBUF_PULL(&mb, typeof(v.u8), 1, nodata);
                         break;
 
                     case MRP_MSG_FIELD_SINT8:
-                        as8[i] = MRP_MSGBUF_PULL(&mb, typeof(v.s8), 1, nodata);
+                        as8[j] = MRP_MSGBUF_PULL(&mb, typeof(v.s8), 1, nodata);
                         break;
 
                     case MRP_MSG_FIELD_UINT16:
-                        au16[i] = be16toh(MRP_MSGBUF_PULL(&mb, typeof(v.u16),
+                        au16[j] = be16toh(MRP_MSGBUF_PULL(&mb, typeof(v.u16),
                                                           1, nodata));
                         break;
 
                     case MRP_MSG_FIELD_SINT16:
-                        as16[i] = be16toh(MRP_MSGBUF_PULL(&mb, typeof(v.s16),
+                        as16[j] = be16toh(MRP_MSGBUF_PULL(&mb, typeof(v.s16),
                                                           1, nodata));
                         break;
 
                     case MRP_MSG_FIELD_UINT32:
-                        au32[i] = be32toh(MRP_MSGBUF_PULL(&mb, typeof(v.u32),
+                        au32[j] = be32toh(MRP_MSGBUF_PULL(&mb, typeof(v.u32),
                                                           1, nodata));
                         break;
 
                     case MRP_MSG_FIELD_SINT32:
-                        as32[i] = be32toh(MRP_MSGBUF_PULL(&mb, typeof(v.s32),
+                        as32[j] = be32toh(MRP_MSGBUF_PULL(&mb, typeof(v.s32),
                                                           1, nodata));
                         break;
 
                     case MRP_MSG_FIELD_UINT64:
-                        au64[i] = be64toh(MRP_MSGBUF_PULL(&mb, typeof(v.u64),
+                        au64[j] = be64toh(MRP_MSGBUF_PULL(&mb, typeof(v.u64),
                                                           1, nodata));
                         break;
 
                     case MRP_MSG_FIELD_SINT64:
-                        as64[i] = be64toh(MRP_MSGBUF_PULL(&mb, typeof(v.s64),
+                        as64[j] = be64toh(MRP_MSGBUF_PULL(&mb, typeof(v.s64),
                                                           1, nodata));
                         break;
 
                     case MRP_MSG_FIELD_DOUBLE:
-                        adbl[i] = MRP_MSGBUF_PULL(&mb, typeof(v.dbl),
+                        adbl[j] = MRP_MSGBUF_PULL(&mb, typeof(v.dbl),
                                                   1, nodata);
                     break;
 
