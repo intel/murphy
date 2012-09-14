@@ -14,7 +14,7 @@ QUIET_GEN       = $(Q:@=@echo '  GEN   '$@;)
 LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 
-INCLUDES        = -I$(top_builddir)/src/murphy-db/include -I$(top_builddir)
+INCLUDES        = -Imurphy-db/include
 
 ###################################
 # murphy common library
@@ -336,7 +336,8 @@ libmurphy_resolver_la_SOURCES =			\
 		resolver-func-info.c
 
 libmurphy_resolver_la_CFLAGS =			\
-		$(AM_CFLAGS)
+		$(AM_CFLAGS)                    \
+		$(INCLUDES)
 
 libmurphy_resolver_la_LDFLAGS =			\
 		-Wl,-version-script=linker-script.resolver \
@@ -429,7 +430,7 @@ libmurphy_resource_la_SOURCES =			\
 
 libmurphy_resource_la_CFLAGS =			\
 		$(AM_CFLAGS)			\
-		-Imurphy-db/include
+		$(INCLUDES)
 
 libmurphy_resource_la_LDFLAGS =			\
 		-Wl,-version-script=linker-script.resource \
