@@ -225,7 +225,7 @@ uint32_t mrp_resource_get_mask(mrp_resource_t *res)
 
         MRP_ASSERT(def, "confused with internal data structures");
 
-        mask = (uint32_t)1 << def->id;
+        mask = (mrp_resource_mask_t)1 << def->id;
     }
 
     return mask;
@@ -237,6 +237,77 @@ bool mrp_resource_is_shared(mrp_resource_t *res)
         return res->shared;
 
     return false;
+}
+
+mrp_attr_t *mrp_resource_read_attribute(mrp_resource_t *res,
+                                        uint32_t        idx,
+                                        mrp_attr_t     *value)
+{
+    mrp_attr_t *retval;
+    mrp_resource_def_t *rdef;
+
+    MRP_ASSERT(res, "invalid argument");
+
+    rdef = res->def;
+
+    MRP_ASSERT(rdef, "confused with data structures");
+
+    retval = mrp_attribute_get_value(idx, value, rdef->nattr,
+                                     rdef->attrdefs, res->attrs);
+
+    if (!retval) {
+        mrp_log_error("Memory alloc failure. Can't get "
+                      "resource '%s' attribute %u", rdef->name, idx);
+    }
+
+    return retval;
+}
+
+
+mrp_attr_t *mrp_resource_read_all_attributes(mrp_resource_t *res,
+                                             uint32_t nvalue,
+                                             mrp_attr_t *values)
+{
+    mrp_attr_t *retval;
+    mrp_resource_def_t *rdef;
+
+    MRP_ASSERT(res, "invalid argument");
+
+    rdef = res->def;
+
+    MRP_ASSERT(rdef, "confused with data structures");
+
+    retval = mrp_attribute_get_all_values(nvalue, values, rdef->nattr,
+                                          rdef->attrdefs, res->attrs);
+
+    if (!retval) {
+        mrp_log_error("Memory alloc failure. Can't get all"
+                      "attributes of resource '%s'", rdef->name);
+    }
+
+    return retval;
+}
+
+int mrp_resource_write_attributes(mrp_resource_t *res, mrp_attr_t *values)
+{
+    int sts;
+    mrp_resource_def_t *rdef;
+
+    MRP_ASSERT(res && values, "invalid argument");
+
+    rdef = res->def;
+
+    MRP_ASSERT(rdef, "confused with data structures");
+
+    sts = mrp_attribute_set_values(values, rdef->nattr,
+                                   rdef->attrdefs, res->attrs);
+
+    if (sts < 0) {
+        mrp_log_error("Memory alloc failure. Can't set attributes "
+                      "of resource '%s'", rdef->name);
+    }
+
+    return sts;
 }
 
 
@@ -260,7 +331,7 @@ int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
     gap[indent] = '\0';
 
     e = (p = buf) + len;
-    m = ((uint32_t)1 << rdef->id);
+    m = ((mrp_resource_mask_t)1 << rdef->id);
 
     PRINT("%s%s: 0x%02x %s %s", gap, rdef->name, m,
           (m & mandatory) ? "mandatory":"optional ",

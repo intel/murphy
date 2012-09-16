@@ -40,6 +40,12 @@ int mrp_zone_definition_create(mrp_attr_def_t *attrdefs);
 uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs);
 uint32_t mrp_zone_get_id(mrp_zone_t *zone);
 const char *mrp_zone_get_name(mrp_zone_t *zone);
+mrp_attr_t *mrp_zone_write_attribute(mrp_zone_t *zone,
+                                     uint32_t idx,
+                                     mrp_attr_t *buf);
+mrp_attr_t *mrp_zone_write_all_attributes(mrp_zone_t *zone,
+                                          uint32_t buflen,
+                                          mrp_attr_t *buf);
 
 mrp_resource_class_t *mrp_resource_class_create(const char *name,
                                                 uint32_t priority);
@@ -55,6 +61,13 @@ uint32_t mrp_resource_definition_create(const char *name,
                                         void *manager_data);
 mrp_resource_t *mrp_resource_create(const char *name, bool shared,
                                     mrp_attr_t *attrs);
+mrp_attr_t *mrp_resource_read_attribute(mrp_resource_t *resource,
+                                        uint32_t attribute_index,
+                                        mrp_attr_t *buf);
+mrp_attr_t *mrp_resource_read_all_attributes(mrp_resource_t *resource,
+                                             uint32_t buflen,
+                                             mrp_attr_t *buf);
+int mrp_resource_write_attributes(mrp_resource_t *resource, mrp_attr_t *attrs);
 
 mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
                                             void *client_data,

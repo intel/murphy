@@ -36,8 +36,8 @@
 int mrp_attribute_copy_definitions(mrp_attr_def_t *, mrp_attr_def_t *);
 mrp_attr_t *mrp_attribute_get_value(uint32_t, mrp_attr_t *, uint32_t,
                                     mrp_attr_def_t *, mrp_attr_value_t *);
-mrp_attr_t *mrp_attribute_get_values(uint32_t, mrp_attr_t *, uint32_t,
-                                     mrp_attr_def_t *, mrp_attr_value_t *);
+mrp_attr_t *mrp_attribute_get_all_values(uint32_t, mrp_attr_t *, uint32_t,
+                                         mrp_attr_def_t *, mrp_attr_value_t *);
 int mrp_attribute_set_values(mrp_attr_t *, uint32_t, mrp_attr_def_t *,
                              mrp_attr_value_t *);
 

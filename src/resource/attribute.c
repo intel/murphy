@@ -103,11 +103,11 @@ mrp_attr_t *mrp_attribute_get_value(uint32_t          idx,
 }
 
 
-mrp_attr_t *mrp_attribute_get_values(uint32_t          nvalue,
-                                     mrp_attr_t       *values,
-                                     uint32_t          nattr,
-                                     mrp_attr_def_t   *defs,
-                                     mrp_attr_value_t *attrs)
+mrp_attr_t *mrp_attribute_get_all_values(uint32_t          nvalue,
+                                         mrp_attr_t       *values,
+                                         uint32_t          nattr,
+                                         mrp_attr_def_t   *defs,
+                                         mrp_attr_value_t *attrs)
 {
     mrp_attr_def_t *adef;
     mrp_attr_t *vdst, *vend;

@@ -148,6 +148,45 @@ const char *mrp_zone_get_name(mrp_zone_t *zone)
     return zone->name;
 }
 
+mrp_attr_t *mrp_zone_write_attribute(mrp_zone_t *zone,
+                                     uint32_t    idx,
+                                     mrp_attr_t *value)
+{
+    mrp_attr_t *retval;
+
+    MRP_ASSERT(zone, "invalid argument");
+    MRP_ASSERT(zone_def, "no zone definition");
+
+    retval = mrp_attribute_get_value(idx, value, zone_def->nattr,
+                                     zone_def->attrdefs, zone->attrs);
+
+    if (!retval) {
+        mrp_log_error("Memory alloc failure. Can't get "
+                      "zone '%s' attribute %u", zone->name, idx);
+    }
+
+    return retval;
+}
+
+mrp_attr_t *mrp_zone_write_all_attributes(mrp_zone_t *zone,
+                                          uint32_t nvalue,
+                                          mrp_attr_t *values)
+{
+    mrp_attr_t *retval;
+
+    MRP_ASSERT(zone, "invalid argument");
+
+    retval = mrp_attribute_get_all_values(nvalue, values, zone_def->nattr,
+                                          zone_def->attrdefs, zone->attrs);
+
+    if (!retval) {
+        mrp_log_error("Memory alloc failure. Can't get all"
+                      "attributes of zone '%s'", zone->name);
+    }
+
+    return retval;
+}
+
 int mrp_zone_attribute_print(mrp_zone_t *zone, char *buf, int len)
 {
     MRP_ASSERT(zone && buf && len > 0, "invalid argument");
