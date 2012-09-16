@@ -50,19 +50,30 @@ static mrp_resource_owner_t  resource_owners[MRP_ZONE_MAX * RESOURCE_MAX];
 
 static mrp_resource_owner_t *get_owner(uint32_t, uint32_t);
 static void reset_owners(uint32_t, mrp_resource_owner_t *);
-static bool grant_ownership(mrp_resource_owner_t *, mrp_resource_class_t *,
-                            mrp_resource_set_t *, mrp_resource_t *, bool);
+static bool grant_ownership(mrp_resource_owner_t *, mrp_zone_t *,
+                            mrp_resource_class_t *, mrp_resource_set_t *,
+                            mrp_resource_t *);
+static bool advice_ownership(mrp_resource_owner_t *, mrp_zone_t *,
+                             mrp_resource_class_t *, mrp_resource_set_t *,
+                             mrp_resource_t *);
+
+static void manager_start_transaction(mrp_zone_t *);
+static void manager_end_transaction(mrp_zone_t *);
 
 
-void mrp_resource_owner_update_zone(uint32_t zone)
+
+void mrp_resource_owner_update_zone(uint32_t zoneid)
 {
     mrp_resource_owner_t oldowners[RESOURCE_MAX];
     mrp_resource_owner_t backup[RESOURCE_MAX];
+    mrp_zone_t *zone;
     mrp_resource_class_t *class;
     mrp_resource_set_t *rset;
     mrp_resource_t *res;
     mrp_resource_def_t *rdef;
+    mrp_resource_mgr_ftbl_t *ftbl;
     mrp_resource_owner_t *owner, *old;
+    mrp_resource_mask_t mask;
     mrp_resource_mask_t mandatory;
     mrp_resource_mask_t grant;
     mrp_resource_mask_t advice;
@@ -70,9 +81,15 @@ void mrp_resource_owner_update_zone(uint32_t zone)
     uint32_t rid;
     uint32_t rcnt;
 
-    MRP_ASSERT(zone < MRP_ZONE_MAX, "invalid argument");
+    MRP_ASSERT(zoneid < MRP_ZONE_MAX, "invalid argument");
 
-    reset_owners(zone, oldowners);
+    zone = mrp_zone_find_by_id(zoneid);
+
+    MRP_ASSERT(zone, "zone is not defined");
+
+    reset_owners(zoneid, oldowners);
+    manager_start_transaction(zone);
+
 
     rcnt = mrp_resource_definition_count();
     clc  = NULL;
@@ -80,7 +97,7 @@ void mrp_resource_owner_update_zone(uint32_t zone)
     while ((class = mrp_resource_class_iterate_classes(&clc))) {
         rsc = NULL;
 
-        while ((rset = mrp_resource_class_iterate_rsets(class,zone,&rsc))) {
+        while ((rset = mrp_resource_class_iterate_rsets(class,zoneid,&rsc))) {
             mandatory = rset->resource.mask.mandatory;
             grant = 0;
             advice = 0;
@@ -92,35 +109,46 @@ void mrp_resource_owner_update_zone(uint32_t zone)
                 while ((res = mrp_resource_set_iterate_resources(rset, &rc))) {
                     rdef  = res->def;
                     rid   = rdef->id;
-                    owner = get_owner(zone, rid); 
-                    
-                    backup[rid] = *owner;
-                    
-                    if (grant_ownership(owner, class, rset, res, false))
-                        grant |= ((uint32_t)1 << rid);
-                }
-                if (mandatory && (grant & mandatory) != mandatory) {
-                    grant = 0;
-                    rc = NULL;
+                    owner = get_owner(zoneid, rid);
 
+                    backup[rid] = *owner;
+
+                    if (grant_ownership(owner, zone, class, rset, res))
+                        grant |= ((mrp_resource_mask_t)1 << rid);
+                }
+                if (mandatory && (grant & mandatory) == mandatory)
+                    advice = grant;
+                else {
                     /* rollback, ie. restore the backed up state */
+                    rc = NULL;
                     while ((res=mrp_resource_set_iterate_resources(rset,&rc))){
                          rdef  = res->def;
                          rid   = rdef->id;
-                         owner = get_owner(zone, rid);
-                        *owner = backup[rid]; 
+                         mask  = (mrp_resource_mask_t)1 << rid;
+                         owner = get_owner(zoneid, rid);
+                        *owner = backup[rid];
+
+                        if ((grant & mask)) {
+                            if ((ftbl = rdef->manager.ftbl) && ftbl->free)
+                                ftbl->free(zone, res, rdef->manager.userdata);
+                        }
+
+                        if (advice_ownership(owner, zone, class, rset, res))
+                            advice |= mask;
                     }
+
+                    /* nothing is granted */
+                    grant = 0;
                 }
-                advice = grant;
                 break;
 
             case mrp_resource_release:
                 while ((res = mrp_resource_set_iterate_resources(rset, &rc))) {
                     rdef  = res->def;
                     rid   = rdef->id;
-                    owner = get_owner(zone, rid); 
+                    owner = get_owner(zoneid, rid);
 
-                    if (grant_ownership(owner, class, rset, res, true))
+                    if (advice_ownership(owner, zone, class, rset, res))
                         advice |= ((uint32_t)1 << rid);
                 }
                 if (mandatory && (advice & mandatory) != mandatory)
@@ -142,17 +170,19 @@ void mrp_resource_owner_update_zone(uint32_t zone)
         } /* while rset */
     } /* while class */
 
+    manager_end_transaction(zone);
+
     for (rid = 0;  rid < rcnt;  rid++) {
-        owner = get_owner(zone, rid);
+        owner = get_owner(zoneid, rid);
         old   = oldowners + rid;
 
         if (owner->class != old->class ||
             owner->rset  != old->rset  ||
             owner->res   != old->res     )
         {
-            
+
         }
-    }    
+    }
 }
 
 int mrp_resource_owner_print(char *buf, int len)
@@ -195,7 +225,7 @@ int mrp_resource_owner_print(char *buf, int len)
                 continue;
 
             PRINT("      %-15s: ", rdef->name);
-            
+
             owner = get_owner(zid, rid);
 
             if (!(class = owner->class) ||
@@ -208,7 +238,7 @@ int mrp_resource_owner_print(char *buf, int len)
                 MRP_ASSERT(rdef == res->def, "confused with data structures");
 
                 PRINT("%-15s", class->name);
-                
+
                 p += mrp_resource_attribute_print(res, p, e-p);
             }
 
@@ -241,44 +271,131 @@ static void reset_owners(uint32_t zone, mrp_resource_owner_t *oldowners)
 }
 
 static bool grant_ownership(mrp_resource_owner_t *owner,
+                            mrp_zone_t           *zone,
                             mrp_resource_class_t *class,
                             mrp_resource_set_t   *rset,
-                            mrp_resource_t       *res,
-                            bool                  advice)
+                            mrp_resource_t       *res)
 {
+    mrp_resource_def_t      *rdef = res->def;
+    mrp_resource_mgr_ftbl_t *ftbl = rdef->manager.ftbl;
+    bool                     set_owner = false;
 
     /*
-      if (fake_grant())
-        return true;
       if (forbid_grant())
         return false;
      */
 
-    if (!owner->class && !owner->rset) {
-        /* nobody owns this, so grab it */
-        if (!advice) {
-            owner->class = class;
-            owner->rset  = rset;
-            owner->res   = res;
-            owner->share = res->shared;
+    do { /* not a loop */
+        if (!owner->class && !owner->rset) {
+            /* nobody owns this, so grab it */
+            set_owner = true;
+            break;
         }
-        return true;
-    }
 
-    if (owner->class == class && owner->rset == rset) {
-        /* we happen to won it already */
-        return true;
-    }
+        if (owner->class == class && owner->rset == rset) {
+            /* we happen to already own it */
+            break;
+        }
 
-    if (owner->share) {
-        /* OK, someone else owns it but
-           the owner is ready to share it with us */
-        if (!advice)
+        if (owner->share) {
+            /* OK, someone else owns it bu
+               the owner is ready to share it with us */
             owner->share = res->shared;
-        return true;
+            break;
+        }
+
+        return false;
+
+    } while(0);
+
+    if (ftbl && ftbl->allocate) {
+        if (!ftbl->allocate(zone, res, rdef->manager.userdata))
+            return false;
     }
 
-    return false;
+    if (set_owner) {
+        owner->class = class;
+        owner->rset  = rset;
+        owner->res   = res;
+        owner->share = res->shared;
+    }
+
+    return true;
+}
+
+static bool advice_ownership(mrp_resource_owner_t *owner,
+                             mrp_zone_t           *zone,
+                             mrp_resource_class_t *class,
+                             mrp_resource_set_t   *rset,
+                             mrp_resource_t       *res)
+{
+    mrp_resource_def_t      *rdef = res->def;
+    mrp_resource_mgr_ftbl_t *ftbl = rdef->manager.ftbl;
+
+    (void)zone;
+
+    /*
+      if (forbid_grant())
+        return false;
+     */
+
+    do { /* not a loop */
+        if (!owner->class && !owner->rset)
+            /* nobody owns this */
+            break;
+
+        if (owner->share)
+            /* someone else owns it but it can be shared */
+            break;
+
+
+        if (owner->class == class) {
+            if (owner->rset->class.priority == rset->class.priority)
+                break;
+        }
+
+        return false;
+
+    } while(0);
+
+    if (ftbl && ftbl->advice) {
+        if (!ftbl->advice(zone, res, rdef->manager.userdata))
+            return false;
+    }
+
+    return true;
+}
+
+static void manager_start_transaction(mrp_zone_t *zone)
+{
+    mrp_resource_def_t *rdef;
+    mrp_resource_mgr_ftbl_t *ftbl;
+    void *cursor = NULL;
+
+    while ((rdef = mrp_resource_definition_iterate_manager(&cursor))) {
+        ftbl = rdef->manager.ftbl;
+
+        MRP_ASSERT(ftbl, "confused with data structures");
+
+        if (ftbl->init)
+            ftbl->init(zone, rdef->manager.userdata);
+    }
+}
+
+static void manager_end_transaction(mrp_zone_t *zone)
+{
+    mrp_resource_def_t *rdef;
+    mrp_resource_mgr_ftbl_t *ftbl;
+    void *cursor = NULL;
+
+    while ((rdef = mrp_resource_definition_iterate_manager(&cursor))) {
+        ftbl = rdef->manager.ftbl;
+
+        MRP_ASSERT(ftbl, "confused with data structures");
+
+        if (ftbl->commit)
+            ftbl->commit(zone, rdef->manager.userdata);
+    }
 }
 
 

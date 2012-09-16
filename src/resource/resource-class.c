@@ -44,9 +44,9 @@
 
 /*
  * sorting key bit layout
- * 
+ *
  * +---------+----+----+--------+
- * | 31 - 29 | 28 | 27 | 26 - 0 |  
+ * | 31 - 29 | 28 | 27 | 26 - 0 |
  * +---------+----+----+--------+
  *      |      |    |       |
  *      |      |    |       +---- 0x07ffffff stamp of the last request
@@ -126,7 +126,7 @@ mrp_resource_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
 
     /* list do not have insert_before function,
        so don't be mislead by the name */
-    mrp_list_append(insert_before, &class->list); 
+    mrp_list_append(insert_before, &class->list);
 
     add_to_name_hash(class);
 
@@ -154,7 +154,7 @@ mrp_resource_class_t *mrp_resource_class_iterate_classes(void **cursor)
 
     if (entry == &class_list)
         return NULL;
- 
+
     *cursor = entry->prev;
 
     return mrp_list_entry(entry, mrp_resource_class_t, list);
@@ -176,7 +176,7 @@ mrp_resource_class_iterate_rsets(mrp_resource_class_t *class,
         return NULL;
 
     *cursor = entry->prev;
-    
+
     return mrp_list_entry(entry, mrp_resource_set_t, class.list);
 }
 
@@ -324,7 +324,7 @@ static void init_name_hash(void)
 static int add_to_name_hash(mrp_resource_class_t *class)
 {
     MRP_ASSERT(class && class->name, "invalid argument");
-    
+
     init_name_hash();
 
     if (!mrp_htbl_insert(name_hash, (void *)class->name, class))

@@ -87,6 +87,12 @@ mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
     return rset;
 }
 
+uint32_t mrp_get_resource_set_id(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->id;
+}
 
 mrp_resource_t *mrp_resource_set_iterate_resources(mrp_resource_set_t *rset,
                                                    void **cursor)
@@ -128,11 +134,11 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
 
     rset->resource.mask.all       |= mask;
     rset->resource.mask.mandatory |= mandatory ? mask : 0;
-    rset->resource.share          |= mrp_resource_is_shared(res); 
+    rset->resource.share          |= mrp_resource_is_shared(res);
 
 
     mrp_list_append(&rset->resource.list, &res->list);
-        
+
     return 0;
 }
 
@@ -195,7 +201,7 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
         res = mrp_list_entry(resen, mrp_resource_t, list);
         p  += mrp_resource_print(res, mandatory, indent+6, p, e-p);
     }
-    
+
     return p - buf;
 
 #undef PRINT

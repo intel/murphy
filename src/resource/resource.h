@@ -39,6 +39,11 @@ struct mrp_resource_def_s {
     uint32_t            id;
     const char         *name;
     bool                shareable;
+    struct {
+        mrp_list_hook_t list;
+        mrp_resource_mgr_ftbl_t *ftbl;
+        void *userdata;
+    }                   manager;
     uint32_t            nattr;
     mrp_attr_def_t      attrdefs[0];
 };
@@ -55,6 +60,7 @@ struct mrp_resource_s {
 uint32_t            mrp_resource_definition_count(void);
 mrp_resource_def_t *mrp_resource_definition_find_by_name(const char *);
 mrp_resource_def_t *mrp_resource_definition_find_by_id(uint32_t);
+mrp_resource_def_t *mrp_resource_definition_iterate_manager(void **);
 
 
 void                mrp_resource_destroy(mrp_resource_t *);

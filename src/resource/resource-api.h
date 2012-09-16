@@ -38,6 +38,8 @@ void mrp_resource_client_destroy(mrp_resource_client_t *client);
 
 int mrp_zone_definition_create(mrp_attr_def_t *attrdefs);
 uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs);
+uint32_t mrp_zone_get_id(mrp_zone_t *zone);
+const char *mrp_zone_get_name(mrp_zone_t *zone);
 
 mrp_resource_class_t *mrp_resource_class_create(const char *name,
                                                 uint32_t priority);
@@ -48,13 +50,16 @@ int mrp_resource_class_print(char *buf, int len);
 
 uint32_t mrp_resource_definition_create(const char *name,
                                         bool shareable,
-                                        mrp_attr_def_t *attrdefs);
+                                        mrp_attr_def_t *attrdefs,
+                                        mrp_resource_mgr_ftbl_t *manager,
+                                        void *manager_data);
 mrp_resource_t *mrp_resource_create(const char *name, bool shared,
                                     mrp_attr_t *attrs);
 
 mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
                                             void *client_data,
                                             uint32_t priority);
+uint32_t mrp_get_resource_set_id(mrp_resource_set_t *);
 int mrp_resource_set_add_resource(mrp_resource_set_t *resource_set,
                                   const char *resource_name,
                                   bool shared,

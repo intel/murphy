@@ -72,7 +72,7 @@ int mrp_zone_definition_create(mrp_attr_def_t *attrdefs)
 
     if (mrp_attribute_copy_definitions(attrdefs, def->attrdefs) < 0)
         return -1;
-    
+
     return 0;
 }
 
@@ -83,14 +83,13 @@ uint32_t mrp_zone_count(void)
 
 uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs)
 {
-    uint32_t id;
     size_t size;
     mrp_zone_t *zone;
     const char *dup_name;
     int sts;
 
     MRP_ASSERT(name, "invalid argument");
-    
+
     if (!zone_def) {
         mrp_log_error("Zone definition must preceed zone creation. "
                       "can't create zone '%s'", name);
@@ -110,6 +109,7 @@ uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs)
     }
 
 
+    zone->id   = zone_count++;
     zone->name = dup_name;
 
     sts = mrp_attribute_set_values(attrs, zone_def->nattr,
@@ -119,11 +119,9 @@ uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs)
         return MRP_ZONE_ID_INVALID;
     }
 
-    id = zone_count++;
+    zone_table[zone->id] = zone;
 
-    zone_table[id] = zone;
-    
-    return id;
+    return zone->id;
 }
 
 mrp_zone_t *mrp_zone_find_by_id(uint32_t id)
@@ -132,6 +130,22 @@ mrp_zone_t *mrp_zone_find_by_id(uint32_t id)
         return zone_table[id];
 
     return NULL;
+}
+
+uint32_t mrp_zone_get_id(mrp_zone_t *zone)
+{
+    if (!zone)
+        return MRP_ZONE_ID_INVALID;
+
+    return zone->id;
+}
+
+const char *mrp_zone_get_name(mrp_zone_t *zone)
+{
+    if (!zone | !zone->name)
+        return "<unknown zone>";
+
+    return zone->name;
 }
 
 int mrp_zone_attribute_print(mrp_zone_t *zone, char *buf, int len)

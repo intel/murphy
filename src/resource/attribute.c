@@ -54,7 +54,7 @@ int mrp_attribute_copy_definitions(mrp_attr_def_t *from, mrp_attr_def_t *to)
                 goto no_memory;
 
             d->access = s->access;
- 
+
             if ((d->type = s->type) != mqi_string)
                 d->value = s->value;
             else {
@@ -66,7 +66,7 @@ int mrp_attribute_copy_definitions(mrp_attr_def_t *from, mrp_attr_def_t *to)
             }
         }
     }
-            
+
     return 0;
 
  no_memory:
@@ -163,7 +163,7 @@ int mrp_attribute_set_values(mrp_attr_t      *values,
 
     MRP_ASSERT(!nattr || (nattr > 0 && defs && attrs),
                "invlaid arguments");
-    
+
     for (i = 0;  i < nattr;  i++) {
         adef = defs  + i;
         vdst = attrs + i;
@@ -192,7 +192,7 @@ int mrp_attribute_print(uint32_t          nattr,
                         int               len)
 {
 #define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
-    
+
     mrp_attr_def_t *adef;
     mrp_attr_value_t *aval;
     uint32_t i;
@@ -238,7 +238,7 @@ static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_t     *list,
                 return &attr->value;
         }
     }
-        
+
     return NULL;
 }
 

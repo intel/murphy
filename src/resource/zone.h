@@ -38,6 +38,7 @@ struct mrp_zone_def_s {
 };
 
 struct mrp_zone_s {
+    uint32_t          id;
     const char       *name;
     mrp_attr_value_t  attrs[0];
 };

@@ -48,20 +48,24 @@
 
 
 
-typedef enum   mrp_resource_event_e    mrp_resource_event_t;
-typedef enum   mrp_resource_access_e   mrp_resource_access_t;
-typedef struct mrp_resource_client_s   mrp_resource_client_t;
-typedef union  mrp_attr_value_u        mrp_attr_value_t;
-typedef struct mrp_attr_def_s          mrp_attr_def_t;
-typedef struct mrp_attr_s              mrp_attr_t;
-typedef struct mrp_zone_def_s          mrp_zone_def_t;
-typedef struct mrp_zone_s              mrp_zone_t;
-typedef struct mrp_resource_owner_s    mrp_resource_owner_t;
-typedef struct mrp_resource_class_s    mrp_resource_class_t;
-typedef struct mrp_resource_set_s      mrp_resource_set_t;
-typedef struct mrp_resource_def_s      mrp_resource_def_t;
-typedef struct mrp_resource_s          mrp_resource_t;
-typedef uint32_t                       mrp_resource_mask_t;
+typedef enum   mrp_resource_event_e     mrp_resource_event_t;
+typedef enum   mrp_resource_access_e    mrp_resource_access_t;
+
+typedef struct mrp_resource_client_s    mrp_resource_client_t;
+typedef union  mrp_attr_value_u         mrp_attr_value_t;
+typedef struct mrp_attr_def_s           mrp_attr_def_t;
+typedef struct mrp_attr_s               mrp_attr_t;
+typedef struct mrp_zone_def_s           mrp_zone_def_t;
+typedef struct mrp_zone_s               mrp_zone_t;
+typedef struct mrp_resource_owner_s     mrp_resource_owner_t;
+typedef struct mrp_resource_class_s     mrp_resource_class_t;
+typedef struct mrp_resource_set_s       mrp_resource_set_t;
+typedef struct mrp_resource_def_s       mrp_resource_def_t;
+typedef struct mrp_resource_s           mrp_resource_t;
+typedef struct mrp_resource_mgr_ftbl_s  mrp_resource_mgr_ftbl_t;
+typedef struct mrp_resource_mgr_s       mrp_resource_mgr_t;
+
+typedef uint32_t                        mrp_resource_mask_t;
 
 
 enum mrp_resource_event_e {
@@ -97,6 +101,24 @@ struct mrp_attr_s {
     mqi_data_type_t  type;
     mrp_attr_value_t value;
 };
+
+
+
+typedef void (*mrp_manager_init_func_t)(mrp_zone_t *, void *);
+typedef bool (*mrp_manager_alloc_func_t)(mrp_zone_t *,mrp_resource_t *,void*);
+typedef void (*mrp_manager_free_func_t)(mrp_zone_t *,mrp_resource_t *,void *);
+typedef bool (*mrp_manager_advice_func_t)(mrp_zone_t *,mrp_resource_t*,void *);
+typedef void (*mrp_manager_commit_func_t)(mrp_zone_t *, void *);
+
+struct mrp_resource_mgr_ftbl_s  {
+    mrp_manager_init_func_t     init;
+    mrp_manager_alloc_func_t    allocate;
+    mrp_manager_free_func_t     free;
+    mrp_manager_advice_func_t   advice;
+    mrp_manager_commit_func_t   commit;
+};
+
+
 
 #endif  /* __MURPHY_DATA_TYPES_H__ */
 

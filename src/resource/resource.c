@@ -50,8 +50,10 @@
 
 static uint32_t            resource_def_count;
 static mrp_resource_def_t *resource_def_table[RESOURCE_MAX];
+static MRP_LIST_HOOK(manager_list);
 
-static uint32_t add_resource_definition(const char *, bool, uint32_t);
+static uint32_t add_resource_definition(const char *, bool, uint32_t,
+                                        mrp_resource_mgr_ftbl_t *, void *);
 
 #if 0
 static uint32_t find_resource_attribute_id(mrp_resource_t *, const char *);
@@ -65,8 +67,10 @@ static mrp_attr_value_t *get_resource_attribute_default_value(mrp_resource_t*,
 
 
 
-uint32_t mrp_resource_definition_create(const char *name, bool shareable, 
-                                        mrp_attr_def_t *attrdefs)
+uint32_t mrp_resource_definition_create(const char *name, bool shareable,
+                                        mrp_attr_def_t *attrdefs,
+                                        mrp_resource_mgr_ftbl_t *manager,
+                                        void *mgrdata)
 {
     uint32_t nattr;
     uint32_t id;
@@ -82,7 +86,7 @@ uint32_t mrp_resource_definition_create(const char *name, bool shareable,
     for (nattr = 0;  attrdefs && attrdefs[nattr].name;  nattr++)
         ;
 
-    id = add_resource_definition(name, shareable, nattr);
+    id = add_resource_definition(name, shareable, nattr, manager, mgrdata);
 
     if (id != MRP_RESOURCE_ID_INVALID) {
         def = mrp_resource_definition_find_by_id(id);
@@ -92,7 +96,7 @@ uint32_t mrp_resource_definition_create(const char *name, bool shareable,
         if (mrp_attribute_copy_definitions(attrdefs, def->attrdefs) < 0)
             return MRP_RESOURCE_ID_INVALID;
     }
-    
+
     return id;
 }
 
@@ -124,10 +128,26 @@ mrp_resource_def_t *mrp_resource_definition_find_by_id(uint32_t id)
     return NULL;
 }
 
+mrp_resource_def_t *mrp_resource_definition_iterate_manager(void **cursor)
+{
+    mrp_list_hook_t *entry;
+
+    MRP_ASSERT(cursor, "invalid argument");
+
+    entry = (*cursor == NULL) ? manager_list.next : (mrp_list_hook_t *)*cursor;
+
+    if (entry == &manager_list)
+        return NULL;
+
+    *cursor = entry->next;
+
+    return mrp_list_entry(entry, mrp_resource_def_t, manager.list);
+}
+
 
 mrp_resource_t *mrp_resource_create(const char *name,
                                     bool        shared,
-                                    mrp_attr_t *attrs)
+                                  mrp_attr_t *attrs)
 {
     mrp_resource_t *res = NULL;
     mrp_resource_def_t *rdef;
@@ -180,12 +200,12 @@ void mrp_resource_destroy(mrp_resource_t *res)
         rdef = res->def;
 
         MRP_ASSERT(rdef, "invalid_argument");
-        
+
         mrp_list_delete(&res->list);
 
         for (id = 0;  id < rdef->nattr;  id++) {
             type = rdef->attrdefs[id].type;
-        
+
             if (type == mqi_string)
                 mrp_free((void *)res->attrs[id].string);
         }
@@ -193,7 +213,7 @@ void mrp_resource_destroy(mrp_resource_t *res)
         mrp_free(res);
     }
 }
-                                    
+
 
 uint32_t mrp_resource_get_mask(mrp_resource_t *res)
 {
@@ -220,7 +240,6 @@ bool mrp_resource_is_shared(mrp_resource_t *res)
 }
 
 
-
 int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
                        size_t indent, char *buf, int len)
 {
@@ -239,7 +258,7 @@ int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
     MRP_ASSERT(rdef, "Confused with data structures");
 
     gap[indent] = '\0';
-    
+
     e = (p = buf) + len;
     m = ((uint32_t)1 << rdef->id);
 
@@ -271,8 +290,11 @@ int mrp_resource_attribute_print(mrp_resource_t *res, char *buf, int len)
 }
 
 
-static uint32_t add_resource_definition(const char *name, bool shareable,
-                                        uint32_t nattr)
+static uint32_t add_resource_definition(const char *name,
+                                        bool        shareable,
+                                        uint32_t    nattr,
+                                        mrp_resource_mgr_ftbl_t *mgrftbl,
+                                        void       *mgrdata)
 {
     mrp_resource_def_t *def;
     const char         *dup_name;
@@ -298,16 +320,23 @@ static uint32_t add_resource_definition(const char *name, bool shareable,
     def->id        = id;
     def->name      = dup_name;
     def->shareable = shareable;
+    def->manager.ftbl = mgrftbl;
+    def->manager.userdata = mgrdata;
     def->nattr     = nattr;
 
     resource_def_table[id] = def;
-    
+
+    if (!mgrftbl)
+        mrp_list_init(&def->manager.list);
+    else
+        mrp_list_append(&manager_list, &def->manager.list);
+
     return id;
 }
 
 
 #if 0
-static uint32_t find_resource_attribute_id(mrp_resource_t *res, 
+static uint32_t find_resource_attribute_id(mrp_resource_t *res,
                                            const char *attrnam)
 {
     mrp_resource_def_t *rdef;
@@ -338,7 +367,7 @@ get_resource_attribute_value_type(mrp_resource_t *res, uint32_t id)
     MRP_ASSERT(rdef, "confused with data structures");
     MRP_ASSERT(id < rdef->nattr, "invalid argument");
 
-    return rdef->attrdefs[id].type;    
+    return rdef->attrdefs[id].type;
 }
 
 static mrp_attr_value_t *
@@ -353,9 +382,10 @@ get_resource_attribute_default_value(mrp_resource_t *res, uint32_t id)
     MRP_ASSERT(rdef, "confused with data structures");
     MRP_ASSERT(id < rdef->nattr, "invalid argument");
 
-    return &rdef->attrdefs[id].value;        
+    return &rdef->attrdefs[id].value;
 }
 #endif
+
 
 
 /*
