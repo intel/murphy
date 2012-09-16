@@ -412,7 +412,10 @@ libmurphy_resource_ladir =			\
 
 libmurphy_resource_la_HEADERS =			\
 		resource/data-types.h           \
-		resource/resource-api.h
+		resource/common-api.h           \
+		resource/client-api.h           \
+		resource/manager-api.h          \
+		resource/config-api.h
 
 libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/attribute.c		\

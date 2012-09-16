@@ -27,47 +27,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_RESOURCE_API_H__
-#define __MURPHY_RESOURCE_API_H__
+#ifndef __MURPHY_RESOURCE_CLIENT_API_H__
+#define __MURPHY_RESOURCE_CLIENT_API_H__
 
-#include <murphy/resource/data-types.h>
+#include <murphy/resource/common-api.h>
 
 mrp_resource_client_t *mrp_resource_client_create(const char *name,
                                                   void *user_data);
 void mrp_resource_client_destroy(mrp_resource_client_t *client);
 
-int mrp_zone_definition_create(mrp_attr_def_t *attrdefs);
-uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs);
-uint32_t mrp_zone_get_id(mrp_zone_t *zone);
-const char *mrp_zone_get_name(mrp_zone_t *zone);
-mrp_attr_t *mrp_zone_write_attribute(mrp_zone_t *zone,
-                                     uint32_t idx,
-                                     mrp_attr_t *buf);
-mrp_attr_t *mrp_zone_write_all_attributes(mrp_zone_t *zone,
-                                          uint32_t buflen,
-                                          mrp_attr_t *buf);
 
-mrp_resource_class_t *mrp_resource_class_create(const char *name,
-                                                uint32_t priority);
 void mrp_resource_class_add_resource_set(mrp_resource_class_t *class,
                                          uint32_t zone_id,
                                          mrp_resource_set_t *resource_set);
-int mrp_resource_class_print(char *buf, int len);
 
-uint32_t mrp_resource_definition_create(const char *name,
-                                        bool shareable,
-                                        mrp_attr_def_t *attrdefs,
-                                        mrp_resource_mgr_ftbl_t *manager,
-                                        void *manager_data);
 mrp_resource_t *mrp_resource_create(const char *name, bool shared,
                                     mrp_attr_t *attrs);
-mrp_attr_t *mrp_resource_read_attribute(mrp_resource_t *resource,
-                                        uint32_t attribute_index,
-                                        mrp_attr_t *buf);
-mrp_attr_t *mrp_resource_read_all_attributes(mrp_resource_t *resource,
-                                             uint32_t buflen,
-                                             mrp_attr_t *buf);
-int mrp_resource_write_attributes(mrp_resource_t *resource, mrp_attr_t *attrs);
 
 mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
                                             void *client_data,
@@ -81,12 +56,7 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *resource_set,
 void mrp_resource_set_acquire(mrp_resource_set_t *resource_set);
 void mrp_resource_set_release(mrp_resource_set_t *resource_set);
 
-
-int mrp_resource_owner_print(char *buf, int len);
-
-
-
-#endif  /* __MURPHY_RESOURCE_API_H__ */
+#endif  /* __MURPHY_RESOURCE_CLIENT_API_H__ */
 
 /*
  * Local Variables:

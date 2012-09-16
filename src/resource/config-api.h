@@ -27,64 +27,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
+#ifndef __MURPHY_RESOURCE_CONFIG_API_H__
+#define __MURPHY_RESOURCE_CONFIG_API_H__
 
-#include <murphy/common/mm.h>
-#include <murphy/common/log.h>
+#include <murphy/resource/common-api.h>
 
-#include <resource/client-api.h>
+int mrp_zone_definition_create(mrp_attr_def_t *attrdefs);
+uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs);
 
-#include "resource-client.h"
-#include "resource-set.h"
-
-
-
-static MRP_LIST_HOOK(client_list);
-
-
-mrp_resource_client_t *mrp_resource_client_create(const char *name,
-                                                  void *user_data)
-{
-    mrp_resource_client_t *client;
-    const char *dup_name;
-
-    MRP_ASSERT(name, "invalid argument");
-
-    if (!(client = mrp_allocz(sizeof(*client))) ||
-        !(dup_name = mrp_strdup(name)))
-    {
-        mrp_log_error("Memory alloc failure. Can't create client '%s'", name);
-        return NULL;
-    }
-
-    client->name = dup_name;
-    client->user_data = user_data;
-    mrp_list_init(&client->resource_sets);
-
-    mrp_list_append(&client_list, &client->list);
-
-    return client;
-}
-
-void mrp_resource_client_destroy(mrp_resource_client_t *client)
-{
-    mrp_list_hook_t *entry, *n;
-    mrp_resource_set_t *rset;
-
-    if (client) {
-        mrp_list_delete(&client->list);
-
-        mrp_list_foreach(&client->resource_sets, entry, n) {
-            rset = mrp_list_entry(entry, mrp_resource_set_t, client.list);
-        }
-
-        mrp_free(client);
-    }
-}
+mrp_resource_class_t *mrp_resource_class_create(const char *name,
+                                                uint32_t priority);
+int mrp_resource_class_print(char *buf, int len);
 
 
 
+int mrp_resource_owner_print(char *buf, int len);
+
+
+
+#endif  /* __MURPHY_RESOURCE_CONFIG_API_H__ */
 
 /*
  * Local Variables:

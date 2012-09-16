@@ -33,7 +33,8 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
 
-#include <murphy/resource/resource-api.h>
+#include <murphy/resource/client-api.h>
+#include <murphy/resource/manager-api.h>
 
 #include "resource.h"
 

@@ -35,7 +35,8 @@
 #include <murphy/common/utils.h>
 #include <murphy/common/log.h>
 
-#include <murphy/resource/resource-api.h>
+#include <murphy/resource/client-api.h>
+#include <murphy/resource/config-api.h>
 
 #include "resource-class.h"
 #include "resource-set.h"

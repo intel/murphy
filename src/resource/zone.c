@@ -33,7 +33,8 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
 
-#include <murphy/resource/resource-api.h>
+#include <murphy/resource/manager-api.h>
+#include <murphy/resource/config-api.h>
 
 #include "zone.h"
 
@@ -148,9 +149,9 @@ const char *mrp_zone_get_name(mrp_zone_t *zone)
     return zone->name;
 }
 
-mrp_attr_t *mrp_zone_write_attribute(mrp_zone_t *zone,
-                                     uint32_t    idx,
-                                     mrp_attr_t *value)
+mrp_attr_t *mrp_zone_read_attribute(mrp_zone_t *zone,
+                                    uint32_t    idx,
+                                    mrp_attr_t *value)
 {
     mrp_attr_t *retval;
 
@@ -168,9 +169,9 @@ mrp_attr_t *mrp_zone_write_attribute(mrp_zone_t *zone,
     return retval;
 }
 
-mrp_attr_t *mrp_zone_write_all_attributes(mrp_zone_t *zone,
-                                          uint32_t nvalue,
-                                          mrp_attr_t *values)
+mrp_attr_t *mrp_zone_read_all_attributes(mrp_zone_t *zone,
+                                         uint32_t nvalue,
+                                         mrp_attr_t *values)
 {
     mrp_attr_t *retval;
 
