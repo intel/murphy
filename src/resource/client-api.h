@@ -36,10 +36,14 @@ mrp_resource_client_t *mrp_resource_client_create(const char *name,
                                                   void *user_data);
 void mrp_resource_client_destroy(mrp_resource_client_t *client);
 
+const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf);
 
-void mrp_resource_class_add_resource_set(mrp_resource_class_t *class,
-                                         uint32_t zone_id,
-                                         mrp_resource_set_t *resource_set);
+const char **mrp_resource_class_get_all_names(uint32_t buflen,
+                                              const char **buf);
+
+int mrp_resource_class_add_resource_set(const char *class_name,
+                                        const char *zone_name,
+                                        mrp_resource_set_t *resource_set);
 
 mrp_resource_t *mrp_resource_create(const char *name, bool shared,
                                     mrp_attr_t *attrs);
@@ -47,12 +51,13 @@ mrp_resource_t *mrp_resource_create(const char *name, bool shared,
 mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
                                             void *client_data,
                                             uint32_t priority);
-uint32_t mrp_get_resource_set_id(mrp_resource_set_t *);
+uint32_t mrp_get_resource_set_id(mrp_resource_set_t *resource_set);
 int mrp_resource_set_add_resource(mrp_resource_set_t *resource_set,
                                   const char *resource_name,
                                   bool shared,
                                   mrp_attr_t *attrs,
                                   bool mandatory);
+
 void mrp_resource_set_acquire(mrp_resource_set_t *resource_set);
 void mrp_resource_set_release(mrp_resource_set_t *resource_set);
 

@@ -35,7 +35,7 @@
 uint32_t mrp_zone_get_id(mrp_zone_t *zone);
 const char *mrp_zone_get_name(mrp_zone_t *zone);
 mrp_attr_t *mrp_zone_read_attribute(mrp_zone_t *zone,
-                                    uint32_t idx,
+                                    uint32_t attribute_index,
                                     mrp_attr_t *buf);
 mrp_attr_t *mrp_zone_read_all_attributes(mrp_zone_t *zone,
                                          uint32_t buflen,

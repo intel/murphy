@@ -35,12 +35,15 @@
 #include <murphy/common/utils.h>
 #include <murphy/common/log.h>
 
+#include <murphy/resource/manager-api.h>
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 
 #include "resource-class.h"
 #include "resource-set.h"
 #include "zone.h"
+
+#define CLASS_MAX 64
 
 
 /*
@@ -181,19 +184,66 @@ mrp_resource_class_iterate_rsets(mrp_resource_class_t *class,
     return mrp_list_entry(entry, mrp_resource_set_t, class.list);
 }
 
-
-void mrp_resource_class_add_resource_set(mrp_resource_class_t *class,
-                                         uint32_t zone,
-                                         mrp_resource_set_t *rset)
+const char **mrp_resource_class_get_all_names(uint32_t buflen,const char **buf)
 {
-    MRP_ASSERT(class && rset && zone < MRP_ZONE_MAX, "invalid argument");
+    mrp_list_hook_t *entry, *n;
+    mrp_resource_class_t *class;
+    bool freeit = false;
+    uint32_t i  = 0;
+
+    MRP_ASSERT(!buf || (buf && buflen > 1), "invalid argument");
+
+    if (!buf) {
+        freeit = true;
+        buflen = CLASS_MAX;
+        if (!(buf = mrp_allocz(sizeof(const char *) * buflen))) {
+            mrp_log_error("Memory alloc failure. Can't get class names");
+            return NULL;
+        }
+    }
+
+    mrp_list_foreach(&class_list, entry, n) {
+        class = mrp_list_entry(entry, mrp_resource_class_t, list);
+
+        if (i >= buflen-1) {
+            if (freeit)
+                mrp_free(buf);
+            return NULL;
+        }
+
+        buf[i++] = class->name;
+    }
+
+    buf[i] = NULL;
+
+    return buf;
+}
+
+
+int mrp_resource_class_add_resource_set(const char *class_name,
+                                        const char *zone_name,
+                                        mrp_resource_set_t *rset)
+{
+    mrp_resource_class_t *class;
+    mrp_zone_t *zone;
+
+
+    MRP_ASSERT(class_name && rset && zone_name, "invalid argument");
     MRP_ASSERT(!rset->class.ptr || !mrp_list_empty(&rset->class.list),
                "attempt to add multiple times the same resource set");
 
+    if (!(class = mrp_resource_class_find(class_name)))
+        return -1;
+
+    if (!(zone = mrp_zone_find_by_name(zone_name)))
+        return -1;
+
     rset->class.ptr = class;
-    rset->zone = zone;
+    rset->zone = mrp_zone_get_id(zone);
 
     mrp_resource_class_move_resource_set(rset);
+
+    return 0;
 }
 
 void mrp_resource_class_move_resource_set(mrp_resource_set_t *rset)
@@ -309,7 +359,7 @@ static void init_name_hash(void)
     mrp_htbl_config_t  cfg;
 
     if (!name_hash) {
-        cfg.nentry  = 32;
+        cfg.nentry  = CLASS_MAX;
         cfg.comp    = mrp_string_comp;
         cfg.hash    = mrp_string_hash;
         cfg.free    = NULL;

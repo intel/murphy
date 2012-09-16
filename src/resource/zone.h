@@ -46,6 +46,7 @@ struct mrp_zone_s {
 
 uint32_t mrp_zone_count(void);
 mrp_zone_t *mrp_zone_find_by_id(uint32_t);
+mrp_zone_t *mrp_zone_find_by_name(const char *);
 
 int mrp_zone_attribute_print(mrp_zone_t *, char *, int);
 

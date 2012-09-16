@@ -30,19 +30,17 @@
 #ifndef __MURPHY_RESOURCE_CONFIG_API_H__
 #define __MURPHY_RESOURCE_CONFIG_API_H__
 
-#include <murphy/resource/common-api.h>
+#include <murphy/resource/data-types.h>
 
 int mrp_zone_definition_create(mrp_attr_def_t *attrdefs);
 uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs);
 
 mrp_resource_class_t *mrp_resource_class_create(const char *name,
                                                 uint32_t priority);
+
 int mrp_resource_class_print(char *buf, int len);
 
-
-
 int mrp_resource_owner_print(char *buf, int len);
-
 
 
 #endif  /* __MURPHY_RESOURCE_CONFIG_API_H__ */

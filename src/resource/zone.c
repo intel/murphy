@@ -34,6 +34,7 @@
 #include <murphy/common/log.h>
 
 #include <murphy/resource/manager-api.h>
+#include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 
 #include "zone.h"
@@ -133,6 +134,21 @@ mrp_zone_t *mrp_zone_find_by_id(uint32_t id)
     return NULL;
 }
 
+mrp_zone_t *mrp_zone_find_by_name(const char *name)
+{
+    mrp_zone_t *zone;
+    uint32_t id;
+
+    for (id = 0;  id < zone_count;  id++) {
+        zone = zone_table[id];
+
+        if (!strcasecmp(name, zone->name))
+            return zone;
+    }
+
+    return NULL;
+}
+
 uint32_t mrp_zone_get_id(mrp_zone_t *zone)
 {
     if (!zone)
@@ -148,6 +164,33 @@ const char *mrp_zone_get_name(mrp_zone_t *zone)
 
     return zone->name;
 }
+
+const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf)
+{
+    uint32_t i;
+
+    MRP_ASSERT(!buf || (buf && buflen > 1), "invlaid argument");
+
+    if (buf) {
+        if (buflen < zone_count + 1)
+            return NULL;
+    }
+    else if (!buf) {
+        buflen = zone_count + 1;
+        if (!(buf = mrp_allocz(sizeof(const char *) * buflen))) {
+            mrp_log_error("Memory alloc failure. Can't get all zone names");
+            return NULL;
+        }
+    }
+
+    for (i = 0;  i < zone_count;  i++)
+        buf[i] = zone_table[i]->name;
+
+    buf[i] = NULL;
+
+    return buf;
+}
+
 
 mrp_attr_t *mrp_zone_read_attribute(mrp_zone_t *zone,
                                     uint32_t    idx,
