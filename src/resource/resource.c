@@ -37,6 +37,7 @@
 #include <murphy/resource/manager-api.h>
 
 #include "resource.h"
+#include "resource-owner.h"
 
 
 #define RESOURCE_MAX   (sizeof(mrp_resource_mask_t) * 8)
@@ -96,6 +97,8 @@ uint32_t mrp_resource_definition_create(const char *name, bool shareable,
 
         if (mrp_attribute_copy_definitions(attrdefs, def->attrdefs) < 0)
             return MRP_RESOURCE_ID_INVALID;
+
+        mrp_resource_owner_create_database_table(def);
     }
 
     return id;

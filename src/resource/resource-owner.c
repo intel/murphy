@@ -29,6 +29,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
+#include <errno.h>
 
 #include <murphy/common/mm.h>
 #include <murphy/common/hashtbl.h>
@@ -36,6 +38,7 @@
 #include <murphy/common/log.h>
 
 #include <murphy/resource/config-api.h>
+#include <murphy-db/mqi.h>
 
 #include "resource-owner.h"
 #include "resource-class.h"
@@ -44,9 +47,23 @@
 #include "zone.h"
 
 
-#define RESOURCE_MAX   (sizeof(mrp_resource_mask_t) * 8)
+#define RESOURCE_MAX        (sizeof(mrp_resource_mask_t) * 8)
+#define NAME_LENGTH          24
+
+#define ZONE_ID_IDX          0
+#define ZONE_NAME_IDX        1
+#define CLASS_NAME_IDX       2
+#define FIRST_ATTRIBUTE_IDX  3
+
+typedef struct {
+    uint32_t          zone_id;
+    const char       *zone_name;
+    const char       *class_name;
+    mrp_attr_value_t  attrs[MQI_COLUMN_MAX];
+} owner_row_t;
 
 static mrp_resource_owner_t  resource_owners[MRP_ZONE_MAX * RESOURCE_MAX];
+static mqi_handle_t          owner_tables[RESOURCE_MAX];
 
 static mrp_resource_owner_t *get_owner(uint32_t, uint32_t);
 static void reset_owners(uint32_t, mrp_resource_owner_t *);
@@ -60,6 +77,81 @@ static bool advice_ownership(mrp_resource_owner_t *, mrp_zone_t *,
 static void manager_start_transaction(mrp_zone_t *);
 static void manager_end_transaction(mrp_zone_t *);
 
+static void delete_resource_owner(mrp_zone_t *, mrp_resource_t *);
+static void insert_resource_owner(mrp_zone_t *, mrp_resource_class_t *,
+                                  mrp_resource_t *);
+static void update_resource_owner(mrp_zone_t *, mrp_resource_class_t *,
+                                  mrp_resource_t *);
+static void set_attr_descriptors(mqi_column_desc_t *, mrp_resource_t *);
+
+
+int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
+{
+    MQI_COLUMN_DEFINITION_LIST(base_coldefs,
+        MQI_COLUMN_DEFINITION( "zone_id"       , MQI_UNSIGNED            , 0 ),
+        MQI_COLUMN_DEFINITION( "zone_name"     , MQI_VARCHAR(NAME_LENGTH), 0 ),
+        MQI_COLUMN_DEFINITION( "resource_class", MQI_VARCHAR(NAME_LENGTH), 0 )
+    );
+
+    MQI_INDEX_DEFINITION(indexdef,
+        MQI_INDEX_COLUMN("zone_id")
+    );
+
+    static bool initialized = false;
+
+    char name[256];
+    mqi_column_def_t  coldefs[MQI_COLUMN_MAX + 1];
+    mqi_column_def_t *col;
+    mrp_attr_def_t *atd;
+    mqi_handle_t table;
+    char c, *p;
+    size_t i,j;
+
+    if (!initialized) {
+        mqi_open();
+        for (i = 0;  i < RESOURCE_MAX;  i++)
+            owner_tables[i] = MQI_HANDLE_INVALID;
+        initialized = true;
+    }
+
+    MRP_ASSERT(sizeof(base_coldefs) < sizeof(coldefs),"too many base columns");
+    MRP_ASSERT(rdef, "invalid argument");
+    MRP_ASSERT(rdef->id < RESOURCE_MAX, "confused with data structures");
+    MRP_ASSERT(owner_tables[rdef->id] == MQI_HANDLE_INVALID,
+               "owner table already exist");
+
+    snprintf(name, sizeof(name), "%s_owner", rdef->name);
+    for (p = name; (c = *p);  p++) {
+        if (!isascii(c) || (!isalnum(c) && c != '_'))
+            *p = '_';
+    }
+
+    j = MQI_DIMENSION(base_coldefs) - 1;
+    memcpy(coldefs, base_coldefs, j * sizeof(mqi_column_def_t));
+
+    for (i = 0;  i < rdef->nattr && j < MQI_COLUMN_MAX;  i++, j++) {
+        col = coldefs + j;
+        atd = rdef->attrdefs + i;
+
+        col->name   = atd->name;
+        col->type   = atd->type;
+        col->length = (col->type == mqi_string) ? NAME_LENGTH : 0;
+        col->flags  = 0;
+    }
+
+    memset(coldefs + j, 0, sizeof(mqi_column_def_t));
+
+    table = MQI_CREATE_TABLE(name, MQI_TEMPORARY, coldefs, indexdef);
+
+    if (table == MQI_HANDLE_INVALID) {
+        mrp_log_error("Can't create table '%s': %s", name, strerror(errno));
+        return -1;
+    }
+
+    owner_tables[rdef->id] = table;
+
+    return 0;
+}
 
 
 void mrp_resource_owner_update_zone(uint32_t zoneid)
@@ -180,7 +272,12 @@ void mrp_resource_owner_update_zone(uint32_t zoneid)
             owner->rset  != old->rset  ||
             owner->res   != old->res     )
         {
-
+            if (!owner->res)
+                delete_resource_owner(zone, old->res);
+            else if (!old->res)
+                insert_resource_owner(zone, owner->class, owner->res);
+            else
+                update_resource_owner(zone, owner->class, owner->res);
         }
     }
 }
@@ -396,6 +493,127 @@ static void manager_end_transaction(mrp_zone_t *zone)
         if (ftbl->commit)
             ftbl->commit(zone, rdef->manager.userdata);
     }
+}
+
+
+static void delete_resource_owner(mrp_zone_t *zone, mrp_resource_t *res)
+{
+    static uint32_t zone_id;
+
+    MQI_WHERE_CLAUSE(where,
+        MQI_EQUAL( MQI_COLUMN(0), MQI_UNSIGNED_VAR(zone_id) )
+    );
+
+    mrp_resource_def_t *rdef;
+    int n;
+
+    MRP_ASSERT(res, "invalid argument");
+
+    rdef = res->def;
+    zone_id = zone->id;
+
+    if ((n = MQI_DELETE(owner_tables[rdef->id], where)) != 1)
+        mrp_log_error("Could not delete resource owner");
+}
+
+static void insert_resource_owner(mrp_zone_t *zone,
+                                  mrp_resource_class_t *class,
+                                  mrp_resource_t *res)
+{
+    mrp_resource_def_t *rdef = res->def;
+    uint32_t i;
+    int n;
+    owner_row_t row;
+    owner_row_t *rows[2];
+    mqi_column_desc_t cdsc[FIRST_ATTRIBUTE_IDX + MQI_COLUMN_MAX + 1];
+
+    MRP_ASSERT(FIRST_ATTRIBUTE_IDX + rdef->nattr <= MQI_COLUMN_MAX,
+               "too many attributes for a table");
+
+    row.zone_id    = zone->id;
+    row.zone_name  = zone->name;
+    row.class_name = class->name;
+    memcpy(row.attrs, res->attrs, rdef->nattr * sizeof(mrp_attr_value_t));
+
+    i = 0;
+    cdsc[i].cindex = ZONE_ID_IDX;
+    cdsc[i].offset = MQI_OFFSET(owner_row_t, zone_id);
+
+    i++;
+    cdsc[i].cindex = ZONE_NAME_IDX;
+    cdsc[i].offset = MQI_OFFSET(owner_row_t, zone_name);
+
+    i++;
+    cdsc[i].cindex = CLASS_NAME_IDX;
+    cdsc[i].offset = MQI_OFFSET(owner_row_t, class_name);
+
+    set_attr_descriptors(cdsc + (i+1), res);
+
+    rows[0] = &row;
+    rows[1] = NULL;
+
+    if ((n = MQI_INSERT_INTO(owner_tables[rdef->id], cdsc, rows)) != 1)
+        mrp_log_error("can't insert row into owner table");
+}
+
+static void update_resource_owner(mrp_zone_t *zone,
+                                  mrp_resource_class_t *class,
+                                  mrp_resource_t *res)
+{
+    static uint32_t zone_id;
+
+    MQI_WHERE_CLAUSE(where,
+        MQI_EQUAL( MQI_COLUMN(0), MQI_UNSIGNED_VAR(zone_id) )
+    );
+
+    mrp_resource_def_t *rdef = res->def;
+    uint32_t i;
+    int n;
+    owner_row_t row;
+    mqi_column_desc_t cdsc[FIRST_ATTRIBUTE_IDX + MQI_COLUMN_MAX + 1];
+
+    zone_id = zone->id;
+
+    MRP_ASSERT(1 + rdef->nattr <= MQI_COLUMN_MAX,
+               "too many attributes for a table");
+
+    row.class_name = class->name;
+    memcpy(row.attrs, res->attrs, rdef->nattr * sizeof(mrp_attr_value_t));
+
+    i = 0;
+    cdsc[i].cindex = CLASS_NAME_IDX;
+    cdsc[i].offset = MQI_OFFSET(owner_row_t, class_name);
+
+    set_attr_descriptors(cdsc + (i+1), res);
+
+
+    if ((n = MQI_UPDATE(owner_tables[rdef->id], cdsc, &row, where)) != 1)
+        mrp_log_error("can't update row in owner table");
+}
+
+
+static void set_attr_descriptors(mqi_column_desc_t *cdsc, mrp_resource_t *res)
+{
+    mrp_resource_def_t *rdef = res->def;
+    uint32_t i,j;
+    int o;
+
+    for (i = j = 0;  j < rdef->nattr;  j++) {
+        switch (rdef->attrdefs[j].type) {
+        case mqi_string:   o = MQI_OFFSET(owner_row_t,attrs[j].string);  break;
+        case mqi_integer:  o = MQI_OFFSET(owner_row_t,attrs[j].integer); break;
+        case mqi_unsignd:  o = MQI_OFFSET(owner_row_t,attrs[j].unsignd); break;
+        case mqi_floating: o = MQI_OFFSET(owner_row_t,attrs[j].floating);break;
+        default:           /* skip this */                            continue;
+        }
+
+        cdsc[i].cindex = FIRST_ATTRIBUTE_IDX + j;
+        cdsc[i].offset = o;
+        i++;
+    }
+
+    cdsc[i].cindex = -1;
+    cdsc[i].offset =  1;
 }
 
 
