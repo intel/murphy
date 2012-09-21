@@ -538,6 +538,28 @@ plugin_LTLIBRARIES    += plugin-glib.la
 endif
 endif
 
+# resource-dbus plugin
+if DBUS_ENABLED
+RESOURCE_DBUS_PLUGIN_SOURCES = plugins/plugin-resource-dbus.c
+RESOURCE_DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
+RESOURCE_DBUS_PLUGIN_LIBS    = libmurphy-resource.la
+
+if !DISABLED_PLUGIN_RESOURCE_DBUS
+if BUILTIN_PLUGIN_RESOURCE_DBUS
+BUILTIN_PLUGINS += $(RESOURCE_DBUS_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(RESOURCE_DBUS_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(RESOURCE_DBUS_PLUGIN_LIBS)
+else
+plugin_resource_dbus_la_SOURCES = $(RESOURCE_DBUS_PLUGIN_SOURCES)
+plugin_resource_dbus_la_CFLAGS  = $(RESOURCE_DBUS_PLUGIN_CFLAGS) $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_resource_dbus_la_LDFLAGS = -module -avoid-version
+plugin_resource_dbus_la_LIBADD  = $(RESOURCE_DBUS_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES    += plugin-resource-dbus.la
+endif
+endif
+endif
+
 # console plugin
 CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/plugin-console.c
 CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES) \
