@@ -48,7 +48,7 @@
 
 
 
-typedef enum   mrp_resource_event_e     mrp_resource_event_t;
+typedef enum   mrp_resource_request_e   mrp_resource_request_t;
 typedef enum   mrp_resource_access_e    mrp_resource_access_t;
 
 typedef struct mrp_resource_client_s    mrp_resource_client_t;
@@ -66,12 +66,13 @@ typedef struct mrp_resource_mgr_ftbl_s  mrp_resource_mgr_ftbl_t;
 typedef struct mrp_resource_mgr_s       mrp_resource_mgr_t;
 
 typedef uint32_t                        mrp_resource_mask_t;
+typedef uint32_t                        mrp_attribute_mask_t;
 
 
-enum mrp_resource_event_e {
-    MRP_RESOURCE_EVENT_UNKNOWN = 0,
-    MRP_RESOURCE_EVENT_GRANT,
-    MRP_RESOURCE_EVENT_ADVICE,
+enum mrp_resource_request_e {
+    mrp_resource_no_request = 0,
+    mrp_resource_release,
+    mrp_resource_acquire,
 };
 
 
@@ -103,6 +104,7 @@ struct mrp_attr_s {
 };
 
 
+typedef void (*mrp_resource_event_cb_t)(uint32_t, mrp_resource_set_t *, void*);
 
 typedef void (*mrp_manager_init_func_t)(mrp_zone_t *, void *);
 typedef bool (*mrp_manager_alloc_func_t)(mrp_zone_t *,mrp_resource_t *,void*);

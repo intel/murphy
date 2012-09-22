@@ -47,21 +47,25 @@
 #define PRIORITY_MAX  ((uint32_t)1 << MRP_KEY_PRIORITY_BITS)
 
 static MRP_LIST_HOOK(resource_set_list);
-
+static uint32_t resource_set_count;
 
 static uint32_t    get_request_stamp(void);
 static const char *request_str(mrp_resource_request_t);
 
 
+uint32_t mrp_get_resource_set_count(void)
+{
+    return resource_set_count;
+}
+
 mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
-                                            void *client_data,
-                                            uint32_t priority)
+                                            uint32_t priority,
+                                            mrp_resource_event_cb_t event_cb,
+                                            void *user_data)
 {
     static uint32_t our_id;
 
     mrp_resource_set_t *rset;
-
-    MRP_ASSERT(client_data, "invalid argument");
 
     if (priority >= PRIORITY_MAX)
         priority = PRIORITY_MAX - 1;
@@ -76,12 +80,16 @@ mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
 
         mrp_list_init(&rset->client.list);
         rset->client.id   = client_id;
-        rset->client.data = client_data;
 
         mrp_list_init(&rset->class.list);
         rset->class.priority = priority;
 
         mrp_list_append(&resource_set_list, &rset->list);
+
+        rset->event = event_cb;
+        rset->user_data = user_data;
+
+        resource_set_count++;
     }
 
     return rset;
@@ -142,29 +150,31 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
     return 0;
 }
 
-void mrp_resource_set_acquire(mrp_resource_set_t *rset)
+void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 {
     MRP_ASSERT(rset, "invalid argument");
 
     if (rset->request.type != mrp_resource_acquire) {
+        rset->request.id    = reqid;
         rset->request.type  = mrp_resource_acquire;
         rset->request.stamp = get_request_stamp();
 
         mrp_resource_class_move_resource_set(rset);
-        mrp_resource_owner_update_zone(rset->zone);
+        mrp_resource_owner_update_zone(rset->zone, reqid);
     }
 }
 
-void mrp_resource_set_release(mrp_resource_set_t *rset)
+void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
 {
     MRP_ASSERT(rset, "invalid argument");
 
     if (rset->request.type != mrp_resource_release) {
+        rset->request.id    = reqid;
         rset->request.type  = mrp_resource_release;
         rset->request.stamp = get_request_stamp();
 
         mrp_resource_class_move_resource_set(rset);
-        mrp_resource_owner_update_zone(rset->zone);
+        mrp_resource_owner_update_zone(rset->zone, reqid);
     }
 }
 

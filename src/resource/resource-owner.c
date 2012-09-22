@@ -154,8 +154,13 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
 }
 
 
-void mrp_resource_owner_update_zone(uint32_t zoneid)
+void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
 {
+    typedef struct {
+        uint32_t reqid;
+        mrp_resource_set_t *rset;
+    } event_t;
+
     mrp_resource_owner_t oldowners[RESOURCE_MAX];
     mrp_resource_owner_t backup[RESOURCE_MAX];
     mrp_zone_t *zone;
@@ -172,12 +177,21 @@ void mrp_resource_owner_update_zone(uint32_t zoneid)
     void *clc, *rsc, *rc;
     uint32_t rid;
     uint32_t rcnt;
+    bool changed;
+    uint32_t nevent, maxev;
+    event_t *events, *ev, *lastev;
 
     MRP_ASSERT(zoneid < MRP_ZONE_MAX, "invalid argument");
 
     zone = mrp_zone_find_by_id(zoneid);
 
     MRP_ASSERT(zone, "zone is not defined");
+
+    maxev  = mrp_get_resource_set_count();
+    nevent = 0;
+    events = mrp_alloc(sizeof(event_t) * maxev);
+
+    MRP_ASSERT(events, "Memory alloc failure. Can't update zone");
 
     reset_owners(zoneid, oldowners);
     manager_start_transaction(zone);
@@ -251,18 +265,35 @@ void mrp_resource_owner_update_zone(uint32_t zoneid)
                 break;
             }
 
+            changed = false;
+
             if (grant != rset->resource.mask.grant) {
                 rset->resource.mask.grant = grant;
+                changed = true;
             }
 
             if (advice != rset->resource.mask.advice) {
                 rset->resource.mask.advice = advice;
+                changed = true;
             }
 
+            if (changed && rset->event) {
+                ev = events + nevent++;
+
+                ev->reqid = (reqid == rset->request.id) ? reqid : 0;
+                ev->rset  = rset;
+            }
         } /* while rset */
     } /* while class */
 
     manager_end_transaction(zone);
+
+    for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
+        rset = ev->rset;
+        rset->event(ev->reqid, rset, rset->user_data);
+    }
+
+    mrp_free(events);
 
     for (rid = 0;  rid < rcnt;  rid++) {
         owner = get_owner(zoneid, rid);

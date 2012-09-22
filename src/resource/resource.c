@@ -41,7 +41,7 @@
 
 
 #define RESOURCE_MAX   (sizeof(mrp_resource_mask_t) * 8)
-#define ATTRIBUTE_MAX  32
+#define ATTRIBUTE_MAX  (sizeof(mrp_attribute_mask_t) * 8)
 
 #define VALID_TYPE(t) ((t) == mqi_string  || \
                        (t) == mqi_integer || \

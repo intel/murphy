@@ -43,7 +43,7 @@ struct mrp_resource_owner_s {
 
 
 int  mrp_resource_owner_create_database_table(mrp_resource_def_t *);
-void mrp_resource_owner_update_zone(uint32_t);
+void mrp_resource_owner_update_zone(uint32_t, uint32_t);
 
 
 #endif  /* __MURPHY_RESOURCE_OWNER_H__ */

@@ -35,11 +35,6 @@
 #include "data-types.h"
 
 
-typedef enum mrp_resource_request_e {
-    mrp_resource_no_request = 0,
-    mrp_resource_release,
-    mrp_resource_acquire,
-} mrp_resource_request_t;
 
 struct mrp_resource_set_s {
     mrp_list_hook_t                 list;
@@ -58,7 +53,6 @@ struct mrp_resource_set_s {
         mrp_list_hook_t list;
         uint32_t id;
         uint32_t reqno;
-        void *data;
     }                               client;
     struct {
         mrp_list_hook_t list;
@@ -67,13 +61,16 @@ struct mrp_resource_set_s {
     }                               class;
     uint32_t                        zone;
     struct {
+        uint32_t id;
         mrp_resource_request_t type;
         uint32_t stamp;
     }                               request;
+    mrp_resource_event_cb_t         event;
+    void                           *user_data;
 };
 
 
-mrp_resource_set_t *mrp_resource_set_create(uint32_t, void *, uint32_t);
+uint32_t            mrp_get_resource_set_count(void);
 mrp_resource_t     *mrp_resource_set_iterate_resources(mrp_resource_set_t *,
                                                        void **);
 int                 mrp_resource_set_print(mrp_resource_set_t *, size_t,
