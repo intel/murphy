@@ -30,13 +30,16 @@
 #ifndef __MURPHY_RESOURCE_CLIENT_API_H__
 #define __MURPHY_RESOURCE_CLIENT_API_H__
 
-#include <murphy/resource/common-api.h>
+#include <murphy/resource/data-types.h>
 
 mrp_resource_client_t *mrp_resource_client_create(const char *name,
                                                   void *user_data);
 void mrp_resource_client_destroy(mrp_resource_client_t *client);
 
 const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf);
+
+const char **mrp_resource_definition_get_all_names(uint32_t buflen,
+                                                   const char **buf);
 
 const char **mrp_resource_class_get_all_names(uint32_t buflen,
                                               const char **buf);
@@ -45,22 +48,46 @@ int mrp_resource_class_add_resource_set(const char *class_name,
                                         const char *zone_name,
                                         mrp_resource_set_t *resource_set);
 
-mrp_resource_t *mrp_resource_create(const char *name, bool shared,
-                                    mrp_attr_t *attrs);
-
 mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
                                             uint32_t priority,
                                             mrp_resource_event_cb_t event_cb,
                                             void *user_data);
 uint32_t mrp_get_resource_set_id(mrp_resource_set_t *resource_set);
+
+mrp_resource_state_t
+mrp_get_resource_set_state(mrp_resource_set_t *resource_set);
+
+mrp_resource_mask_t
+mrp_get_resource_set_grant(mrp_resource_set_t *resource_set);
+
+mrp_resource_mask_t
+mrp_get_resource_set_advice(mrp_resource_set_t *resource_set);
+
 int mrp_resource_set_add_resource(mrp_resource_set_t *resource_set,
                                   const char *resource_name,
                                   bool shared,
-                                  mrp_attr_t *attrs,
+                                  mrp_attr_t *attribute_list,
                                   bool mandatory);
+
+mrp_attr_t *
+mrp_resource_set_read_attribute(mrp_resource_set_t *resource_set,
+                                const char *resource_name,
+                                uint32_t attribute_index,
+                                mrp_attr_t *buf);
+
+mrp_attr_t *
+mrp_resource_set_read_all_attributes(mrp_resource_set_t *resource_set,
+                                     const char *resource_name,
+                                     uint32_t buflen,
+                                     mrp_attr_t *buf);
+
+int mrp_resource_set_write_attributes(mrp_resource_set_t *resource_set,
+                                      const char *resource_name,
+                                      mrp_attr_t *attribute_list);
 
 void mrp_resource_set_acquire(mrp_resource_set_t *resource_set,
                               uint32_t request_id);
+
 void mrp_resource_set_release(mrp_resource_set_t *resource_set,
                               uint32_t request_id);
 

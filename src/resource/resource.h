@@ -63,6 +63,7 @@ mrp_resource_def_t *mrp_resource_definition_find_by_id(uint32_t);
 mrp_resource_def_t *mrp_resource_definition_iterate_manager(void **);
 
 
+mrp_resource_t     *mrp_resource_create(const char *, bool, mrp_attr_t *);
 void                mrp_resource_destroy(mrp_resource_t *);
 
 uint32_t            mrp_resource_get_mask(mrp_resource_t *);

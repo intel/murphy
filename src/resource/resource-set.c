@@ -36,6 +36,7 @@
 #include <murphy/common/log.h>
 
 #include <murphy/resource/client-api.h>
+#include <murphy/resource/common-api.h>
 
 #include "resource-set.h"
 #include "resource-class.h"
@@ -49,8 +50,9 @@
 static MRP_LIST_HOOK(resource_set_list);
 static uint32_t resource_set_count;
 
-static uint32_t    get_request_stamp(void);
-static const char *request_str(mrp_resource_request_t);
+static mrp_resource_t *find_resource(mrp_resource_set_t *, const char *);
+static uint32_t get_request_stamp(void);
+static const char *state_str(mrp_resource_state_t);
 
 
 uint32_t mrp_get_resource_set_count(void)
@@ -102,6 +104,27 @@ uint32_t mrp_get_resource_set_id(mrp_resource_set_t *rset)
     return rset->id;
 }
 
+mrp_resource_state_t mrp_get_resource_set_state(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->state;
+}
+
+mrp_resource_mask_t mrp_get_resource_set_grant(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->resource.mask.grant;
+}
+
+mrp_resource_mask_t mrp_get_resource_set_advice(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->resource.mask.advice;
+}
+
 mrp_resource_t *mrp_resource_set_iterate_resources(mrp_resource_set_t *rset,
                                                    void **cursor)
 {
@@ -150,13 +173,60 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
     return 0;
 }
 
+mrp_attr_t *mrp_resource_set_read_attribute(mrp_resource_set_t *rset,
+                                            const char *resnam,
+                                            uint32_t attridx,
+                                            mrp_attr_t *buf)
+{
+    mrp_resource_t *res;
+
+    MRP_ASSERT(rset && resnam, "invalid argument");
+
+    if (!(res = find_resource(rset, resnam)))
+        return NULL;
+
+    return mrp_resource_read_attribute(res, attridx, buf);
+}
+
+mrp_attr_t *mrp_resource_set_read_all_attributes(mrp_resource_set_t *rset,
+                                                 const char *resnam,
+                                                 uint32_t buflen,
+                                                 mrp_attr_t *buf)
+{
+    mrp_resource_t *res;
+
+    MRP_ASSERT(rset && resnam, "invalid argument");
+
+    if (!(res = find_resource(rset, resnam)))
+        return NULL;
+
+    return mrp_resource_read_all_attributes(res, buflen, buf);
+}
+
+int mrp_resource_set_write_attributes(mrp_resource_set_t *rset,
+                                      const char *resnam,
+                                      mrp_attr_t *attrs)
+{
+    mrp_resource_t *res;
+
+    MRP_ASSERT(rset && resnam && attrs, "invalid argument");
+
+    if (!(res = find_resource(rset, resnam)))
+        return -1;
+
+    if (mrp_resource_write_attributes(res, attrs) < 0)
+        return -1;
+
+    return 0;
+}
+
 void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 {
     MRP_ASSERT(rset, "invalid argument");
 
-    if (rset->request.type != mrp_resource_acquire) {
-        rset->request.id    = reqid;
-        rset->request.type  = mrp_resource_acquire;
+    if (rset->state != mrp_resource_acquire) {
+        rset->state = mrp_resource_acquire;
+        rset->request.id = reqid;
         rset->request.stamp = get_request_stamp();
 
         mrp_resource_class_move_resource_set(rset);
@@ -168,9 +238,9 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
 {
     MRP_ASSERT(rset, "invalid argument");
 
-    if (rset->request.type != mrp_resource_release) {
-        rset->request.id    = reqid;
-        rset->request.type  = mrp_resource_release;
+    if (rset->state != mrp_resource_release) {
+        rset->state = mrp_resource_release;
+        rset->request.id = reqid;
         rset->request.stamp = get_request_stamp();
 
         mrp_resource_class_move_resource_set(rset);
@@ -205,7 +275,7 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
           rset->resource.mask.grant, rset->resource.mask.advice,
           mrp_resource_class_get_sorting_key(rset), rset->class.priority,
           rset->resource.share ? "shared   ":"exclusive",
-          request_str(rset->request.type));
+          state_str(rset->state));
 
     mrp_list_foreach(&rset->resource.list, resen, n) {
         res = mrp_list_entry(resen, mrp_resource_t, list);
@@ -215,6 +285,27 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
     return p - buf;
 
 #undef PRINT
+}
+
+static mrp_resource_t *find_resource(mrp_resource_set_t *rset,const char *name)
+{
+    mrp_list_hook_t *entry, *n;
+    mrp_resource_t *res;
+    mrp_resource_def_t *rdef;
+
+    MRP_ASSERT(rset && name, "invalid_argument");
+
+    mrp_list_foreach(&rset->resource.list, entry, n) {
+        res = mrp_list_entry(entry, mrp_resource_t, list);
+        rdef = res->def;
+
+        MRP_ASSERT(rdef, "confused with data structures");
+
+        if (!strcasecmp(name, rdef->name))
+            return res;
+    }
+
+    return NULL;
 }
 
 static uint32_t get_request_stamp(void)
@@ -247,9 +338,9 @@ static uint32_t get_request_stamp(void)
     return stamp++;
 }
 
-static const char *request_str(mrp_resource_request_t request)
+static const char *state_str(mrp_resource_state_t state)
 {
-    switch(request) {
+    switch(state) {
     case mrp_resource_no_request:     return "no-request";
     case mrp_resource_release:        return "release";
     case mrp_resource_acquire:        return "acquire";

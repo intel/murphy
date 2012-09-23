@@ -39,6 +39,7 @@
 struct mrp_resource_set_s {
     mrp_list_hook_t                 list;
     uint32_t                        id;
+    mrp_resource_state_t            state;
     struct {
         struct {
             mrp_resource_mask_t all;
@@ -62,7 +63,6 @@ struct mrp_resource_set_s {
     uint32_t                        zone;
     struct {
         uint32_t id;
-        mrp_resource_request_t type;
         uint32_t stamp;
     }                               request;
     mrp_resource_event_cb_t         event;

@@ -198,7 +198,7 @@ const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf)
         if (buflen < zone_count + 1)
             return NULL;
     }
-    else if (!buf) {
+    else {
         buflen = zone_count + 1;
         if (!(buf = mrp_allocz(sizeof(const char *) * buflen))) {
             mrp_log_error("Memory alloc failure. Can't get all zone names");

@@ -148,6 +148,34 @@ mrp_resource_def_t *mrp_resource_definition_iterate_manager(void **cursor)
     return mrp_list_entry(entry, mrp_resource_def_t, manager.list);
 }
 
+const char **mrp_resource_definition_get_all_names(uint32_t buflen,
+                                                   const char **buf)
+{
+    uint32_t i;
+
+    MRP_ASSERT(!buf || (buf && buflen > 1), "invlaid argument");
+
+    if (buf) {
+        if (buflen < resource_def_count + 1)
+            return NULL;
+    }
+    else {
+        buflen = resource_def_count + 1;
+        if (!(buf = mrp_allocz(sizeof(const char *) * buflen))) {
+            mrp_log_error("Memory alloc failure. Can't get resource names");
+            return NULL;
+        }
+    }
+
+    for (i = 0;  i < resource_def_count;  i++)
+        buf[i] = resource_def_table[i]->name;
+
+    buf[i] = NULL;
+
+    return buf;
+}
+
+
 
 mrp_resource_t *mrp_resource_create(const char *name,
                                     bool        shared,

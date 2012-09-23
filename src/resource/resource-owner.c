@@ -209,7 +209,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
             advice = 0;
             rc = NULL;
 
-            switch (rset->request.type) {
+            switch (rset->state) {
 
             case mrp_resource_acquire:
                 while ((res = mrp_resource_set_iterate_resources(rset, &rc))) {

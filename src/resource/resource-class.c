@@ -54,24 +54,24 @@
  * +---------+----+----+--------+
  *      |      |    |       |
  *      |      |    |       +---- 0x07ffffff stamp of the last request
- *      |      |    +------------ 0x08000000 request (set if acquiring)
+ *      |      |    +------------ 0x08000000 state (set if acquiring)
  *      |      +----------------- 0x10000000 usage (set if shared)
  *      +------------------------ 0xe0000000 priority (0-7)
  */
 #define MASK(b)   (((uint32_t)1 << (b)) - (uint32_t)1)
 
 #define STAMP_SHIFT     0
-#define REQUEST_SHIFT   (STAMP_SHIFT   + MRP_KEY_STAMP_BITS)
-#define USAGE_SHIFT     (REQUEST_SHIFT + MRP_KEY_REQUEST_BITS)
-#define PRIORITY_SHIFT  (USAGE_SHIFT   + MRP_KEY_USAGE_BITS)
+#define STATE_SHIFT     (STAMP_SHIFT + MRP_KEY_STAMP_BITS)
+#define USAGE_SHIFT     (STATE_SHIFT + MRP_KEY_STATE_BITS)
+#define PRIORITY_SHIFT  (USAGE_SHIFT + MRP_KEY_USAGE_BITS)
 
 #define STAMP_MASK      MASK(MRP_KEY_STAMP_BITS)
-#define REQUEST_MASK    MASK(MRP_KEY_REQUEST_BITS)
+#define STATE_MASK      MASK(MRP_KEY_STATE_BITS)
 #define USAGE_MASK      MASK(MRP_KEY_USAGE_BITS)
 #define PRIORITY_MASK   MASK(MRP_KEY_PRIORITY_BITS)
 
 #define STAMP_KEY(p)    (((uint32_t)(p) & STAMP_MASK)    << STAMP_SHIFT)
-#define REQUEST_KEY(p)  (((uint32_t)(p) & REQUEST_MASK)  << REQUEST_SHIFT)
+#define STATE_KEY(p)    (((uint32_t)(p) & STATE_MASK)    << STATE_SHIFT)
 #define USAGE_KEY(p)    (((uint32_t)(p) & USAGE_MASK)    << USAGE_SHIFT)
 #define PRIORITY_KEY(p) (((uint32_t)(p) & PRIORITY_MASK) << PRIORITY_SHIFT)
 
@@ -280,7 +280,7 @@ uint32_t mrp_resource_class_get_sorting_key(mrp_resource_set_t *rset)
 {
     uint32_t priority;
     uint32_t usage;
-    uint32_t request;
+    uint32_t state;
     uint32_t stamp;
     uint32_t key;
 
@@ -288,10 +288,10 @@ uint32_t mrp_resource_class_get_sorting_key(mrp_resource_set_t *rset)
 
     priority = PRIORITY_KEY(rset->class.priority);
     usage    = USAGE_KEY(rset->resource.share ? 1 : 0);
-    request  = REQUEST_KEY(rset->request.type == mrp_resource_acquire ? 1 : 0);
+    state    = STATE_KEY(rset->state == mrp_resource_acquire ? 1 : 0);
     stamp    = STAMP_KEY(rset->request.stamp);
 
-    key = priority | usage | request | stamp;
+    key = priority | usage | state | stamp;
 
     return key;
 }

@@ -38,7 +38,7 @@
 #define MRP_ZONE_MAX            8
 
 #define MRP_KEY_STAMP_BITS      27
-#define MRP_KEY_REQUEST_BITS    1
+#define MRP_KEY_STATE_BITS      1
 #define MRP_KEY_USAGE_BITS      1
 #define MRP_KEY_PRIORITY_BITS   3
 
@@ -48,7 +48,7 @@
 
 
 
-typedef enum   mrp_resource_request_e   mrp_resource_request_t;
+typedef enum   mrp_resource_state_e     mrp_resource_state_t;
 typedef enum   mrp_resource_access_e    mrp_resource_access_t;
 
 typedef struct mrp_resource_client_s    mrp_resource_client_t;
@@ -69,7 +69,7 @@ typedef uint32_t                        mrp_resource_mask_t;
 typedef uint32_t                        mrp_attribute_mask_t;
 
 
-enum mrp_resource_request_e {
+enum mrp_resource_state_e {
     mrp_resource_no_request = 0,
     mrp_resource_release,
     mrp_resource_acquire,
