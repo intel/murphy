@@ -48,10 +48,12 @@ int mrp_resource_class_add_resource_set(const char *class_name,
                                         const char *zone_name,
                                         mrp_resource_set_t *resource_set);
 
-mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
+mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
                                             uint32_t priority,
                                             mrp_resource_event_cb_t event_cb,
                                             void *user_data);
+void mrp_resource_set_destroy(mrp_resource_set_t *resource_set);
+
 uint32_t mrp_get_resource_set_id(mrp_resource_set_t *resource_set);
 
 mrp_resource_state_t

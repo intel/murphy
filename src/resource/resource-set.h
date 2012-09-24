@@ -52,7 +52,7 @@ struct mrp_resource_set_s {
     }                               resource;
     struct {
         mrp_list_hook_t list;
-        uint32_t id;
+        mrp_resource_client_t *ptr;
         uint32_t reqno;
     }                               client;
     struct {

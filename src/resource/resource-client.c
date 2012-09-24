@@ -77,6 +77,7 @@ void mrp_resource_client_destroy(mrp_resource_client_t *client)
 
         mrp_list_foreach(&client->resource_sets, entry, n) {
             rset = mrp_list_entry(entry, mrp_resource_set_t, client.list);
+            mrp_resource_set_destroy(rset);
         }
 
         mrp_free(client);

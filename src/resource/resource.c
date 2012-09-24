@@ -179,7 +179,7 @@ const char **mrp_resource_definition_get_all_names(uint32_t buflen,
 
 mrp_resource_t *mrp_resource_create(const char *name,
                                     bool        shared,
-                                  mrp_attr_t *attrs)
+                                    mrp_attr_t *attrs)
 {
     mrp_resource_t *res = NULL;
     mrp_resource_def_t *rdef;
@@ -423,9 +423,19 @@ static uint32_t add_resource_definition(const char *name,
     def->id        = id;
     def->name      = dup_name;
     def->shareable = shareable;
-    def->manager.ftbl = mgrftbl;
-    def->manager.userdata = mgrdata;
     def->nattr     = nattr;
+
+    if (mgrftbl) {
+        def->manager.ftbl = mrp_alloc(sizeof(mrp_resource_mgr_ftbl_t));
+        def->manager.userdata = mgrdata;
+
+        if (def->manager.ftbl)
+            memcpy(def->manager.ftbl, mgrftbl,sizeof(mrp_resource_mgr_ftbl_t));
+        else {
+            mrp_log_error("Memory alloc failure. No manager for resource '%s'",
+                          name);
+        }
+    }
 
     resource_def_table[id] = def;
 

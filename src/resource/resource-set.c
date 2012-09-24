@@ -41,6 +41,7 @@
 #include "resource-set.h"
 #include "resource-class.h"
 #include "resource.h"
+#include "resource-client.h"
 #include "resource-owner.h"
 
 
@@ -60,7 +61,7 @@ uint32_t mrp_get_resource_set_count(void)
     return resource_set_count;
 }
 
-mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
+mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
                                             uint32_t priority,
                                             mrp_resource_event_cb_t event_cb,
                                             void *user_data)
@@ -68,6 +69,8 @@ mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
     static uint32_t our_id;
 
     mrp_resource_set_t *rset;
+
+    MRP_ASSERT(client, "invlaid argument");
 
     if (priority >= PRIORITY_MAX)
         priority = PRIORITY_MAX - 1;
@@ -80,8 +83,9 @@ mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
         mrp_list_init(&rset->resource.list);
         rset->resource.share = false;
 
-        mrp_list_init(&rset->client.list);
-        rset->client.id   = client_id;
+        mrp_list_append(&client->resource_sets, &rset->client.list);
+        rset->client.ptr = client;
+        rset->client.reqno = MRP_RESOURCE_REQNO_INVALID;
 
         mrp_list_init(&rset->class.list);
         rset->class.priority = priority;
@@ -96,6 +100,37 @@ mrp_resource_set_t *mrp_resource_set_create(uint32_t client_id,
 
     return rset;
 }
+
+void mrp_resource_set_destroy(mrp_resource_set_t *rset)
+{
+    mrp_resource_state_t state;
+    uint32_t zoneid;
+    mrp_list_hook_t *entry, *n;
+    mrp_resource_t *res;
+
+    if (rset) {
+        state  = rset->state;
+        zoneid = rset->zone;
+
+        mrp_list_foreach(&rset->resource.list, entry, n) {
+            res = mrp_list_entry(entry, mrp_resource_t, list);
+            mrp_resource_destroy(res);
+        }
+
+        mrp_list_delete(&rset->list);
+        mrp_list_delete(&rset->client.list);
+        mrp_list_delete(&rset->class.list);
+
+        mrp_free(rset);
+
+        if (resource_set_count > 0)
+            resource_set_count--;
+
+        if (state == mrp_resource_acquire)
+            mrp_resource_owner_update_zone(zoneid, MRP_RESOURCE_REQNO_INVALID);
+    }
+}
+
 
 uint32_t mrp_get_resource_set_id(mrp_resource_set_t *rset)
 {
