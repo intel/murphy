@@ -41,7 +41,7 @@
 #include <murphy-db/mqi.h>
 
 #include "resource-owner.h"
-#include "resource-class.h"
+#include "application-class.h"
 #include "resource-set.h"
 #include "resource.h"
 #include "zone.h"
@@ -68,19 +68,19 @@ static mqi_handle_t          owner_tables[RESOURCE_MAX];
 static mrp_resource_owner_t *get_owner(uint32_t, uint32_t);
 static void reset_owners(uint32_t, mrp_resource_owner_t *);
 static bool grant_ownership(mrp_resource_owner_t *, mrp_zone_t *,
-                            mrp_resource_class_t *, mrp_resource_set_t *,
+                            mrp_application_class_t *, mrp_resource_set_t *,
                             mrp_resource_t *);
 static bool advice_ownership(mrp_resource_owner_t *, mrp_zone_t *,
-                             mrp_resource_class_t *, mrp_resource_set_t *,
+                             mrp_application_class_t *, mrp_resource_set_t *,
                              mrp_resource_t *);
 
 static void manager_start_transaction(mrp_zone_t *);
 static void manager_end_transaction(mrp_zone_t *);
 
 static void delete_resource_owner(mrp_zone_t *, mrp_resource_t *);
-static void insert_resource_owner(mrp_zone_t *, mrp_resource_class_t *,
+static void insert_resource_owner(mrp_zone_t *, mrp_application_class_t *,
                                   mrp_resource_t *);
-static void update_resource_owner(mrp_zone_t *, mrp_resource_class_t *,
+static void update_resource_owner(mrp_zone_t *, mrp_application_class_t *,
                                   mrp_resource_t *);
 static void set_attr_descriptors(mqi_column_desc_t *, mrp_resource_t *);
 
@@ -164,7 +164,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
     mrp_resource_owner_t oldowners[RESOURCE_MAX];
     mrp_resource_owner_t backup[RESOURCE_MAX];
     mrp_zone_t *zone;
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     mrp_resource_set_t *rset;
     mrp_resource_t *res;
     mrp_resource_def_t *rdef;
@@ -200,10 +200,10 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
     rcnt = mrp_resource_definition_count();
     clc  = NULL;
 
-    while ((class = mrp_resource_class_iterate_classes(&clc))) {
+    while ((class = mrp_application_class_iterate_classes(&clc))) {
         rsc = NULL;
 
-        while ((rset = mrp_resource_class_iterate_rsets(class,zoneid,&rsc))) {
+        while ((rset=mrp_application_class_iterate_rsets(class,zoneid,&rsc))) {
             mandatory = rset->resource.mask.mandatory;
             grant = 0;
             advice = 0;
@@ -319,7 +319,7 @@ int mrp_resource_owner_print(char *buf, int len)
 
     mrp_zone_t *zone;
     mrp_resource_owner_t *owner;
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     mrp_resource_set_t *rset;
     mrp_resource_t *res;
     mrp_resource_def_t *rdef;
@@ -398,11 +398,11 @@ static void reset_owners(uint32_t zone, mrp_resource_owner_t *oldowners)
     memset(ptr, 0, size);
 }
 
-static bool grant_ownership(mrp_resource_owner_t *owner,
-                            mrp_zone_t           *zone,
-                            mrp_resource_class_t *class,
-                            mrp_resource_set_t   *rset,
-                            mrp_resource_t       *res)
+static bool grant_ownership(mrp_resource_owner_t    *owner,
+                            mrp_zone_t              *zone,
+                            mrp_application_class_t *class,
+                            mrp_resource_set_t      *rset,
+                            mrp_resource_t          *res)
 {
     mrp_resource_def_t      *rdef = res->def;
     mrp_resource_mgr_ftbl_t *ftbl = rdef->manager.ftbl;
@@ -451,11 +451,11 @@ static bool grant_ownership(mrp_resource_owner_t *owner,
     return true;
 }
 
-static bool advice_ownership(mrp_resource_owner_t *owner,
-                             mrp_zone_t           *zone,
-                             mrp_resource_class_t *class,
-                             mrp_resource_set_t   *rset,
-                             mrp_resource_t       *res)
+static bool advice_ownership(mrp_resource_owner_t    *owner,
+                             mrp_zone_t              *zone,
+                             mrp_application_class_t *class,
+                             mrp_resource_set_t      *rset,
+                             mrp_resource_t          *res)
 {
     mrp_resource_def_t      *rdef = res->def;
     mrp_resource_mgr_ftbl_t *ftbl = rdef->manager.ftbl;
@@ -548,7 +548,7 @@ static void delete_resource_owner(mrp_zone_t *zone, mrp_resource_t *res)
 }
 
 static void insert_resource_owner(mrp_zone_t *zone,
-                                  mrp_resource_class_t *class,
+                                  mrp_application_class_t *class,
                                   mrp_resource_t *res)
 {
     mrp_resource_def_t *rdef = res->def;
@@ -588,7 +588,7 @@ static void insert_resource_owner(mrp_zone_t *zone,
 }
 
 static void update_resource_owner(mrp_zone_t *zone,
-                                  mrp_resource_class_t *class,
+                                  mrp_application_class_t *class,
                                   mrp_resource_t *res)
 {
     static uint32_t zone_id;

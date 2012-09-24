@@ -35,10 +35,10 @@
 
 
 struct mrp_resource_owner_s {
-    mrp_resource_class_t *class;  /**< owner class */
-    mrp_resource_set_t   *rset;   /**< owner resource set  */
-    mrp_resource_t       *res;    /**< owner resource */
-    bool                  share;  /**< do not use this  */
+    mrp_application_class_t *class;  /**< owner application class */
+    mrp_resource_set_t      *rset;   /**< owner resource set  */
+    mrp_resource_t          *res;    /**< owner resource */
+    bool                     share;  /**< do not use this  */
 };
 
 

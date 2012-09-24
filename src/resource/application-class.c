@@ -39,7 +39,7 @@
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 
-#include "resource-class.h"
+#include "application-class.h"
 #include "resource-set.h"
 #include "zone.h"
 
@@ -80,15 +80,15 @@ static MRP_LIST_HOOK(class_list);
 static mrp_htbl_t *name_hash;
 
 static void init_name_hash(void);
-static int  add_to_name_hash(mrp_resource_class_t *);
+static int  add_to_name_hash(mrp_application_class_t *);
 #if 0
-static void remove_from_name_hash(mrp_resource_class_t *);
+static void remove_from_name_hash(mrp_application_class_t *);
 #endif
 
 
-mrp_resource_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
+mrp_application_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
 {
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     mrp_list_hook_t *insert_before, *clhook, *n;
     uint32_t zone;
 
@@ -100,7 +100,7 @@ mrp_resource_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
     insert_before = &class_list;
 
     mrp_list_foreach_back(&class_list, clhook, n) {
-        class = mrp_list_entry(clhook, mrp_resource_class_t, list);
+        class = mrp_list_entry(clhook, mrp_application_class_t, list);
 
         if (!strcasecmp(name, class->name)) {
             mrp_log_warning("Multiple definitions for class '%s'", name);
@@ -116,7 +116,7 @@ mrp_resource_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
             insert_before = &class->list;
     }
 
-    if (!(class = mrp_allocz(sizeof(mrp_resource_class_t)))) {
+    if (!(class = mrp_allocz(sizeof(mrp_application_class_t)))) {
         mrp_log_error("Memory alloc failure. Can't create resource class '%s'",
                       name);
         return NULL;
@@ -138,9 +138,9 @@ mrp_resource_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
 }
 
 
-mrp_resource_class_t *mrp_resource_class_find(const char *name)
+mrp_application_class_t *mrp_application_class_find(const char *name)
 {
-    mrp_resource_class_t *class = NULL;
+    mrp_application_class_t *class = NULL;
 
     if (name_hash && name)
         class = mrp_htbl_lookup(name_hash, (void *)name);
@@ -148,7 +148,7 @@ mrp_resource_class_t *mrp_resource_class_find(const char *name)
     return class;
 }
 
-mrp_resource_class_t *mrp_resource_class_iterate_classes(void **cursor)
+mrp_application_class_t *mrp_application_class_iterate_classes(void **cursor)
 {
     mrp_list_hook_t *entry;
 
@@ -161,13 +161,13 @@ mrp_resource_class_t *mrp_resource_class_iterate_classes(void **cursor)
 
     *cursor = entry->prev;
 
-    return mrp_list_entry(entry, mrp_resource_class_t, list);
+    return mrp_list_entry(entry, mrp_application_class_t, list);
 }
 
 mrp_resource_set_t *
-mrp_resource_class_iterate_rsets(mrp_resource_class_t *class,
-                                 uint32_t              zone,
-                                 void                **cursor)
+mrp_application_class_iterate_rsets(mrp_application_class_t *class,
+                                    uint32_t                 zone,
+                                    void                   **cursor)
 {
     mrp_list_hook_t *list, *entry;
 
@@ -184,10 +184,11 @@ mrp_resource_class_iterate_rsets(mrp_resource_class_t *class,
     return mrp_list_entry(entry, mrp_resource_set_t, class.list);
 }
 
-const char **mrp_resource_class_get_all_names(uint32_t buflen,const char **buf)
+const char **mrp_application_class_get_all_names(uint32_t buflen,
+                                                 const char **buf)
 {
     mrp_list_hook_t *entry, *n;
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     bool freeit = false;
     uint32_t i  = 0;
 
@@ -203,7 +204,7 @@ const char **mrp_resource_class_get_all_names(uint32_t buflen,const char **buf)
     }
 
     mrp_list_foreach(&class_list, entry, n) {
-        class = mrp_list_entry(entry, mrp_resource_class_t, list);
+        class = mrp_list_entry(entry, mrp_application_class_t, list);
 
         if (i >= buflen-1) {
             if (freeit)
@@ -220,11 +221,11 @@ const char **mrp_resource_class_get_all_names(uint32_t buflen,const char **buf)
 }
 
 
-int mrp_resource_class_add_resource_set(const char *class_name,
-                                        const char *zone_name,
-                                        mrp_resource_set_t *rset)
+int mrp_application_class_add_resource_set(const char *class_name,
+                                           const char *zone_name,
+                                           mrp_resource_set_t *rset)
 {
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     mrp_zone_t *zone;
 
 
@@ -232,7 +233,7 @@ int mrp_resource_class_add_resource_set(const char *class_name,
     MRP_ASSERT(!rset->class.ptr || !mrp_list_empty(&rset->class.list),
                "attempt to add multiple times the same resource set");
 
-    if (!(class = mrp_resource_class_find(class_name)))
+    if (!(class = mrp_application_class_find(class_name)))
         return -1;
 
     if (!(zone = mrp_zone_find_by_name(zone_name)))
@@ -241,14 +242,14 @@ int mrp_resource_class_add_resource_set(const char *class_name,
     rset->class.ptr = class;
     rset->zone = mrp_zone_get_id(zone);
 
-    mrp_resource_class_move_resource_set(rset);
+    mrp_application_class_move_resource_set(rset);
 
     return 0;
 }
 
-void mrp_resource_class_move_resource_set(mrp_resource_set_t *rset)
+void mrp_application_class_move_resource_set(mrp_resource_set_t *rset)
 {
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     mrp_list_hook_t *list, *lentry, *n, *insert_before;
     mrp_resource_set_t *rentry;
     uint32_t key;
@@ -262,12 +263,12 @@ void mrp_resource_class_move_resource_set(mrp_resource_set_t *rset)
     zone  = rset->zone;
 
     list = insert_before = class->resource_sets + zone;
-    key  = mrp_resource_class_get_sorting_key(rset);
+    key  = mrp_application_class_get_sorting_key(rset);
 
     mrp_list_foreach_back(list, lentry, n) {
         rentry = mrp_list_entry(lentry, mrp_resource_set_t, class.list);
 
-         if (key >= mrp_resource_class_get_sorting_key(rentry))
+         if (key >= mrp_application_class_get_sorting_key(rentry))
              break;
 
          insert_before = lentry;
@@ -276,7 +277,7 @@ void mrp_resource_class_move_resource_set(mrp_resource_set_t *rset)
     mrp_list_append(insert_before, &rset->class.list);
 }
 
-uint32_t mrp_resource_class_get_sorting_key(mrp_resource_set_t *rset)
+uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 {
     uint32_t priority;
     uint32_t usage;
@@ -297,12 +298,12 @@ uint32_t mrp_resource_class_get_sorting_key(mrp_resource_set_t *rset)
 }
 
 
-int mrp_resource_class_print(char *buf, int len)
+int mrp_application_class_print(char *buf, int len)
 {
 #define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
 
     mrp_zone_t *zone;
-    mrp_resource_class_t *class;
+    mrp_application_class_t *class;
     mrp_resource_set_t *rset;
     mrp_list_hook_t *clen, *n;
     mrp_list_hook_t *list, *rsen, *m;
@@ -315,10 +316,10 @@ int mrp_resource_class_print(char *buf, int len)
     e = (p = buf) + len;
     clcnt = rscnt = 0;
 
-    PRINT("Resource classes:\n");
+    PRINT("Application classes:\n");
 
     mrp_list_foreach_back(&class_list, clen, n) {
-        class = mrp_list_entry(clen, mrp_resource_class_t, list);
+        class = mrp_list_entry(clen, mrp_application_class_t, list);
         PRINT("  %3u - %s\n", class->priority, class->name);
 
         for (zid = 0;   zid < MRP_ZONE_MAX;   zid++) {
@@ -372,7 +373,7 @@ static void init_name_hash(void)
 }
 
 
-static int add_to_name_hash(mrp_resource_class_t *class)
+static int add_to_name_hash(mrp_application_class_t *class)
 {
     MRP_ASSERT(class && class->name, "invalid argument");
 
@@ -385,9 +386,9 @@ static int add_to_name_hash(mrp_resource_class_t *class)
 }
 
 #if 0
-static void remove_from_name_hash(mrp_resource_class_t *class)
+static void remove_from_name_hash(mrp_application_class_t *class)
 {
-    mrp_resource_class_t *deleted;
+    mrp_application_class_t *deleted;
 
     if (class && class->name && name_hash) {
         deleted = mrp_htbl_remove(name_hash, (void *)class->name, false);

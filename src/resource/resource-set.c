@@ -39,7 +39,7 @@
 #include <murphy/resource/common-api.h>
 
 #include "resource-set.h"
-#include "resource-class.h"
+#include "application-class.h"
 #include "resource.h"
 #include "resource-client.h"
 #include "resource-owner.h"
@@ -272,7 +272,7 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
         rset->request.id = reqid;
         rset->request.stamp = get_request_stamp();
 
-        mrp_resource_class_move_resource_set(rset);
+        mrp_application_class_move_resource_set(rset);
         mrp_resource_owner_update_zone(rset->zone, reqid);
     }
 }
@@ -286,7 +286,7 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
         rset->request.id = reqid;
         rset->request.stamp = get_request_stamp();
 
-        mrp_resource_class_move_resource_set(rset);
+        mrp_application_class_move_resource_set(rset);
         mrp_resource_owner_update_zone(rset->zone, reqid);
     }
 }
@@ -316,7 +316,7 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
           gap, rset->id,
           rset->resource.mask.all, mandatory,
           rset->resource.mask.grant, rset->resource.mask.advice,
-          mrp_resource_class_get_sorting_key(rset), rset->class.priority,
+          mrp_application_class_get_sorting_key(rset), rset->class.priority,
           rset->resource.share ? "shared   ":"exclusive",
           state_str(rset->state));
 

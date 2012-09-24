@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_RESOURCE_CLASS_H__
-#define __MURPHY_RESOURCE_CLASS_H__
+#ifndef __MURPHY_APPLICATION_CLASS_H__
+#define __MURPHY_APPLICATION_CLASS_H__
 
 #include <murphy/common/list.h>
 
@@ -36,24 +36,24 @@
 
 
 
-struct mrp_resource_class_s {
+struct mrp_application_class_s {
     mrp_list_hook_t  list;
     const char      *name;
     uint32_t         priority;
     mrp_list_hook_t  resource_sets[MRP_ZONE_MAX];
 };
 
-mrp_resource_class_t *mrp_resource_class_find(const char *);
-mrp_resource_class_t *mrp_resource_class_iterate_classes(void **);
-mrp_resource_set_t   *mrp_resource_class_iterate_rsets(mrp_resource_class_t *,
-                                                       uint32_t, void **);
+mrp_application_class_t *mrp_application_class_find(const char *);
+mrp_application_class_t *mrp_application_class_iterate_classes(void **);
+mrp_resource_set_t *
+mrp_application_class_iterate_rsets(mrp_application_class_t*,uint32_t,void**);
 
-void     mrp_resource_class_move_resource_set(mrp_resource_set_t *);
+void mrp_application_class_move_resource_set(mrp_resource_set_t *);
 
-uint32_t mrp_resource_class_get_sorting_key(mrp_resource_set_t *);
+uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *);
 
 
-#endif  /* __MURPHY_RESOURCE_CLASS_H__ */
+#endif  /* __MURPHY_APPLICATION_CLASS_H__ */
 
 /*
  * Local Variables:

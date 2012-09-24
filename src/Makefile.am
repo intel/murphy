@@ -421,7 +421,7 @@ libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/attribute.c		\
 		resource/resource.c		\
 		resource/resource-set.c		\
-		resource/resource-class.c	\
+		resource/application-class.c	\
 		resource/resource-owner.c	\
 		resource/resource-client.c	\
 		resource/zone.c

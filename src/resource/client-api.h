@@ -41,12 +41,12 @@ const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf);
 const char **mrp_resource_definition_get_all_names(uint32_t buflen,
                                                    const char **buf);
 
-const char **mrp_resource_class_get_all_names(uint32_t buflen,
-                                              const char **buf);
+const char **mrp_application_class_get_all_names(uint32_t buflen,
+                                                 const char **buf);
 
-int mrp_resource_class_add_resource_set(const char *class_name,
-                                        const char *zone_name,
-                                        mrp_resource_set_t *resource_set);
+int mrp_application_class_add_resource_set(const char *class_name,
+                                           const char *zone_name,
+                                           mrp_resource_set_t *resource_set);
 
 mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
                                             uint32_t priority,

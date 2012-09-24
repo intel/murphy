@@ -57,7 +57,7 @@ struct mrp_resource_set_s {
     }                               client;
     struct {
         mrp_list_hook_t list;
-        mrp_resource_class_t *ptr;
+        mrp_application_class_t *ptr;
         uint32_t priority;
     }                               class;
     uint32_t                        zone;
