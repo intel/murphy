@@ -43,7 +43,7 @@
 
 
 #define MQI_COLUMN_DEFINITION(name, type...)  \
-    {name, type}
+    {name, type, 0}
 
 #define MQI_COLUMN_SELECTOR(column_index, result_structure, result_member) \
     {column_index, MQI_OFFSET(result_structure, result_member)}
@@ -94,7 +94,7 @@
 #define MQI_COLUMN_DEFINITION_LIST(name, columns...)            \
     static mqi_column_def_t name[] = {                          \
         columns,                                                \
-        {NULL, mqi_unknown, 0}                                  \
+        {NULL, mqi_unknown, 0, 0}                               \
     }
 
 #define MQI_INDEX_COLUMN(column_name)  column_name,
