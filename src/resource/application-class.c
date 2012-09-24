@@ -29,6 +29,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include <murphy/common/mm.h>
 #include <murphy/common/hashtbl.h>
@@ -39,11 +40,17 @@
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 
+#include <murphy-db/mqi.h>
+
 #include "application-class.h"
 #include "resource-set.h"
 #include "zone.h"
 
-#define CLASS_MAX 64
+#define CLASS_MAX        64
+#define NAME_LENGTH      24
+
+#define CLASS_NAME_IDX   0
+#define PRIORITY_IDX     1
 
 
 /*
@@ -75,6 +82,11 @@
 #define USAGE_KEY(p)    (((uint32_t)(p) & USAGE_MASK)    << USAGE_SHIFT)
 #define PRIORITY_KEY(p) (((uint32_t)(p) & PRIORITY_MASK) << PRIORITY_SHIFT)
 
+typedef struct {
+    const char *class_name;
+    uint32_t    priority;
+} class_row_t;
+
 
 static MRP_LIST_HOOK(class_list);
 static mrp_htbl_t *name_hash;
@@ -85,8 +97,12 @@ static int  add_to_name_hash(mrp_application_class_t *);
 static void remove_from_name_hash(mrp_application_class_t *);
 #endif
 
+static mqi_handle_t get_database_table(void);
+static void insert_into_application_class_table(const char *, uint32_t);
 
-mrp_application_class_t *mrp_resource_class_create(const char *name, uint32_t pri)
+
+mrp_application_class_t *mrp_application_class_create(const char *name,
+                                                      uint32_t pri)
 {
     mrp_application_class_t *class;
     mrp_list_hook_t *insert_before, *clhook, *n;
@@ -133,6 +149,8 @@ mrp_application_class_t *mrp_resource_class_create(const char *name, uint32_t pr
     mrp_list_append(insert_before, &class->list);
 
     add_to_name_hash(class);
+
+    insert_into_application_class_table(class->name, class->priority);
 
     return class;
 }
@@ -404,6 +422,56 @@ static void remove_from_name_hash(mrp_application_class_t *class)
     }
 }
 #endif
+
+
+static mqi_handle_t get_database_table(void)
+{
+    MQI_COLUMN_DEFINITION_LIST(coldefs,
+        MQI_COLUMN_DEFINITION( "name"     , MQI_VARCHAR(NAME_LENGTH), 0 ),
+        MQI_COLUMN_DEFINITION( "priority" , MQI_UNSIGNED            , 0 )
+    );
+
+    MQI_INDEX_DEFINITION(indexdef,
+        MQI_INDEX_COLUMN("priority")
+    );
+
+    static mqi_handle_t  table = MQI_HANDLE_INVALID;
+    static char         *name  = "application_classes";
+
+    if (table == MQI_HANDLE_INVALID) {
+        mqi_open();
+
+        table = MQI_CREATE_TABLE(name, MQI_TEMPORARY, coldefs, indexdef);
+
+        if (table == MQI_HANDLE_INVALID)
+            mrp_log_error("Can't create table '%s': %s", name,strerror(errno));
+    }
+
+    return table;
+}
+
+static void insert_into_application_class_table(const char *name, uint32_t pri)
+{
+    MQI_COLUMN_SELECTION_LIST(cols,
+        MQI_COLUMN_SELECTOR(CLASS_NAME_IDX, class_row_t, class_name),
+        MQI_COLUMN_SELECTOR(PRIORITY_IDX  , class_row_t, priority  )
+    );
+
+    class_row_t   row;
+    mqi_handle_t  table   = get_database_table();
+    class_row_t  *rows[2] = {&row, NULL};
+
+    MRP_ASSERT(name, "invalid argument");
+    MRP_ASSERT(table != MQI_HANDLE_INVALID, "database problem");
+
+    row.class_name = name;
+    row.priority = pri;
+
+    if (MQI_INSERT_INTO(table, cols, rows) != 1)
+        mrp_log_error("Failed to add application class '%s' to database",name);
+}
+
+
 
 /*
  * Local Variables:
