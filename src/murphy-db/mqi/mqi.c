@@ -679,10 +679,17 @@ int mqi_delete_from(mqi_handle_t h, mqi_cond_entry_t *cond)
 
 mqi_handle_t mqi_get_table_handle(char *table_name)
 {
+    void *data;
+
     MDB_CHECKARG(table_name, MQI_HANDLE_INVALID);
     MDB_PREREQUISITE(dbs && ndb > 0, MQI_HANDLE_INVALID);
 
-    return mdb_hash_get_data(table_name_hash, 0,table_name) - NULL;
+    data = mdb_hash_get_data(table_name_hash, 0,table_name);
+
+    if (data != NULL)
+        return data - NULL;
+    else
+        return MQI_HANDLE_INVALID;
 }
 
 
