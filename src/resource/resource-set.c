@@ -160,6 +160,14 @@ mrp_resource_mask_t mrp_get_resource_set_advice(mrp_resource_set_t *rset)
     return rset->resource.mask.advice;
 }
 
+mrp_resource_client_t *mrp_get_resource_set_client(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->client.ptr;
+}
+
+
 mrp_resource_t *mrp_resource_set_iterate_resources(mrp_resource_set_t *rset,
                                                    void **cursor)
 {

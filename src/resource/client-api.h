@@ -65,6 +65,10 @@ mrp_get_resource_set_grant(mrp_resource_set_t *resource_set);
 mrp_resource_mask_t
 mrp_get_resource_set_advice(mrp_resource_set_t *resource_set);
 
+mrp_resource_client_t *
+mrp_get_resource_set_client(mrp_resource_set_t *resource_set);
+
+
 int mrp_resource_set_add_resource(mrp_resource_set_t *resource_set,
                                   const char *resource_name,
                                   bool shared,
