@@ -601,6 +601,35 @@ plugin_signalling_ladir      = $(SIGNALLING_PLUGINdir)
 plugin_LTLIBRARIES    += plugin-signalling.la
 endif
 
+# resource plugin
+RESOURCE_PLUGIN_REGULAR_SOURCES = plugins/plugin-resource.c
+RESOURCE_PLUGIN_SOURCES         = $(RESOURCE_PLUGIN_REGULAR_SOURCES) \
+				  plugin-resource-func-info.c
+RESOURCE_PLUGIN_CFLAGS  	=       \
+		$(INCLUDES)
+RESOURCE_PLUGIN_LIBS    	=       \
+		libmurphy-core.la   	\
+		libmurphy-common.la 	\
+		murphy-db/mqi/libmqi.la \
+		murphy-db/mdb/libmdb.la \
+		libmurphy-resource.la
+
+plugin_resource_la_SOURCES = $(RESOURCE_PLUGIN_SOURCES)
+plugin_resource_la_CFLAGS  = $(RESOURCE_PLUGIN_CFLAGS) \
+			     $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_resource_la_LDFLAGS = -module -avoid-version
+plugin_resource_la_LIBADD  = $(RESOURCE_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES += plugin-resource.la
+
+# debug file:line-function mapping generation
+plugin-resource-func-info.c: $(RESOURCE_PLUGIN_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm plugin-resource-func-info.c
+
+
 ###################################
 # murphy daemon
 #
