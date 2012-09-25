@@ -230,7 +230,7 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
             if (ctx->log_mask < 0)
                 print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
             else
-                mrp_log_set_target(ctx->log_target);
+                mrp_log_set_mask(ctx->log_mask);
             break;
 
         case 't':
