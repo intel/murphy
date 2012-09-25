@@ -602,16 +602,18 @@ plugin_LTLIBRARIES    += plugin-signalling.la
 endif
 
 # resource plugin
-RESOURCE_PLUGIN_REGULAR_SOURCES = plugins/plugin-resource.c
-RESOURCE_PLUGIN_SOURCES         = $(RESOURCE_PLUGIN_REGULAR_SOURCES) \
-				  plugin-resource-func-info.c
-RESOURCE_PLUGIN_CFLAGS  	=       \
+RESOURCE_PLUGIN_REGULAR_SOURCES = 			\
+		plugins/resource/plugin-resource.c
+RESOURCE_PLUGIN_SOURCES = 				\
+		$(RESOURCE_PLUGIN_REGULAR_SOURCES)	\
+                plugin-resource-func-info.c
+RESOURCE_PLUGIN_CFLAGS =				\
 		$(INCLUDES)
-RESOURCE_PLUGIN_LIBS    	=       \
-		libmurphy-core.la   	\
-		libmurphy-common.la 	\
-		murphy-db/mqi/libmqi.la \
-		murphy-db/mdb/libmdb.la \
+RESOURCE_PLUGIN_LIBS =       				\
+		libmurphy-core.la			\
+		libmurphy-common.la			\
+		murphy-db/mqi/libmqi.la			\
+		murphy-db/mdb/libmdb.la			\
 		libmurphy-resource.la
 
 plugin_resource_la_SOURCES = $(RESOURCE_PLUGIN_SOURCES)
