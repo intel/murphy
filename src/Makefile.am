@@ -415,7 +415,8 @@ libmurphy_resource_la_HEADERS =			\
 		resource/common-api.h           \
 		resource/client-api.h           \
 		resource/manager-api.h          \
-		resource/config-api.h
+		resource/config-api.h           \
+		resource/protocol.h
 
 libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/attribute.c		\

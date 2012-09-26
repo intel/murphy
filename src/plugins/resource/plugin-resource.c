@@ -46,6 +46,7 @@
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 #include <murphy/resource/manager-api.h>
+#include <murphy/resource/protocol.h>
 
 enum {
     ARG_CONFIG_FILE,
@@ -234,6 +235,77 @@ int set_default_configuration(void)
 }
 
 
+static void reply_with_array(client_t *client,mrp_msg_t *msg,const char **arr)
+{
+    resource_data_t *data   = client->data;
+    mrp_plugin_t    *plugin = data->plugin;
+    uint16_t         dim;
+    bool             s;
+
+    for (dim = 0;  arr[dim];  dim++)
+        ;
+
+    s  = mrp_msg_append(msg, MRP_MSG_TAG_SINT16(RESPROTO_REQUEST_STATUS, 0));
+    s &= mrp_msg_append(msg, MRP_MSG_TAG_STRING_ARRAY(RESPROTO_RESOURCE_NAME,
+                                               dim, arr));
+    if (!s) {
+        mrp_log_error("%s: failed to build reply", plugin->instance);
+        return;
+    }
+
+    if (!mrp_transport_send(client->transp, msg))
+        mrp_log_error("%s: failed to send reply", plugin->instance);
+}
+
+static void reply_with_error(client_t *client, mrp_msg_t *msg, int16_t err)
+{
+    if (!mrp_msg_append(msg,MRP_MSG_TAG_SINT16(RESPROTO_REQUEST_STATUS,err)) ||
+        !mrp_transport_send(client->transp, msg))
+    {
+        resource_data_t *data   = client->data;
+        mrp_plugin_t    *plugin = data->plugin;
+
+        mrp_log_error("%s: failed to create or send reply", plugin->instance);
+    }
+}
+
+static void query_resources_request(client_t *client, mrp_msg_t *req)
+{
+    const char **names = mrp_resource_definition_get_all_names(0, NULL);
+
+    if (!names)
+        reply_with_error(client, req, ENOMEM);
+    else {
+        reply_with_array(client, req, names);
+        mrp_free(names);
+    }
+}
+
+static void query_classes_request(client_t *client, mrp_msg_t *req)
+{
+    const char **names = mrp_application_class_get_all_names(0, NULL);
+
+    if (!names)
+        reply_with_error(client, req, ENOMEM);
+    else {
+        reply_with_array(client, req, names);
+        mrp_free(names);
+    }
+}
+
+static void query_zones_request(client_t *client, mrp_msg_t *req)
+{
+    const char **names = mrp_zone_get_all_names(0, NULL);
+
+    if (!names)
+        reply_with_error(client, req, ENOMEM);
+    else {
+        reply_with_array(client, req, names);
+        mrp_free(names);
+    }
+}
+
+
 static void connection_evt(mrp_transport_t *listen, void *user_data)
 {
     static uint32_t  id;
@@ -264,7 +336,7 @@ static void connection_evt(mrp_transport_t *listen, void *user_data)
 
     mrp_list_append(&data->clients, &client->list);
 
-    mrp_log_warning("%s: %s connected", plugin->instance, name);
+    mrp_log_info("%s: %s connected", plugin->instance, name);
 }
 
 void closed_evt(mrp_transport_t *transp, int error, void *user_data)
@@ -279,7 +351,7 @@ void closed_evt(mrp_transport_t *transp, int error, void *user_data)
         mrp_log_error("%s: connection error %d (%s)",
                       plugin->instance, error, strerror(error));
     else
-        mrp_log_warning("%s: peer closed connection", plugin->instance);
+        mrp_log_info("%s: peer closed connection", plugin->instance);
 
     mrp_resource_client_destroy(client->rscli);
 
@@ -293,10 +365,60 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
                          mrp_sockaddr_t *addr, socklen_t addrlen,
                          void *user_data)
 {
-    resource_data_t *data = (resource_data_t *)user_data;
+    client_t               *client = (client_t *)user_data;
+    resource_data_t        *data   = client->data;
+    mrp_plugin_t           *plugin = data->plugin;
+    uint32_t                seqno  = 0;
+    mrp_resproto_request_t  reqtyp = -1;
+    mrp_msg_field_t        *field;
 
-    mrp_log_warning("%s: received a message", data->plugin->instance);
-    //mrp_dump_msg(msg, stdout);
+    MRP_UNUSED(addr);
+    MRP_UNUSED(addrlen);
+
+    MRP_ASSERT(client->transp == transp, "confused with data structures");
+
+    mrp_log_info("%s: received a message", plugin->instance);
+    mrp_msg_dump(msg, stdout);
+
+    field = mrp_msg_find(msg, RESPROTO_SEQUENCE_NO);
+
+    if (field && field->type == MRP_MSG_FIELD_UINT32)
+        seqno = field->u32;
+    else {
+        mrp_log_warning("%s: malformed message. Bad or missing "
+                        "sequence number", plugin->instance);
+        return;
+    }
+
+    field = mrp_msg_find(msg, RESPROTO_REQUEST_TYPE);
+
+    if (field && field->type == MRP_MSG_FIELD_UINT16)
+        reqtyp = field->u16;
+    else {
+        mrp_log_warning("%s: malformed message. Bad or missing "
+                        "request type", plugin->instance);
+        return;
+    }
+
+    switch (reqtyp) {
+
+    case RESPROTO_QUERY_RESOURCES:
+        query_resources_request(client, msg);
+        break;
+
+    case RESPROTO_QUERY_CLASSES:
+        query_classes_request(client, msg);
+        break;
+
+    case RESPROTO_QUERY_ZONES:
+        query_zones_request(client, msg);
+        break;
+
+    default:
+        mrp_log_warning("%s: unsupported request type %d",
+                        plugin->instance, reqtyp);
+        break;
+    }
 }
 
 static void recv_msg(mrp_transport_t *transp, mrp_msg_t *msg, void *user_data)
@@ -321,8 +443,6 @@ static int initiate_transport(mrp_plugin_t *plugin)
     const char       *addr  = args[ARG_ADDRESS].str;
     int               flags = MRP_TRANSPORT_REUSEADDR;
     bool              stream;
-
-    //register_messages(data);
 
     data->alen = mrp_transport_resolve(NULL, addr, &data->saddr,
                                        sizeof(data->saddr), &data->atyp);
@@ -376,15 +496,15 @@ static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
     MRP_UNUSED(event_data);
 
 
-    mrp_log_warning("%s: got event 0x%x (%s):", plugin->instance, id, event);
+    mrp_log_info("%s: got event 0x%x (%s):", plugin->instance, id, event);
 
     if (data && event) {
         if (!strcmp(event, MRP_PLUGIN_EVENT_STARTED)) {
             cfgfile = args[ARG_CONFIG_FILE].str;
 
             set_default_configuration();
-            mrp_log_warning("%s: built-in default configuration is in use",
-                            plugin->instance);
+            mrp_log_info("%s: built-in default configuration is in use",
+                         plugin->instance);
 
             initiate_transport(plugin);
 
