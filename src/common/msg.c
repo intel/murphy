@@ -367,6 +367,95 @@ int mrp_msg_prepend(mrp_msg_t *msg, uint16_t tag, ...)
 }
 
 
+int mrp_msg_set(mrp_msg_t *msg, uint16_t tag, ...)
+{
+    mrp_msg_field_t *of, *nf;
+    va_list          ap;
+
+    of = mrp_msg_find(msg, tag);
+
+    if (of != NULL) {
+        va_start(ap, tag);
+        nf = create_field(tag, &ap);
+        va_end(ap);
+
+        if (nf != NULL) {
+            mrp_list_append(&of->hook, &nf->hook);
+            destroy_field(of);
+
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+
+int mrp_msg_iterate(mrp_msg_t *msg, void **it, uint16_t *tagp, uint16_t *typep,
+                    mrp_msg_value_t *valp, size_t *sizep)
+{
+    mrp_list_hook_t *p = *(mrp_list_hook_t **)it;
+    mrp_msg_field_t *f;
+
+    if (p == NULL)
+        p = msg->fields.next;
+
+    if (p == &msg->fields)
+        return FALSE;
+
+    f = mrp_list_entry(p, typeof(*f), hook);
+
+    *tagp  = f->tag;
+    *typep = f->type;
+
+    switch (f->type) {
+#define HANDLE_TYPE(type, member)                       \
+        case MRP_MSG_FIELD_##type:                      \
+            valp->member = f->member;                   \
+            if (sizep != NULL)                          \
+                *sizep = sizeof(typeof(f->member));     \
+            break
+
+        HANDLE_TYPE(BOOL  , bln);
+        HANDLE_TYPE(UINT8 , u8);
+        HANDLE_TYPE(SINT8 , s8);
+        HANDLE_TYPE(UINT16, u16);
+        HANDLE_TYPE(SINT16, s16);
+        HANDLE_TYPE(UINT32, u32);
+        HANDLE_TYPE(SINT32, s32);
+        HANDLE_TYPE(UINT64, u64);
+        HANDLE_TYPE(SINT64, s64);
+        HANDLE_TYPE(DOUBLE, dbl);
+
+    case MRP_MSG_FIELD_STRING:
+        valp->str = f->str;
+        if (sizep != NULL)
+            *sizep = strlen(f->str);
+        break;
+
+    case MRP_MSG_FIELD_BLOB:
+        valp->blb = f->blb;
+        if (sizep != NULL)
+            *sizep = (size_t)f->size[0];
+        break;
+
+    default:
+        if (f->type & MRP_MSG_FIELD_ARRAY) {
+            valp->aany = f->aany;
+            if (sizep != NULL)
+                *sizep = f->size[0];
+        }
+        else
+            return FALSE;
+#undef HANDLE_TYPE
+    }
+
+    *it = p->next;
+
+    return TRUE;
+}
+
+
 mrp_msg_field_t *mrp_msg_find(mrp_msg_t *msg, uint16_t tag)
 {
     mrp_msg_field_t *f;
@@ -385,13 +474,23 @@ mrp_msg_field_t *mrp_msg_find(mrp_msg_t *msg, uint16_t tag)
 int mrp_msg_get(mrp_msg_t *msg, ...)
 {
 #define HANDLE_TYPE(_type, _member)                       \
-            case MRP_MSG_FIELD_##_type:                   \
-                valp          = va_arg(ap, typeof(valp)); \
-                valp->_member = f->_member;               \
-                break
+    case MRP_MSG_FIELD_##_type:                           \
+        valp          = va_arg(ap, typeof(valp));         \
+        valp->_member = f->_member;                       \
+        break
+
+#define HANDLE_ARRAY(_type, _member)                      \
+    case MRP_MSG_FIELD_##_type:                           \
+        cntp          = va_arg(ap, typeof(cntp));         \
+        valp          = va_arg(ap, typeof(valp));         \
+        *cntp         = f->size[0];                       \
+        valp->_member = f->_member;                       \
+        break
+
 
     mrp_msg_field_t *f;
     mrp_msg_value_t *valp;
+    uint32_t        *cntp;
     mrp_list_hook_t *start, *p;
     uint16_t         tag, type;
     int              found;
@@ -443,9 +542,27 @@ int mrp_msg_get(mrp_msg_t *msg, ...)
                 HANDLE_TYPE(UINT64, u64);
                 HANDLE_TYPE(SINT64, s64);
                 HANDLE_TYPE(DOUBLE, dbl);
-                /* XXX TODO: add handling for array types */
             default:
-                goto out;
+                if (type & MRP_MSG_FIELD_ARRAY) {
+                    switch (type & ~MRP_MSG_FIELD_ARRAY) {
+                        HANDLE_ARRAY(STRING, astr);
+                        HANDLE_ARRAY(BOOL  , abln);
+                        HANDLE_ARRAY(UINT8 , au8 );
+                        HANDLE_ARRAY(SINT8 , as8 );
+                        HANDLE_ARRAY(UINT16, au16);
+                        HANDLE_ARRAY(SINT16, as16);
+                        HANDLE_ARRAY(UINT32, au32);
+                        HANDLE_ARRAY(SINT32, as32);
+                        HANDLE_ARRAY(UINT64, au64);
+                        HANDLE_ARRAY(SINT64, as64);
+                        HANDLE_ARRAY(DOUBLE, adbl);
+                    default:
+                        goto out;
+
+                    }
+                }
+                else
+                    goto out;
             }
 
             start = p->next;
@@ -463,6 +580,8 @@ int mrp_msg_get(mrp_msg_t *msg, ...)
     return found;
 
 #undef HANDLE_TYPE
+#undef HANDLE_ARRAY
+
 }
 
 

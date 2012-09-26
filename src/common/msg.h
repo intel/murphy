@@ -71,6 +71,7 @@ typedef enum {
 #define MRP_MSG_END ((char *)MRP_MSG_FIELD_INVALID) /* NULL */
 
 #define MRP_MSG_FIELD_ARRAY_OF(t) (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##t)
+#define MRP_MSG_FIELD_IS_ARRAY(t) ((t) & MRP_MSG_FIELD_ARRAY)
 
 #define MRP_MSG_TAG_STRING(tag, arg) (tag), MRP_MSG_FIELD_STRING, (arg)
 #define MRP_MSG_TAG_BOOL(tag, arg)   (tag), MRP_MSG_FIELD_BOOL  , (arg)
@@ -86,7 +87,7 @@ typedef enum {
 #define MRP_MSG_TAG_BLOB(tag, arg)   (tag), MRP_MSG_FIELD_BLOB  , (arg)
 
 #define MRP_MSG_TAG_ARRAY(tag, type, cnt, arr)                        \
-    ((tag), MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##type, (cnt), (arr))
+    (tag), MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##type, (cnt), (arr)
 #define MRP_MSG_TAG_STRING_ARRAY(tag, cnt, arr) \
     MRP_MSG_TAG_ARRAY((tag), STRING, (cnt), (arr))
 #define MRP_MSG_TAG_BOOL_ARRAY(tag, cnt, arr) \
@@ -199,6 +200,20 @@ int mrp_msg_append(mrp_msg_t *msg, uint16_t tag, ...);
 
 /** Prepend a field to a message. */
 int mrp_msg_prepend(mrp_msg_t *msg, uint16_t tag, ...);
+
+/** Set a field in a message to the given value. */
+int mrp_msg_set(mrp_msg_t *msg, uint16_t tag, ...);
+
+/** Iterate through the fields of a message. You must not any of the
+    fields while iterating. */
+int mrp_msg_iterate(mrp_msg_t *msg, void **it, uint16_t *tagp,
+                    uint16_t *typep, mrp_msg_value_t *valp, size_t *sizep);
+
+/** Iterate through the matching fields of a message. You should not  delete
+ * any of the fields while iterating through the message. */
+int mrp_msg_iterate_matching(mrp_msg_t *msg, void **it, uint16_t *tagp,
+                             uint16_t *typep, mrp_msg_value_t *valp,
+                             size_t *sizep);
 
 /** Find a field in a message. */
 mrp_msg_field_t *mrp_msg_find(mrp_msg_t *msg, uint16_t tag);
