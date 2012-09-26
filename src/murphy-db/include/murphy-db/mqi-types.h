@@ -50,6 +50,12 @@
  */
 #define MQI_HANDLE_INVALID     (~((mqi_handle_t)0))
 
+/**
+ * Stamp for a non-existing table or a table without any inserts ever.
+ */
+#define MQI_STAMP_NONE ((uint32_t)0)
+
+
 #define MQI_DIMENSION(array)  \
     (sizeof(array) / sizeof(array[0]))
 

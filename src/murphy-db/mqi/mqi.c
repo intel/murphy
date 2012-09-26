@@ -724,7 +724,7 @@ uint32_t mqi_get_table_stamp(mqi_handle_t h)
     mqi_db_functbl_t *ftb;
     void             *tbl;
 
-    MDB_CHECKARG(h != MDB_HANDLE_INVALID, -1);
+    MDB_CHECKARG(h != MDB_HANDLE_INVALID, MQI_STAMP_NONE);
     MDB_PREREQUISITE(dbs && ndb > 0, -1);
 
     GET_TABLE(tbl, ftb, h, -1);
