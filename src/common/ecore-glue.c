@@ -27,6 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include <Ecore.h>
 
@@ -44,6 +46,7 @@ typedef struct {
     void            (*cb)(void *glue_data,
                           void *id, int fd, mrp_io_event_t events,
                           void *user_data);
+    mrp_io_event_t    mask;
     void             *user_data;
     void             *glue_data;
 } io_t;
@@ -89,6 +92,19 @@ static void  del_defer(void *glue_data, void *id);
 static void  mod_defer(void *glue_data, void *id, int enabled);
 
 
+static int io_check_hup(int fd)
+{
+    char buf[1];
+    int  saved_errno, n;
+
+    saved_errno = errno;
+    n = recv(fd, buf, 1, MSG_PEEK);
+    errno = saved_errno;
+
+    return (n == 0);
+}
+
+
 static Eina_Bool io_cb(void *user_data, Ecore_Fd_Handler *ec_io)
 {
     io_t           *io     = (io_t *)user_data;
@@ -99,12 +115,17 @@ static Eina_Bool io_cb(void *user_data, Ecore_Fd_Handler *ec_io)
         events |= MRP_IO_EVENT_IN;
     if (ecore_main_fd_handler_active_get(ec_io, ECORE_FD_WRITE))
         events |= MRP_IO_EVENT_OUT;
+    if (ecore_main_fd_handler_active_get(ec_io, ECORE_FD_ERROR))
+        events |= MRP_IO_EVENT_ERR;
+
 #if 0 /* Pfoof... ecore cannot monitor for HUP. */
     if (ecore_main_fd_handler_active_get(ec_io, NO_SUCH_ECORE_EVENT))
         events |= MRP_IO_EVENT_HUP;
+#else
+    if ((io->mask & MRP_IO_EVENT_HUP) && (events & MRP_IO_EVENT_IN))
+        if (io_check_hup(fd))
+            events |= MRP_IO_EVENT_HUP;
 #endif
-    if (ecore_main_fd_handler_active_get(ec_io, ECORE_FD_ERROR))
-        events |= MRP_IO_EVENT_ERR;
 
     io->cb(io->glue_data, io, fd, events, io->user_data);
 
@@ -130,6 +151,7 @@ static void *add_io(void *glue_data, int fd, mrp_io_event_t events,
 #endif
         if (events & MRP_IO_EVENT_ERR) mask |= ECORE_FD_ERROR;
 
+        io->mask  = events;
         io->ec_io = ecore_main_fd_handler_add(fd, mask, io_cb, io, NULL, NULL);
 
         if (io->ec_io != NULL) {
