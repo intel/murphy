@@ -430,6 +430,7 @@ static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
         space = t->isize - t->idata;
         while ((n = read(fd, t->ibuf + t->idata, space)) > 0) {
             t->idata += n;
+            left      = 0;
 
             if (t->idata >= sizeof(size)) {
                 sizep = t->ibuf;
