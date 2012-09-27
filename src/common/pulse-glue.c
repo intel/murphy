@@ -34,11 +34,10 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/mainloop.h>
 
-
+#include <murphy/common/pulse-glue.h>
 
 
 typedef struct {
-    mrp_mainloop_t  *ml;
     pa_mainloop_api *pa;
 } pulse_glue_t;
 
@@ -228,7 +227,7 @@ static void mod_timer(void *glue_data, void *id, unsigned int msecs)
 }
 
 
-void defer_cb(pa_mainloop_api *pa, pa_defer_event *e, void *user_data)
+static void defer_cb(pa_mainloop_api *pa, pa_defer_event *e, void *user_data)
 {
     dfr_t *d = (dfr_t *)user_data;
 
@@ -288,52 +287,67 @@ static void mod_defer(void *glue_data, void *id, int enabled)
 }
 
 
+static void unregister(void *data)
+{
+    pulse_glue_t *glue = (pulse_glue_t *)data;
+
+    mrp_free(glue);
+}
+
+
 static mrp_superloop_ops_t pa_ops = {
-    .add_io    = add_io,
-    .del_io    = del_io,
-    .add_timer = add_timer,
-    .del_timer = del_timer,
-    .mod_timer = mod_timer,
-    .add_defer = add_defer,
-    .del_defer = del_defer,
-    .mod_defer = mod_defer,
+    .add_io     = add_io,
+    .del_io     = del_io,
+    .add_timer  = add_timer,
+    .del_timer  = del_timer,
+    .mod_timer  = mod_timer,
+    .add_defer  = add_defer,
+    .del_defer  = del_defer,
+    .mod_defer  = mod_defer,
+    .unregister = unregister,
 };
 
 
-void *mrp_mainloop_register_with_pulse(mrp_mainloop_t *ml, pa_mainloop_api *pa)
+int mrp_mainloop_register_with_pulse(mrp_mainloop_t *ml, pa_mainloop_api *pa)
 {
     pulse_glue_t *glue;
 
     glue = mrp_allocz(sizeof(*glue));
 
     if (glue != NULL) {
-        glue->ml = ml;
         glue->pa = pa;
 
         if (mrp_set_superloop(ml, &pa_ops, glue))
-            return glue;
+            return TRUE;
         else
             mrp_free(glue);
-    }
-
-    return NULL;
-}
-
-
-int mrp_mainloop_unregister_from_pulse(mrp_mainloop_t *ml, pa_mainloop_api *pa,
-                                       void *data)
-{
-    pulse_glue_t *glue = (pulse_glue_t *)data;
-
-    if (glue->ml == ml && glue->pa == pa) {
-        if (mrp_clear_superloop(ml, &pa_ops, data)) {
-            mrp_free(glue);
-
-            return TRUE;
-        }
     }
 
     return FALSE;
 }
 
 
+int mrp_mainloop_unregister_from_pulse(mrp_mainloop_t *ml)
+{
+    return mrp_mainloop_unregister(ml);
+}
+
+
+
+static mrp_mainloop_t *pulse_ml;
+
+mrp_mainloop_t *mrp_mainloop_pulse_get(pa_mainloop_api *pa)
+{
+    if (pulse_ml == NULL) {
+        pulse_ml = mrp_mainloop_create();
+
+        if (pulse_ml != NULL) {
+            if (!mrp_mainloop_register_with_pulse(pulse_ml, pa)) {
+                mrp_mainloop_destroy(pulse_ml);
+                pulse_ml = NULL;
+            }
+        }
+    }
+
+    return pulse_ml;
+}

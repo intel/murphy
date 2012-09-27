@@ -167,6 +167,7 @@ typedef struct {
                        void *user_data);
     void  (*del_defer)(void *glue_data, void *id);
     void  (*mod_defer)(void *glue_data, void *id, int enabled);
+    void  (*unregister)(void *glue_data);
 } mrp_superloop_ops_t;
 
 
@@ -175,9 +176,10 @@ int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
                       void *loop_data);
 
 /** Clear the superloop that pumps the given mainloop. */
-int mrp_clear_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
-                        void *loop_data);
+int mrp_clear_superloop(mrp_mainloop_t *ml);
 
+/** Unregister a mainloop from its superloop if it has one. */
+int mrp_mainloop_unregister(mrp_mainloop_t *ml);
 
 /*
  * mainloop

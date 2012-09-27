@@ -821,6 +821,7 @@ void mrp_del_subloop(mrp_subloop_t *sl)
  * external mainloop that pumps us
  */
 
+
 static void super_io_cb(void *super_data, void *id, int fd,
                         mrp_io_event_t events, void *user_data)
 {
@@ -932,22 +933,38 @@ int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
         if (ml->iow != NULL && ml->timer != NULL && ml->work != NULL)
             return TRUE;
         else
-            mrp_clear_superloop(ml, ops, loop_data);
+            mrp_clear_superloop(ml);
     }
 
     return FALSE;
 }
 
 
-int mrp_clear_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
-                        void *loop_data)
+int mrp_clear_superloop(mrp_mainloop_t *ml)
 {
-    if (ml->super_ops == ops && ml->super_data == loop_data) {
-        if (ml->iow != NULL)
-            ops->del_io(ml->super_data, ml->iow);
+    mrp_superloop_ops_t *ops  = ml->super_ops;
+    void                *data = ml->super_data;
+
+    if (ops != NULL) {
+        if (ml->iow != NULL) {
+            ops->del_io(data, ml->iow);
+            ml->iow = NULL;
+        }
+
+        if (ml->work != NULL) {
+            ops->del_defer(data, ml->work);
+            ml->work = NULL;
+        }
+
+        if (ml->timer != NULL) {
+            ops->del_timer(data, ml->timer);
+            ml->timer = NULL;
+        }
 
         ml->super_ops  = NULL;
         ml->super_data = NULL;
+
+        ops->unregister(data);
 
         return TRUE;
     }
@@ -955,6 +972,11 @@ int mrp_clear_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
         return FALSE;
 }
 
+
+int mrp_mainloop_unregister(mrp_mainloop_t *ml)
+{
+    return mrp_clear_superloop(ml);
+}
 
 
 /*

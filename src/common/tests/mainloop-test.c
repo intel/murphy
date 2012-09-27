@@ -53,6 +53,11 @@
 #  include <murphy/common/pulse-glue.h>
 #endif
 
+#ifdef ECORE_ENABLED
+#  include <Ecore.h>
+#  include <murphy/common/ecore-glue.h>
+#endif
+
 #define info(fmt, args...) do {                                           \
         fprintf(stdout, "I: "fmt"\n" ,  ## args);                         \
         fflush(stdout);                                                   \
@@ -88,7 +93,6 @@ typedef struct {
 
     int ngio;
     int ngtimer;
-    int ngidle;
 
     int ndbus_method;
     int ndbus_signal;
@@ -100,6 +104,10 @@ typedef struct {
     pa_mainloop     *pa_main;
     pa_mainloop_api *pa;
 #endif
+#ifdef ECORE_ENABLED
+    int ecore;
+#endif
+
 
     int nrunning;
     int runtime;
@@ -541,17 +549,21 @@ static void check_signals(void)
 static void check_quit(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
 {
     MRP_UNUSED(user_data);
+    MRP_UNUSED(ml);
 
     if (cfg.nrunning <= 0) {
         mrp_del_timer(timer);
 #ifdef PULSE_ENABLED
-        MRP_UNUSED(ml);
-
         if (cfg.pa_main != NULL)
             pa_mainloop_quit(cfg.pa_main, 0);
         else
 #endif
-        mrp_mainloop_quit(ml, 0);
+#ifdef ECORE_ENABLED
+            if (cfg.ecore)
+                ecore_main_loop_quit();
+            else
+#endif
+                mrp_mainloop_quit(ml, 0);
     }
 }
 
@@ -613,7 +625,7 @@ static void setup_glib_timers(void)
     int           intervals[] = { GTIMER_INTERVALS, 0 }, *iv = intervals;
     int           msecs, i;
 
-    if ((gtimers = mrp_allocz_array(glib_timer_t, cfg.ntimer)) != NULL) {
+    if ((gtimers = mrp_allocz_array(glib_timer_t, cfg.ngtimer)) != NULL) {
         for (i = 0, t = gtimers; i < cfg.ngtimer; i++, t++) {
             t->id = i;
 
@@ -654,7 +666,7 @@ static void check_glib_timers(void)
     glib_timer_t *t;
     int           i;
 
-    for (i = 0, t = gtimers; i < cfg.ntimer; i++, t++) {
+    for (i = 0, t = gtimers; i < cfg.ngtimer; i++, t++) {
         if (t->target != 0 && t->count != t->target)
             warning("GLIB timer #%d: FAIL (only %d/%d)", t->id, t->count,
                     t->target);
@@ -1170,6 +1182,9 @@ static void setup_dbus_tests(mrp_mainloop_t *ml)
 {
     mrp_sighandler_t *h;
 
+    if (cfg.ndbus_method == 0 || cfg.ndbus_signal == 0)
+        return;
+
     if ((h = mrp_add_sighandler(ml, SIGCHLD, sigchild_handler, NULL)) != NULL) {
         open_dbus_pipe();
         fork_dbus_client(ml);
@@ -1181,6 +1196,9 @@ static void setup_dbus_tests(mrp_mainloop_t *ml)
 
 static void check_dbus(void)
 {
+    if (cfg.ndbus_method == 0 || cfg.ndbus_signal == 0)
+        return;
+
     if (dbus_test.client != 0) {
         if (dbus_test.nmethod == cfg.ndbus_method)
             info("DBUS test: method calls: OK (%d/%d)",
@@ -1241,6 +1259,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -r, --runtime                  how many seconds to run tests\n"
            "  -i, --ios                      number of I/O watches\n"
            "  -t, --timers                   number of timers\n"
+           "  -s, --signals                  number of POSIX signals\n"
            "  -I, --glib-ios                 number of glib I/O watches\n"
            "  -T, --glib-timers              number of glib timers\n"
            "  -S, --dbus-signals             number of D-Bus signals\n"
@@ -1253,6 +1272,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -d, --debug                    enable debug messages\n"
 #ifdef PULSE_ENABLED
            "  -p, --pulse                    use pulse mainloop\n"
+#endif
+#ifdef ECORE_ENABLED
+           "  -e, --ecore                    use ecore mainloop\n"
 #endif
            "  -h, --help                     show help on usage\n",
            argv0);
@@ -1271,7 +1293,13 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 #else
 #   define PULSE_OPTION ""
 #endif
-#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vdh"PULSE_OPTION
+#ifdef ECORE_ENABLED
+#   define ECORE_OPTION "e"
+#else
+#   define ECORE_OPTION ""
+#endif
+
+#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vdh"PULSE_OPTION""ECORE_OPTION
     struct option options[] = {
         { "runtime"     , required_argument, NULL, 'r' },
         { "ios"         , required_argument, NULL, 'i' },
@@ -1283,6 +1311,9 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
         { "dbus-methods", required_argument, NULL, 'M' },
 #ifdef PULSE_ENABLED
         { "pulse-main"  , no_argument      , NULL, 'p' },
+#endif
+#ifdef ECORE_ENABLED
+        { "ecore-main"  , no_argument      , NULL, 'e' },
 #endif
         { "log-level"   , required_argument, NULL, 'l' },
         { "log-target"  , required_argument, NULL, 'o' },
@@ -1366,6 +1397,12 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
             break;
 #endif
 
+#ifdef ECORE_ENABLED
+        case 'e':
+            cfg->ecore = TRUE;
+            break;
+#endif
+
         case 'v':
             cfg->log_mask <<= 1;
             cfg->log_mask  |= 1;
@@ -1404,10 +1441,69 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 }
 
 
+mrp_mainloop_t *mainloop_create(void)
+{
+    mrp_mainloop_t *ml;
+
+#ifdef PULSE_ENABLED
+    if (cfg.pa != NULL)
+        ml = mrp_mainloop_pulse_get(cfg.pa);
+    else
+#endif
+#ifdef ECORE_ENABLED
+        if (cfg.ecore)
+            ml = mrp_mainloop_ecore_get();
+        else
+#endif
+            ml = mrp_mainloop_create();
+
+    return ml;
+}
+
+
+void mainloop_run(mrp_mainloop_t *ml)
+{
+#ifdef PULSE_ENABLED
+    if (cfg.pa != NULL) {
+        int retval;
+
+        pa_mainloop_run(cfg.pa_main, &retval);
+        mrp_log_info("PulseAudio mainloop exited with status %d.", retval);
+    }
+    else
+#endif
+#ifdef ECORE_ENABLED
+        if (cfg.ecore) {
+            ecore_main_loop_begin();
+            mrp_log_info("EFL/ecore mainloop exited.");
+        }
+        else
+#endif
+            mrp_mainloop_run(ml);
+}
+
+
+void mainloop_cleanup(mrp_mainloop_t *ml)
+{
+#ifdef PULSE_ENABLED
+    if (cfg.pa) {
+        mrp_mainloop_unregister(ml);
+        pa_mainloop_free(cfg.pa_main);
+    }
+    else
+#endif
+#ifdef ECORE_ENABLED
+        if (cfg.ecore)
+            mrp_mainloop_unregister(ml);
+#endif
+
+    mrp_mainloop_destroy(ml);
+}
+
+
 int main(int argc, char *argv[])
 {
     mrp_mainloop_t *ml;
-    int             retval;
 
     mrp_clear(&cfg);
     parse_cmdline(&cfg, argc, argv);
@@ -1415,14 +1511,15 @@ int main(int argc, char *argv[])
     mrp_log_set_mask(cfg.log_mask);
     mrp_log_set_target(cfg.log_target);
 
-    if ((ml = mrp_mainloop_create()) == NULL)
+    if ((ml = mainloop_create()) == NULL)
         fatal("failed to create main loop.");
 
     setup_timers(ml);
     setup_io(ml);
     setup_signals(ml);
 
-    glib_pump_setup(ml);
+    if (cfg.ngio > 0 || cfg.ngtimer > 0)
+        glib_pump_setup(ml);
 
     setup_glib_io();
     setup_glib_timers();
@@ -1434,26 +1531,7 @@ int main(int argc, char *argv[])
     if (mrp_add_timer(ml, 1000, check_quit, NULL) == NULL)
         fatal("failed to create quit-check timer");
 
-#ifdef PULSE_ENABLED
-    if (cfg.pa != NULL) {
-        mrp_log_info("Running with PulseAudio mainloop.");
-
-        if (!mrp_mainloop_register_with_pulse(ml, cfg.pa)) {
-            mrp_log_error("Failed to register with PulseAudio mainloop.");
-            exit(1);
-        }
-
-        pa_mainloop_run(cfg.pa_main, &retval);
-
-        mrp_log_info("PulseAudio mainloop exited with status %d.", retval);
-
-        mrp_mainloop_unregister_from_pulse(ml, cfg.pa);
-
-        pa_mainloop_free(cfg.pa_main);
-    }
-    else
-#endif
-        retval = mrp_mainloop_run(ml);
+    mainloop_run(ml);
 
     check_io();
     check_timers();
@@ -1467,7 +1545,8 @@ int main(int argc, char *argv[])
 
     check_dbus();
 
-    glib_pump_cleanup();
+    if (cfg.ngio > 0 || cfg.ngtimer > 0)
+        glib_pump_cleanup();
 
-    mrp_mainloop_destroy(ml);
+    mainloop_cleanup(ml);
 }
