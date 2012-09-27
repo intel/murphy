@@ -14,7 +14,7 @@ QUIET_GEN       = $(Q:@=@echo '  GEN   '$@;)
 LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 
-INCLUDES        = -Isrc/murphy-db/include
+INCLUDES        = -I$(top_builddir)/src/murphy-db/include
 
 ###################################
 # murphy common library
@@ -256,6 +256,47 @@ linker-script.pulse: $(libmurphy_pulse_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.pulse
+endif
+
+###################################
+# murphy ecore glue library
+#
+
+if ECORE_ENABLED
+lib_LTLIBRARIES += libmurphy-ecore.la
+EXTRA_DIST      += common/murphy-ecore.pc
+pkgconfig_DATA  += common/murphy-ecore.pc
+
+libmurphy_ecore_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_ecore_la_HEADERS =		\
+		common/ecore-glue.h
+
+libmurphy_ecore_la_SOURCES =		\
+		common/ecore-glue.c
+
+libmurphy_ecore_la_CFLAGS  =		\
+		$(AM_CFLAGS)		\
+		$(ECORE_CFLAGS)
+
+libmurphy_ecore_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.ecore \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_ecore_la_LIBADD  =
+
+libmurphy_ecore_la_DEPENDENCIES = linker-script.ecore
+
+libecoreincludedir      = $(includedir)/murphy/ecore
+libecoreinclude_HEADERS = $(libmurphy_ecore_la_HEADERS)
+
+# linker script generation
+linker-script.ecore: $(libmurphy_ecore_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.ecore
 endif
 
 ###################################

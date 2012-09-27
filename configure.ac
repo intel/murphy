@@ -175,6 +175,31 @@ AC_SUBST(PULSE_ENABLED)
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 
+# Check if EFL/ecore mainloop support was enabled.
+AC_ARG_ENABLE(ecore,
+              [  --enable-ecore          enable EFL/ecore mainloop support],
+	      [enable_ecore=$enableval], [enable_ecore=auto])
+
+if test "$enable_ecore" != "no"; then
+    PKG_CHECK_MODULES(ECORE, ecore >= 0.9.22,
+                      [have_ecore=yes], [have_ecore=no])
+    if test "$have_ecore" = "no" -a "$enable_ecore" != "yes"; then
+        AC_MSG_ERROR([EFL/ecore development libraries not found.])
+    fi
+
+    enable_ecore="$have_ecore"
+else
+    AC_MSG_NOTICE([EFL/ecore mainloop support is disabled.])
+fi
+
+if test "$enable_ecore" = "yes"; then
+    AC_DEFINE([ECORE_ENABLED], 1, [Enable EFL/ecore mainloop support ?])
+fi
+AM_CONDITIONAL(ECORE_ENABLED, [test "$enable_ecore" = "yes"])
+AC_SUBST(ECORE_ENABLED)
+AC_SUBST(ECORE_CFLAGS)
+AC_SUBST(ECORE_LIBS)
+
 # Check if building murphy-console was enabled.
 AC_ARG_ENABLE(console,
               [  --enable-console        build Murphy console],
@@ -389,6 +414,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-common.pc
 		 src/common/murphy-dbus.pc
 		 src/common/murphy-pulse.pc
+		 src/common/murphy-ecore.pc
 		 src/core/murphy-core.pc
 		 src/murphy-db/Makefile
 		 src/murphy-db/mdb/Makefile
@@ -411,6 +437,7 @@ echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
 echo "D-Bus support: $enable_dbus"
 echo "PulseAudio mainloop support: $enable_pulse"
+echo "EFL/ecore mainloop support: $enable_ecore"
 echo "Murphy console plugin and client: $enable_console"
 echo "Plugins:"
 echo "  - linked-in:"

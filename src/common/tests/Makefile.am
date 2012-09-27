@@ -23,6 +23,11 @@ if PULSE_ENABLED
 mainloop_test_CFLAGS += $(PULSE_CFLAGS)
 mainloop_test_LDADD  += ../../libmurphy-pulse.la $(PULSE_LIBS)
 endif
+if ECORE_ENABLED
+mainloop_test_CFLAGS += $(ECORE_CFLAGS)
+mainloop_test_LDADD  += ../../libmurphy-ecore.la $(ECORE_LIBS)
+endif
+
 
 # msg test
 msg_test_SOURCES = msg-test.c

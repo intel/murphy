@@ -1,0 +1,8 @@
+{
+    global:
+        mrp_mainloop_ecore_get;
+        mrp_mainloop_register_with_ecore;
+        mrp_mainloop_unregister_from_ecore;
+    local:
+        *;
+};
