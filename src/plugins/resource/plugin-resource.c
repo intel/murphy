@@ -48,10 +48,25 @@
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
 
+#define ATTRIBUTE_MAX   (sizeof(mrp_attribute_mask_t) * 8)
+
+
+
+enum {
+    RESOURCE_ERROR  = -1,
+    ATTRIBUTE_ERROR = -1,
+    RESOURCE_OK     = 0,
+    ATTRIBUTE_OK    = 0,
+    ATTRIBUTE_LAST,
+    RESOURCE_LAST,
+};
+
+
 enum {
     ARG_CONFIG_FILE,
     ARG_ADDRESS,
 };
+
 
 typedef struct {
     mrp_plugin_t      *plugin;
@@ -72,10 +87,12 @@ typedef struct {
 } client_t;
 
 
-void print_zones_cb(mrp_console_t *c,void *user_data,int argc, char **argv);
-void print_classes_cb(mrp_console_t *c,void *user_data,int argc,char **argv);
-void print_sets_cb(mrp_console_t *c,void *user_data,int argc,char **argv);
-void print_owners_cb(mrp_console_t *c,void *user_data,int argc,char **argv);
+static void print_zones_cb(mrp_console_t *, void *, int, char **argv);
+static void print_classes_cb(mrp_console_t *, void *, int, char **argv);
+static void print_sets_cb(mrp_console_t *, void *, int, char **argv);
+static void print_owners_cb(mrp_console_t *, void *, int, char **argv);
+
+static void resource_event_handler(uint32_t, mrp_resource_set_t *, void *);
 
 
 MRP_CONSOLE_GROUP(resource_group, "resource", NULL, NULL, {
@@ -105,7 +122,8 @@ MRP_CONSOLE_GROUP(resource_group, "resource", NULL, NULL, {
 });
 
 
-void print_zones_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+static void print_zones_cb(mrp_console_t *c, void *user_data,
+                           int argc, char **argv)
 {
     const char **zone_names;
     int i;
@@ -127,7 +145,8 @@ void print_zones_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
-void print_classes_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+static void print_classes_cb(mrp_console_t *c, void *user_data,
+                             int argc, char **argv)
 {
     const char **class_names;
     int i;
@@ -149,7 +168,8 @@ void print_classes_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
-void print_sets_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+static void print_sets_cb(mrp_console_t *c, void *user_data,
+                          int argc, char **argv)
 {
     char buf[8192];
 
@@ -163,7 +183,8 @@ void print_sets_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
-void print_owners_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+static void print_owners_cb(mrp_console_t *c, void *user_data,
+                            int argc, char **argv)
 {
     char buf[2048];
 
@@ -176,7 +197,7 @@ void print_owners_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     mrp_console_printf(c, "%s", buf);
 }
 
-int set_default_configuration(void)
+static int set_default_configuration(void)
 {
     typedef struct {
         const char     *name;
@@ -235,7 +256,8 @@ int set_default_configuration(void)
 }
 
 
-static void reply_with_array(client_t *client,mrp_msg_t *msg,const char **arr)
+static void reply_with_array(client_t *client, mrp_msg_t *msg,
+                             uint16_t tag, const char **arr)
 {
     resource_data_t *data   = client->data;
     mrp_plugin_t    *plugin = data->plugin;
@@ -246,8 +268,8 @@ static void reply_with_array(client_t *client,mrp_msg_t *msg,const char **arr)
         ;
 
     s  = mrp_msg_append(msg, MRP_MSG_TAG_SINT16(RESPROTO_REQUEST_STATUS, 0));
-    s &= mrp_msg_append(msg, MRP_MSG_TAG_STRING_ARRAY(RESPROTO_RESOURCE_NAME,
-                                               dim, arr));
+    s &= mrp_msg_append(msg, MRP_MSG_TAG_STRING_ARRAY(tag, dim, arr));
+
     if (!s) {
         mrp_log_error("%s: failed to build reply", plugin->instance);
         return;
@@ -276,7 +298,7 @@ static void query_resources_request(client_t *client, mrp_msg_t *req)
     if (!names)
         reply_with_error(client, req, ENOMEM);
     else {
-        reply_with_array(client, req, names);
+        reply_with_array(client, req, RESPROTO_RESOURCE_NAME, names);
         mrp_free(names);
     }
 }
@@ -288,7 +310,7 @@ static void query_classes_request(client_t *client, mrp_msg_t *req)
     if (!names)
         reply_with_error(client, req, ENOMEM);
     else {
-        reply_with_array(client, req, names);
+        reply_with_array(client, req, RESPROTO_CLASS_NAME, names);
         mrp_free(names);
     }
 }
@@ -300,8 +322,215 @@ static void query_zones_request(client_t *client, mrp_msg_t *req)
     if (!names)
         reply_with_error(client, req, ENOMEM);
     else {
-        reply_with_array(client, req, names);
+        reply_with_array(client, req, RESPROTO_ZONE_NAME, names);
         mrp_free(names);
+    }
+}
+
+static int add_attribute(mrp_msg_t *req, mrp_attr_t *attr, void *pcurs)
+{
+    uint16_t tag;
+    uint16_t type;
+    size_t size;
+    mrp_msg_value_t value;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size))
+        return ATTRIBUTE_ERROR;
+
+    if (tag == RESPROTO_SECTION_END)
+        return ATTRIBUTE_LAST;
+
+    if (tag != RESPROTO_ATTRIBUTE_NAME || type != MRP_MSG_FIELD_STRING)
+        return ATTRIBUTE_ERROR;
+
+    attr->name = value.str;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size) ||
+        tag != RESPROTO_ATTRIBUTE_VALUE)
+        return ATTRIBUTE_ERROR;
+
+    switch (type) {
+    case MRP_MSG_FIELD_STRING:
+        attr->type = mqi_string;
+        attr->value.string = value.str;
+        break;
+    case MRP_MSG_FIELD_SINT32:
+        attr->type = mqi_integer;
+        attr->value.integer = value.s32;
+        break;
+    case MRP_MSG_FIELD_UINT32:
+        attr->type = mqi_unsignd;
+        attr->value.unsignd = value.u32;
+        break;
+    case MRP_MSG_FIELD_DOUBLE:
+        attr->type = mqi_floating;
+        attr->value.floating = value.dbl;
+        break;
+    default:
+        return ATTRIBUTE_ERROR;
+    }
+
+    {
+        char str[256];
+
+        switch (attr->type) {
+        case mqi_string:
+            snprintf(str, sizeof(str), "'%s'", attr->value.string);
+            break;
+        case mqi_integer:
+            snprintf(str, sizeof(str), "%d", attr->value.integer);
+            break;
+        case mqi_unsignd:
+            snprintf(str, sizeof(str), "%u", attr->value.unsignd);
+            break;
+        case mqi_floating:
+            snprintf(str, sizeof(str), "%.2lf", attr->value.floating);
+            break;
+        default:
+            snprintf(str, sizeof(str), "< ??? >");
+            break;
+        }
+
+        mrp_log_info("      attribute %s:%s", attr->name, str);
+    }
+
+    return ATTRIBUTE_OK;
+}
+
+
+static int add_resource(mrp_resource_set_t *rset, mrp_msg_t *req, void *pcurs)
+{
+    uint16_t        tag;
+    uint16_t        type;
+    size_t          size;
+    mrp_msg_value_t value;
+    const char     *name;
+    bool            mand;
+    bool            shared;
+    mrp_attr_t      attrs[ATTRIBUTE_MAX + 1];
+    uint32_t        i;
+    int             arst;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size))
+        return RESOURCE_LAST;
+
+    if (tag != RESPROTO_RESOURCE_NAME || type != MRP_MSG_FIELD_STRING)
+        return RESOURCE_ERROR;
+
+    name = value.str;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size) ||
+        tag != RESPROTO_RESOURCE_FLAGS || type != MRP_MSG_FIELD_UINT32)
+        return RESOURCE_ERROR;
+
+    mand   = (value.u32 & RESPROTO_RESFLAG_MANDATORY) ? true : false;
+    shared = (value.u32 & RESPROTO_RESFLAG_SHARED)    ? true : false;
+
+    mrp_log_info("   resource: name:'%s' %s %s", name,
+                 mand?"mandatory":"optional ", shared?"shared":"exclusive");
+
+    for (i = 0, arst = 0;    i < ATTRIBUTE_MAX && arst == 0;    i++)
+        arst = add_attribute(req, attrs + i, pcurs);
+
+    memset(attrs + i, 0, sizeof(mrp_attr_t));
+
+    if (arst > 0) {
+        if (mrp_resource_set_add_resource(rset, name, shared, attrs, mand) < 0)
+            arst = RESOURCE_ERROR;
+        else
+            arst = 0;
+    }
+
+    return arst;
+}
+
+static void create_resource_set_request(client_t *client, mrp_msg_t *req,
+                                        uint32_t seqno, void *pcurs)
+{
+    static uint16_t reqtyp = RESPROTO_CREATE_RESOURCE_SET;
+
+    resource_data_t    *data   = client->data;
+    mrp_plugin_t       *plugin = data->plugin;
+    mrp_resource_set_t *rset   = 0;
+    mrp_msg_t          *rpl;
+    uint32_t            flags;
+    uint32_t            priority;
+    const char         *class;
+    const char         *zone;
+    uint16_t            tag;
+    uint16_t            type;
+    size_t              size;
+    mrp_msg_value_t     value;
+    uint32_t            rsid;
+    int                 arst;
+    int32_t             status;
+
+    MRP_ASSERT(client, "invalid argument");
+    MRP_ASSERT(client->rscli, "confused with data structures");
+
+    rsid = MRP_RESOURCE_ID_INVALID;
+    status = EINVAL;
+
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size) ||
+        tag != RESPROTO_RESOURCE_FLAGS || type != MRP_MSG_FIELD_UINT32)
+        goto reply;
+
+    flags = value.u32;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size) ||
+        tag != RESPROTO_RESOURCE_PRIORITY || type != MRP_MSG_FIELD_UINT32)
+        goto reply;
+
+    priority = value.u32;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size) ||
+        tag != RESPROTO_CLASS_NAME || type != MRP_MSG_FIELD_STRING)
+        goto reply;
+
+    class = value.str;
+
+    if (!mrp_msg_iterate(req, pcurs, &tag, &type, &value, &size) ||
+        tag != RESPROTO_ZONE_NAME || type != MRP_MSG_FIELD_STRING)
+        goto reply;
+
+    zone = value.str;
+
+    mrp_log_info("resource-set flags:%u priority:%u class:'%s' zone:'%s'",
+                 flags, priority, class, zone);
+
+    rset = mrp_resource_set_create(client->rscli, priority,
+                                   resource_event_handler, client);
+    if (!rset)
+        goto reply;
+
+    rsid = mrp_get_resource_set_id(rset);
+
+    while ((arst = add_resource(rset, req, pcurs)) == 0)
+        ;
+
+    if (arst > 0) {
+        if (mrp_application_class_add_resource_set(class, zone, rset) == 0)
+            status = 0;
+    }
+
+ reply:
+    rpl = mrp_msg_create(MRP_MSG_TAG_UINT32( RESPROTO_SEQUENCE_NO    , seqno ),
+                         MRP_MSG_TAG_UINT16( RESPROTO_REQUEST_TYPE   , reqtyp),
+                         MRP_MSG_TAG_SINT16( RESPROTO_REQUEST_STATUS , status),
+                         MRP_MSG_TAG_UINT32( RESPROTO_RESOURCE_SET_ID, rsid  ),
+                         RESPROTO_MESSAGE_END                                );
+    if (!rpl || !mrp_transport_send(client->transp, rpl)) {
+        mrp_log_error("%s: failed to send reply", plugin->instance);
+        return;
+    }
+
+    mrp_msg_unref(rpl);
+
+    if (status != 0)
+        mrp_resource_set_destroy(rset);
+    else {
+        /* we need to register the id to the client */
     }
 }
 
@@ -339,7 +568,7 @@ static void connection_evt(mrp_transport_t *listen, void *user_data)
     mrp_log_info("%s: %s connected", plugin->instance, name);
 }
 
-void closed_evt(mrp_transport_t *transp, int error, void *user_data)
+static void closed_evt(mrp_transport_t *transp, int error, void *user_data)
 {
     client_t        *client = (client_t *)user_data;
     resource_data_t *data   = client->data;
@@ -368,9 +597,14 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
     client_t               *client = (client_t *)user_data;
     resource_data_t        *data   = client->data;
     mrp_plugin_t           *plugin = data->plugin;
-    uint32_t                seqno  = 0;
-    mrp_resproto_request_t  reqtyp = -1;
-    mrp_msg_field_t        *field;
+    void                   *cursor = NULL;
+    uint32_t                seqno;
+    mrp_resproto_request_t  reqtyp;
+    uint16_t                tag;
+    uint16_t                type;
+    size_t                  size;
+    mrp_msg_value_t         value;
+
 
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
@@ -380,20 +614,19 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
     mrp_log_info("%s: received a message", plugin->instance);
     mrp_msg_dump(msg, stdout);
 
-    field = mrp_msg_find(msg, RESPROTO_SEQUENCE_NO);
 
-    if (field && field->type == MRP_MSG_FIELD_UINT32)
-        seqno = field->u32;
+    if (mrp_msg_iterate(msg, &cursor, &tag, &type, &value, &size) &&
+        tag == RESPROTO_SEQUENCE_NO && type == MRP_MSG_FIELD_UINT32)
+        seqno = value.u32;
     else {
         mrp_log_warning("%s: malformed message. Bad or missing "
                         "sequence number", plugin->instance);
         return;
     }
 
-    field = mrp_msg_find(msg, RESPROTO_REQUEST_TYPE);
-
-    if (field && field->type == MRP_MSG_FIELD_UINT16)
-        reqtyp = field->u16;
+    if (mrp_msg_iterate(msg, &cursor, &tag, &type, &value, &size) &&
+        tag == RESPROTO_REQUEST_TYPE && type == MRP_MSG_FIELD_UINT16)
+        reqtyp = value.u16;
     else {
         mrp_log_warning("%s: malformed message. Bad or missing "
                         "request type", plugin->instance);
@@ -414,6 +647,10 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
         query_zones_request(client, msg);
         break;
 
+    case RESPROTO_CREATE_RESOURCE_SET:
+        create_resource_set_request(client, msg, seqno, &cursor);
+        break;
+
     default:
         mrp_log_warning("%s: unsupported request type %d",
                         plugin->instance, reqtyp);
@@ -424,6 +661,13 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
 static void recv_msg(mrp_transport_t *transp, mrp_msg_t *msg, void *user_data)
 {
     return recvfrom_msg(transp, msg, NULL, 0, user_data);
+}
+
+
+static void resource_event_handler(uint32_t reqid, mrp_resource_set_t *rset,
+                                   void *userdata)
+{
+    client_t *client = (client_t *)userdata;
 }
 
 
