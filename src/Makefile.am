@@ -14,7 +14,7 @@ QUIET_GEN       = $(Q:@=@echo '  GEN   '$@;)
 LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 
-INCLUDES        = -I$(top_builddir)/src/murphy-db/include
+INCLUDES        = -I$(top_builddir)/src/murphy-db/include -I$(top_builddir)
 
 ###################################
 # murphy common library
@@ -62,7 +62,8 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/transport.c		\
 		common/stream-transport.c	\
 		common/internal-transport.c	\
-		common/dgram-transport.c
+		common/dgram-transport.c	\
+		common/core-transport.c
 
 libmurphy_common_la_SOURCES =				\
 		$(libmurphy_common_la_REGULAR_SOURCES)	\
@@ -538,6 +539,55 @@ plugin_signalling_ladir      = $(SIGNALLING_PLUGINdir)
 
 plugin_LTLIBRARIES    += plugin-signalling.la
 endif
+
+# decision plugin
+DECISION_PLUGIN_SOURCES = plugins/decision/plugin-decision.c \
+			  plugins/decision/pdp.c	     \
+			  plugins/decision/pep.c	     \
+			  plugins/decision/table.c	     \
+			  plugins/decision/transport.c       \
+			  plugins/decision/message.c
+
+DECISION_PLUGIN_CFLAGS  =
+DECISION_PLUGIN_LIBS    =
+
+if !DISABLED_PLUGIN_DECISION
+if BUILTIN_PLUGIN_DECISION
+BUILTIN_PLUGINS += $(DECISION_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(DECISION_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(DECISION_PLUGIN_LIBS)
+else
+plugin_decision_la_SOURCES = $(DECISION_PLUGIN_SOURCES)
+plugin_decision_la_CFLAGS  = $(DECISION_PLUGIN_CFLAGS) \
+			     $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_decision_la_LDFLAGS = -module -avoid-version
+plugin_decision_la_LIBADD  = $(DECISION_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES    += plugin-decision.la
+endif
+
+lib_LTLIBRARIES   += libpep.la
+libpep_la_SOURCES  = plugins/decision/pep-client.c \
+		     plugins/decision/pep-db.c
+libpep_la_CFLAGS   =
+libpep_la_LIBADD   = libmurphy-common.la
+
+# enforcement point test client
+bin_PROGRAMS += test-ep test-pep
+
+test_ep_SOURCES = plugins/decision/test-ep.c
+test_ep_CFLAGS  = $(AM_CFLAGS)
+test_ep_LDADD   = libmurphy-core.la   \
+		  libmurphy-common.la \
+		  -lreadline
+
+test_pep_SOURCES = plugins/decision/test-pep.c
+test_pep_CFLAGS  = $(AM_CFLAGS)
+test_pep_LDADD   = libpep.la    \
+		   libmurphy-common.la \
+		  -lreadline
+endif
+
 
 ###################################
 # murphy daemon
