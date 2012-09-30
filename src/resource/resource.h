@@ -66,9 +66,6 @@ mrp_resource_def_t *mrp_resource_definition_iterate_manager(void **);
 mrp_resource_t     *mrp_resource_create(const char *, bool, mrp_attr_t *);
 void                mrp_resource_destroy(mrp_resource_t *);
 
-uint32_t            mrp_resource_get_mask(mrp_resource_t *);
-bool                mrp_resource_is_shared(mrp_resource_t *);
-
 int                 mrp_resource_print(mrp_resource_t*, uint32_t,
                                        size_t, char *, int);
 int                 mrp_resource_attribute_print(mrp_resource_t *, char *,int);

@@ -175,6 +175,29 @@ const char **mrp_resource_definition_get_all_names(uint32_t buflen,
     return buf;
 }
 
+mrp_attr_t *mrp_resource_definition_read_all_attributes(uint32_t resid,
+                                                        uint32_t buflen,
+                                                        mrp_attr_t *buf)
+{
+    mrp_resource_def_t *rdef   = mrp_resource_definition_find_by_id(resid);
+    mrp_attr_t         *retval;
+
+
+    if (!rdef)
+        retval = mrp_attribute_get_all_values(buflen, buf, 0, NULL, 0);
+    else {
+        retval = mrp_attribute_get_all_values(buflen, buf, rdef->nattr,
+                                              rdef->attrdefs, 0);
+    }
+
+    if (!retval) {
+        mrp_log_error("Memory alloc failure. Can't get all "
+                      "attributes of resource definition");
+    }
+
+    return retval;
+}
+
 
 
 mrp_resource_t *mrp_resource_create(const char *name,
@@ -246,11 +269,38 @@ void mrp_resource_destroy(mrp_resource_t *res)
     }
 }
 
-
-uint32_t mrp_resource_get_mask(mrp_resource_t *res)
+uint32_t mrp_resource_get_id(mrp_resource_t *res)
 {
     mrp_resource_def_t *def;
-    uint32_t mask = 0;
+
+    if (res) {
+        def = res->def;
+        MRP_ASSERT(def, "confused with internal data structures");
+        return def->id;
+    }
+
+    return MRP_RESOURCE_ID_INVALID;
+}
+
+const char *mrp_resource_get_name(mrp_resource_t *res)
+{
+    mrp_resource_def_t *def;
+
+    if (res) {
+        def = res->def;
+
+        MRP_ASSERT(def && def->name, "confused with internal data structures");
+
+        return def->name;
+    }
+
+    return "<unknown resource>";
+}
+
+mrp_resource_mask_t mrp_resource_get_mask(mrp_resource_t *res)
+{
+    mrp_resource_def_t *def;
+    mrp_resource_mask_t mask = 0;
 
     if (res) {
         def = res->def;
@@ -313,7 +363,7 @@ mrp_attr_t *mrp_resource_read_all_attributes(mrp_resource_t *res,
                                           rdef->attrdefs, res->attrs);
 
     if (!retval) {
-        mrp_log_error("Memory alloc failure. Can't get all"
+        mrp_log_error("Memory alloc failure. Can't get all "
                       "attributes of resource '%s'", rdef->name);
     }
 

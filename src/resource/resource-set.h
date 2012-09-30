@@ -71,8 +71,6 @@ struct mrp_resource_set_s {
 
 
 uint32_t            mrp_get_resource_set_count(void);
-mrp_resource_t     *mrp_resource_set_iterate_resources(mrp_resource_set_t *,
-                                                       void **);
 int                 mrp_resource_set_print(mrp_resource_set_t *, size_t,
                                            char *, int);
 

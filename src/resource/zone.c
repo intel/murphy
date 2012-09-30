@@ -266,8 +266,8 @@ int mrp_zone_attribute_print(mrp_zone_t *zone, char *buf, int len)
 static mqi_handle_t create_zone_table(mrp_zone_def_t *zdef)
 {
     MQI_COLUMN_DEFINITION_LIST(base_coldefs,
-        MQI_COLUMN_DEFINITION( "zone_id"       , MQI_UNSIGNED            , 0 ),
-        MQI_COLUMN_DEFINITION( "zone_name"     , MQI_VARCHAR(NAME_LENGTH), 0 )
+        MQI_COLUMN_DEFINITION( "zone_id"       , MQI_UNSIGNED             ),
+        MQI_COLUMN_DEFINITION( "zone_name"     , MQI_VARCHAR(NAME_LENGTH) )
     );
 
     MQI_INDEX_DEFINITION(indexdef,

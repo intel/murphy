@@ -30,16 +30,25 @@
 #ifndef __MURPHY_RESOURCE_CLIENT_API_H__
 #define __MURPHY_RESOURCE_CLIENT_API_H__
 
-#include <murphy/resource/data-types.h>
+#include <murphy/resource/common-api.h>
 
 mrp_resource_client_t *mrp_resource_client_create(const char *name,
                                                   void *user_data);
 void mrp_resource_client_destroy(mrp_resource_client_t *client);
 
+mrp_resource_set_t *mrp_resource_client_find_set(mrp_resource_client_t *client,
+                                                 uint32_t resource_set_id);
+
+
 const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf);
 
 const char **mrp_resource_definition_get_all_names(uint32_t buflen,
                                                    const char **buf);
+
+mrp_attr_t *
+mrp_resource_definition_read_all_attributes(uint32_t resource_id,
+                                            uint32_t buflen,
+                                            mrp_attr_t *buf);
 
 const char **mrp_application_class_get_all_names(uint32_t buflen,
                                                  const char **buf);
@@ -96,6 +105,15 @@ void mrp_resource_set_acquire(mrp_resource_set_t *resource_set,
 
 void mrp_resource_set_release(mrp_resource_set_t *resource_set,
                               uint32_t request_id);
+
+mrp_resource_t *
+mrp_resource_set_iterate_resources(mrp_resource_set_t *resource_set,void **it);
+
+uint32_t mrp_resource_get_id(mrp_resource_t *resource);
+const char *mrp_resource_get_name(mrp_resource_t *resource);
+mrp_resource_mask_t mrp_resource_get_mask(mrp_resource_t *resource);
+bool mrp_resource_is_shared(mrp_resource_t *resource);
+
 
 #endif  /* __MURPHY_RESOURCE_CLIENT_API_H__ */
 

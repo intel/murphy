@@ -37,6 +37,7 @@
 #include <murphy/common/utils.h>
 #include <murphy/common/log.h>
 
+#include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 #include <murphy-db/mqi.h>
 
@@ -88,13 +89,13 @@ static void set_attr_descriptors(mqi_column_desc_t *, mrp_resource_t *);
 int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
 {
     MQI_COLUMN_DEFINITION_LIST(base_coldefs,
-        MQI_COLUMN_DEFINITION("zone_id"       , MQI_UNSIGNED               ,0),
-        MQI_COLUMN_DEFINITION("zone_name"     , MQI_VARCHAR(NAME_LENGTH)   ,0),
-        MQI_COLUMN_DEFINITION("application_class", MQI_VARCHAR(NAME_LENGTH),0)
+        MQI_COLUMN_DEFINITION( "zone_id"          , MQI_UNSIGNED             ),
+        MQI_COLUMN_DEFINITION( "zone_name"        , MQI_VARCHAR(NAME_LENGTH) ),
+        MQI_COLUMN_DEFINITION( "application_class", MQI_VARCHAR(NAME_LENGTH) )
     );
 
     MQI_INDEX_DEFINITION(indexdef,
-        MQI_INDEX_COLUMN("zone_id")
+        MQI_INDEX_COLUMN( "zone_id" )
     );
 
     static bool initialized = false;

@@ -85,7 +85,23 @@ void mrp_resource_client_destroy(mrp_resource_client_t *client)
 }
 
 
+mrp_resource_set_t *mrp_resource_client_find_set(mrp_resource_client_t *client,
+                                                 uint32_t resource_set_id)
+{
+    mrp_list_hook_t *entry, *n;
+    mrp_resource_set_t *rset;
 
+    if (client) {
+        mrp_list_foreach(&client->resource_sets, entry, n) {
+            rset = mrp_list_entry(entry, mrp_resource_set_t, client.list);
+
+            if (resource_set_id == rset->id)
+                return rset;
+        }
+    }
+
+    return NULL;
+}
 
 /*
  * Local Variables:

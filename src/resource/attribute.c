@@ -113,14 +113,15 @@ mrp_attr_t *mrp_attribute_get_all_values(uint32_t          nvalue,
     mrp_attr_t *vdst, *vend;
     uint32_t i;
 
-    MRP_ASSERT(!nvalue || (nvalue > 0 && values), "invalid argument");
-    MRP_ASSERT(!nattr  || (nattr  > 0 && defs && attrs), "invalid argument");
+    MRP_ASSERT(!nvalue || (nvalue > 0 && values) ||
+               !nattr  || (nattr  > 0 && defs),
+               "invalid argument");
 
     if (nvalue)
         nvalue--;
     else {
         for (i = 0;  i < nattr;  i++) {
-            if ((defs[i].access & MRP_RESOURCE_READ))
+            if (!attrs || (attrs && (defs[i].access & MRP_RESOURCE_READ)))
                 nvalue++;
         }
 
@@ -140,7 +141,7 @@ mrp_attr_t *mrp_attribute_get_all_values(uint32_t          nvalue,
 
         vdst->name   =  adef->name;
         vdst->type   =  adef->type;
-        vdst->value  =  attrs[i];
+        vdst->value  =  attrs ? attrs[i] : adef->value;
 
         vdst++;
     }

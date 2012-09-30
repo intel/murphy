@@ -78,7 +78,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
     if (!(rset = mrp_allocz(sizeof(mrp_resource_set_t))))
         mrp_log_error("Memory alloc failure. Can't create resource set");
     else {
-        rset->id = our_id++;
+        rset->id = ++our_id;
 
         mrp_list_init(&rset->resource.list);
         rset->resource.share = false;
@@ -130,6 +130,7 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
             mrp_resource_owner_update_zone(zoneid, MRP_RESOURCE_REQNO_INVALID);
     }
 }
+
 
 
 uint32_t mrp_get_resource_set_id(mrp_resource_set_t *rset)

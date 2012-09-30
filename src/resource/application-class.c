@@ -427,8 +427,8 @@ static void remove_from_name_hash(mrp_application_class_t *class)
 static mqi_handle_t get_database_table(void)
 {
     MQI_COLUMN_DEFINITION_LIST(coldefs,
-        MQI_COLUMN_DEFINITION( "name"     , MQI_VARCHAR(NAME_LENGTH), 0 ),
-        MQI_COLUMN_DEFINITION( "priority" , MQI_UNSIGNED            , 0 )
+        MQI_COLUMN_DEFINITION( "name"     , MQI_VARCHAR(NAME_LENGTH) ),
+        MQI_COLUMN_DEFINITION( "priority" , MQI_UNSIGNED             )
     );
 
     MQI_INDEX_DEFINITION(indexdef,
