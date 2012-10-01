@@ -625,6 +625,14 @@ plugin_resource_la_LIBADD  = $(RESOURCE_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES += plugin-resource.la
 
+# resource-client
+bin_PROGRAMS += resource-client
+
+resource_client_SOURCES = plugins/resource/resource-client.c
+resource_client_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
+resource_client_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la
+
+
 # debug file:line-function mapping generation
 plugin-resource-func-info.c: $(RESOURCE_PLUGIN_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
