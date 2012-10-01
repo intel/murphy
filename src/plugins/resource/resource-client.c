@@ -1158,12 +1158,53 @@ static char *parse_attribute(mrp_msg_t *msg, char *str, char *sep)
 #undef PUSH_ATTRIBUTE_NAME
 }
 
+bool parse_flags(char *str, uint32_t *pflags)
+{
+    typedef struct { char *str; uint32_t flags; } flagdef_t;
+
+    static flagdef_t flagdefs[] = {
+        { "M" ,    RESPROTO_RESFLAG_MANDATORY |            0            },
+        { "O" ,               0               |            0            },
+        { "S" ,    RESPROTO_RESFLAG_MANDATORY | RESPROTO_RESFLAG_SHARED },
+        { "E" ,    RESPROTO_RESFLAG_MANDATORY |            0            },
+        { "MS",    RESPROTO_RESFLAG_MANDATORY | RESPROTO_RESFLAG_SHARED },
+        { "ME",    RESPROTO_RESFLAG_MANDATORY |            0            },
+        { "OS",               0               | RESPROTO_RESFLAG_SHARED },
+        { "OE",               0               |            0            },
+        { "SM",    RESPROTO_RESFLAG_MANDATORY | RESPROTO_RESFLAG_SHARED },
+        { "SO",               0               | RESPROTO_RESFLAG_SHARED },
+        { "EM",    RESPROTO_RESFLAG_MANDATORY |            0            },
+        { "EO",               0               |            0            },
+        { NULL,               0               |            0            }
+    };
+
+    flagdef_t *fd;
+    bool success;
+
+    *pflags = RESPROTO_RESFLAG_MANDATORY;
+
+    if (!str)
+        success = true;
+    else {
+        for (success = false, fd = flagdefs;    fd->str;    fd++) {
+            if (!strcasecmp(str, fd->str)) {
+                success = true;
+                *pflags = fd->flags;
+                break;
+            }
+        }
+    }
+
+    return success;
+}
+
 static char *parse_resource(mrp_msg_t *msg, char *str, char *sep)
 {
 #define PUSH(msg, tag, typ, val) \
     mrp_msg_append(msg, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
 
-    uint32_t flags = RESPROTO_RESFLAG_MANDATORY;
+    uint32_t flags;
+    char *name, *flgstr;
     char *p;
     char  c;
 
@@ -1172,18 +1213,31 @@ static char *parse_resource(mrp_msg_t *msg, char *str, char *sep)
     if (!(p = str))
         return NULL;
 
+    name = p;
+    flgstr = NULL;
+
     while ((c = *p++)) {
-        if (c == '/' || c == ',') {
+        if (c == ':') {
+            *(p-1) = '\0';
+            flgstr = name;
+            name = p;
+        }
+        else if (c == '/' || c == ',') {
             *(p-1) = '\0';
             break;
         }
-        if (!isalnum(c) && c != '_' && c != '-') {
-            mrp_log_error("invalid resource name: '%s'", str);
+        else if (!isalnum(c) && c != '_' && c != '-') {
+            mrp_log_error("invalid resource name: '%s'", name);
             return NULL;
         }
     }
 
-    if (!PUSH(msg, RESOURCE_NAME , STRING, str  ) ||
+    if (!parse_flags(flgstr, &flags)) {
+        mrp_log_error("invalid flag string '%s'", flgstr ? flgstr : "");
+        return NULL;
+    }
+
+    if (!PUSH(msg, RESOURCE_NAME , STRING, name ) ||
         !PUSH(msg, RESOURCE_FLAGS, UINT32, flags)   )
         goto failed;
 
@@ -1222,7 +1276,7 @@ static void create_resource_set(client_t   *client,
     char *p;
     char c;
 
-    /* 'def' is in the form resource_name/attr_name:{siuf}:["]value["]/ , */
+    /* 'def' => {m|o}{s|e}:resource_name/attr_name:{s|i|u|f}:["]value["] */
 
     if (!client || !class || !zone || !def)
         return;
