@@ -57,6 +57,8 @@
 #define MAX_DBUS_SIG_LENGTH 8
 
 
+#define HAVE_TO_DEFINE_RESOURCES
+
 enum {
     ARG_DBUS_SERVICE,
 };
@@ -84,6 +86,7 @@ typedef struct property_o_s {
     /* data */
     char *name;
     void *value;
+    bool writable; /* used later when we allow more access to properties */
 
     dbus_data_t *ctx;
 
@@ -101,6 +104,10 @@ struct manager_o_s {
     mrp_htbl_t *rsets;
 
     property_o_t *rsets_prop;
+
+    /* resource library */
+    const char *zone;
+    mrp_resource_client_t *client;
 };
 
 typedef struct {
@@ -111,10 +118,14 @@ typedef struct {
 
     mrp_htbl_t *resources;
 
+
     property_o_t *resources_prop;
     property_o_t *available_resources_prop;
     property_o_t *class_prop;
     property_o_t *status_prop;
+
+    /* resource library */
+    mrp_resource_set_t *set;
 } resource_set_o_t;
 
 
@@ -126,6 +137,7 @@ typedef struct {
     property_o_t *status_prop;
     property_o_t *mandatory_prop;
     property_o_t *shared_prop;
+    property_o_t *name_prop;
 } resource_o_t;
 
 
@@ -208,6 +220,39 @@ static void free_string_array(void *array) {
     }
 
     mrp_free(array);
+}
+
+
+static char **copy_string_array(const char **array)
+{
+    int count = 0, i;
+    char **tmp = (char **) array;
+    char **ret;
+
+    if (!array)
+        return NULL;
+
+    while (*tmp) {
+        count++;
+        tmp++;
+    }
+
+    ret = mrp_alloc_array(char *, count+1);
+
+    if (!ret)
+        return NULL;
+
+    for (i = 0; i < count; i++) {
+        ret[i] = mrp_strdup(array[i]);
+        if (!ret[i]) {
+            free_string_array(ret);
+            return NULL;
+        }
+    }
+
+    ret[i] = NULL;
+
+    return ret;
 }
 
 
@@ -344,6 +389,7 @@ static property_o_t *create_property(dbus_data_t *ctx, char *path,
     prop->interface = mrp_strdup(interface);
     prop->path = mrp_strdup(path);
     prop->name = mrp_strdup(name);
+    prop->writable = FALSE;
     prop->value = value;
 
     prop->ctx = ctx;
@@ -395,14 +441,104 @@ static void destroy_resource(resource_o_t *resource)
     mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
             RSET_IFACE, "getProperties", resource_cb, resource->rset->mgr->ctx);
 
-    mrp_free(resource->path);
-
-    /* TODO: Free all resource properties */
-
     destroy_property(resource->mandatory_prop);
     destroy_property(resource->shared_prop);
+    destroy_property(resource->name_prop);
+    destroy_property(resource->status_prop);
+
+    mrp_free(resource->path);
 
     mrp_free(resource);
+}
+
+
+struct search_data_s {
+    const char *name;
+    resource_o_t *resource;
+};
+
+
+static int find_resource_cb(void *key, void *object, void *user_data)
+{
+    resource_o_t *r = object;
+    struct search_data_s *s = user_data;
+    MRP_UNUSED(key);
+
+    if (strcmp(r->name_prop->value, s->name) == 0) {
+        s->resource = r;
+        return MRP_HTBL_ITER_STOP;
+    }
+
+    return MRP_HTBL_ITER_MORE;
+}
+
+
+static resource_o_t *get_resource_by_name(resource_set_o_t *rset,
+        const char *name)
+{
+    struct search_data_s s;
+
+    s.name = name;
+    s.resource = NULL;
+
+    mrp_htbl_foreach(rset->resources, find_resource_cb, &s);
+
+    return s.resource;
+}
+
+
+static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
+{
+    resource_set_o_t *rset = data;
+    mrp_resource_t *resource;
+    void *iter = NULL;
+
+    mrp_resource_mask_t grant = mrp_get_resource_set_grant(set);
+    mrp_resource_mask_t advice = mrp_get_resource_set_advice(set);
+
+    MRP_UNUSED(request_id);
+
+    mrp_log_info("Received event from policy engine");
+
+    /* the resource API is bit awkward here */
+
+    while ((resource = mrp_resource_set_iterate_resources(set, &iter))) {
+        mrp_resource_mask_t mask;
+        const char *name;
+        resource_o_t *res;
+
+        mask = mrp_resource_get_mask(resource);
+        name = mrp_resource_get_name(resource);
+
+        /* search the matching resource set object */
+
+        res = get_resource_by_name(rset, name);
+
+        if (!res) {
+            mrp_log_error("Resource %s not found", name);
+            continue;
+        }
+
+        if (mask & grant) {
+            update_property(res->status_prop, "acquired");
+        }
+        else if (mask & advice) {
+            update_property(res->status_prop, "available");
+        }
+        else {
+            update_property(res->status_prop, "lost");
+        }
+    }
+
+    if (grant) {
+        update_property(rset->status_prop, "acquired");
+    }
+    else if (advice) {
+        update_property(rset->status_prop, "available");
+    }
+    else {
+        update_property(rset->status_prop, "lost");
+    }
 }
 
 
@@ -416,10 +552,12 @@ static void htbl_free_resources(void *key, void *object)
 }
 
 
-static resource_o_t * create_resource(resource_set_o_t *rset, uint32_t id)
+static resource_o_t * create_resource(resource_set_o_t *rset,
+        const char *resource_name, uint32_t id)
 {
-    char buf[64];
+    char buf[MAX_PATH_LENGTH];
     int ret;
+    char *name;
     dbus_bool_t *mandatory, *shared;
 
     resource_o_t *resource = mrp_allocz(sizeof(resource_o_t));
@@ -427,22 +565,43 @@ static resource_o_t * create_resource(resource_set_o_t *rset, uint32_t id)
     if (!resource)
         goto error;
 
-    ret = snprintf(buf, 64, "%s/%u", rset->path, id);
+    ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", rset->path, id);
 
-    if (ret == 64)
+    if (ret == MAX_PATH_LENGTH)
         goto error;
 
     mandatory = mrp_allocz(sizeof(bool));
     shared = mrp_allocz(sizeof(bool));
+    name = mrp_strdup(resource_name);
 
     *mandatory = TRUE;
     *shared = FALSE;
 
     resource->mandatory_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", "mandatory", mandatory, free_value);
+    resource->mandatory_prop->writable = TRUE;
+
+    if (!resource->mandatory_prop)
+        goto error;
 
     resource->shared_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", "shared", shared, free_value);
+    resource->shared_prop->writable = TRUE;
+
+    if (!resource->shared_prop)
+        goto error;
+
+    resource->name_prop = create_property(rset->mgr->ctx, buf,
+            RESOURCE_IFACE, "s", "name", name, free_value);
+
+    if (!resource->name_prop)
+        goto error;
+
+    resource->status_prop = create_property(rset->mgr->ctx, buf,
+            RESOURCE_IFACE, "s", "status", "pending", NULL);
+
+    if (!resource->status_prop)
+        goto error;
 
     resource->path = mrp_strdup(buf);
     resource->rset = rset;
@@ -450,10 +609,8 @@ static resource_o_t * create_resource(resource_set_o_t *rset, uint32_t id)
     return resource;
 
 error:
-
-    if (resource) {
+    if (resource)
         destroy_resource(resource);
-    }
 
     return NULL;
 }
@@ -479,8 +636,6 @@ static void destroy_rset(resource_set_o_t *rset)
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
             RSET_IFACE, "getProperties", rset_cb, rset->mgr->ctx);
 
-    mrp_free(rset->path);
-
     if (rset->resources)
         mrp_htbl_destroy(rset->resources, TRUE);
 
@@ -489,6 +644,8 @@ static void destroy_rset(resource_set_o_t *rset)
     destroy_property(rset->resources_prop);
     destroy_property(rset->available_resources_prop);
 
+    mrp_free(rset->path);
+
     mrp_free(rset);
 }
 
@@ -496,6 +653,7 @@ static void destroy_rset(resource_set_o_t *rset)
 static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
 {
     char buf[64];
+    char resbuf[128];
     int ret;
     mrp_htbl_config_t resources_conf;
     resource_set_o_t *rset = mrp_allocz(sizeof(resource_set_o_t));
@@ -534,12 +692,6 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
         goto error;
     resources_arr[0] = NULL;
 
-    /* FIXME: temporary placeholder code */
-    available_resources_arr = mrp_allocz(sizeof(char **));
-    if (!available_resources_arr)
-        goto error;
-    available_resources_arr[0] = NULL;
-
     rset->resources_prop = create_property(rset->mgr->ctx, rset->path,
             RSET_IFACE, "ao", "resources", resources_arr, free_string_array);
 
@@ -548,18 +700,23 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
 
     rset->class_prop = create_property(rset->mgr->ctx, rset->path,
             RSET_IFACE, "s", "class", mrp_strdup("default"), free_value);
+    rset->class_prop->writable = TRUE;
 
     if (!rset->class_prop)
         goto error;
 
     rset->status_prop = create_property(rset->mgr->ctx, rset->path,
-            RSET_IFACE, "s", "status", mrp_strdup("pending"), free_value);
+            RSET_IFACE, "s", "status", "pending", NULL);
 
     if (!rset->status_prop)
         goto error;
 
-    /* TODO: get available resources and put them as the default value */
+    /* TODO: what's the point in having a const char buf?!? */
+    available_resources_arr = copy_string_array(
+                mrp_resource_definition_get_all_names(128,
+                        (const char **) resbuf));
 
+    /* TODO: how to listen to the changes in available resources? */
     rset->available_resources_prop = create_property(rset->mgr->ctx,
             rset->path, RSET_IFACE, "as", "availableResources",
             available_resources_arr, free_string_array);
@@ -567,10 +724,16 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
     if (!rset->available_resources_prop)
         goto error;
 
+    rset->set = mrp_resource_set_create(rset->mgr->client, 0, event_cb, rset);
+
+    if (!rset->set) {
+        mrp_log_error("Failed to create resource set");
+        goto error;
+    }
+
     return rset;
 
 error:
-
     if (rset) {
         destroy_rset(rset);
     }
@@ -679,27 +842,27 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         goto error_reply;
     }
 
-    if (snprintf(buf, 64, "%s/%u", MURPHY_PATH_BASE, rset_id) == 64) {
+    if (snprintf(buf, 64, "%s/%u", MURPHY_PATH_BASE, rset_id) == 64)
         goto error_reply;
-    }
 
     rset = mrp_htbl_lookup(ctx->mgr->rsets, buf);
 
-    if (!rset) {
+    if (!rset)
         goto error_reply;
-    }
 
     resource = mrp_htbl_lookup(rset->resources, (void *) path);
 
-    if (!resource) {
+    if (!resource)
         goto error_reply;
-    }
 
     if (strcmp(member, "getProperties") == 0) {
         DBusMessageIter msg_iter;
         DBusMessageIter array_iter;
 
         reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
 
         mrp_log_info("getProperties of resource %s", path);
 
@@ -708,6 +871,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_iter_open_container(&msg_iter, DBUS_TYPE_ARRAY, "{sv}",
                 &array_iter);
 
+        get_property_dict_entry(resource->name_prop, &array_iter);
+        get_property_dict_entry(resource->status_prop, &array_iter);
         get_property_dict_entry(resource->mandatory_prop, &array_iter);
         get_property_dict_entry(resource->shared_prop, &array_iter);
 
@@ -777,6 +942,10 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         }
 
         reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
+
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
@@ -787,6 +956,10 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         update_property(rset->resources_prop, htbl_keys(rset->resources));
 
         reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
+
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
@@ -794,14 +967,37 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     return TRUE;
 
 error_reply:
-
     reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED,
                 "Received invalid message");
-    mrp_dbus_send_msg(dbus, reply);
-    dbus_message_unref(reply);
+
+    if (reply) {
+        mrp_dbus_send_msg(dbus, reply);
+        dbus_message_unref(reply);
+    }
 
     return FALSE;
+
+error:
+    return FALSE;
 }
+
+
+static int add_resource_cb(void *key, void *object, void *user_data)
+{
+    resource_o_t *r = object;
+    resource_set_o_t *rset = user_data;
+
+    bool shared = *(dbus_bool_t *) r->shared_prop->value;
+    bool mandatory = *(dbus_bool_t *) r->mandatory_prop->value;
+
+    MRP_UNUSED(key);
+
+    mrp_resource_set_add_resource(rset->set, r->name_prop->value,
+            shared, NULL, mandatory);
+
+    return MRP_HTBL_ITER_MORE;
+}
+
 
 
 static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
@@ -832,6 +1028,9 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         reply = dbus_message_new_method_return(msg);
 
+        if (!reply)
+            goto error;
+
         mrp_log_info("getProperties of rset %s", path);
 
         dbus_message_iter_init_append(reply, &msg_iter);
@@ -850,7 +1049,16 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_unref(reply);
     }
     else if (strcmp(member, "addResource") == 0) {
-        resource_o_t *resource = create_resource(rset, rset->next_id++);
+        const char *name;
+
+        resource_o_t *resource;
+
+        if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &name,
+                DBUS_TYPE_INVALID)) {
+            goto error_reply;
+        }
+
+        resource = create_resource(rset, name, rset->next_id++);
 
         if (!resource)
             goto error_reply;
@@ -873,9 +1081,9 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         update_property(rset->resources_prop, htbl_keys(rset->resources));
 
         reply = dbus_message_new_method_return(msg);
-        if (!reply) {
+
+        if (!reply)
             goto error;
-        }
 
         dbus_message_append_args(reply, DBUS_TYPE_OBJECT_PATH, &resource->path,
                 DBUS_TYPE_INVALID);
@@ -884,14 +1092,24 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_unref(reply);
     }
     else if (strcmp(member, "request") == 0) {
+        dbus_bool_t success = TRUE;
+
         mrp_log_info("Requesting rset %s", path);
 
-        reply = dbus_message_new_method_return(msg);
-        if (!reply) {
-            goto error;
-        }
+        /* add the resources */
+        mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
 
-        dbus_message_append_args(reply, DBUS_TYPE_BOOLEAN, TRUE,
+        mrp_application_class_add_resource_set((char *) rset->class_prop->value,
+                rset->mgr->zone, rset->set);
+
+        mrp_resource_set_acquire(rset->set, 0);
+
+        reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
+
+        dbus_message_append_args(reply, DBUS_TYPE_BOOLEAN, &success,
                 DBUS_TYPE_INVALID);
 
         mrp_dbus_send_msg(dbus, reply);
@@ -899,6 +1117,8 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     }
     else if (strcmp(member, "release") == 0) {
         mrp_log_info("Releasing rset %s", path);
+
+        mrp_resource_set_release(rset->set, 0);
 
         reply = dbus_message_new_method_return(msg);
         if (!reply) {
@@ -915,6 +1135,10 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         update_property(ctx->mgr->rsets_prop, htbl_keys(ctx->mgr->rsets));
 
         reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
+
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
@@ -946,7 +1170,8 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_iter_recurse(&msg_iter, &variant_iter);
 
         if (strcmp(name, "class") == 0) {
-            if (!dbus_message_iter_get_arg_type(&variant_iter) == DBUS_TYPE_STRING) {
+            if (!dbus_message_iter_get_arg_type(&variant_iter)
+                        == DBUS_TYPE_STRING) {
                 goto error_reply;
             }
 
@@ -959,6 +1184,10 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         }
 
         reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
+
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
@@ -966,14 +1195,15 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     return TRUE;
 
 error_reply:
-
     reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED,
                 "Received invalid message");
-    mrp_dbus_send_msg(dbus, reply);
-    dbus_message_unref(reply);
+
+    if (reply) {
+        mrp_dbus_send_msg(dbus, reply);
+        dbus_message_unref(reply);
+    }
 
 error:
-
     return FALSE;
 }
 
@@ -996,6 +1226,9 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         DBusMessageIter array_iter;
 
         reply = dbus_message_new_method_return(msg);
+
+        if (!reply)
+            goto error;
 
         mrp_log_info("getProperties of manager %s", path);
 
@@ -1067,11 +1300,12 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     return TRUE;
 
 error_reply:
-
     reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED,
                 "Received invalid message");
-    mrp_dbus_send_msg(dbus, reply);
-    dbus_message_unref(reply);
+    if (reply) {
+        mrp_dbus_send_msg(dbus, reply);
+        dbus_message_unref(reply);
+    }
 
 error:
     return FALSE;
@@ -1083,8 +1317,16 @@ static void destroy_manager(manager_o_t *mgr)
     if (!mgr)
         return;
 
+    mrp_dbus_remove_method(mgr->ctx->dbus, MURPHY_PATH_BASE,
+            MANAGER_IFACE, "createResourceSet", mgr_cb, mgr->ctx);
+
+    mrp_dbus_remove_method(mgr->ctx->dbus, MURPHY_PATH_BASE,
+            MANAGER_IFACE, "getProperties", mgr_cb, mgr->ctx);
+
     mrp_htbl_destroy(mgr->rsets, TRUE);
     destroy_property(mgr->rsets_prop);
+
+    mrp_resource_client_destroy(mgr->client);
 
     mrp_free(mgr);
 }
@@ -1122,6 +1364,16 @@ static manager_o_t *create_manager(dbus_data_t *ctx)
 
     mgr->rsets = mrp_htbl_create(&rsets_conf);
 
+    if (!mgr->rsets)
+        goto error;
+
+    mgr->client = mrp_resource_client_create("dbus", ctx);
+
+    if (!mgr->client)
+        goto error;
+
+    mgr->zone = "default";
+
     return mgr;
 
 error:
@@ -1131,6 +1383,35 @@ error:
     return NULL;
 }
 
+#ifdef HAVE_TO_DEFINE_RESOURCES
+#include <murphy/resource/manager-api.h>
+#include <murphy/resource/config-api.h>
+
+
+static void tmp_create_resources()
+{
+    /* FIXME: this is the wrong place to do this */
+
+    static mrp_resource_mgr_ftbl_t audio_playback_manager;
+    static mrp_resource_mgr_ftbl_t audio_record_manager;
+
+    mrp_zone_definition_create(NULL);
+
+    mrp_zone_create("default", NULL);
+
+    mrp_application_class_create("default", 0);
+    mrp_application_class_create("player", 1);
+    mrp_application_class_create("sound", 2);
+    mrp_application_class_create("camera", 3);
+    mrp_application_class_create("phone", 4);
+
+    mrp_resource_definition_create("audio_playback", true, NULL,
+                &audio_playback_manager, NULL);
+
+    mrp_resource_definition_create("audio_record", true, NULL,
+                &audio_record_manager, NULL);
+}
+#endif
 
 static int dbus_resource_init(mrp_plugin_t *plugin)
 {
@@ -1144,6 +1425,10 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
         mrp_log_error("Failed to connect to D-Bus");
         goto error;
     }
+
+#ifdef HAVE_TO_DEFINE_RESOURCES
+    tmp_create_resources();
+#endif
 
     ctx->mgr = create_manager(ctx);
 
@@ -1176,7 +1461,10 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     return TRUE;
 
 error:
-    /* TODO */
+    if (ctx) {
+        destroy_manager(ctx->mgr);
+    }
+
     return FALSE;
 }
 
