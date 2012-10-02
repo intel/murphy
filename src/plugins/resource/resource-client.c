@@ -1514,8 +1514,8 @@ static void usage(client_t *client, int exit_code)
            "\t\t\t\t\t'i' - signed integer\n"
            "\t\t\t\t\t'u' - unsigned integer\n"
            "\t\t\t\t\t'f' - floating\n"
-           "\nExample:\n"
-           "  %s player ms:audio_playback/role:s:\"video\",me:video_playback\n"
+           "\nExample:\n\n%s player driver "
+           "ms:audio_playback/role:s:\"video\",me:video_playback\n"
            "\n", client->name, client->name);
 
     exit(exit_code);
