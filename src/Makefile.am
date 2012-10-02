@@ -441,7 +441,10 @@ libmurphy_resource_la_LDFLAGS =			\
 
 libmurphy_resource_la_LIBADD =	    \
 		libmurphy-core.la   \
-		libmurphy-common.la
+		libmurphy-common.la \
+		murphy-db/mql/libmql.la \
+		murphy-db/mqi/libmqi.la \
+		murphy-db/mdb/libmdb.la
 
 libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
 				     libmurphy-core.la      \
