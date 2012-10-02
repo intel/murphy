@@ -24,7 +24,6 @@
 #define ADVICE          1
 
 
-
 typedef struct {
     uint32_t        dim;
     const char     *elems[0];
@@ -66,6 +65,9 @@ typedef struct {
     uint32_t              seqno;
     bool                  prompt;
     bool                  msgdump;
+    char *                class;
+    char *                zone;
+    char *                rsetd;
     resource_def_array_t *resources;
     string_array_t       *class_names;
     string_array_t       *zone_names;
@@ -1467,9 +1469,10 @@ static void console_input(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     }
 }
 
-void sighandler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum, void *ud)
+static void sighandler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum,
+                       void *user_data)
 {
-    client_t *client = (client_t *)ud;
+    client_t *client = (client_t *)user_data;
 
     MRP_UNUSED(h);
 
@@ -1488,6 +1491,62 @@ void sighandler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum, void *ud)
     }
 }
 
+static void usage(client_t *client, int exit_code)
+{
+    printf("Usage: %s [-h] [-v] [class zone resources]\n\nwhere\n"
+           "\t-h\t\tprints this help\n"
+           "\t-v\t\tverbose mode (dumps the transport messages)\n"
+           "\tclass\t\tapplication class of the resource set\n"
+           "\tzone\t\tzone wher the resource set lives\n"
+           "\tresources\tcomma separated list of resources. Each resource is\n"
+           "\t\t\tspecified as flags:name[/attribute[/ ... ]]\n"
+           "\t\t\tflags\t\tspecified as {m|o}{s|e} where\n"
+           "\t\t\t\t\t'm' stands for mandatory,\n"
+           "\t\t\t\t\t'o' for optional,\n"
+           "\t\t\t\t\t's' for shared and\n"
+           "\t\t\t\t\t'e' for exclusive.\n"
+           "\t\t\tresource\tis the name of the resource composed of\n"
+           "\t\t\t\t\ta series of letters, digits, '_' and\n"
+           "\t\t\t\t\t'-' characters\n"
+           "\t\t\tattribute\tis defined as attr-name:type:[\"]value[\"]\n"
+           "\t\t\t\t\ttypes can be\n"
+           "\t\t\t\t\t's' - string\n"
+           "\t\t\t\t\t'i' - signed integer\n"
+           "\t\t\t\t\t'u' - unsigned integer\n"
+           "\t\t\t\t\t'f' - floating\n"
+           "\nExample:\n"
+           "  %s player ms:audio_playback/role:s:\"video\",me:video_playback\n"
+           "\n", client->name, client->name);
+
+    exit(exit_code);
+}
+
+static void parse_arguments(client_t *client, int argc, char **argv)
+{
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hv")) != -1) {
+        switch (opt) {
+        case 'h':
+            usage(client, 0);
+        case 'v':
+            client->msgdump = true;
+            break;
+        default:
+            usage(client, EINVAL);
+        }
+    }
+
+    if (optind + 3 == argc) {
+        client->class = argv[optind + 0];
+        client->zone  = argv[optind + 1];
+        client->rsetd = argv[optind + 2];
+    }
+    else if (optind < argc) {
+        usage(client, EINVAL);
+    }
+}
+
 
 int main(int argc, char **argv)
 {
@@ -1503,14 +1562,17 @@ int main(int argc, char **argv)
     client->prompt  = true;
     client->rset_id = INVALID_ID;
 
+    parse_arguments(client, argc, argv);
+
     mrp_add_sighandler(client->ml, SIGHUP , sighandler, client);
     mrp_add_sighandler(client->ml, SIGTERM, sighandler, client);
     mrp_add_sighandler(client->ml, SIGINT , sighandler, client);
 
     init_transport(client, addr);
 
-    if (argc == 4)
-        create_resource_set(client, argv[1], argv[2], argv[3]);
+
+    if (client->class && client->zone && client->rsetd)
+        create_resource_set(client, client->class,client->zone,client->rsetd);
     else
         print_prompt(client, false);
 
