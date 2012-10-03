@@ -63,7 +63,6 @@ enum {
     ARG_DBUS_SERVICE,
 };
 
-
 typedef struct manager_o_s manager_o_t;
 
 typedef struct {
@@ -118,16 +117,15 @@ typedef struct {
 
     mrp_htbl_t *resources;
 
-
     property_o_t *resources_prop;
     property_o_t *available_resources_prop;
     property_o_t *class_prop;
     property_o_t *status_prop;
 
     /* resource library */
+    bool locked; /* if the library allows the settings to be changed */
     mrp_resource_set_t *set;
 } resource_set_o_t;
-
 
 typedef struct {
     char *path;
@@ -138,8 +136,9 @@ typedef struct {
     property_o_t *mandatory_prop;
     property_o_t *shared_prop;
     property_o_t *name_prop;
+    property_o_t *arguments_prop;
+    property_o_t *conf_prop;
 } resource_o_t;
-
 
 static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
 static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
@@ -191,7 +190,7 @@ static char **htbl_keys(mrp_htbl_t *ht)
 
     mrp_htbl_foreach(ht, count_keys_cb, &len);
 
-    keys = mrp_allocz(len+1);
+    keys = mrp_alloc_array(char *, len+1);
 
     kd.curr_key = 0;
     kd.keys = keys;
@@ -214,12 +213,31 @@ static void free_string_array(void *array) {
 
     char **i = array;
 
+    if (!array)
+        return;
+
     while (*i) {
         mrp_free(*i);
         i++;
     }
 
     mrp_free(array);
+}
+
+
+static void free_attr_array(mrp_attr_t *arr)
+{
+    /* only free the allocated members */
+    mrp_attr_t *i = arr;
+
+    while (i->name) {
+
+        if (i->type == mqi_string)
+            mrp_free((void *) i->value.string);
+
+        mrp_free((void *) i->name);
+        i++;
+    }
 }
 
 
@@ -253,6 +271,60 @@ static char **copy_string_array(const char **array)
     ret[i] = NULL;
 
     return ret;
+}
+
+
+static int dbus_value_cb(void *key, void *object, void *user_data)
+{
+    DBusMessageIter *iter = user_data;
+    DBusMessageIter dict_iter;
+    DBusMessageIter variant_iter;
+    char *arg_name = key;
+    mrp_attr_t *arg_value = object;
+
+    dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY, NULL,
+            &dict_iter);
+
+    dbus_message_iter_append_basic(&dict_iter, DBUS_TYPE_STRING, &arg_name);
+
+    /* TODO: do this with get_property_entry or similar to deal with multiple
+       types of different values? */
+
+    switch(arg_value->type) {
+        case mqi_string:
+            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
+                    "s", &variant_iter);
+            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_STRING,
+                    &arg_value->value.string);
+            break;
+        case mqi_integer:
+            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
+                    "i", &variant_iter);
+            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_INT32,
+                    &arg_value->value.integer);
+            break;
+        case mqi_unsignd:
+            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
+                    "u", &variant_iter);
+            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_UINT32,
+                    &arg_value->value.unsignd);
+            break;
+        case mqi_floating:
+            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
+                    "d", &variant_iter);
+            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_DOUBLE,
+                    &arg_value->value.floating);
+            break;
+        default:
+            mrp_log_error("unknown type %d in attributes", arg_value->type);
+            break;
+    }
+
+    dbus_message_iter_close_container(&dict_iter, &variant_iter);
+
+    dbus_message_iter_close_container(iter, &dict_iter);
+
+    return MRP_HTBL_ITER_MORE;
 }
 
 
@@ -305,6 +377,18 @@ static bool get_property_entry(property_o_t *prop, DBusMessageIter *dict_iter)
         }
 
         dbus_message_iter_close_container(&variant_iter, &array_iter);
+    }
+    else if (strcmp(prop->dbus_sig, "a{sv}") == 0) {
+        DBusMessageIter array_iter;
+
+        dbus_message_iter_open_container(&variant_iter, DBUS_TYPE_ARRAY, "{sv}",
+                &array_iter);
+
+        /* iterate through the elements in the map */
+        mrp_htbl_foreach(prop->value, dbus_value_cb, &array_iter);
+
+        dbus_message_iter_close_container(&variant_iter, &array_iter);
+
     }
     else {
         mrp_log_error("Unknown sig '%s'", prop->dbus_sig);
@@ -404,7 +488,6 @@ static property_o_t *create_property(dbus_data_t *ctx, char *path,
     return prop;
 
 error:
-
     if (prop) {
         destroy_property(prop);
     }
@@ -498,7 +581,8 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
 
     MRP_UNUSED(request_id);
 
-    mrp_log_info("Received event from policy engine");
+    mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
+        rset->path, grant, advice);
 
     /* the resource API is bit awkward here */
 
@@ -552,6 +636,27 @@ static void htbl_free_resources(void *key, void *object)
 }
 
 
+static void htbl_free_args(void *key, void *object)
+{
+    mrp_attr_t *attr = object;
+
+    MRP_UNUSED(key);
+
+    if (attr->type == mqi_string)
+        mrp_free((void *) attr->value.string);
+
+    mrp_free((void *) attr->name);
+    mrp_free(attr);
+}
+
+
+static void free_map(void *object)
+{
+    mrp_htbl_t *ht = object;
+    mrp_htbl_destroy(ht, TRUE);
+}
+
+
 static resource_o_t * create_resource(resource_set_o_t *rset,
         const char *resource_name, uint32_t id)
 {
@@ -559,6 +664,16 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     int ret;
     char *name;
     dbus_bool_t *mandatory, *shared;
+
+    /* attribute handling */
+    mrp_attr_t attr_buf[128];
+    mrp_attr_t *i;
+    uint32_t resource_id;
+    mrp_attr_t *attrs;
+    mrp_attr_t *copy;
+
+    mrp_htbl_config_t map_conf;
+    mrp_htbl_t *conf;
 
     resource_o_t *resource = mrp_allocz(sizeof(resource_o_t));
 
@@ -570,12 +685,21 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     if (ret == MAX_PATH_LENGTH)
         goto error;
 
-    mandatory = mrp_allocz(sizeof(bool));
-    shared = mrp_allocz(sizeof(bool));
+    /* TODO: check */
+    mandatory = mrp_allocz(sizeof(dbus_bool_t));
+    shared = mrp_allocz(sizeof(dbus_bool_t));
     name = mrp_strdup(resource_name);
 
     *mandatory = TRUE;
     *shared = FALSE;
+
+    map_conf.comp = mrp_string_comp;
+    map_conf.hash = mrp_string_hash;
+    map_conf.free = htbl_free_args;
+    map_conf.nbucket = 0;
+    map_conf.nentry = 10;
+
+    conf = mrp_htbl_create(&map_conf);
 
     resource->mandatory_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", "mandatory", mandatory, free_value);
@@ -602,6 +726,31 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
 
     if (!resource->status_prop)
         goto error;
+
+    resource_id = mrp_resource_definition_get_resource_id_by_name(name);
+
+
+    attrs = mrp_resource_definition_read_all_attributes(resource_id, 128,
+            attr_buf);
+    i = attrs;
+
+    while (i->name != NULL) {
+
+        copy = mrp_allocz(sizeof(mrp_attr_t));
+        memcpy(copy, i, sizeof(mrp_attr_t));
+        copy->name = mrp_strdup(i->name);
+        if (i->type == mqi_string) {
+            copy->value.string = mrp_strdup(i->value.string);
+        }
+        mrp_htbl_insert(conf, (void *) copy->name, copy);
+        i++;
+    }
+
+    resource->conf_prop = create_property(rset->mgr->ctx, buf,
+            RESOURCE_IFACE, "a{sv}", "attributes_conf", conf, free_map);
+
+    resource->arguments_prop = create_property(rset->mgr->ctx, buf,
+            RESOURCE_IFACE, "a{sv}", "attributes", conf, NULL);
 
     resource->path = mrp_strdup(buf);
     resource->rset = rset;
@@ -711,7 +860,6 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
     if (!rset->status_prop)
         goto error;
 
-    /* TODO: what's the point in having a const char buf?!? */
     available_resources_arr = copy_string_array(
                 mrp_resource_definition_get_all_names(128,
                         (const char **) resbuf));
@@ -816,11 +964,68 @@ static int parse_path(const char *path, uint32_t *rset_id,
 }
 
 
+struct attr_iter_s {
+    mrp_attr_t *attrs;
+    int count;
+};
+
+
+static int collect_attrs_cb(void *key, void *object, void *user_data)
+{
+    mrp_attr_t *attr = object;
+    mrp_attr_t *copy;
+    struct attr_iter_s *s = user_data;
+    MRP_UNUSED(key);
+
+    copy = &s->attrs[s->count];
+
+    memcpy(copy, attr, sizeof(mrp_attr_t));
+
+    if (attr->type == mqi_string) {
+        copy->value.string = mrp_strdup(attr->value.string);
+    }
+    copy->name = mrp_strdup(attr->name);
+
+    s->count++;
+
+    return MRP_HTBL_ITER_MORE;
+}
+
+
+static void update_attributes(const char *resource_name,
+        mrp_resource_set_t *set, mrp_htbl_t *attr_map)
+{
+    int count = 0;
+    mrp_htbl_foreach(attr_map, count_keys_cb, &count);
+
+    {
+        struct attr_iter_s iter;
+        mrp_attr_t attrs[count+1];
+
+        memset(attrs, 0, (count+1)*sizeof(mrp_attr_t));
+
+        iter.count = 0;
+        iter.attrs = attrs;
+
+        /* add the attributes */
+        mrp_htbl_foreach(attr_map, collect_attrs_cb, &iter);
+
+        /* FIXME: this breaks down if there are two resources of the same name
+         * in a resource set */
+
+        mrp_resource_set_write_attributes(set, resource_name, attrs);
+        free_attr_array(attrs);
+    }
+}
+
+
+
 static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 {
     const char *member = dbus_message_get_member(msg);
     const char *iface = dbus_message_get_interface(msg);
     const char *path = dbus_message_get_path(msg);
+    char *error_msg = "Received invalid message";
 
     DBusMessage *reply;
     char buf[64];
@@ -875,6 +1080,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         get_property_dict_entry(resource->status_prop, &array_iter);
         get_property_dict_entry(resource->mandatory_prop, &array_iter);
         get_property_dict_entry(resource->shared_prop, &array_iter);
+        get_property_dict_entry(resource->arguments_prop, &array_iter);
+        get_property_dict_entry(resource->conf_prop, &array_iter);
 
         dbus_message_iter_close_container(&msg_iter, &array_iter);
 
@@ -892,29 +1099,38 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_iter_init(msg, &msg_iter);
 
         if (!dbus_message_iter_get_arg_type(&msg_iter) == DBUS_TYPE_STRING) {
+            error_msg = "Missing resource property key";
             goto error_reply;
         }
 
         dbus_message_iter_get_basic(&msg_iter, &name);
 
         if (!dbus_message_iter_has_next(&msg_iter)) {
+            error_msg = "Missing resource property value";
             goto error_reply;
         }
 
         dbus_message_iter_next(&msg_iter);
 
         if (!dbus_message_iter_get_arg_type(&msg_iter) == DBUS_TYPE_VARIANT) {
+            error_msg = "Resource property value not wrapped in variant";
             goto error_reply;
         }
 
         dbus_message_iter_recurse(&msg_iter, &variant_iter);
 
+        if (resource->rset->locked && strcmp(name, "conf") != 0) {
+            error_msg = "Resource set cannot be changed after requesting";
+            goto error_reply;
+        }
+
         if (strcmp(name, "mandatory") == 0) {
             dbus_bool_t value;
-            dbus_bool_t *tmp = mrp_alloc(sizeof(bool));
+            dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
 
             if (!dbus_message_iter_get_arg_type(&variant_iter)
                         == DBUS_TYPE_BOOLEAN) {
+                mrp_free(tmp);
                 goto error_reply;
             }
 
@@ -925,10 +1141,11 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         }
         else if (strcmp(name, "shared") == 0) {
             dbus_bool_t value;
-            dbus_bool_t *tmp = mrp_alloc(sizeof(bool));
+            dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
 
             if (!dbus_message_iter_get_arg_type(&variant_iter)
                         == DBUS_TYPE_BOOLEAN) {
+                mrp_free(tmp);
                 goto error_reply;
             }
 
@@ -937,7 +1154,174 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             *tmp = value;
             update_property(resource->shared_prop, tmp);
         }
+        else if (strcmp(name, "attributes_conf") == 0) {
+            DBusMessageIter a_iter;
+            DBusMessageIter d_iter;
+            DBusMessageIter v_iter;
+            mrp_htbl_config_t map_conf;
+            mrp_htbl_t *conf;
+            int value_type;
+
+            map_conf.comp = mrp_string_comp;
+            map_conf.hash = mrp_string_hash;
+            map_conf.free = htbl_free_args;
+            map_conf.nbucket = 0;
+            map_conf.nentry = 10;
+
+            conf = mrp_htbl_create(&map_conf);
+
+            if (!dbus_message_iter_get_arg_type(&variant_iter)
+                        == DBUS_TYPE_ARRAY) {
+                mrp_htbl_destroy(conf, TRUE);
+                error_msg = "Resource configuration attribute array missing";
+                goto error_reply;
+            }
+
+            dbus_message_iter_recurse(&variant_iter, &a_iter);
+
+            while (dbus_message_iter_get_arg_type(&a_iter)
+                    != DBUS_TYPE_INVALID) {
+                char *key;
+                mrp_attr_t *prev_value;
+                mrp_attr_t *new_value;
+
+                if (dbus_message_iter_get_arg_type(&a_iter)
+                            != DBUS_TYPE_DICT_ENTRY) {
+                    mrp_htbl_destroy(conf, TRUE);
+                    error_msg = "Configuration attribute array"
+                                        "doesn't contain dictionary entries";
+                    goto error_reply;
+                }
+
+                dbus_message_iter_recurse(&a_iter, &d_iter);
+
+                if (dbus_message_iter_get_arg_type(&d_iter)
+                            != DBUS_TYPE_STRING) {
+                    mrp_htbl_destroy(conf, TRUE);
+                    error_msg = "Configuration attribute key missing";
+                    goto error_reply;
+                }
+
+                dbus_message_iter_get_basic(&d_iter, &key);
+
+                prev_value = mrp_htbl_lookup(resource->conf_prop->value, key);
+                if (!prev_value) {
+                    mrp_log_error("no previous value %s in attributes", key);
+                    error_msg = "Configuration attribute definition missing";
+                    mrp_htbl_destroy(conf, TRUE);
+                    goto error_reply;
+                }
+
+                if (!dbus_message_iter_has_next(&d_iter)) {
+                    mrp_htbl_destroy(conf, TRUE);
+                    error_msg = "Configuration attribute value missing";
+                    goto error_reply;
+                }
+                dbus_message_iter_next(&d_iter);
+
+                if (dbus_message_iter_get_arg_type(&d_iter)
+                            != DBUS_TYPE_VARIANT) {
+                    mrp_htbl_destroy(conf, TRUE);
+                    error_msg = "Attribute value not wrapped in variant";
+                    goto error_reply;
+                }
+
+                dbus_message_iter_recurse(&d_iter, &v_iter);
+
+                new_value = mrp_allocz(sizeof(mrp_attr_t));
+
+                value_type = dbus_message_iter_get_arg_type(&v_iter);
+
+                switch (value_type) {
+                    case DBUS_TYPE_STRING:
+                    {
+                        char *value;
+
+                        if (prev_value->type != mqi_string) {
+                            mrp_htbl_destroy(conf, TRUE);
+                            error_msg = "Attribute value not string";
+                            goto error_reply;
+                        }
+
+                        dbus_message_iter_get_basic(&v_iter, &value);
+                        new_value->name = mrp_strdup(key);
+                        new_value->type = mqi_string;
+                        new_value->value.string = mrp_strdup(value);
+                        break;
+                    }
+                    case DBUS_TYPE_INT32:
+                    {
+                        int32_t value;
+
+                        if (prev_value->type != mqi_integer) {
+                            mrp_htbl_destroy(conf, TRUE);
+                            error_msg = "Attribute value not int32";
+                            goto error_reply;
+                        }
+
+                        dbus_message_iter_get_basic(&v_iter, &value);
+                        new_value->name = mrp_strdup(key);
+                        new_value->type = mqi_integer;
+                        new_value->value.integer = value;
+                        break;
+                    }
+                    case DBUS_TYPE_UINT32:
+                    {
+                        uint32_t value;
+
+                        if (prev_value->type != mqi_unsignd) {
+                            mrp_htbl_destroy(conf, TRUE);
+                            error_msg = "Attribute value not uint32";
+                            goto error_reply;
+                        }
+
+                        dbus_message_iter_get_basic(&v_iter, &value);
+                        new_value->name = mrp_strdup(key);
+                        new_value->type = mqi_unsignd;
+                        new_value->value.unsignd = value;
+                        break;
+                    }
+                    case DBUS_TYPE_DOUBLE:
+                    {
+                        double value;
+
+                        if (prev_value->type != mqi_floating) {
+                            mrp_htbl_destroy(conf, TRUE);
+                            error_msg = "Attribute value not double";
+                            goto error_reply;
+                        }
+
+                        dbus_message_iter_get_basic(&v_iter, &value);
+                        new_value->name = mrp_strdup(key);
+                        new_value->type = mqi_floating;
+                        new_value->value.floating = value;
+                        break;
+                    }
+                    default:
+                        mrp_htbl_destroy(conf, TRUE);
+                        error_msg = "Attribute value unknown";
+                        goto error_reply;
+                }
+
+                mrp_htbl_insert(conf, (void *) new_value->name, new_value);
+
+                dbus_message_iter_next(&a_iter);
+            }
+
+            /* TODO: what about if not all properties were set? */
+
+            update_property(resource->conf_prop, conf);
+            update_property(resource->arguments_prop, conf);
+
+            if (resource->rset->locked) {
+                /* if the resource set is already created for the library,
+                 * we can set the attributes */
+                update_attributes(resource->name_prop->value,
+                        resource->rset->set, conf);
+            }
+        }
         else {
+            error_msg = "Resource property read-only or missing";
             goto error_reply;
         }
 
@@ -967,8 +1351,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     return TRUE;
 
 error_reply:
-    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED,
-                "Received invalid message");
+    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED, error_msg);
 
     if (reply) {
         mrp_dbus_send_msg(dbus, reply);
@@ -989,15 +1372,22 @@ static int add_resource_cb(void *key, void *object, void *user_data)
 
     bool shared = *(dbus_bool_t *) r->shared_prop->value;
     bool mandatory = *(dbus_bool_t *) r->mandatory_prop->value;
+    char *name = r->name_prop->value;
+
+    int count = 0;
+
+    /* count the attributes */
+    mrp_htbl_foreach(r->conf_prop->value, count_keys_cb, &count);
 
     MRP_UNUSED(key);
 
-    mrp_resource_set_add_resource(rset->set, r->name_prop->value,
-            shared, NULL, mandatory);
+    if (mrp_resource_set_add_resource(rset->set, name, shared, NULL, mandatory)
+                >= 0) {
+        update_attributes(name, rset->set, r->conf_prop->value);
+    }
 
     return MRP_HTBL_ITER_MORE;
 }
-
 
 
 static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
@@ -1005,6 +1395,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     const char *member = dbus_message_get_member(msg);
     const char *iface = dbus_message_get_interface(msg);
     const char *path = dbus_message_get_path(msg);
+    char *error_msg = "Received invalid message";
 
     DBusMessage *reply;
 
@@ -1092,25 +1483,28 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_unref(reply);
     }
     else if (strcmp(member, "request") == 0) {
-        dbus_bool_t success = TRUE;
-
         mrp_log_info("Requesting rset %s", path);
 
-        /* add the resources */
-        mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
+        if (!rset->locked) {
+            /* add the resources */
+            mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
 
-        mrp_application_class_add_resource_set((char *) rset->class_prop->value,
-                rset->mgr->zone, rset->set);
+            mrp_application_class_add_resource_set(
+                    (char *) rset->class_prop->value,
+                    rset->mgr->zone, rset->set);
+        }
 
         mrp_resource_set_acquire(rset->set, 0);
+
+        /* Due to limitations in resource library, this resource set cannot
+         * be changed anymore. This might change in the future.
+         */
+        rset->locked = TRUE;
 
         reply = dbus_message_new_method_return(msg);
 
         if (!reply)
             goto error;
-
-        dbus_message_append_args(reply, DBUS_TYPE_BOOLEAN, &success,
-                DBUS_TYPE_INVALID);
 
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
@@ -1148,6 +1542,11 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         const char *name;
         const char *value;
+
+        if (rset->locked) {
+            error_msg = "Resource set cannot be changed after requesting";
+            goto error_reply;
+        }
 
         dbus_message_iter_init(msg, &msg_iter);
 
@@ -1195,8 +1594,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     return TRUE;
 
 error_reply:
-    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED,
-                "Received invalid message");
+    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED, error_msg);
 
     if (reply) {
         mrp_dbus_send_msg(dbus, reply);
@@ -1395,6 +1793,14 @@ static void tmp_create_resources()
     static mrp_resource_mgr_ftbl_t audio_playback_manager;
     static mrp_resource_mgr_ftbl_t audio_record_manager;
 
+    static mrp_attr_def_t audio_attrs[] = {
+        { "role",  MRP_RESOURCE_RW, mqi_string , .value.string="music" },
+        { "pid",   MRP_RESOURCE_RW, mqi_unsignd, .value.unsignd=0      },
+        { "scale", MRP_RESOURCE_RW, mqi_floating,.value.floating=3.14  },
+        { "num",   MRP_RESOURCE_RW, mqi_integer, .value.integer=8      },
+        {  NULL ,        0        , mqi_unknown, .value.string=NULL    }
+    };
+
     mrp_zone_definition_create(NULL);
 
     mrp_zone_create("default", NULL);
@@ -1405,7 +1811,7 @@ static void tmp_create_resources()
     mrp_application_class_create("camera", 3);
     mrp_application_class_create("phone", 4);
 
-    mrp_resource_definition_create("audio_playback", true, NULL,
+    mrp_resource_definition_create("audio_playback", true, audio_attrs,
                 &audio_playback_manager, NULL);
 
     mrp_resource_definition_create("audio_record", true, NULL,
@@ -1490,6 +1896,10 @@ static void dbus_resource_exit(mrp_plugin_t *plugin)
 #define DBUS_RESOURCE_VERSION     MRP_VERSION_INT(0, 0, 1)
 #define DBUS_RESOURCE_AUTHORS     "Ismo Puustinen <ismo.puustinen@intel.com>"
 
+/* TODO: more arguments needed, such as:
+ *    - whether the D-Bus client processes need to be tracked
+ *    - security settings?
+ */
 static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_DBUS_SERVICE, STRING, "dbus_service", "org.Murphy"),
 };
