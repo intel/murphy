@@ -16,6 +16,10 @@ info () {
     echo "$*" 1>&2
 }
 
+warning () {
+    echo "warning: $*" 1>&2
+}
+
 usage () {
     info "usage: $0 [-p <pattern>] [-I <ignore-list>] -o <output> <inputs>"
     exit ${1:-1}
@@ -27,7 +31,7 @@ emit () {
 
 
 # set up defaults
-PATTERN="^mrp_"                       # export everything prefixed with mrp_
+PATTERN="^mrp_|^_mrp_"                # export everything prefixed with mrp_
 IGNORE="MRP_PRINTF_LIKE,MRP_NULLTERM" # ignore these symbols/macros
 IT=","                                # ignore-list is comma-separated
 SOURCES=""                            # no default input, must be specified
@@ -78,8 +82,12 @@ if [ -z "$OUTPUT" ]; then
 fi
 
 if [ -z "$SOURCES" ]; then
-    error "No input files specified."
-    usage
+    warning "No input files, generating local-only linker script."
+    emit "{"
+    emit "    local:"
+    emit "        *;"
+    emit "};"
+    exit 0
 fi
 
 if [ -z "$PATTERN" ]; then
