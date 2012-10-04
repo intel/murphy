@@ -209,7 +209,7 @@ int mrp_msg_set(mrp_msg_t *msg, uint16_t tag, ...);
 int mrp_msg_iterate(mrp_msg_t *msg, void **it, uint16_t *tagp,
                     uint16_t *typep, mrp_msg_value_t *valp, size_t *sizep);
 
-/** Iterate through the matching fields of a message. You should not  delete
+/** Iterate through the matching fields of a message. You should not delete
  * any of the fields while iterating through the message. */
 int mrp_msg_iterate_matching(mrp_msg_t *msg, void **it, uint16_t *tagp,
                              uint16_t *typep, mrp_msg_value_t *valp,
@@ -220,6 +220,9 @@ mrp_msg_field_t *mrp_msg_find(mrp_msg_t *msg, uint16_t tag);
 
 /** Get the given fields (with matching tags and types) from the message. */
 int mrp_msg_get(mrp_msg_t *msg, ...) MRP_NULLTERM;
+
+/** Iterate through the message getting the given fields. */
+int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...);
 
 /** Dump a message. */
 int mrp_msg_dump(mrp_msg_t *msg, FILE *fp);

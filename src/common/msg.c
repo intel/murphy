@@ -585,6 +585,123 @@ int mrp_msg_get(mrp_msg_t *msg, ...)
 }
 
 
+int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
+{
+#define HANDLE_TYPE(_type, _member)                       \
+    case MRP_MSG_FIELD_##_type:                           \
+        valp          = va_arg(ap, typeof(valp));         \
+        valp->_member = f->_member;                       \
+        break
+
+#define HANDLE_ARRAY(_type, _member)                      \
+    case MRP_MSG_FIELD_##_type:                           \
+        cntp          = va_arg(ap, typeof(cntp));         \
+        valp          = va_arg(ap, typeof(valp));         \
+        *cntp         = f->size[0];                       \
+        valp->_member = f->_member;                       \
+        break
+
+
+    mrp_msg_field_t *f;
+    mrp_msg_value_t *valp;
+    uint32_t        *cntp;
+    mrp_list_hook_t *start, *p;
+    uint16_t         tag, type;
+    int              found;
+    va_list          ap;
+
+    va_start(ap, it);
+
+    /*
+     * Okay... this might look a bit weird at first sight. This is
+     * mostly because we don't use the standard list iterating macros
+     * in the inner loop. There is a good reason for that: we want to
+     * minimise the number of times we scan the message which is just
+     * a linked list of fields. We do this by arranging the nested
+     * loops below in such a way that if the order of fields to fetch
+     * in the argument list matches the order of fields in the message
+     * we end up running the outer and inner loops in a 'phase lock'.
+     * So if the caller fetches the fields in the correct order we end
+     * up scanning the message at most once but only up to the last
+     * field to fetch.
+     */
+
+    start = (*it) ? (mrp_list_hook_t *)*it : msg->fields.next;
+
+    while ((tag = va_arg(ap, unsigned int)) != MRP_MSG_FIELD_INVALID) {
+        type  = va_arg(ap, unsigned int);
+        found = FALSE;
+
+        for (p = start; p != start->prev; p = p->next) {
+            if (p == &msg->fields)
+                continue;
+
+            f = mrp_list_entry(p, typeof(*f), hook);
+
+            if (f->tag != tag)
+                continue;
+
+            if (f->type != type)
+                goto out;
+
+            switch (type) {
+                HANDLE_TYPE(STRING, str);
+                HANDLE_TYPE(BOOL  , bln);
+                HANDLE_TYPE(UINT8 , u8 );
+                HANDLE_TYPE(SINT8 , s8 );
+                HANDLE_TYPE(UINT16, u16);
+                HANDLE_TYPE(SINT16, s16);
+                HANDLE_TYPE(UINT32, u32);
+                HANDLE_TYPE(SINT32, s32);
+                HANDLE_TYPE(UINT64, u64);
+                HANDLE_TYPE(SINT64, s64);
+                HANDLE_TYPE(DOUBLE, dbl);
+            default:
+                if (type & MRP_MSG_FIELD_ARRAY) {
+                    switch (type & ~MRP_MSG_FIELD_ARRAY) {
+                        HANDLE_ARRAY(STRING, astr);
+                        HANDLE_ARRAY(BOOL  , abln);
+                        HANDLE_ARRAY(UINT8 , au8 );
+                        HANDLE_ARRAY(SINT8 , as8 );
+                        HANDLE_ARRAY(UINT16, au16);
+                        HANDLE_ARRAY(SINT16, as16);
+                        HANDLE_ARRAY(UINT32, au32);
+                        HANDLE_ARRAY(SINT32, as32);
+                        HANDLE_ARRAY(UINT64, au64);
+                        HANDLE_ARRAY(SINT64, as64);
+                        HANDLE_ARRAY(DOUBLE, adbl);
+                    default:
+                        goto out;
+
+                    }
+                }
+                else
+                    goto out;
+            }
+
+            start = p->next;
+            found = TRUE;
+            break;
+        }
+
+        if (!found)
+            break;
+    }
+
+ out:
+    va_end(ap);
+
+    if (found)
+        *it = start;
+
+    return found;
+
+#undef HANDLE_TYPE
+#undef HANDLE_ARRAY
+
+}
+
+
 static const char *field_type_name(uint16_t type)
 {
 #define BASIC(t, n) [MRP_MSG_FIELD_##t] = n
