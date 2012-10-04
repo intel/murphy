@@ -255,8 +255,10 @@ AC_ARG_WITH(dynamic-plugins,
             [  --with-dynamic-plugins=<plugin-list>  specify which plugins compile as DSOs],
             [dynamic_plugins=$withval],[dynamic_plugins=none])
 
-all_plugins=$(ls src/plugins/*.c 2>/dev/null | \
-              sed 's#src/plugins/plugin-##g;s#\.c$##g' | tr '\n' ' ')
+all_plugins=$(find src/plugins/. -name plugin-*.c 2>/dev/null | \
+              sed 's#^.*/plugin-##g;s#\.c$##g' | tr '\n' ' ')
+
+#echo "all plugins: [$all_plugins]"
 
 case dynamic_plugins in
     all)  dynamic_plugins="$all_plugins";;
@@ -313,17 +315,19 @@ function check_if_internal() {
     return 1
 }
 
-AM_CONDITIONAL(DISABLED_PLUGIN_TEST,    [check_if_disabled test])
-AM_CONDITIONAL(DISABLED_PLUGIN_DBUS,    [check_if_disabled dbus])
-AM_CONDITIONAL(DISABLED_PLUGIN_GLIB,    [check_if_disabled glib])
-AM_CONDITIONAL(DISABLED_PLUGIN_CONSOLE, [check_if_disabled console])
+AM_CONDITIONAL(DISABLED_PLUGIN_TEST,     [check_if_disabled test])
+AM_CONDITIONAL(DISABLED_PLUGIN_DBUS,     [check_if_disabled dbus])
+AM_CONDITIONAL(DISABLED_PLUGIN_GLIB,     [check_if_disabled glib])
+AM_CONDITIONAL(DISABLED_PLUGIN_CONSOLE,  [check_if_disabled console])
 AM_CONDITIONAL(DISABLED_PLUGIN_SIGNALLING, [check_if_disabled signalling])
+AM_CONDITIONAL(DISABLED_PLUGIN_DECISION, [check_if_disabled decision])
 
 AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,     [check_if_internal test])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,     [check_if_internal dbus])
 AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,     [check_if_internal glib])
 AM_CONDITIONAL(BUILTIN_PLUGIN_CONSOLE,  [check_if_internal console])
 AM_CONDITIONAL(BUILTIN_PLUGIN_SIGNALLING, [check_if_internal signalling])
+AM_CONDITIONAL(BUILTIN_PLUGIN_DECISION, [check_if_internal decision])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 
