@@ -45,6 +45,8 @@ const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf);
 const char **mrp_resource_definition_get_all_names(uint32_t buflen,
                                                    const char **buf);
 
+uint32_t mrp_resource_definition_get_resource_id_by_name(const char *name);
+
 mrp_attr_t *
 mrp_resource_definition_read_all_attributes(uint32_t resource_id,
                                             uint32_t buflen,

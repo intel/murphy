@@ -124,6 +124,17 @@ mrp_resource_def_t *mrp_resource_definition_find_by_name(const char *name)
     return NULL;
 }
 
+uint32_t mrp_resource_definition_get_resource_id_by_name(const char *name)
+{
+    mrp_resource_def_t *def = mrp_resource_definition_find_by_name(name);
+
+    if (!def) {
+        return MRP_RESOURCE_ID_INVALID;
+    }
+
+    return def->id;
+}
+
 mrp_resource_def_t *mrp_resource_definition_find_by_id(uint32_t id)
 {
     if (id < resource_def_count)
