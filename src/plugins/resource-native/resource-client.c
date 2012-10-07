@@ -780,8 +780,6 @@ static void acquire_resource_set_response(client_t *client, uint32_t seqno,
     int status;
     uint32_t rset_id;
 
-    MRP_UNUSED(seqno);
-
     if (!fetch_resource_set_id(msg, pcursor, &rset_id) ||
         !fetch_status(msg, pcursor, &status))
     {
@@ -789,10 +787,14 @@ static void acquire_resource_set_response(client_t *client, uint32_t seqno,
         return;
     }
 
-    if (status)
-        printf("\n%s of resource set failed. error code %u", op, status);
-    else
-        printf("\nSuccessful %s of resource set %u\n", op, status);
+    if (status) {
+        printf("\n%s of resource set %u failed. request no %u "
+               "error code %u", op, rset_id, seqno, status);
+    }
+    else {
+        printf("\nSuccessful %s of resource set %u. request no %u\n",
+               op, rset_id, seqno);
+    }
 
     client->prompt = true;
 
@@ -820,9 +822,7 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
     uint32_t mask;
     int cnt;
 
-    MRP_UNUSED(seqno);
-
-    printf("\nResource event:\n");
+    printf("\nResource event (request no %u):\n", seqno);
 
     if (!fetch_resource_set_id(msg, pcursor, &rset) ||
         !fetch_resource_set_state(msg, pcursor, &state) ||
@@ -1311,12 +1311,13 @@ static void create_resource_set(client_t   *client,
 #undef PUSH
 }
 
-static void acquire_resource_set(client_t *client, bool acquire)
+static uint32_t acquire_resource_set(client_t *client, bool acquire)
 {
 #define PUSH(msg, tag, typ, val) \
     mrp_msg_append(msg, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
 
     uint16_t   tag;
+    uint32_t   reqno;
     mrp_msg_t *req;
 
     if (!client || client->rset_id == INVALID_ID)
@@ -1327,7 +1328,7 @@ static void acquire_resource_set(client_t *client, bool acquire)
     else
         tag = RESPROTO_RELEASE_RESOURCE_SET;
 
-    req = create_request(client->seqno++, tag);
+    req = create_request((reqno = client->seqno++), tag);
 
     if (!PUSH(req, RESOURCE_SET_ID, UINT32, client->rset_id))
         mrp_msg_unref(req);
@@ -1337,6 +1338,8 @@ static void acquire_resource_set(client_t *client, bool acquire)
 
         send_message(client, req);
     }
+
+    return reqno;
 
 #undef PUSH
 }
@@ -1405,8 +1408,8 @@ static void parse_line(client_t *client, char *buf, int len)
             }
             else {
                 client->prompt = false;
-                printf("   acquiring resource set %u\n", client->rset_id);
-                acquire_resource_set(client, true);
+                printf("   acquiring resource set %u. request no %u\n",
+                       client->rset_id, acquire_resource_set(client, true));
             }
         }
         else if (!strcmp(p, "release")) {
@@ -1416,8 +1419,8 @@ static void parse_line(client_t *client, char *buf, int len)
             }
             else {
                 client->prompt = false;
-                printf("   releasing resource set %u\n", client->rset_id);
-                acquire_resource_set(client, false);
+                printf("   releasing resource set %u. request no %u\n",
+                       client->rset_id, acquire_resource_set(client, false));
             }
         }
         else {
