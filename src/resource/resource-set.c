@@ -62,6 +62,7 @@ uint32_t mrp_get_resource_set_count(void)
 }
 
 mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
+                                            bool auto_release,
                                             uint32_t priority,
                                             mrp_resource_event_cb_t event_cb,
                                             void *user_data)
@@ -79,6 +80,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
         mrp_log_error("Memory alloc failure. Can't create resource set");
     else {
         rset->id = ++our_id;
+        rset->auto_release = auto_release;
 
         mrp_list_init(&rset->resource.list);
         rset->resource.share = false;

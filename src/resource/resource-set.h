@@ -40,6 +40,7 @@ struct mrp_resource_set_s {
     mrp_list_hook_t                 list;
     uint32_t                        id;
     mrp_resource_state_t            state;
+    bool                            auto_release;
     struct {
         struct {
             mrp_resource_mask_t all;

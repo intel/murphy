@@ -545,6 +545,7 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
     uint32_t            rsid;
     int                 arst;
     int32_t             status;
+    bool                auto_release;
 
     MRP_ASSERT(client, "invalid argument");
     MRP_ASSERT(client->rscli, "confused with data structures");
@@ -580,7 +581,9 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
     mrp_log_info("resource-set flags:%u priority:%u class:'%s' zone:'%s'",
                  flags, priority, class, zone);
 
-    rset = mrp_resource_set_create(client->rscli, priority,
+    auto_release = (flags & RESPROTO_RSETFLAG_AUTORELEASE);
+
+    rset = mrp_resource_set_create(client->rscli, auto_release, priority,
                                    resource_event_handler, client);
     if (!rset)
         goto reply;

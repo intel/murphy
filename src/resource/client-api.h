@@ -58,6 +58,7 @@ int mrp_application_class_add_resource_set(const char *class_name,
                                            mrp_resource_set_t *resource_set);
 
 mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
+                                            bool auto_release,
                                             uint32_t priority,
                                             mrp_resource_event_cb_t event_cb,
                                             void *user_data);

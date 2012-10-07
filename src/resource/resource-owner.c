@@ -270,9 +270,13 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
             changed = false;
             replyid = (reqid == rset->request.id) ? reqid : 0;
 
+
             if (grant != rset->resource.mask.grant) {
                 rset->resource.mask.grant = grant;
                 changed = true;
+
+                if (!grant && rset->auto_release)
+                    rset->state = mrp_resource_release;
             }
 
             if (advice != rset->resource.mask.advice) {

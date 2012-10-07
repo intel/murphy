@@ -68,6 +68,7 @@ typedef struct {
     char *                class;
     char *                zone;
     char *                rsetd;
+    uint32_t              rsetf;
     resource_def_array_t *resources;
     string_array_t       *class_names;
     string_array_t       *zone_names;
@@ -1266,13 +1267,13 @@ static char *parse_resource(mrp_msg_t *msg, char *str, char *sep)
 static void create_resource_set(client_t   *client,
                                 const char *class,
                                 const char *zone,
-                                const char *def)
+                                const char *def,
+                                uint32_t    flags)
 {
 #define PUSH(msg, tag, typ, val) \
     mrp_msg_append(msg, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
 
     char  *buf;
-    uint32_t flags = 0;
     uint32_t priority = 0;
     mrp_msg_t *req;
     char *p;
@@ -1493,9 +1494,10 @@ static void sighandler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum,
 
 static void usage(client_t *client, int exit_code)
 {
-    printf("Usage: %s [-h] [-v] [class zone resources]\n\nwhere\n"
+    printf("Usage: %s [-h] [-v] [-a] [class zone resources]\n\nwhere\n"
            "\t-h\t\tprints this help\n"
            "\t-v\t\tverbose mode (dumps the transport messages)\n"
+           "\t-a\t\tautorelease mode\n"
            "\tclass\t\tapplication class of the resource set\n"
            "\tzone\t\tzone wher the resource set lives\n"
            "\tresources\tcomma separated list of resources. Each resource is\n"
@@ -1525,12 +1527,15 @@ static void parse_arguments(client_t *client, int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv, "hv")) != -1) {
+    while ((opt = getopt(argc, argv, "hva")) != -1) {
         switch (opt) {
         case 'h':
             usage(client, 0);
         case 'v':
             client->msgdump = true;
+            break;
+        case 'a':
+            client->rsetf |= RESPROTO_RSETFLAG_AUTORELEASE;
             break;
         default:
             usage(client, EINVAL);
@@ -1571,10 +1576,12 @@ int main(int argc, char **argv)
     init_transport(client, addr);
 
 
-    if (client->class && client->zone && client->rsetd)
-        create_resource_set(client, client->class,client->zone,client->rsetd);
-    else
+    if (!client->class || !client->zone || !client->rsetd)
         print_prompt(client, false);
+    else {
+        create_resource_set(client, client->class, client->zone,
+                            client->rsetd, client->rsetf);
+    }
 
     mrp_add_io_watch(client->ml, 0, MRP_IO_EVENT_IN, console_input, client);
 
