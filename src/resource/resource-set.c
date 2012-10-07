@@ -128,8 +128,10 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
         if (resource_set_count > 0)
             resource_set_count--;
 
-        if (state == mrp_resource_acquire)
-            mrp_resource_owner_update_zone(zoneid, MRP_RESOURCE_REQNO_INVALID);
+        if (state == mrp_resource_acquire) {
+            mrp_resource_owner_update_zone(zoneid, NULL,
+                                           MRP_RESOURCE_REQNO_INVALID);
+        }
     }
 }
 
@@ -275,7 +277,7 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
     rset->request.stamp = get_request_stamp();
     
     mrp_application_class_move_resource_set(rset);
-    mrp_resource_owner_update_zone(rset->zone, reqid);
+    mrp_resource_owner_update_zone(rset->zone, rset, reqid);
 }
 
 void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
@@ -292,7 +294,7 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
         rset->request.stamp = get_request_stamp();
 
         mrp_application_class_move_resource_set(rset);
-        mrp_resource_owner_update_zone(rset->zone, reqid);
+        mrp_resource_owner_update_zone(rset->zone, rset, reqid);
     }
 }
 

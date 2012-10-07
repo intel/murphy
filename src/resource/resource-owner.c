@@ -155,7 +155,9 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
 }
 
 
-void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
+void mrp_resource_owner_update_zone(uint32_t zoneid,
+                                    mrp_resource_set_t *reqset,
+                                    uint32_t reqid)
 {
     typedef struct {
         uint32_t replyid;
@@ -268,7 +270,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
             }
 
             changed = false;
-            replyid = (reqid == rset->request.id) ? reqid : 0;
+            replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
 
             if (grant != rset->resource.mask.grant) {
