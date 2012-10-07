@@ -602,43 +602,43 @@ plugin_signalling_ladir      = $(SIGNALLING_PLUGINdir)
 plugin_LTLIBRARIES    += plugin-signalling.la
 endif
 
-# resource plugin
-RESOURCE_PLUGIN_REGULAR_SOURCES = 			\
-		plugins/resource/plugin-resource.c
-RESOURCE_PLUGIN_SOURCES = 				\
-		$(RESOURCE_PLUGIN_REGULAR_SOURCES)	\
-                plugin-resource-func-info.c
-RESOURCE_PLUGIN_CFLAGS =				\
+# native resource plugin
+PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES = 				\
+		plugins/resource-native/plugin-resource-native.c
+PLUGIN_RESOURCE_NATIVE_SOURCES = 					\
+		$(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)		\
+                plugin-resource-native-func-info.c
+PLUGIN_RESOURCE_NATIVE_CFLAGS =						\
 		$(INCLUDES)
-RESOURCE_PLUGIN_LIBS =       				\
-		libmurphy-core.la			\
-		libmurphy-common.la			\
-		murphy-db/mqi/libmqi.la			\
-		murphy-db/mdb/libmdb.la			\
+PLUGIN_RESOURCE_NATIVE_LIBS =       					\
+		libmurphy-core.la					\
+		libmurphy-common.la					\
+		murphy-db/mqi/libmqi.la					\
+		murphy-db/mdb/libmdb.la					\
 		libmurphy-resource.la
 
-plugin_resource_la_SOURCES = $(RESOURCE_PLUGIN_SOURCES)
-plugin_resource_la_CFLAGS  = $(RESOURCE_PLUGIN_CFLAGS) \
-			     $(MURPHY_CFLAGS) $(AM_CFLAGS)
-plugin_resource_la_LDFLAGS = -module -avoid-version
-plugin_resource_la_LIBADD  = $(RESOURCE_PLUGIN_LIBS)
+plugin_resource_native_la_SOURCES = $(PLUGIN_RESOURCE_NATIVE_SOURCES)
+plugin_resource_native_la_CFLAGS  = $(PLUGIN_RESOURCE_NATIVE_CFLAGS)	\
+				    $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_resource_native_la_LDFLAGS = -module -avoid-version
+plugin_resource_native_la_LIBADD  = $(PLUGIN_RESOURCE_NATIVE_LIBS)
 
-plugin_LTLIBRARIES += plugin-resource.la
+plugin_LTLIBRARIES += plugin-resource-native.la
 
 # resource-client
 bin_PROGRAMS += resource-client
 
-resource_client_SOURCES = plugins/resource/resource-client.c
+resource_client_SOURCES = plugins/resource-native/resource-client.c
 resource_client_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
 resource_client_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la
 
 
 # debug file:line-function mapping generation
-plugin-resource-func-info.c: $(RESOURCE_PLUGIN_REGULAR_SOURCES)
+plugin-resource-native-func-info.c: $(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
 
 clean-func-infos::
-	-rm plugin-resource-func-info.c
+	-rm plugin-resource-native-func-info.c
 
 
 ###################################
