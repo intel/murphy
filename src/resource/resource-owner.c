@@ -263,7 +263,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     if (advice_ownership(owner, zone, class, rset, res))
                         advice |= ((mrp_resource_mask_t)1 << rid);
                 }
-                if (mandatory && (advice & mandatory) != mandatory)
+                if ((advice & mandatory) != mandatory)
                     advice = 0;
                 break;
 
