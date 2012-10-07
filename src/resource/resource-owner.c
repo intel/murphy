@@ -158,7 +158,7 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
 void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
 {
     typedef struct {
-        uint32_t reqid;
+        uint32_t replyid;
         mrp_resource_set_t *rset;
     } event_t;
 
@@ -179,6 +179,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
     uint32_t rid;
     uint32_t rcnt;
     bool changed;
+    uint32_t replyid;
     uint32_t nevent, maxev;
     event_t *events, *ev, *lastev;
 
@@ -267,6 +268,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
             }
 
             changed = false;
+            replyid = (reqid == rset->request.id) ? reqid : 0;
 
             if (grant != rset->resource.mask.grant) {
                 rset->resource.mask.grant = grant;
@@ -278,11 +280,11 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
                 changed = true;
             }
 
-            if (changed && rset->event) {
+            if ((replyid || changed) && rset->event) {
                 ev = events + nevent++;
 
-                ev->reqid = (reqid == rset->request.id) ? reqid : 0;
-                ev->rset  = rset;
+                ev->replyid = replyid;
+                ev->rset = rset;
             }
         } /* while rset */
     } /* while class */
@@ -291,7 +293,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid, uint32_t reqid)
 
     for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
         rset = ev->rset;
-        rset->event(ev->reqid, rset, rset->user_data);
+        rset->event(ev->replyid, rset, rset->user_data);
     }
 
     mrp_free(events);
