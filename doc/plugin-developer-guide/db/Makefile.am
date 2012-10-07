@@ -24,8 +24,14 @@ xmldir = $(MRP_DOCDIR)
 nodist_xml_DATA = $(TARGETS)
 
 
-all-am: $(TARGETS)
+all-am: $(TARGETS) copy_svg
 
+
+copy_svg:
+	for f in $(FIGURES_SVG) ; do \
+	    echo "  CP    $$f" ; \
+	    cp $(MRP_FIGDIR)/$$f . ; \
+	done 1>&2
 
 mql-grammar.xml: $(TOP_SRCDIR)/murphy-db/mql/mql-scanner.l \
                  $(TOP_SRCDIR)/murphy-db/mql/mql-parser.y
