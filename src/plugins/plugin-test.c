@@ -800,6 +800,8 @@ static int test_init(mrp_plugin_t *plugin)
 
     subscribe_events(plugin);
 
+    mqi_open();
+
     return !args[ARG_FAILINIT].bln;
 }
 
