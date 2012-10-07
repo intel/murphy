@@ -964,6 +964,8 @@ static int initiate_transport(mrp_plugin_t *plugin)
         return -1;
     }
 
+    mrp_log_info("%s: listening for connections on %s", plugin->instance,addr);
+
     return 0;
 }
 
@@ -1075,7 +1077,7 @@ static void resource_exit(mrp_plugin_t *plugin)
 #define RESOURCE_AUTHORS     "Janos Kovacs <jankovac503@gmail.com>"
 
 #define DEF_CONFIG_FILE      "/etc/murphy/resource.conf"
-#define DEF_ADDRESS          "tcp4:localhost:2012"
+#define DEF_ADDRESS          RESPROTO_DEFAULT_ADDRESS
 
 static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_CONFIG_FILE, STRING, "config-file", DEF_CONFIG_FILE),

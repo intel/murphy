@@ -35,6 +35,9 @@
 
 #include <murphy/common/msg.h>
 
+#define RESPROTO_DEFAULT_ADDRESS      "tcp4:127.0.0.1:3030"
+
+
 #define RESPROTO_BIT(n)               ((uint32_t)1 << (n))
 
 #define RESPROTO_RSETFLAG_AUTORELEASE RESPROTO_BIT(0)

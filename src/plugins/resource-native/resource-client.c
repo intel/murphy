@@ -1556,7 +1556,7 @@ static void parse_arguments(client_t *client, int argc, char **argv)
 int main(int argc, char **argv)
 {
     client_t *client = mrp_allocz(sizeof(client_t));
-    char     *addr = "tcp4:localhost:2012";
+    char     *addr = RESPROTO_DEFAULT_ADDRESS;
 
     mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_DEBUG));
     mrp_log_set_target(MRP_LOG_TO_STDOUT);
