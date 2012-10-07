@@ -226,7 +226,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     if (grant_ownership(owner, zone, class, rset, res))
                         grant |= ((mrp_resource_mask_t)1 << rid);
                 }
-                if (mandatory && (grant & mandatory) == mandatory)
+                if ((grant & mandatory) == mandatory)
                     advice = grant;
                 else {
                     /* rollback, ie. restore the backed up state */
@@ -247,8 +247,10 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                             advice |= mask;
                     }
 
-                    /* nothing is granted */
                     grant = 0;
+
+                    if ((advice & mandatory) != mandatory)
+                        advice = 0;
                 }
                 break;
 
@@ -259,7 +261,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     owner = get_owner(zoneid, rid);
 
                     if (advice_ownership(owner, zone, class, rset, res))
-                        advice |= ((uint32_t)1 << rid);
+                        advice |= ((mrp_resource_mask_t)1 << rid);
                 }
                 if (mandatory && (advice & mandatory) != mandatory)
                     advice = 0;
