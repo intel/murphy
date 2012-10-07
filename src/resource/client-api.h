@@ -55,7 +55,8 @@ const char **mrp_application_class_get_all_names(uint32_t buflen,
 
 int mrp_application_class_add_resource_set(const char *class_name,
                                            const char *zone_name,
-                                           mrp_resource_set_t *resource_set);
+                                           mrp_resource_set_t *resource_set,
+                                           uint32_t request_id);
 
 mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
                                             bool auto_release,

@@ -1321,7 +1321,7 @@ static uint32_t acquire_resource_set(client_t *client, bool acquire)
     mrp_msg_t *req;
 
     if (!client || client->rset_id == INVALID_ID)
-        return;
+        return 0;
 
     if (acquire)
         tag = RESPROTO_ACQUIRE_RESOURCE_SET;
@@ -1567,7 +1567,7 @@ int main(int argc, char **argv)
     client->name    = mrp_strdup(basename(argv[0]));
     client->ml      = mrp_mainloop_create();
     client->seqno   = 1;
-    client->prompt  = true;
+    client->prompt  = false;
     client->rset_id = INVALID_ID;
 
     parse_arguments(client, argc, argv);

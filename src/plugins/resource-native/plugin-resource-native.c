@@ -594,7 +594,7 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
         ;
 
     if (arst > 0) {
-        if (mrp_application_class_add_resource_set(class, zone, rset) == 0)
+        if (mrp_application_class_add_resource_set(class,zone,rset,seqno) == 0)
             status = 0;
     }
 

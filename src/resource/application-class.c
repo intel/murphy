@@ -241,7 +241,8 @@ const char **mrp_application_class_get_all_names(uint32_t buflen,
 
 int mrp_application_class_add_resource_set(const char *class_name,
                                            const char *zone_name,
-                                           mrp_resource_set_t *rset)
+                                           mrp_resource_set_t *rset,
+                                           uint32_t reqid)
 {
     mrp_application_class_t *class;
     mrp_zone_t *zone;
@@ -259,9 +260,11 @@ int mrp_application_class_add_resource_set(const char *class_name,
 
     rset->class.ptr = class;
     rset->zone = mrp_zone_get_id(zone);
+    rset->request.id = reqid;
 
     mrp_application_class_move_resource_set(rset);
-
+    mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+    
     return 0;
 }
 
