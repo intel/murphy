@@ -72,7 +72,7 @@ emit_murphy_loader () {
         emit "#include \"linkedin-$_p-loader.h\""
     done
     emit ""
-    emit "void mrp_load_linkedin_plugins(void)"
+    emit "int mrp_load_linkedin_plugins(void)"
     emit "{"
     emit "    return \\"
     for _p in $*; do
