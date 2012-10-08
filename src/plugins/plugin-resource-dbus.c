@@ -872,7 +872,8 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
     if (!rset->available_resources_prop)
         goto error;
 
-    rset->set = mrp_resource_set_create(rset->mgr->client, 0, event_cb, rset);
+    rset->set = mrp_resource_set_create(rset->mgr->client, 0, 0, event_cb,
+                rset);
 
     if (!rset->set) {
         mrp_log_error("Failed to create resource set");
@@ -1491,7 +1492,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
             mrp_application_class_add_resource_set(
                     (char *) rset->class_prop->value,
-                    rset->mgr->zone, rset->set);
+                    rset->mgr->zone, rset->set, 0);
         }
 
         mrp_resource_set_acquire(rset->set, 0);
