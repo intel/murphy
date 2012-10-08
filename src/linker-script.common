@@ -79,6 +79,7 @@
         mrp_msg_find_type;
         mrp_msg_get;
         mrp_msg_iterate;
+        mrp_msg_iterate_get;
         mrp_msg_iterate_matching;
         mrp_msg_prepend;
         mrp_msg_ref;
