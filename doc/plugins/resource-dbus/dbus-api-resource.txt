@@ -1,0 +1,76 @@
+D-Bus API for Murphy resource handling
+
+
+Service org.murphy
+
+Interface org.murphy.manager
+Path /org/murphy/resource
+
+methods:
+
+    dict getProperties()
+    ObjectPath createResourceSet()
+
+signals:
+
+    propertyChanged(String, Variant)
+
+properties:
+
+    RO [ObjectPath] resourceSets: default []
+
+
+
+Interface org.murphy.resourceset
+Path varies (from createResourceSet)
+
+methods:
+
+    dict getProperties()
+    void setProperty(String, Variant)
+    ObjectPath addResource(String)
+    void request()
+    void release()
+    void delete()
+
+signals:
+
+    propertyChanged(String, Variant)
+    updatedResources([ObjectPath]) # not yet implemented
+
+properties:
+
+    RW String class: default "default"
+    RO String status: default "pending"
+    RO [String] availableResources
+    RO [ObjectPath] resources: default []
+
+
+
+Interface org.murphy.resource
+Path varies (from addResource)
+
+methods:
+
+    dict getProperties()
+    void setProperty(String, Variant)
+    void delete()
+
+signals:
+
+    propertyChanged(String, Variant)
+
+properties:
+
+    RO String status: default "pending"
+    RO String name
+    RW Boolean mandatory
+    RW Boolean shared
+
+    RO dict attributes (string: variant) {
+        ... properties specified by resource type ...
+    }
+
+    RW dict conf (string: variant) {
+        ... properties specified by resource type ...
+    }
