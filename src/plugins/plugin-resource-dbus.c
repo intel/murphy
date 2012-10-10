@@ -692,8 +692,8 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
 {
     char buf[MAX_PATH_LENGTH];
     int ret;
-    char *name;
-    dbus_bool_t *mandatory, *shared;
+    char *name = NULL;
+    dbus_bool_t *mandatory = NULL, *shared = NULL;
 
     /* attribute handling */
     mrp_attr_t attr_buf[128];
@@ -715,10 +715,16 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     if (ret == MAX_PATH_LENGTH)
         goto error;
 
-    /* TODO: check */
     mandatory = mrp_allocz(sizeof(dbus_bool_t));
     shared = mrp_allocz(sizeof(dbus_bool_t));
     name = mrp_strdup(resource_name);
+
+    if (!mandatory || !shared || !name) {
+        mrp_free(mandatory);
+        mrp_free(shared);
+        mrp_free(name);
+        goto error;
+    }
 
     *mandatory = TRUE;
     *shared = FALSE;
@@ -735,21 +741,30 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
             RESOURCE_IFACE, "b", PROP_MANDATORY, mandatory, free_value);
     resource->mandatory_prop->writable = TRUE;
 
-    if (!resource->mandatory_prop)
+    if (!resource->mandatory_prop) {
+        mrp_free(mandatory);
+        mrp_free(shared);
+        mrp_free(name);
         goto error;
+    }
 
     resource->shared_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", PROP_SHARED, shared, free_value);
     resource->shared_prop->writable = TRUE;
 
-    if (!resource->shared_prop)
+    if (!resource->shared_prop) {
+        mrp_free(shared);
+        mrp_free(name);
         goto error;
+    }
 
     resource->name_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "s", PROP_NAME, name, free_value);
 
-    if (!resource->name_prop)
+    if (!resource->name_prop) {
+        mrp_free(name);
         goto error;
+    }
 
     resource->status_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "s", PROP_STATUS, "pending", NULL);
@@ -758,7 +773,6 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
         goto error;
 
     resource_id = mrp_resource_definition_get_resource_id_by_name(name);
-
 
     attrs = mrp_resource_definition_read_all_attributes(resource_id, 128,
             attr_buf);
@@ -894,7 +908,6 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
                 mrp_resource_definition_get_all_names(128,
                         (const char **) resbuf));
 
-    /* TODO: how to listen to the changes in available resources? */
     rset->available_resources_prop = create_property(rset->mgr->ctx,
             rset->path, RSET_IFACE, "as", PROP_AVAILABLE_RESOURCES,
             available_resources_arr, free_string_array);
@@ -1192,6 +1205,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             mrp_htbl_config_t map_conf;
             mrp_htbl_t *conf;
             int value_type;
+            int new_count = 0;
+            int old_count = 0;
 
             map_conf.comp = mrp_string_comp;
             map_conf.hash = mrp_string_hash;
@@ -1336,10 +1351,22 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
                 mrp_htbl_insert(conf, (void *) new_value->name, new_value);
 
+                new_count++;
                 dbus_message_iter_next(&a_iter);
             }
 
-            /* TODO: what about if not all properties were set? */
+            /* What about if not all properties were set? Maybe
+             * update_property should merge the old map with the new map.
+             * For now, just check the the size is the same. */
+
+            mrp_htbl_foreach(resource->conf_prop->value, count_keys_cb,
+                    &old_count);
+
+            if (old_count != new_count) {
+                mrp_htbl_destroy(conf, TRUE);
+                error_msg = "Value not specified for every attribute";
+                goto error_reply;
+            }
 
             update_property(resource->conf_prop, conf);
             update_property(resource->arguments_prop, conf);
