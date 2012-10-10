@@ -57,6 +57,34 @@
 #define MAX_DBUS_SIG_LENGTH 8
 
 
+#define MANAGER_CREATE_RESOURCE_SET "createResourceSet"
+#define MANAGER_GET_PROPERTIES      "getProperties"
+
+#define RSET_SET_PROPERTY           "setProperty"
+#define RSET_GET_PROPERTIES         "getProperties"
+#define RSET_ADD_RESOURCE           "addResource"
+#define RSET_REQUEST                "request"
+#define RSET_RELEASE                "release"
+#define RSET_DELETE                 "delete"
+
+#define RESOURCE_SET_PROPERTY       "setProperty"
+#define RESOURCE_GET_PROPERTIES     "getProperties"
+#define RESOURCE_DELETE             "delete"
+
+#define PROP_RESOURCE_SETS          "resourceSets"
+#define PROP_AVAILABLE_RESOURCES    "availableResources"
+#define PROP_NAME                   "name"
+#define PROP_SHARED                 "shared"
+#define PROP_MANDATORY              "mandatory"
+#define PROP_CLASS                  "class"
+#define PROP_RESOURCES              "resources"
+#define PROP_STATUS                 "status"
+#define PROP_ATTRIBUTES             "attributes"
+#define PROP_ATTRIBUTES_CONF        "attributes_conf"
+
+#define SIG_PROPERTYCHANGED         "propertyChanged"
+
+
 #define HAVE_TO_DEFINE_RESOURCES
 
 enum {
@@ -432,7 +460,7 @@ static void trigger_property_changed_signal(dbus_data_t *ctx,
     mrp_log_info("propertyChanged signal (%s)", prop->name);
 
     sig = dbus_message_new_signal(prop->path, prop->interface,
-            "propertyChanged");
+            SIG_PROPERTYCHANGED);
 
     dbus_message_iter_init_append(sig, &msg_iter);
 
@@ -518,11 +546,13 @@ static void destroy_resource(resource_o_t *resource)
     mrp_log_info("destroy resource %s", resource->path);
 
     mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
-            RSET_IFACE, "delete", resource_cb, resource->rset->mgr->ctx);
+            RSET_IFACE, RSET_DELETE, resource_cb, resource->rset->mgr->ctx);
     mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
-            RSET_IFACE, "setProperty", resource_cb, resource->rset->mgr->ctx);
+            RSET_IFACE, RSET_SET_PROPERTY, resource_cb,
+            resource->rset->mgr->ctx);
     mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
-            RSET_IFACE, "getProperties", resource_cb, resource->rset->mgr->ctx);
+            RSET_IFACE, RSET_GET_PROPERTIES, resource_cb,
+            resource->rset->mgr->ctx);
 
     destroy_property(resource->mandatory_prop);
     destroy_property(resource->shared_prop);
@@ -702,27 +732,27 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     conf = mrp_htbl_create(&map_conf);
 
     resource->mandatory_prop = create_property(rset->mgr->ctx, buf,
-            RESOURCE_IFACE, "b", "mandatory", mandatory, free_value);
+            RESOURCE_IFACE, "b", PROP_MANDATORY, mandatory, free_value);
     resource->mandatory_prop->writable = TRUE;
 
     if (!resource->mandatory_prop)
         goto error;
 
     resource->shared_prop = create_property(rset->mgr->ctx, buf,
-            RESOURCE_IFACE, "b", "shared", shared, free_value);
+            RESOURCE_IFACE, "b", PROP_SHARED, shared, free_value);
     resource->shared_prop->writable = TRUE;
 
     if (!resource->shared_prop)
         goto error;
 
     resource->name_prop = create_property(rset->mgr->ctx, buf,
-            RESOURCE_IFACE, "s", "name", name, free_value);
+            RESOURCE_IFACE, "s", PROP_NAME, name, free_value);
 
     if (!resource->name_prop)
         goto error;
 
     resource->status_prop = create_property(rset->mgr->ctx, buf,
-            RESOURCE_IFACE, "s", "status", "pending", NULL);
+            RESOURCE_IFACE, "s", PROP_STATUS, "pending", NULL);
 
     if (!resource->status_prop)
         goto error;
@@ -747,10 +777,10 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     }
 
     resource->conf_prop = create_property(rset->mgr->ctx, buf,
-            RESOURCE_IFACE, "a{sv}", "attributes_conf", conf, free_map);
+            RESOURCE_IFACE, "a{sv}", PROP_ATTRIBUTES_CONF, conf, free_map);
 
     resource->arguments_prop = create_property(rset->mgr->ctx, buf,
-            RESOURCE_IFACE, "a{sv}", "attributes", conf, NULL);
+            RESOURCE_IFACE, "a{sv}", PROP_ATTRIBUTES, conf, NULL);
 
     resource->path = mrp_strdup(buf);
     resource->rset = rset;
@@ -773,17 +803,17 @@ static void destroy_rset(resource_set_o_t *rset)
     mrp_log_info("destroy rset %s", rset->path);
 
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, "delete", rset_cb, rset->mgr->ctx);
+            RSET_IFACE, RSET_DELETE, rset_cb, rset->mgr->ctx);
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, "release", rset_cb, rset->mgr->ctx);
+            RSET_IFACE, RSET_RELEASE, rset_cb, rset->mgr->ctx);
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, "request", rset_cb, rset->mgr->ctx);
+            RSET_IFACE, RSET_REQUEST, rset_cb, rset->mgr->ctx);
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, "addResource", rset_cb, rset->mgr->ctx);
+            RSET_IFACE, RSET_ADD_RESOURCE, rset_cb, rset->mgr->ctx);
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, "setProperty", rset_cb, rset->mgr->ctx);
+            RSET_IFACE, RSET_SET_PROPERTY, rset_cb, rset->mgr->ctx);
     mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, "getProperties", rset_cb, rset->mgr->ctx);
+            RSET_IFACE, RSET_GET_PROPERTIES, rset_cb, rset->mgr->ctx);
 
     if (rset->resources)
         mrp_htbl_destroy(rset->resources, TRUE);
@@ -842,20 +872,20 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
     resources_arr[0] = NULL;
 
     rset->resources_prop = create_property(rset->mgr->ctx, rset->path,
-            RSET_IFACE, "ao", "resources", resources_arr, free_string_array);
+            RSET_IFACE, "ao", PROP_RESOURCES, resources_arr, free_string_array);
 
     if (!rset->resources_prop)
         goto error;
 
     rset->class_prop = create_property(rset->mgr->ctx, rset->path,
-            RSET_IFACE, "s", "class", mrp_strdup("default"), free_value);
+            RSET_IFACE, "s", PROP_CLASS, mrp_strdup("default"), free_value);
     rset->class_prop->writable = TRUE;
 
     if (!rset->class_prop)
         goto error;
 
     rset->status_prop = create_property(rset->mgr->ctx, rset->path,
-            RSET_IFACE, "s", "status", "pending", NULL);
+            RSET_IFACE, "s", PROP_STATUS, "pending", NULL);
 
     if (!rset->status_prop)
         goto error;
@@ -866,7 +896,7 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
 
     /* TODO: how to listen to the changes in available resources? */
     rset->available_resources_prop = create_property(rset->mgr->ctx,
-            rset->path, RSET_IFACE, "as", "availableResources",
+            rset->path, RSET_IFACE, "as", PROP_AVAILABLE_RESOURCES,
             available_resources_arr, free_string_array);
 
     if (!rset->available_resources_prop)
@@ -1061,7 +1091,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     if (!resource)
         goto error_reply;
 
-    if (strcmp(member, "getProperties") == 0) {
+    if (strcmp(member, RESOURCE_GET_PROPERTIES) == 0) {
         DBusMessageIter msg_iter;
         DBusMessageIter array_iter;
 
@@ -1089,7 +1119,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "setProperty") == 0) {
+    else if (strcmp(member, RESOURCE_SET_PROPERTY) == 0) {
         DBusMessageIter msg_iter;
         DBusMessageIter variant_iter;
 
@@ -1120,12 +1150,12 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         dbus_message_iter_recurse(&msg_iter, &variant_iter);
 
-        if (resource->rset->locked && strcmp(name, "conf") != 0) {
+        if (resource->rset->locked && strcmp(name, PROP_ATTRIBUTES_CONF) != 0) {
             error_msg = "Resource set cannot be changed after requesting";
             goto error_reply;
         }
 
-        if (strcmp(name, "mandatory") == 0) {
+        if (strcmp(name, PROP_MANDATORY) == 0) {
             dbus_bool_t value;
             dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
 
@@ -1140,7 +1170,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             *tmp = value;
             update_property(resource->mandatory_prop, tmp);
         }
-        else if (strcmp(name, "shared") == 0) {
+        else if (strcmp(name, PROP_SHARED) == 0) {
             dbus_bool_t value;
             dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
 
@@ -1155,7 +1185,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             *tmp = value;
             update_property(resource->shared_prop, tmp);
         }
-        else if (strcmp(name, "attributes_conf") == 0) {
+        else if (strcmp(name, PROP_ATTRIBUTES_CONF) == 0) {
             DBusMessageIter a_iter;
             DBusMessageIter d_iter;
             DBusMessageIter v_iter;
@@ -1334,7 +1364,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "delete") == 0) {
+    else if (strcmp(member, RESOURCE_DELETE) == 0) {
         mrp_log_info("Deleting resource %s", path);
 
         mrp_htbl_remove(rset->resources, (void *) path, TRUE);
@@ -1412,7 +1442,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         goto error;
     }
 
-    if (strcmp(member, "getProperties") == 0) {
+    if (strcmp(member, RSET_GET_PROPERTIES) == 0) {
         DBusMessageIter msg_iter;
         DBusMessageIter array_iter;
 
@@ -1440,7 +1470,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "addResource") == 0) {
+    else if (strcmp(member, RSET_ADD_RESOURCE) == 0) {
         const char *name;
 
         resource_o_t *resource;
@@ -1456,15 +1486,16 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             goto error_reply;
 
         if (!mrp_dbus_export_method(ctx->dbus, resource->path,
-                    RESOURCE_IFACE, "getProperties", resource_cb, ctx)) {
+                    RESOURCE_IFACE, RESOURCE_GET_PROPERTIES, resource_cb,
+                    ctx)) {
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, resource->path,
-                    RESOURCE_IFACE, "setProperty", resource_cb, ctx)) {
+                    RESOURCE_IFACE, RESOURCE_SET_PROPERTY, resource_cb, ctx)) {
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, resource->path,
-                    RESOURCE_IFACE, "delete", resource_cb, ctx)) {
+                    RESOURCE_IFACE, RESOURCE_DELETE, resource_cb, ctx)) {
             goto error_reply;
         }
 
@@ -1483,7 +1514,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "request") == 0) {
+    else if (strcmp(member, RSET_REQUEST) == 0) {
         mrp_log_info("Requesting rset %s", path);
 
         if (!rset->locked) {
@@ -1510,7 +1541,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "release") == 0) {
+    else if (strcmp(member, RSET_RELEASE) == 0) {
         mrp_log_info("Releasing rset %s", path);
 
         mrp_resource_set_release(rset->set, 0);
@@ -1523,7 +1554,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "delete") == 0) {
+    else if (strcmp(member, RSET_DELETE) == 0) {
         mrp_log_info("Deleting rset %s", path);
 
         mrp_htbl_remove(ctx->mgr->rsets, (void *) path, TRUE);
@@ -1537,7 +1568,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "setProperty") == 0) {
+    else if (strcmp(member, RSET_SET_PROPERTY) == 0) {
         DBusMessageIter msg_iter;
         DBusMessageIter variant_iter;
 
@@ -1569,7 +1600,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         dbus_message_iter_recurse(&msg_iter, &variant_iter);
 
-        if (strcmp(name, "class") == 0) {
+        if (strcmp(name, PROP_CLASS) == 0) {
             if (!dbus_message_iter_get_arg_type(&variant_iter)
                         == DBUS_TYPE_STRING) {
                 goto error_reply;
@@ -1620,7 +1651,7 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     mrp_log_info("Manager callback called -- member: '%s', path: '%s',"
             " interface: '%s'", member, path, iface);
 
-    if (strcmp(member, "getProperties") == 0) {
+    if (strcmp(member, MANAGER_GET_PROPERTIES) == 0) {
         DBusMessageIter msg_iter;
         DBusMessageIter array_iter;
 
@@ -1643,39 +1674,39 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         dbus_message_unref(reply);
     }
-    else if (strcmp(member, "createResourceSet") == 0) {
+    else if (strcmp(member, MANAGER_CREATE_RESOURCE_SET) == 0) {
         resource_set_o_t *rset = create_rset(ctx->mgr, ctx->mgr->next_id++);
 
         if (!rset)
             goto error_reply;
 
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
-                    RSET_IFACE, "getProperties", rset_cb, ctx)) {
+                    RSET_IFACE, RSET_GET_PROPERTIES, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
-                    RSET_IFACE, "setProperty", rset_cb, ctx)) {
+                    RSET_IFACE, RSET_SET_PROPERTY, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
-                    RSET_IFACE, "addResource", rset_cb, ctx)) {
+                    RSET_IFACE, RSET_ADD_RESOURCE, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
-                    RSET_IFACE, "request", rset_cb, ctx)) {
+                    RSET_IFACE, RSET_REQUEST, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
-                    RSET_IFACE, "release", rset_cb, ctx)) {
+                    RSET_IFACE, RSET_RELEASE, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
-                    RSET_IFACE, "delete", rset_cb, ctx)) {
+                    RSET_IFACE, RSET_DELETE, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
@@ -1717,10 +1748,10 @@ static void destroy_manager(manager_o_t *mgr)
         return;
 
     mrp_dbus_remove_method(mgr->ctx->dbus, MURPHY_PATH_BASE,
-            MANAGER_IFACE, "createResourceSet", mgr_cb, mgr->ctx);
+            MANAGER_IFACE, MANAGER_CREATE_RESOURCE_SET, mgr_cb, mgr->ctx);
 
     mrp_dbus_remove_method(mgr->ctx->dbus, MURPHY_PATH_BASE,
-            MANAGER_IFACE, "getProperties", mgr_cb, mgr->ctx);
+            MANAGER_IFACE, MANAGER_GET_PROPERTIES, mgr_cb, mgr->ctx);
 
     mrp_htbl_destroy(mgr->rsets, TRUE);
     destroy_property(mgr->rsets_prop);
@@ -1750,7 +1781,7 @@ static manager_o_t *create_manager(dbus_data_t *ctx)
     /* FIXME: duplication of code? */
 
     mgr->rsets_prop = create_property(ctx, MURPHY_PATH_BASE, MANAGER_IFACE,
-            "ao", "resourceSets", rset_arr, free_string_array);
+            "ao", PROP_RESOURCE_SETS, rset_arr, free_string_array);
 
     if (!mgr->rsets_prop)
         goto error;
@@ -1854,13 +1885,13 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
      */
 
     if (!mrp_dbus_export_method(ctx->dbus, MURPHY_PATH_BASE,
-                MANAGER_IFACE, "createResourceSet", mgr_cb, ctx)) {
+                MANAGER_IFACE, MANAGER_CREATE_RESOURCE_SET, mgr_cb, ctx)) {
        mrp_log_error("Failed to register manager object");
        goto error;
     }
 
     if (!mrp_dbus_export_method(ctx->dbus, MURPHY_PATH_BASE,
-                MANAGER_IFACE, "getProperties", mgr_cb, ctx)) {
+                MANAGER_IFACE, MANAGER_GET_PROPERTIES, mgr_cb, ctx)) {
        mrp_log_error("Failed to register manager object");
        goto error;
     }
