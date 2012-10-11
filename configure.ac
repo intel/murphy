@@ -88,11 +88,6 @@ AC_FUNC_MALLOC
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([clock_gettime memmove memset regcomp strcasecmp strchr strdup strrchr strtol strtoul])
 
-# Check for glib.
-PKG_CHECK_MODULES(GLIB, glib-2.0)
-AC_SUBST(GLIB_CFLAGS)
-AC_SUBST(GLIB_LIBS)
-
 # Check and enable extra compiler warnings if they are supported.
 AC_ARG_ENABLE(extra-warnings,
               [  --enable-extra-warnings enable extra compiler warnings],
@@ -260,8 +255,8 @@ AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_LIBS)
 
 # Set up murphy CFLAGS and LIBS.
-MURPHY_CFLAGS="$GLIB_CFLAGS $DBUS_CFLAGS"
-MURPHY_LIBS="$GLIB_LIBS $DBUS_LIBS"
+MURPHY_CFLAGS=""
+MURPHY_LIBS=""
 AC_SUBST(MURPHY_CFLAGS)
 AC_SUBST(MURPHY_LIBS)
 
