@@ -45,6 +45,7 @@
 
 #include <murphy/config.h>
 #include <murphy/common/macros.h>
+#include <murphy/common/log.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/mainloop.h>
 
@@ -84,6 +85,24 @@
 #define DEFAULT_RUNTIME 30                            /* run for 30 seconds */
 
 
+enum {
+    MAINLOOP_NATIVE,
+    MAINLOOP_PULSE,
+    MAINLOOP_ECORE,
+    MAINLOOP_GLIB
+};
+
+
+struct pulse_config_s;
+typedef struct pulse_config_s pulse_config_t;
+
+struct ecore_config_s;
+typedef struct ecore_config_s ecore_config_t;
+
+struct glib_config_s;
+typedef struct glib_config_s glib_config_t;
+
+
 
 typedef struct {
     int nio;
@@ -100,22 +119,30 @@ typedef struct {
     int         log_mask;
     const char *log_target;
 
-#ifdef PULSE_ENABLED
-    pa_mainloop     *pa_main;
-    pa_mainloop_api *pa;
-#endif
-#ifdef ECORE_ENABLED
-    int ecore;
-#endif
+    int         mainloop_type;
 
+    mrp_mainloop_t *ml;
+    pulse_config_t *pulse;
+    ecore_config_t *ecore;
+    glib_config_t  *glib;
 
     int nrunning;
     int runtime;
 } test_config_t;
 
 
+#include "mainloop-pulse-test.c"
+#include "mainloop-ecore-test.c"
+#include "mainloop-glib-test.c"
+
+
 static test_config_t cfg;
 
+
+static mrp_mainloop_t *mainloop_create(test_config_t *cfg);
+static void mainloop_run(test_config_t *cfg);
+static void mainloop_quit(test_config_t *cfg);
+static void mainloop_cleanup(test_config_t *cfg);
 
 
 /*
@@ -553,17 +580,7 @@ static void check_quit(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
 
     if (cfg.nrunning <= 0) {
         mrp_del_timer(timer);
-#ifdef PULSE_ENABLED
-        if (cfg.pa_main != NULL)
-            pa_mainloop_quit(cfg.pa_main, 0);
-        else
-#endif
-#ifdef ECORE_ENABLED
-            if (cfg.ecore)
-                ecore_main_loop_quit();
-            else
-#endif
-                mrp_mainloop_quit(ml, 0);
+        mainloop_quit(&cfg);
     }
 }
 
@@ -830,7 +847,7 @@ static void check_glib_io(void)
 
 
 /*
- * DBUS tests
+ * DBUS tests (quite a mess the whole shebang...)
  */
 
 #define DBUS_PATH   "/"
@@ -1052,6 +1069,8 @@ static void setup_dbus_client(mrp_mainloop_t *ml)
 
     if ((ml = dbus_test.ml = mrp_mainloop_create()) == NULL)
         fatal("failed to create mainloop");
+
+    cfg.ml = ml;
 
     if ((conn = dbus_test.conn = connect_to_dbus(NULL)) == NULL)
         fatal("failed to connect to DBUS");
@@ -1276,6 +1295,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 #ifdef ECORE_ENABLED
            "  -e, --ecore                    use ecore mainloop\n"
 #endif
+#ifdef GLIB_ENABLED
+           "  -g, --glib                     use glib mainloop\n"
+#endif
            "  -h, --help                     show help on usage\n",
            argv0);
 
@@ -1298,8 +1320,14 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 #else
 #   define ECORE_OPTION ""
 #endif
+#ifdef GLIB_ENABLED
+#    define GLIB_OPTION "g"
+#else
+#    define GLIB_OPTION ""
+#endif
 
-#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vdh"PULSE_OPTION""ECORE_OPTION
+#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vdh" \
+        PULSE_OPTION""ECORE_OPTION""GLIB_OPTION
     struct option options[] = {
         { "runtime"     , required_argument, NULL, 'r' },
         { "ios"         , required_argument, NULL, 'i' },
@@ -1310,10 +1338,13 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
         { "dbus-signals", required_argument, NULL, 'S' },
         { "dbus-methods", required_argument, NULL, 'M' },
 #ifdef PULSE_ENABLED
-        { "pulse-main"  , no_argument      , NULL, 'p' },
+        { "pulse"       , no_argument      , NULL, 'p' },
 #endif
 #ifdef ECORE_ENABLED
-        { "ecore-main"  , no_argument      , NULL, 'e' },
+        { "ecore"       , no_argument      , NULL, 'e' },
+#endif
+#ifdef GLIB_ENABLED
+        { "glib"        , no_argument      , NULL, 'g' },
 #endif
         { "log-level"   , required_argument, NULL, 'l' },
         { "log-target"  , required_argument, NULL, 'o' },
@@ -1388,18 +1419,19 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 
 #ifdef PULSE_ENABLED
         case 'p':
-            cfg->pa_main = pa_mainloop_new();
-            if (cfg->pa_main == NULL) {
-                mrp_log_error("Failed to create PulseAudio mainloop.");
-                exit(1);
-            }
-            cfg->pa = pa_mainloop_get_api(cfg->pa_main);
+            cfg->mainloop_type = MAINLOOP_PULSE;
             break;
 #endif
 
 #ifdef ECORE_ENABLED
         case 'e':
-            cfg->ecore = TRUE;
+            cfg->mainloop_type = MAINLOOP_ECORE;
+            break;
+#endif
+
+#ifdef GLIB_ENABLED
+        case 'g':
+            cfg->mainloop_type = MAINLOOP_GLIB;
             break;
 #endif
 
@@ -1441,63 +1473,113 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 }
 
 
-mrp_mainloop_t *mainloop_create(void)
+static mrp_mainloop_t *mainloop_create(test_config_t *cfg)
 {
-    mrp_mainloop_t *ml;
+    switch (cfg->mainloop_type) {
+    case MAINLOOP_NATIVE:
+        cfg->ml = mrp_mainloop_create();
+        break;
 
-#ifdef PULSE_ENABLED
-    if (cfg.pa != NULL)
-        ml = mrp_mainloop_pulse_get(cfg.pa);
-    else
-#endif
-#ifdef ECORE_ENABLED
-        if (cfg.ecore)
-            ml = mrp_mainloop_ecore_get();
-        else
-#endif
-            ml = mrp_mainloop_create();
+    case MAINLOOP_PULSE:
+        pulse_mainloop_create(cfg);
+        break;
 
-    return ml;
+    case MAINLOOP_ECORE:
+        ecore_mainloop_create(cfg);
+        break;
+
+    case MAINLOOP_GLIB:
+        glib_mainloop_create(cfg);
+        break;
+
+    default:
+        mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
+        exit(1);
+    }
+
+    if (cfg->ml == NULL) {
+        mrp_log_error("Failed to create mainloop.");
+        exit(1);
+    }
+
+    return cfg->ml;
 }
 
 
-void mainloop_run(mrp_mainloop_t *ml)
+static void mainloop_run(test_config_t *cfg)
 {
-#ifdef PULSE_ENABLED
-    if (cfg.pa != NULL) {
-        int retval;
+    switch (cfg->mainloop_type) {
+    case MAINLOOP_NATIVE:
+        mrp_mainloop_run(cfg->ml);
+        break;
 
-        pa_mainloop_run(cfg.pa_main, &retval);
-        mrp_log_info("PulseAudio mainloop exited with status %d.", retval);
+    case MAINLOOP_PULSE:
+        pulse_mainloop_run(cfg);
+        break;
+
+    case MAINLOOP_ECORE:
+        ecore_mainloop_run(cfg);
+        break;
+
+    case MAINLOOP_GLIB:
+        glib_mainloop_run(cfg);
+        break;
+
+    default:
+        mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
+        exit(1);
     }
-    else
-#endif
-#ifdef ECORE_ENABLED
-        if (cfg.ecore) {
-            ecore_main_loop_begin();
-            mrp_log_info("EFL/ecore mainloop exited.");
-        }
-        else
-#endif
-            mrp_mainloop_run(ml);
 }
 
 
-void mainloop_cleanup(mrp_mainloop_t *ml)
+static void mainloop_quit(test_config_t *cfg)
 {
-#ifdef PULSE_ENABLED
-    if (cfg.pa) {
-        mrp_mainloop_unregister(ml);
-        pa_mainloop_free(cfg.pa_main);
-    }
-    else
-#endif
-#ifdef ECORE_ENABLED
-        if (cfg.ecore)
-            mrp_mainloop_unregister(ml);
-#endif
+    switch (cfg->mainloop_type) {
+    case MAINLOOP_NATIVE:
+        mrp_mainloop_quit(cfg->ml, 0);
+        break;
 
-    mrp_mainloop_destroy(ml);
+    case MAINLOOP_PULSE:
+        pulse_mainloop_quit(cfg);
+        break;
+
+    case MAINLOOP_ECORE:
+        ecore_mainloop_quit(cfg);
+        break;
+
+    case MAINLOOP_GLIB:
+        glib_mainloop_quit(cfg);
+        break;
+
+    default:
+        mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
+        exit(1);
+    }
+}
+
+
+void mainloop_cleanup(test_config_t *cfg)
+{
+    switch (cfg->mainloop_type) {
+    case MAINLOOP_NATIVE:
+        break;
+
+    case MAINLOOP_PULSE:
+        pulse_mainloop_cleanup(cfg);
+        break;
+
+    case MAINLOOP_ECORE:
+        ecore_mainloop_cleanup(cfg);
+        break;
+
+    case MAINLOOP_GLIB:
+        glib_mainloop_cleanup(cfg);
+        break;
+
+    default:
+        mrp_log_error("Unknown mainloop type (0x%x).", cfg->mainloop_type);
+        exit(1);
+    }
 }
 
 
@@ -1511,7 +1593,9 @@ int main(int argc, char *argv[])
     mrp_log_set_mask(cfg.log_mask);
     mrp_log_set_target(cfg.log_target);
 
-    if ((ml = mainloop_create()) == NULL)
+    ml = mainloop_create(&cfg);
+
+    if (ml == NULL)
         fatal("failed to create main loop.");
 
     setup_timers(ml);
@@ -1531,7 +1615,7 @@ int main(int argc, char *argv[])
     if (mrp_add_timer(ml, 1000, check_quit, NULL) == NULL)
         fatal("failed to create quit-check timer");
 
-    mainloop_run(ml);
+    mainloop_run(&cfg);
 
     check_io();
     check_timers();
@@ -1548,5 +1632,5 @@ int main(int argc, char *argv[])
     if (cfg.ngio > 0 || cfg.ngtimer > 0)
         glib_pump_cleanup();
 
-    mainloop_cleanup(ml);
+    mainloop_cleanup(&cfg);
 }

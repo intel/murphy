@@ -27,6 +27,10 @@ if ECORE_ENABLED
 mainloop_test_CFLAGS += $(ECORE_CFLAGS)
 mainloop_test_LDADD  += ../../libmurphy-ecore.la $(ECORE_LIBS)
 endif
+if GLIB_ENABLED
+mainloop_test_CFLAGS += $(GLIB_CFLAGS)
+mainloop_test_LDADD  += ../../libmurphy-glib.la $(GLIB_LIBS)
+endif
 
 
 # msg test
