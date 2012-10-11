@@ -3,7 +3,7 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: murphy-pulse
+Name: murphy-ecore
 Description: Murphy policy framework, EFL/ecore mainloop glue library.
 Requires: murphy-common
 Version: @PACKAGE_VERSION@
