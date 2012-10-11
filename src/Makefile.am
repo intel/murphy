@@ -300,6 +300,47 @@ clean-linker-script::
 endif
 
 ###################################
+# murphy glib glue library
+#
+
+if GLIB_ENABLED
+lib_LTLIBRARIES += libmurphy-glib.la
+EXTRA_DIST      += common/murphy-glib.pc
+pkgconfig_DATA  += common/murphy-glib.pc
+
+libmurphy_glib_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_glib_la_HEADERS =		\
+		common/glib-glue.h
+
+libmurphy_glib_la_SOURCES =		\
+		common/glib-glue.c
+
+libmurphy_glib_la_CFLAGS  =		\
+		$(AM_CFLAGS)		\
+		$(GLIB_CFLAGS)
+
+libmurphy_glib_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.glib \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_glib_la_LIBADD  =
+
+libmurphy_glib_la_DEPENDENCIES = linker-script.glib
+
+libglibincludedir      = $(includedir)/murphy/glib
+libglibinclude_HEADERS = $(libmurphy_glib_la_HEADERS)
+
+# linker script generation
+linker-script.glib: $(libmurphy_glib_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.glib
+endif
+
+###################################
 # murphy resolver library
 #
 
@@ -521,6 +562,7 @@ endif
 endif
 endif
 
+if GLIB_ENABLED
 # glib plugin
 GLIB_PLUGIN_SOURCES = plugins/plugin-glib.c
 GLIB_PLUGIN_CFLAGS  = $(GLIB_CFLAGS)
@@ -538,6 +580,7 @@ plugin_glib_la_LDFLAGS = -module -avoid-version
 plugin_glib_la_LIBADD  = $(GLIB_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-glib.la
+endif
 endif
 endif
 

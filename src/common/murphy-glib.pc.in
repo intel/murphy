@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: murphy-glib
+Description: Murphy policy framework, GLIB mainloop glue library.
+Requires: murphy-common
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lmurphy-glib @GLIB_LIBS@
+Cflags: -I${includedir} @GLIB_CFLAGS@

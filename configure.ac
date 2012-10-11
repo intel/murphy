@@ -200,6 +200,31 @@ AC_SUBST(ECORE_ENABLED)
 AC_SUBST(ECORE_CFLAGS)
 AC_SUBST(ECORE_LIBS)
 
+# Check if glib mainloop support was enabled.
+AC_ARG_ENABLE(glib,
+              [  --enable-glib          enable glib mainloop support],
+	      [enable_glib=$enableval], [enable_glib=auto])
+
+if test "$enable_glib" != "no"; then
+    PKG_CHECK_MODULES(GLIB, glib-2.0,
+                      [have_glib=yes], [have_glib=no])
+    if test "$have_glib" = "no" -a "$enable_glib" != "yes"; then
+        AC_MSG_ERROR([glib development libraries not found.])
+    fi
+
+    enable_glib="$have_glib"
+else
+    AC_MSG_NOTICE([glib mainloop support is disabled.])
+fi
+
+if test "$enable_glib" = "yes"; then
+    AC_DEFINE([GLIB_ENABLED], 1, [Enable glib mainloop support ?])
+fi
+AM_CONDITIONAL(GLIB_ENABLED, [test "$enable_glib" = "yes"])
+AC_SUBST(GLIB_ENABLED)
+AC_SUBST(GLIB_CFLAGS)
+AC_SUBST(GLIB_LIBS)
+
 # Check if building murphy-console was enabled.
 AC_ARG_ENABLE(console,
               [  --enable-console        build Murphy console],
@@ -421,6 +446,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-dbus.pc
 		 src/common/murphy-pulse.pc
 		 src/common/murphy-ecore.pc
+		 src/common/murphy-glib.pc
 		 src/core/murphy-core.pc
 		 src/murphy-db/Makefile
 		 src/murphy-db/mdb/Makefile
@@ -445,6 +471,7 @@ echo "Extra C warnings flags: $WARNING_CFLAGS"
 echo "D-Bus support: $enable_dbus"
 echo "PulseAudio mainloop support: $enable_pulse"
 echo "EFL/ecore mainloop support: $enable_ecore"
+echo "glib mainloop support: $enable_glib"
 echo "Murphy console plugin and client: $enable_console"
 echo "Plugins:"
 echo "  - linked-in:"
