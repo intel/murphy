@@ -614,6 +614,14 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
     mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
         rset->path, grant, advice);
 
+    if (!rset->set) {
+        /* We haven't yet returned from the create_set call, and this is before
+         * acquiring the set. Filter out! */
+        mrp_log_info("Filtering out the event");
+
+        return;
+    }
+
     /* the resource API is bit awkward here */
 
     while ((resource = mrp_resource_set_iterate_resources(set, &iter))) {
