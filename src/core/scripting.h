@@ -204,7 +204,7 @@ struct mrp_scriptlet_s {
 };
 
 /** Create a scriptlet of the given type and source. */
-mrp_scriptlet_t *mrp_create_script(char *type, const char *source);
+mrp_scriptlet_t *mrp_create_script(const char *type, const char *source);
 
 /** Destroy the given scriptlet, freeing all of its resources. */
 void mrp_destroy_script(mrp_scriptlet_t *script);

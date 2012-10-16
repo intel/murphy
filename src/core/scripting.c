@@ -134,7 +134,7 @@ mrp_interpreter_t *mrp_lookup_interpreter(const char *name)
 }
 
 
-mrp_scriptlet_t *mrp_create_script(char *type, const char *source)
+mrp_scriptlet_t *mrp_create_script(const char *type, const char *source)
 {
     mrp_interpreter_t *i;
     mrp_scriptlet_t   *s;
