@@ -89,6 +89,25 @@ void mrp_resolver_destroy(mrp_resolver_t *r)
 }
 
 
+int mrp_resolver_add_target(mrp_resolver_t *r, const char *target,
+                            const char **depend, int ndepend,
+                            const char *script_type,
+                            const char *script_source)
+{
+    return (create_target(r, target, depend, ndepend,
+                          script_type, script_source) == 0);
+}
+
+
+int mrp_resolver_add_alias(mrp_resolver_t *r, const char *target,
+                           const char *alias)
+{
+    const char *depend[1] = { target };
+
+    return (create_target(r, alias, depend, 1, NULL, NULL) == 0);
+}
+
+
 int mrp_resolver_update_targetl(mrp_resolver_t *r, const char *target, ...)
 {
     const char         *name;

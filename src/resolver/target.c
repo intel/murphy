@@ -47,53 +47,23 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
 {
     mrp_list_hook_t *lp, *ln;
     yy_res_target_t *pt;
-    target_t        *t;
-    int              auto_update, i;
+    int              auto_update;
 
     auto_update = -1;
     r->ntarget  = 0;
     r->targets  = NULL;
 
     mrp_list_foreach(&parser->targets, lp, ln) {
-        if (!mrp_reallocz(r->targets, r->ntarget * sizeof(*r->targets),
-                          (r->ntarget + 1) * sizeof(*r->targets)))
+        pt = mrp_list_entry(lp, typeof(*pt), hook);
+
+        if (create_target(r, pt->name, (const char **)pt->depends, pt->ndepend,
+                          pt->script_type, pt->script_source) != 0)
+
             return -1;
 
-        pt = mrp_list_entry(lp, typeof(*pt), hook);
-        t  = r->targets + r->ntarget;
-        r->ntarget++;
-
-        t->name     = pt->name;
-        pt->name    = NULL;
-        t->depends  = pt->depends;
-        t->ndepend  = pt->ndepend;
-        pt->depends = NULL;
-        pt->ndepend = 0;
-
-        if (pt->script_source != NULL) {
-            t->script = mrp_create_script(pt->script_type, pt->script_source);
-
-            if (t->script == NULL) {
-                if (errno == ENOENT)
-                    mrp_log_error("Unsupported script type '%s' used in "
-                                  "target '%s'.", pt->script_type, t->name);
-                else
-                    mrp_log_error("Failed to set up script for target '%s'.",
-                                  t->name);
-
-                return -1;
-            }
-        }
-
-        for (i = 0; i < t->ndepend; i++) {
-            if (*t->depends[i] == '$')
-                if (!create_fact(r, t->depends[i]))
-                    return -1;
-        }
-
         if (parser->auto_update != NULL) {
-            if (!strcmp(parser->auto_update, t->name))
-                auto_update = t - r->targets;
+            if (!strcmp(parser->auto_update, pt->name))
+                auto_update = r->ntarget - 1;
         }
     }
 
@@ -112,23 +82,30 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
 }
 
 
+static void purge_target(target_t *t)
+{
+    int i;
+
+    mrp_free(t->name);
+    mrp_free(t->update_facts);
+    mrp_free(t->update_targets);
+    mrp_free(t->fact_stamps);
+
+    for (i = 0; i < t->ndepend; i++)
+        mrp_free(t->depends[i]);
+    mrp_free(t->depends);
+
+    mrp_destroy_script(t->script);
+}
+
+
 void destroy_targets(mrp_resolver_t *r)
 {
     target_t *t;
-    int       i, j;
+    int       i;
 
-    for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
-        mrp_free(t->name);
-        mrp_free(t->update_facts);
-        mrp_free(t->update_targets);
-        mrp_free(t->fact_stamps);
-
-        for (j = 0; j < t->ndepend; j++)
-            mrp_free(t->depends[j]);
-        mrp_free(t->depends);
-
-        mrp_destroy_script(t->script);
-    }
+    for (i = 0, t = r->targets; i < r->ntarget; i++, t++)
+        purge_target(t);
 
     mrp_free(r->targets);
 
@@ -136,6 +113,84 @@ void destroy_targets(mrp_resolver_t *r)
         mrp_del_deferred(r->auto_scheduled);
         r->auto_scheduled = NULL;
     }
+}
+
+
+int create_target(mrp_resolver_t *r, const char *target,
+                  const char **depends, int ndepend,
+                  const char *script_type, const char *script_source)
+{
+    target_t *t;
+    size_t    old_size, new_size;
+    int       i;
+
+    for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
+        if (!strcmp(t->name, target)) {
+            errno = EEXIST;
+            return -1;
+        }
+    }
+
+    old_size = sizeof(*r->targets) *  r->ntarget;
+    new_size = sizeof(*r->targets) * (r->ntarget + 1);
+
+    if (!mrp_reallocz(r->targets, old_size, new_size))
+        return -1;
+
+    t       = r->targets + r->ntarget++;
+    t->name = mrp_strdup(target);
+
+    if (t->name == NULL)
+        goto undo_and_fail;
+
+    if (depends != NULL) {
+        t->depends = mrp_allocz_array(char *, ndepend);
+
+        if (t->depends != NULL) {
+            for (i = 0; i < ndepend; i++) {
+                t->depends[i] = mrp_strdup(depends[i]);
+
+                if (t->depends[i] == NULL)
+                    goto undo_and_fail;
+            }
+
+            t->ndepend = ndepend;
+        }
+        else
+            goto undo_and_fail;
+    }
+
+    for (i = 0; i < t->ndepend; i++) {
+        if (*t->depends[i] == '$')
+            if (!create_fact(r, t->depends[i]))
+                goto undo_and_fail;
+    }
+
+    if (script_source != NULL) {
+        t->script = mrp_create_script(script_type, script_source);
+
+        if (t->script == NULL) {
+            if (errno == ENOENT)
+                mrp_log_error("Unsupported script type '%s' used in "
+                              "target '%s'.", script_type, t->name);
+            else
+                mrp_log_error("Failed to set up script for target '%s'.",
+                              t->name);
+
+            goto undo_and_fail;
+        }
+    }
+
+    return 0;
+
+
+ undo_and_fail:
+    purge_target(t);
+    old_size = new_size;
+    new_size = old_size - 1;
+    mrp_reallocz(r->targets, old_size, new_size);
+
+    return -1;
 }
 
 

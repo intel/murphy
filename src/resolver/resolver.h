@@ -57,6 +57,16 @@ MRP_CDECL_BEGIN
 /** Parse the given resolver input file into a resolver context. */
 mrp_resolver_t *mrp_resolver_parse(mrp_context_t *ctx, const char *path);
 
+/** Add a new target with the given parameters to the resolver context. */
+int mrp_resolver_add_target(mrp_resolver_t *r, const char *target,
+                            const char **depend, int ndepend,
+                            const char *script_type,
+                            const char *script_source);
+
+/** Add an alias for the given target. */
+int mrp_resolver_add_alias(mrp_resolver_t *r, const char *target,
+                           const char *alias);
+
 /** Destroy the given resolver context, freeing all associated resources. */
 void mrp_resolver_destroy(mrp_resolver_t *r);
 
