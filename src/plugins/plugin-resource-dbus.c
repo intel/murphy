@@ -152,6 +152,7 @@ typedef struct {
 
     /* resource library */
     bool locked; /* if the library allows the settings to be changed */
+    bool acquired; /* set to true when we are starting the acquisition */
     mrp_resource_set_t *set;
 } resource_set_o_t;
 
@@ -614,9 +615,10 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
     mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
         rset->path, grant, advice);
 
-    if (!rset->set) {
+    if (!rset->set || !rset->acquired) {
         /* We haven't yet returned from the create_set call, and this is before
-         * acquiring the set. Filter out! */
+         * acquiring the set, or we haven't started the acquitision yet. Filter
+         * out! */
         mrp_log_info("Filtering out the event");
 
         return;
@@ -1561,6 +1563,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                     rset->mgr->zone, rset->set, 0);
         }
 
+        rset->acquired = TRUE;
         mrp_resource_set_acquire(rset->set, 0);
 
         /* Due to limitations in resource library, this resource set cannot
