@@ -89,6 +89,7 @@
 
 enum {
     ARG_DBUS_SERVICE,
+    ARG_DBUS_TRACK_CLIENTS,
 };
 
 typedef struct manager_o_s manager_o_t;
@@ -97,6 +98,7 @@ typedef struct {
     /* configuration */
     mrp_dbus_t *dbus;
     const char *addr;
+    bool tracking;
 
     /* resource management */
     manager_o_t *mgr;
@@ -140,6 +142,7 @@ struct manager_o_s {
 typedef struct {
     uint32_t next_id; /* next resource id */
     char *path;
+    char *owner;
 
     manager_o_t *mgr; /* backpointer */
 
@@ -172,6 +175,8 @@ typedef struct {
 static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
 static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
 static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
+static void dbus_name_cb(mrp_dbus_t *dbus, const char *name, int up,
+                          const char *owner, void *user_data);
 
 
 /* copy the keys in a hash map to a NULL-terminated array */
@@ -560,6 +565,8 @@ static void destroy_resource(resource_o_t *resource)
     destroy_property(resource->name_prop);
     destroy_property(resource->status_prop);
 
+    /* FIXME: resource library doesn't allow destroying resources? */
+
     mrp_free(resource->path);
 
     mrp_free(resource);
@@ -821,23 +828,27 @@ error:
 
 static void destroy_rset(resource_set_o_t *rset)
 {
+    dbus_data_t *ctx;
+
     if (!rset)
         return;
 
+    ctx = rset->mgr->ctx;
+
     mrp_log_info("destroy rset %s", rset->path);
 
-    mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, RSET_DELETE, rset_cb, rset->mgr->ctx);
-    mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, RSET_RELEASE, rset_cb, rset->mgr->ctx);
-    mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, RSET_REQUEST, rset_cb, rset->mgr->ctx);
-    mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, RSET_ADD_RESOURCE, rset_cb, rset->mgr->ctx);
-    mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, RSET_SET_PROPERTY, rset_cb, rset->mgr->ctx);
-    mrp_dbus_remove_method(rset->mgr->ctx->dbus, rset->path,
-            RSET_IFACE, RSET_GET_PROPERTIES, rset_cb, rset->mgr->ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_DELETE,
+            rset_cb, ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_RELEASE,
+            rset_cb, ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_REQUEST,
+            rset_cb, ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_ADD_RESOURCE,
+            rset_cb, ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_SET_PROPERTY,
+            rset_cb, ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE,
+            RSET_GET_PROPERTIES, rset_cb, ctx);
 
     if (rset->resources)
         mrp_htbl_destroy(rset->resources, TRUE);
@@ -847,23 +858,36 @@ static void destroy_rset(resource_set_o_t *rset)
     destroy_property(rset->resources_prop);
     destroy_property(rset->available_resources_prop);
 
+    if (ctx->tracking)
+        mrp_dbus_forget_name(ctx->dbus, rset->owner, dbus_name_cb, rset);
+
+    if (rset->set) {
+        mrp_resource_set_destroy(rset->set);
+        rset->set = NULL;
+    }
+
     mrp_free(rset->path);
+    mrp_free(rset->owner);
 
     mrp_free(rset);
 }
 
 
-static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
+static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
+            const char *sender)
 {
     char buf[64];
     char resbuf[128];
     int ret;
     mrp_htbl_config_t resources_conf;
-    resource_set_o_t *rset = mrp_allocz(sizeof(resource_set_o_t));
+    resource_set_o_t *rset;
     char **resources_arr;
     char **available_resources_arr;
 
-    MRP_UNUSED(mgr);
+    if (!sender)
+        goto error;
+
+    rset = mrp_allocz(sizeof(resource_set_o_t));
 
     if (!rset)
         goto error;
@@ -895,20 +919,20 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
         goto error;
     resources_arr[0] = NULL;
 
-    rset->resources_prop = create_property(rset->mgr->ctx, rset->path,
+    rset->resources_prop = create_property(mgr->ctx, rset->path,
             RSET_IFACE, "ao", PROP_RESOURCES, resources_arr, free_string_array);
 
     if (!rset->resources_prop)
         goto error;
 
-    rset->class_prop = create_property(rset->mgr->ctx, rset->path,
+    rset->class_prop = create_property(mgr->ctx, rset->path,
             RSET_IFACE, "s", PROP_CLASS, mrp_strdup("default"), free_value);
     rset->class_prop->writable = TRUE;
 
     if (!rset->class_prop)
         goto error;
 
-    rset->status_prop = create_property(rset->mgr->ctx, rset->path,
+    rset->status_prop = create_property(mgr->ctx, rset->path,
             RSET_IFACE, "s", PROP_STATUS, "pending", NULL);
 
     if (!rset->status_prop)
@@ -918,14 +942,23 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id)
                 mrp_resource_definition_get_all_names(128,
                         (const char **) resbuf));
 
-    rset->available_resources_prop = create_property(rset->mgr->ctx,
+    rset->available_resources_prop = create_property(mgr->ctx,
             rset->path, RSET_IFACE, "as", PROP_AVAILABLE_RESOURCES,
             available_resources_arr, free_string_array);
 
     if (!rset->available_resources_prop)
         goto error;
 
-    rset->set = mrp_resource_set_create(rset->mgr->client, 0, 0, event_cb,
+    rset->owner = mrp_strdup(sender);
+
+    if (!rset->owner)
+        goto error;
+
+    /* start following the owner */
+    if (mgr->ctx->tracking)
+        mrp_dbus_follow_name(mgr->ctx->dbus, rset->owner, dbus_name_cb, rset);
+
+    rset->set = mrp_resource_set_create(mgr->client, 0, 0, event_cb,
                 rset);
 
     if (!rset->set) {
@@ -941,6 +974,23 @@ error:
     }
 
     return NULL;
+}
+
+
+static void dbus_name_cb(mrp_dbus_t *dbus, const char *name, int up,
+                          const char *owner, void *user_data)
+{
+    mrp_log_info("dbus_name_cb: %s status %d, owner %s", name, up, owner);
+
+    MRP_UNUSED(dbus);
+
+    if (up == 0) {
+        /* a client that we've been tracking has just died */
+        resource_set_o_t *rset = user_data;
+        manager_o_t *mgr = rset->mgr;
+        mrp_htbl_remove(mgr->rsets, (void *) rset->path, TRUE);
+        update_property(mgr->rsets_prop, htbl_keys(mgr->rsets));
+    }
 }
 
 
@@ -1713,7 +1763,9 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         dbus_message_unref(reply);
     }
     else if (strcmp(member, MANAGER_CREATE_RESOURCE_SET) == 0) {
-        resource_set_o_t *rset = create_rset(ctx->mgr, ctx->mgr->next_id++);
+        const char *sender = dbus_message_get_sender(msg);
+        resource_set_o_t *rset = create_rset(ctx->mgr, ctx->mgr->next_id++,
+                sender);
 
         if (!rset)
             goto error_reply;
@@ -1896,6 +1948,7 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
 
     ctx->addr = args[ARG_DBUS_SERVICE].str;
     ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, "system", NULL);
+    ctx->tracking = args[ARG_DBUS_TRACK_CLIENTS].bln;
 
     if (ctx->dbus == NULL) {
         mrp_log_error("Failed to connect to D-Bus");
@@ -1967,11 +2020,11 @@ static void dbus_resource_exit(mrp_plugin_t *plugin)
 #define DBUS_RESOURCE_AUTHORS     "Ismo Puustinen <ismo.puustinen@intel.com>"
 
 /* TODO: more arguments needed, such as:
- *    - whether the D-Bus client processes need to be tracked
  *    - security settings?
  */
 static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_DBUS_SERVICE, STRING, "dbus_service", "org.Murphy"),
+    MRP_PLUGIN_ARGIDX(ARG_DBUS_TRACK_CLIENTS, BOOL, "dbus_track", TRUE),
 };
 
 
