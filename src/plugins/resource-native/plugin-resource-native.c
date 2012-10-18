@@ -977,25 +977,28 @@ static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
     mrp_plugin_arg_t *args   = plugin->args;
     resource_data_t  *data   = (resource_data_t *)plugin->data;
     const char       *event  = mrp_get_event_name(id);
+    uint16_t          tag    = MRP_PLUGIN_TAG_INSTANCE;
+    const char       *inst;
     const char       *cfgfile;
 
     MRP_UNUSED(w);
-    MRP_UNUSED(event_data);
-
 
     mrp_log_info("%s: got event 0x%x (%s):", plugin->instance, id, event);
 
     if (data && event) {
         if (!strcmp(event, MRP_PLUGIN_EVENT_STARTED)) {
-            cfgfile = args[ARG_CONFIG_FILE].str;
+            if (mrp_msg_get(event_data, MRP_MSG_TAG_STRING(tag, &inst),
+                            MRP_MSG_END) && !strcmp(inst, plugin->instance)) {
+                cfgfile = args[ARG_CONFIG_FILE].str;
 
-            set_default_configuration();
-            mrp_log_info("%s: built-in default configuration is in use",
-                         plugin->instance);
+                set_default_configuration();
+                mrp_log_info("%s: built-in default configuration is in use",
+                             plugin->instance);
 
-            initiate_transport(plugin);
+                initiate_transport(plugin);
 
-            return;
+                return;
+            }
         }
     }
 }
