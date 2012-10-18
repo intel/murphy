@@ -46,9 +46,8 @@ warning () {
 }
 
 usage () {
-    info "usage: $0 [-p <plugin>] [-l <plugin-list>] -o <output-file>"
     info "usage: $0 -p <plugin> -o <output-file>, or"
-    info "usage: $0 -o <output-file> <plugin-list>"
+    info "usage: $0 -o <output-file> -d <plugin-list>"
     exit ${1:-1}
 }
 
@@ -86,6 +85,7 @@ emit_murphy_loader () {
 OUTPUT=""
 PLUGIN=""
 PLUGIN_LIST=""
+daemon=no
 
 #echo "*** $0 $* ***"
 
@@ -102,7 +102,7 @@ while [ -n "${1#-}" ]; do
             fi
             ;;
         -p)
-            if [ -z "$PLUGIN" -a -z "$PLUGIN_LIST" ]; then
+            if [ -z "$PLUGIN" -a "$daemon" = "no" ]; then
                 shift
                 PLUGIN="$1"
             else
@@ -114,18 +114,29 @@ while [ -n "${1#-}" ]; do
                 usage
             fi
             ;;
+
         -h)
             usage 0
             ;;
 	-q)
 	    QUIET="yes"
 	    ;;
+        -d)
+            daemon=yes
+            ;;
+
         -*)
             error "Unknown option '$1'."
             usage
             ;;
+
         *)
-            PLUGIN_LIST="$PLUGIN_LIST $1"
+            if [ "$daemon" = "yes" ]; then
+                PLUGIN_LIST="$PLUGIN_LIST $1"
+            else
+                error "Unexpected argument '$1'."
+                usage
+            fi
             ;;
     esac
     shift
@@ -137,20 +148,15 @@ if [ -z "$OUTPUT" ]; then
     usage
 fi
 
-if [ -z "$PLUGIN" -a -z "$PLUGIN_LIST" ]; then
+if [ -z "$PLUGIN" -a "$daemon" = "no" ]; then
     error "Neither builtin plugin nor plugin list is specified."
-    usage
-fi
-
-if [ -n "$PLUGIN" -a -n "$PLUGIN_LIST" ]; then
-    error "Both builtin plugin and plugin list are specified."
     usage
 fi
 
 # generate the output
 rm -f $OUTPUT
 touch $OUTPUT
-if [ -n "$PLUGIN" ]; then
+if [ "$daemon" = "no" ]; then
     emit_plugin_loader $PLUGIN
 else
     emit_murphy_loader $PLUGIN_LIST
