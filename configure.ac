@@ -280,7 +280,7 @@ all_plugins=$(find src/plugins/. -name plugin-*.c 2>/dev/null | \
 
 #echo "all plugins: [$all_plugins]"
 
-case dynamic_plugins in
+case $dynamic_plugins in
     all)  dynamic_plugins="$all_plugins";;
     none) dynamic_plugins="";;
 esac
