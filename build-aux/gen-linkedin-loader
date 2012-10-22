@@ -57,9 +57,9 @@ emit () {
 
 emit_plugin_loader () {
     case $OUTPUT in
-        *.c) emit "int mrp_linkedin_plugin_$1_symbol = 0;"
+        *.c) emit "int mrp_linkedin_plugin_${1//-/_}_symbol = 0;"
              ;;
-        *.h) emit "extern int mrp_linkedin_plugin_$1_symbol;"
+        *.h) emit "extern int mrp_linkedin_plugin_${1//-/_}_symbol;"
              ;;
     esac
 }
@@ -75,7 +75,7 @@ emit_murphy_loader () {
     emit "{"
     emit "    return \\"
     for _p in $*; do
-        emit "        mrp_linkedin_plugin_${_p}_symbol + \\"
+        emit "        mrp_linkedin_plugin_${_p//-/_}_symbol + \\"
     done
     emit "        0;"
     emit "}"

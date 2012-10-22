@@ -842,7 +842,7 @@ linkedin-%-loader.h:
 load-linkedin-plugins.c:
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linkedin-loader \
 	    -o $@ -d $(shell echo $(LINKEDIN_PLUGINS) | \
-	                   sed 's/.*-//g;s/\.[^\.]*$$//g')
+	                   sed 's/.*plugin-//g;s/\.[^\.]*$$//g')
 
 clean-local::
 	-rm -f linkedin-*-loader.[hc] load-linkedin-plugins.c
