@@ -794,6 +794,91 @@ test_client_LDADD   = libmurphy-pep.la    \
 		      -lreadline
 endif
 
+# domain control plugin
+DOMAIN_CONTROL_PLUGIN_SOURCES = plugins/domain-control/plugin-domain-control.c \
+				plugins/domain-control/domain-control.c        \
+				plugins/domain-control/proxy.c		       \
+				plugins/domain-control/table.c                 \
+				plugins/domain-control/message.c               \
+				plugins/domain-control/notify.c
+
+DOMAIN_CONTROL_PLUGIN_CFLAGS  =
+DOMAIN_CONTROL_PLUGIN_LIBS    =
+
+if !DISABLED_PLUGIN_DOMAIN_CONTROL
+if BUILTIN_PLUGIN_DOMAIN_CONTROL
+LINKEDIN_PLUGINS             += libmurphy-plugin-domain-control.la
+lib_LTLIBRARIES              += libmurphy-plugin-domain-control.la
+DOMAIN_CONTROL_PLUGIN_LOADER  = linkedin-domain-control-loader.c
+DOMAIN_CONTROL_PLUGIN_CFLAGS += $(BUILTIN_CFLAGS)
+
+
+libmurphy_plugin_domain_control_ladir =				 \
+		$(includedir)/murphy/domain-control
+
+libmurphy_plugin_domain_control_la_SOURCES =			 \
+		$(DOMAIN_CONTROL_PLUGIN_SOURCES)		 \
+		$(DOMAIN_CONTROL_PLUGIN_LOADER)
+
+libmurphy_plugin_domain_control_la_CFLAGS =			 \
+		$(DOMAIN_CONTROL_PLUGIN_CFLAGS)			 \
+		$(AM_CFLAGS)
+
+libmurphy_plugin_domain_control_la_LDFLAGS =			 \
+		-Wl,-version-script=linker-script.domain-control \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_plugin_domain_control_la_LIBADD =		\
+		libmurphy-core.la   			\
+		libmurphy-common.la 			\
+		murphy-db/mql/libmql.la			\
+		murphy-db/mqi/libmqi.la			\
+		murphy-db/mdb/libmdb.la
+
+libmurphy_plugin_domain_control_la_DEPENDENCIES =	\
+		linker-script.domain-control		\
+		libmurphy-core.la			\
+		libmurphy-common.la			\
+		murphy-db/mql/libmql.la			\
+		murphy-db/mqi/libmqi.la			\
+		murphy-db/mdb/libmdb.la
+
+# linkedin domain control plugin linker script generation
+linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.domain-control
+else
+plugin_domain_control_la_SOURCES = $(DOMAIN_CONTROL_PLUGIN_SOURCES)
+plugin_domain_control_la_CFLAGS  = $(DOMAIN_CONTROL_PLUGIN_CFLAGS) \
+				   $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_domain_control_la_LDFLAGS = -module -avoid-version
+plugin_domain_control_la_LIBADD  = $(DOMAIN_CONTROL_PLUGIN_LIBS)
+plugin_LTLIBRARIES              += plugin-domain-control.la
+endif
+
+# domain controller client library
+lib_LTLIBRARIES                        += libmurphy-domain-controller.la
+libmurphy_domain_controller_la_SOURCES  = plugins/domain-control/client.c      \
+					  plugins/domain-control/table-common.c\
+					  plugins/domain-control/message.c
+libmurphy_domain_controller_la_CFLAGS   =
+libmurphy_domain_controller_la_LIBADD   = libmurphy-common.la     \
+					  murphy-db/mql/libmql.la \
+					  murphy-db/mqi/libmqi.la \
+					  murphy-db/mdb/libmdb.la
+
+# test domain controller
+bin_PROGRAMS += test-domain-controller
+
+test_domain_controller_SOURCES = plugins/domain-control/test-client.c
+test_domain_controller_CFLAGS  = $(AM_CFLAGS)
+test_domain_controller_LDADD   = libmurphy-domain-controller.la    \
+				 libmurphy-common.la \
+				 -lreadline
+endif
+
 ###################################
 # murphy daemon
 #
