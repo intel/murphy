@@ -106,6 +106,11 @@ fi
 
 AC_SUBST(WARNING_CFLAGS)
 
+# check for LUA
+PKG_CHECK_MODULES(LUA, lua >= 1.5.1)
+AC_SUBST(LUA_CFLAGS)
+AC_SUBST(LUA_LIBS)
+
 # Check if potentially GPL bits are allowed to be enabled.
 AC_ARG_ENABLE(gpl,
               [  --enable-gpl            enable linking against GPL code],
@@ -445,6 +450,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-ecore.pc
 		 src/common/murphy-glib.pc
 		 src/core/murphy-core.pc
+                 src/core/lua-utils/murphy-lua-utils.pc
 		 src/murphy-db/Makefile
 		 src/murphy-db/mdb/Makefile
 		 src/murphy-db/mqi/Makefile

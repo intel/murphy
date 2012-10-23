@@ -507,6 +507,59 @@ clean-linker-script::
 
 
 ###################################
+# murphy lua utilities
+#
+
+lib_LTLIBRARIES += libmurphy-lua-utils.la
+EXTRA_DIST      += core/lua-utils/murphy-lua-utils.pc
+pkgconfig_DATA  += core/lua-utils/murphy-lua-utils.pc
+
+libmurphy_lua_utils_ladir =					\
+		$(includedir)/murphy/core/lua-utils
+
+libmurphy_lua_utils_la_HEADERS =				\
+		core/lua-utils/strarray.h			\
+		core/lua-utils/funcbridge.h			\
+		core/lua-utils/object.h
+
+libmurphy_lua_utils_la_REGULAR_SOURCES =			\
+		core/lua-utils/strarray.c			\
+		core/lua-utils/funcbridge.c			\
+		core/lua-utils/object.c
+
+libmurphy_lua_utils_la_SOURCES =				\
+		$(libmurphy_lua_utils_la_REGULAR_SOURCES)	\
+		lua-utils-func-info.c
+
+libmurphy_lua_utils_la_CFLAGS =					\
+		$(AM_CFLAGS)					\
+		$(LUA_CFLAGS)
+
+libmurphy_lua_utils_la_LDFLAGS =				\
+		-Wl,-version-script=linker-script.lua-utils	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_lua_utils_la_LIBADD =	    				\
+		$(LUA_LIBS)
+
+libmurphy_lua_utils_la_DEPENDENCIES = linker-script.lua-utils
+
+# debug file:line-function mapping generation
+lua-utils-func-info.c: $(libmurphy_lua_utils_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm lua-utils-func-info.c
+
+# lua-utils linker script generation
+linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.lua-utils
+
+
+###################################
 # murphy plugins
 #
 
