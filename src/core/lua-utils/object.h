@@ -33,29 +33,49 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
-#define MRP_LUA_CLASSID_PREFIX             "LuaBook."
+#define MRP_LUA_CLASSID_ROOT              "LuaBook."
 
-#define MRP_LUA_CLASS(_name)               & _name ## _class_def
+#define MRP_LUA_CLASS(_name, _constr)     & _name ## _ ## _constr ## _class_def
+#define MRP_LUA_CLASS_SIMPLE(_name)       & _name ## _class_def
 
-#define MRP_LUA_METHOD_LIST(...)           { __VA_ARGS__  {NULL, NULL}}
+#define MRP_LUA_METHOD_LIST(...)          { __VA_ARGS__  {NULL, NULL}}
 
-#define MRP_LUA_METHOD(_name, _func)       { # _name, _func } ,
-#define MRP_LUA_METHOD_CONSTRUCTOR(_func)  { "new", _func } ,
+#define MRP_LUA_METHOD(_name, _func)      { # _name, _func } ,
+#define MRP_LUA_METHOD_CONSTRUCTOR(_func) { "new", _func } ,
 
-#define MRP_LUA_OVERRIDE_GETFIELD(_func)   { "__index", _func } ,
-#define MRP_LUA_OVERRIDE_SETFIELD(_func)   { "__newindex", _func } ,
-#define MRP_LUA_OVERRIDE_CALL(_func)       { "__call", _func } ,
+#define MRP_LUA_OVERRIDE_GETFIELD(_func)  { "__index", _func } ,
+#define MRP_LUA_OVERRIDE_SETFIELD(_func)  { "__newindex", _func } ,
+#define MRP_LUA_OVERRIDE_CALL(_func)      { "__call", _func } ,
+
+#define MRP_LUA_METHOD_LIST_TABLE(_name, ... ) \
+    static luaL_reg _name[] = {                \
+        __VA_ARGS__                            \
+        { NULL, NULL }                         \
+    }
+
 
 #define MRP_LUA_CLASS_DEF(_name, _constr, _type, _destr, _methods, _overrides)\
-    static luaL_reg   _name ## _class_methods[]   = _methods;           \
-    static luaL_reg   _name ## _class_overrides[] = _overrides;         \
+    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
+        .class_name    = # _name ,                                            \
+        .class_id      = MRP_LUA_CLASSID_ROOT # _name "_" # _constr,          \
+        .constructor   = # _name "." # _constr,                               \
+        .destructor    = _destr,                                              \
+        .userdata_id   = MRP_LUA_CLASSID_ROOT #_name "." #_constr ".userdata",\
+        .userdata_size = sizeof(_type),                                       \
+        .methods       = _methods,                                            \
+        .overrides     = _overrides                                           \
+    }
+
+#define MRP_LUA_CLASS_DEF_SIMPLE(_name, _type, _destr, _methods, _overrides) \
+    static luaL_reg _name ## _class_methods[]   = _methods;             \
+    static luaL_reg _name ## _class_overrides[] = _overrides;           \
                                                                         \
     static mrp_lua_classdef_t _name ## _class_def = {                   \
         .class_name    = # _name ,                                      \
-        .class_id      = MRP_LUA_CLASSID_PREFIX # _name,                \
-        .constructor   = # _name "." # _constr,                         \
+        .class_id      = MRP_LUA_CLASSID_ROOT # _name,                  \
+        .constructor   = # _name,                                       \
         .destructor    = _destr,                                        \
-        .userdata_id   = MRP_LUA_CLASSID_PREFIX # _name ".userdata",    \
+        .userdata_id   = MRP_LUA_CLASSID_ROOT # _name ".userdata",      \
         .userdata_size = sizeof(_type),                                 \
         .methods       = _name ## _class_methods,                       \
         .overrides     = _name ## _class_overrides                      \
