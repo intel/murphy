@@ -57,7 +57,7 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
         pt = mrp_list_entry(lp, typeof(*pt), hook);
 
         if (create_target(r, pt->name, (const char **)pt->depends, pt->ndepend,
-                          pt->script_type, pt->script_source) != 0)
+                          pt->script_type, pt->script_source) == NULL)
 
             return -1;
 
@@ -116,9 +116,9 @@ void destroy_targets(mrp_resolver_t *r)
 }
 
 
-int create_target(mrp_resolver_t *r, const char *target,
-                  const char **depends, int ndepend,
-                  const char *script_type, const char *script_source)
+target_t *create_target(mrp_resolver_t *r, const char *target,
+                        const char **depends, int ndepend,
+                        const char *script_type, const char *script_source)
 {
     target_t *t;
     size_t    old_size, new_size;
@@ -127,7 +127,7 @@ int create_target(mrp_resolver_t *r, const char *target,
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
         if (!strcmp(t->name, target)) {
             errno = EEXIST;
-            return -1;
+            return NULL;
         }
     }
 
@@ -135,7 +135,7 @@ int create_target(mrp_resolver_t *r, const char *target,
     new_size = sizeof(*r->targets) * (r->ntarget + 1);
 
     if (!mrp_reallocz(r->targets, old_size, new_size))
-        return -1;
+        return NULL;
 
     t       = r->targets + r->ntarget++;
     t->name = mrp_strdup(target);
@@ -181,7 +181,7 @@ int create_target(mrp_resolver_t *r, const char *target,
         }
     }
 
-    return 0;
+    return t;
 
 
  undo_and_fail:
@@ -190,7 +190,7 @@ int create_target(mrp_resolver_t *r, const char *target,
     new_size = old_size - 1;
     mrp_reallocz(r->targets, old_size, new_size);
 
-    return -1;
+    return NULL;
 }
 
 
@@ -216,9 +216,14 @@ int prepare_target_scripts(mrp_resolver_t *r)
     int       i;
 
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
-        if (mrp_prepare_script(t->script) < 0) {
-            mrp_log_error("Failed to prepare script for target '%s'.", t->name);
-            return -1;
+        if (!t->prepared) {
+            if (mrp_prepare_script(t->script) == 0)
+                t->prepared = TRUE;
+            else {
+                mrp_log_error("Failed to prepare script for target '%s'.",
+                              t->name);
+                return -1;
+            }
         }
     }
 

@@ -54,6 +54,8 @@ struct target_s {
     int             *update_targets;     /* targets to check when updating */
     uint32_t        *fact_stamps;        /* stamps of facts at last update */
     mrp_scriptlet_t *script;             /* update script if any, or NULL */
+    int              prepared : 1;       /* ready for resolution */
+    int              precompiled : 1;
 };
 
 

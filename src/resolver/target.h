@@ -36,9 +36,9 @@
 
 int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser);
 void destroy_targets(mrp_resolver_t *r);
-int create_target(mrp_resolver_t *r, const char *target,
-                  const char **depends, int ndepend,
-                  const char *script_type, const char *script_source);
+target_t *create_target(mrp_resolver_t *r, const char *target,
+                        const char **depends, int ndepend,
+                        const char *script_type, const char *script_source);
 int compile_target_scripts(mrp_resolver_t *r);
 int prepare_target_scripts(mrp_resolver_t *r);
 

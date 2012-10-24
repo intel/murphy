@@ -95,7 +95,7 @@ int mrp_resolver_add_target(mrp_resolver_t *r, const char *target,
                             const char *script_source)
 {
     return (create_target(r, target, depend, ndepend,
-                          script_type, script_source) == 0);
+                          script_type, script_source) != NULL);
 }
 
 
@@ -104,7 +104,27 @@ int mrp_resolver_add_alias(mrp_resolver_t *r, const char *target,
 {
     const char *depend[1] = { target };
 
-    return (create_target(r, alias, depend, 1, NULL, NULL) == 0);
+    return (create_target(r, alias, depend, 1, NULL, NULL) != NULL);
+}
+
+
+int mrp_resolver_add_prepared_target(mrp_resolver_t *r, const char *target,
+                                     const char **depend, int ndepend,
+                                     mrp_scriptlet_t *script)
+{
+    target_t *t;
+
+    t = create_target(r, target, depend, ndepend, NULL, NULL);
+
+    if (t != NULL) {
+        t->script      = script;
+        t->precompiled = TRUE;
+        t->prepared    = TRUE;
+
+        return TRUE;
+    }
+    else
+        return FALSE;
 }
 
 
