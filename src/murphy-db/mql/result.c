@@ -490,6 +490,26 @@ mql_result_t *mql_result_rows_create(int                ncol,
     return (mql_result_t *)rslt;
 }
 
+
+int mql_result_rows_get_row_column_count(mql_result_t *r)
+{
+    result_rows_t *rslt = (result_rows_t *)r;
+
+    MDB_CHECKARG(rslt && rslt->type == mql_result_rows, -1);
+
+    return rslt->ncol;
+}
+
+mqi_data_type_t mql_result_rows_get_row_column_type(mql_result_t *r, int colidx)
+{
+    result_rows_t *rslt = (result_rows_t *)r;
+
+    MDB_CHECKARG(rslt && rslt->type == mql_result_rows &&
+                 rslt->ncol > colidx, -1);
+
+    return rslt->cols[colidx].type;
+}
+
 int mql_result_rows_get_row_count(mql_result_t *r)
 {
     result_rows_t *rslt = (result_rows_t *)r;

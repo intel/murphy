@@ -21,6 +21,8 @@
         mql_result_list_get_unsigned;
         mql_result_rows_get_floating;
         mql_result_rows_get_integer;
+        mql_result_rows_get_row_column_count;
+        mql_result_rows_get_row_column_type;
         mql_result_rows_get_row_count;
         mql_result_rows_get_string;
         mql_result_rows_get_unsigned;
