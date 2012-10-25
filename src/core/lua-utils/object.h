@@ -46,6 +46,7 @@
 #define MRP_LUA_OVERRIDE_GETFIELD(_func)  { "__index", _func } ,
 #define MRP_LUA_OVERRIDE_SETFIELD(_func)  { "__newindex", _func } ,
 #define MRP_LUA_OVERRIDE_CALL(_func)      { "__call", _func } ,
+#define MRP_LUA_OVERRIDE_STRINGIFY(_func) { "__tostring", _func } ,
 
 #define MRP_LUA_METHOD_LIST_TABLE(_name, ... ) \
     static luaL_reg _name[] = {                \
