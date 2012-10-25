@@ -82,7 +82,7 @@ int mrp_lua_push_strarray(lua_State *L, mrp_lua_strarray_t *arr)
         lua_createtable(L, arr->nstring, 0);
 
         for (i = 0;  i < arr->nstring; i++) {
-            lua_pushinteger(L, i);
+            lua_pushinteger(L, (int)(i+1));
             lua_pushstring(L, arr->strings[i]);
             lua_settable(L, -3);
         }
