@@ -15,7 +15,6 @@
         mrp_data_get_blob_size;
         mrp_debug_check;
         mrp_debug_dump_config;
-        mrp_debug_dump_sites;
         mrp_debug_enable;
         mrp_debug_msg;
         mrp_debug_register_file;

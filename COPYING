@@ -1,14 +1,1 @@
-All Murphy source code files are licensed under the three-clause BSD
-license. See file LICENSE-BSD for the license text.
-
-It is possible to configure Murphy to use GPLv2-licensed libraries. At
-least libdbus is licensed under the GPLv2, and under some circumstances
-PulseAudio client library might also fall under the GPLv2. If Murphy is
-configured to use these GPL-licensed libraries, Murphy must be
-distributed under the restrictions defined in GPLv2 license text.
-
-To prevent mistakes in licensing, Murphy needs to be configured with
---enable-gpl configuration option in order to use the GPLv2-licensed
-libaries. This is meant as a heads-up for the system integrator to
-double-check the licensing and distribution of possible proprietary
-Murphy plugins.
+See LICENSE-BSD.

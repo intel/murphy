@@ -37,8 +37,6 @@
 
 MRP_CDECL_BEGIN
 
-#define MRP_DEBUG_SITE_PREFIX "__DEBUG_SITE"
-
 /** Macro to generate a debug site string. */
 #define MRP_DEBUG_SITE(file, line, func)                                  \
     "__DEBUG_SITE_"file":"MRP_STRINGIFY(line)
@@ -74,9 +72,6 @@ int mrp_debug_set_config(const char *cmd);
 
 /** Dump the active debug configuration. */
 int mrp_debug_dump_config(FILE *fp);
-
-/** Dump all known debug sites. */
-void mrp_debug_dump_sites(FILE *fp, int indent);
 
 /** Low-level log wrapper for debug messages. */
 void mrp_debug_msg(const char *site, const char *file, int line,
