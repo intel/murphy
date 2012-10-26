@@ -68,16 +68,19 @@ void mrp_create_funcbridge_class(lua_State *L)
     lua_settable(L, -3);        /* metatable.__index = metatable */
     lua_pushcfunction(L, funcbridge_destructor);
     lua_setfield(L, -2, "__gc");
+    lua_pop(L, 1);
 
     luaL_newmetatable(L, FUNCBRIDGE_METATABLE);
     lua_pushliteral(L, "__index");
     lua_pushvalue(L, -2);
     lua_settable(L, -3);        /* metatable.__index = metatable */
     luaL_openlib(L, NULL, override_methods, 0);
+    lua_pop(L, 1);
 
-    luaL_openlib(L, "builtin", class_methods, 0);
+    luaL_openlib(L, "builtin.method", class_methods, 0);
     lua_pushvalue(L, -2);
     lua_setmetatable(L, -2);
+    lua_pop(L, 1);
 }
 
 
@@ -86,24 +89,30 @@ mrp_funcbridge_t *mrp_funcbridge_create_cfunc(lua_State *L, const char *name,
                                               mrp_funcbridge_cfunc_t func,
                                               void *data)
 {
-    int builtin;
+    int builtin, top;
     mrp_funcbridge_t *fb;
 
-    lua_getglobal(L, "builtin");
-    luaL_checktype(L, -1, LUA_TTABLE);
-    builtin = lua_gettop(L);
+    top = lua_gettop(L);
 
-    fb = create_funcbridge(L, 0, 1);
+    if (luaL_findtable(L, LUA_GLOBALSINDEX, "builtin.method", 20))
+        fb = NULL;
+    else {
+        builtin = lua_gettop(L);
 
-    fb->type = MRP_C_FUNCTION;
-    fb->c.signature = strdup(signature);
-    fb->c.func = func;
-    fb->c.data = data;
+        fb = create_funcbridge(L, 0, 1);
 
-    lua_pushstring(L, name);
-    lua_pushvalue(L, -2);
+        fb->type = MRP_C_FUNCTION;
+        fb->c.signature = strdup(signature);
+        fb->c.func = func;
+        fb->c.data = data;
 
-    lua_rawset(L, builtin);
+        lua_pushstring(L, name);
+        lua_pushvalue(L, -2);
+
+        lua_rawset(L, builtin);
+
+        lua_settop(L, top);
+    }
 
     return fb;
 }
@@ -131,7 +140,7 @@ mrp_funcbridge_t *mrp_funcbridge_create_luafunc(lua_State *L, int f)
         break;
 
     default:
-        luaL_argcheck(L, fb != NULL, 1, "'builtin.xxx' or "
+        luaL_argcheck(L, fb != NULL, 1, "'builtin.method.xxx' or "
                       "lua function expected");
         fb = NULL;
         break;
