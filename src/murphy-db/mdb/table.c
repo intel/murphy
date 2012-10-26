@@ -215,6 +215,8 @@ int mdb_table_drop(mdb_table_t *tbl)
 
     mdb_transaction_drop_table(tbl);
 
+    mdb_hash_delete(table_hash, 0,tbl->name);
+
     destroy_table(tbl);
 
     if (table_count > 1)
