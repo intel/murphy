@@ -30,6 +30,7 @@
 #ifndef __MURPHY_HASHTBL_H__
 #define __MURPHY_HASHTBL_H__
 
+#include <stdint.h>
 
 #include <murphy/common/macros.h>
 

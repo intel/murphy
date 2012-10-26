@@ -85,7 +85,6 @@ static inline log_t *get_last_vlog(mdb_dlist_t *);
 static tx_log_t *get_tx_log(uint32_t);
 static tbl_log_t *get_tbl_log(mdb_dlist_t *, mdb_dlist_t *, uint32_t,
                               mdb_table_t *);
-static void delete_tx_log(uint32_t);
 
 static MDB_DLIST_HEAD(tx_head);
 
@@ -142,7 +141,6 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
                                              int        delete)
 {
     typedef struct {
-        uint32_t         depth;
         mdb_dlist_t     *hhead;
         mdb_dlist_t     *chead;
         mdb_dlist_t     *hlink;
@@ -165,26 +163,19 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
     if (!depth)
         return NULL;
 
-    if ((cursor = *cursor_ptr)) {
-        if (cursor == &empty_cursor)
-            return NULL;
-
+    if ((cursor = *cursor_ptr))
         entry = &cursor->entry;
-    }
     else {
-        if (!(txlog = (tx_log_t *)get_last_vlog(&tx_head)))
+        if (!(txlog = (tx_log_t *)get_last_vlog(&tx_head)) ||
+            depth > txlog->depth)
+        {
             return NULL;
-
-        if (depth > txlog->depth)
-            return NULL;
+        }
 
         hhead = &txlog->hlink;
 
-        if (MDB_DLIST_EMPTY(*hhead)) {
-            if (delete)
-                delete_log((log_t *)txlog);
+        if (MDB_DLIST_EMPTY(*hhead))
             return NULL;
-        }
 
         tblog = MDB_LIST_RELOCATE(tbl_log_t, hlink, hhead->next);
 
@@ -198,7 +189,6 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
         else {
             entry = &cursor->entry;
 
-            cursor->depth = txlog->depth;
             cursor->hhead = hhead;
             cursor->chead = chead;
             cursor->hlink = tblog->hlink.next;
@@ -235,8 +225,6 @@ mdb_log_entry_t *mdb_log_transaction_iterate(uint32_t   depth,
 
         if (cursor->hlink == cursor->hhead) {
             if (cursor != &empty_cursor) {
-                if (delete)
-                    delete_tx_log(cursor->depth);
                 *cursor_ptr = &empty_cursor;
                 free(cursor);
             }
@@ -449,14 +437,6 @@ static tbl_log_t *get_tbl_log(mdb_dlist_t *vhead,
     }
 
     return log;
-}
-
-static void delete_tx_log(uint32_t depth)
-{
-    log_t *log;
-
-    if ((log = get_last_vlog(&tx_head)) && depth == log->depth)
-        delete_log(log);
 }
 
 

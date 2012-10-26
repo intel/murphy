@@ -207,15 +207,22 @@ void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
         p += l;
         n -= l;
 
-        tx = mqi_begin_transaction();
+        if ((tx = mqi_begin_transaction()) == MQI_HANDLE_INVALID)
+            mrp_console_printf(c, "failed to create DB transaction\n");
         r = mql_exec_string(mql_result_string, buf);
 
-        if (!mql_result_is_success(r))
+        if (!mql_result_is_success(r)) {
             mrp_console_printf(c, "failed to execute DB command '%s'\n",
                                buf);
-        else
+        }
+        else {
             mrp_console_printf(c, "DB command executed OK\n");
-        mqi_commit_transaction(tx);
+            mrp_console_printf(c, "%s\n", mql_result_string_get(r));
+        }
+
+        mql_result_free(r);
+        if (mqi_commit_transaction(tx) < 0)
+            mrp_console_printf(c, "failed to commit DB transaction\n");
     }
 }
 
@@ -792,8 +799,6 @@ static int test_init(mrp_plugin_t *plugin)
     test_imports();
 
     subscribe_events(plugin);
-
-    mqi_open();
 
     return !args[ARG_FAILINIT].bln;
 }
