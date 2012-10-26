@@ -99,12 +99,6 @@ typedef struct {
 } mrp_plugin_arg_t;
 
 
-/** Macro for declaring a plugin argument table. */
-#define MRP_PLUGIN_ARGUMENTS(table, ...)     \
-    static mrp_plugin_arg_t table[] =        \
-        __VA_ARGS__                          \
-
-
 /** Convenience macros for setting up argument tables with type and defaults. */
 #define MRP_PLUGIN_ARG_STRING(name, defval)                                \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_STRING, { str: defval } }
