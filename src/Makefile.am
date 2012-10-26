@@ -444,7 +444,7 @@ resolver/scripting/simple/simple-parser.c:	\
 ###################################
 # murphy resource library
 #
-
+if BUILD_RESOURCES
 lib_LTLIBRARIES += libmurphy-resource.la
 EXTRA_DIST      += resource/murphy-resource.pc
 pkgconfig_DATA  += resource/murphy-resource.pc
@@ -505,7 +505,7 @@ linker-script.resource: $(libmurphy_resource_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.resource
-
+endif
 
 ###################################
 # murphy lua utilities
@@ -690,6 +690,7 @@ endif
 endif
 
 # resource-dbus plugin
+if BUILD_RESOURCES
 if DBUS_ENABLED
 RESOURCE_DBUS_PLUGIN_SOURCES = plugins/plugin-resource-dbus.c
 RESOURCE_DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
@@ -707,6 +708,7 @@ plugin_resource_dbus_la_LDFLAGS = -module -avoid-version
 plugin_resource_dbus_la_LIBADD  = $(RESOURCE_DBUS_PLUGIN_LIBS)
 
 plugin_LTLIBRARIES    += plugin-resource-dbus.la
+endif
 endif
 endif
 endif
@@ -778,6 +780,7 @@ plugin_LTLIBRARIES    += plugin-signalling.la
 endif
 
 # native resource plugin
+if BUILD_RESOURCES
 PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES = 				\
 		plugins/resource-native/plugin-resource-native.c
 PLUGIN_RESOURCE_NATIVE_SOURCES = 					\
@@ -813,6 +816,7 @@ plugin-resource-native-func-info.c: $(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)
 
 clean-func-infos::
 	-rm plugin-resource-native-func-info.c
+endif
 
 # domain control plugin
 DOMAIN_CONTROL_PLUGIN_SOURCES = plugins/domain-control/plugin-domain-control.c \

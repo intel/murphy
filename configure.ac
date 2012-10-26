@@ -270,6 +270,14 @@ AC_MSG_CHECKING([libdir])
 AC_MSG_RESULT([$libdir])
 AC_SUBST(LIBDIR, [$libdir])
 
+#Check whether we build resources or not
+AC_ARG_WITH(resources,
+            [  --with-resources wheter to build resource management support],
+	    [with_resources=$withval],[with_resources=yes])
+
+AM_CONDITIONAL(BUILD_RESOURCES,  [ test x$with_resources = "xyes" ])
+
+
 # Check which plugins should be disabled.
 AC_ARG_WITH(disabled-plugins,
             [  --with-disabled-plugins=<plugin-list> specify which plugins to disable],
@@ -478,6 +486,7 @@ echo "PulseAudio mainloop support: $enable_pulse"
 echo "EFL/ecore mainloop support: $enable_ecore"
 echo "glib mainloop support: $enable_glib"
 echo "Murphy console plugin and client: $enable_console"
+echo "Resource management support: $with_resources"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do

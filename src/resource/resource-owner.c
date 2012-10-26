@@ -37,9 +37,10 @@
 #include <murphy/common/utils.h>
 #include <murphy/common/log.h>
 
+#include <murphy-db/mqi.h>
+
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
-#include <murphy-db/mqi.h>
 
 #include "resource-owner.h"
 #include "application-class.h"
