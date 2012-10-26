@@ -3,31 +3,31 @@
 
 /* core/console.c */
 static mrp_debug_info_t info_0[] = {
-    { .line = 77, .func = "console_setup" },
-    { .line = 86, .func = "console_cleanup" },
-    { .line = 102, .func = "mrp_create_console" },
-    { .line = 155, .func = "purge_destroyed" },
-    { .line = 177, .func = "mrp_destroy_console" },
-    { .line = 199, .func = "check_destroy" },
-    { .line = 205, .func = "mrp_console_printf" },
-    { .line = 218, .func = "mrp_set_console_prompt" },
-    { .line = 245, .func = "find_group" },
-    { .line = 271, .func = "find_command" },
-    { .line = 288, .func = "mrp_console_add_group" },
-    { .line = 299, .func = "mrp_console_del_group" },
-    { .line = 310, .func = "mrp_console_add_core_group" },
-    { .line = 321, .func = "mrp_console_del_core_group" },
-    { .line = 332, .func = "input_evt" },
-    { .line = 476, .func = "disconnected_evt" },
-    { .line = 482, .func = "complete_evt" },
-    { .line = 499, .func = "cookie_write" },
-    { .line = 515, .func = "cookie_close" },
-    { .line = 523, .func = "console_fopen" },
-    { .line = 542, .func = "register_commands" },
-    { .line = 548, .func = "unregister_commands" },
-    { .line = 564, .func = "get_next_line" },
-    { .line = 601, .func = "skip_whitespace" },
-    { .line = 608, .func = "get_next_token" },
+    { .line = 106, .func = "console_setup" },
+    { .line = 115, .func = "console_cleanup" },
+    { .line = 131, .func = "mrp_create_console" },
+    { .line = 184, .func = "purge_destroyed" },
+    { .line = 206, .func = "mrp_destroy_console" },
+    { .line = 228, .func = "check_destroy" },
+    { .line = 234, .func = "mrp_console_printf" },
+    { .line = 247, .func = "mrp_set_console_prompt" },
+    { .line = 274, .func = "find_group" },
+    { .line = 300, .func = "find_command" },
+    { .line = 317, .func = "mrp_console_add_group" },
+    { .line = 328, .func = "mrp_console_del_group" },
+    { .line = 339, .func = "mrp_console_add_core_group" },
+    { .line = 350, .func = "mrp_console_del_core_group" },
+    { .line = 361, .func = "input_evt" },
+    { .line = 505, .func = "disconnected_evt" },
+    { .line = 511, .func = "complete_evt" },
+    { .line = 528, .func = "cookie_write" },
+    { .line = 544, .func = "cookie_close" },
+    { .line = 552, .func = "console_fopen" },
+    { .line = 571, .func = "register_commands" },
+    { .line = 577, .func = "unregister_commands" },
+    { .line = 593, .func = "get_next_line" },
+    { .line = 630, .func = "skip_whitespace" },
+    { .line = 637, .func = "get_next_token" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_0 = {
@@ -37,8 +37,8 @@ static mrp_debug_file_t file_0 = {
 
 /* core/context.c */
 static mrp_debug_info_t info_1[] = {
-    { .line = 7, .func = "mrp_context_create" },
-    { .line = 26, .func = "mrp_context_destroy" },
+    { .line = 36, .func = "mrp_context_create" },
+    { .line = 55, .func = "mrp_context_destroy" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_1 = {
