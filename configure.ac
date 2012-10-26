@@ -442,6 +442,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/Makefile
 		 src/common/tests/Makefile
 		 src/core/tests/Makefile
+		 src/core/lua-decision/tests/Makefile
 		 src/daemon/tests/Makefile
 		 src/plugins/tests/Makefile
 		 src/common/murphy-common.pc
@@ -451,6 +452,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-glib.pc
 		 src/core/murphy-core.pc
                  src/core/lua-utils/murphy-lua-utils.pc
+                 src/core/lua-decision/murphy-lua-decision.pc
 		 src/murphy-db/Makefile
 		 src/murphy-db/mdb/Makefile
 		 src/murphy-db/mqi/Makefile

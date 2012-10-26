@@ -1,5 +1,6 @@
 SUBDIRS         = murphy-db . \
-		  common/tests core/tests daemon/tests resolver/tests plugins/tests
+		  common/tests core/tests core/lua-decision/tests \
+		  daemon/tests resolver/tests plugins/tests
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
@@ -557,6 +558,57 @@ linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.lua-utils
+
+
+###################################
+# murphy lua decision network
+#
+
+lib_LTLIBRARIES += libmurphy-lua-decision.la
+EXTRA_DIST      += core/lua-decision/murphy-lua-decision.pc
+pkgconfig_DATA  += core/lua-decision/murphy-lua-decision.pc
+
+libmurphy_lua_decision_ladir =					\
+		$(includedir)/murphy/core/lua-decision
+
+libmurphy_lua_decision_la_HEADERS =				\
+		core/lua-decision/mdb.h
+
+
+libmurphy_lua_decision_la_REGULAR_SOURCES =			\
+		core/lua-decision/mdb.c
+
+
+libmurphy_lua_decision_la_SOURCES =				\
+		$(libmurphy_lua_decision_la_REGULAR_SOURCES)	\
+		lua-decision-func-info.c
+
+libmurphy_lua_decision_la_CFLAGS =				\
+		$(AM_CFLAGS)					\
+		$(LUA_CFLAGS)
+
+libmurphy_lua_decision_la_LDFLAGS =				\
+		-Wl,-version-script=linker-script.lua-decision	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_lua_decision_la_LIBADD =	    			\
+		$(LUA_LIBS)
+
+libmurphy_lua_decision_la_DEPENDENCIES = linker-script.lua-decision
+
+# debug file:line-function mapping generation
+lua-decision-func-info.c: $(libmurphy_lua_decision_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm lua-decision-func-info.c
+
+# lua-decision linker script generation
+linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.lua-decision
 
 
 ###################################
