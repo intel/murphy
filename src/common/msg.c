@@ -606,7 +606,7 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
     mrp_msg_value_t *valp;
     uint32_t        *cntp;
     mrp_list_hook_t *start, *p;
-    uint16_t         tag, type;
+    uint16_t         tag, type, *typep;
     int              found;
     va_list          ap;
 
@@ -632,6 +632,11 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
         type  = va_arg(ap, unsigned int);
         found = FALSE;
 
+        if (type == MRP_MSG_FIELD_ANY) {
+            typep = va_arg(ap, uint16_t *);
+            valp  = va_arg(ap, mrp_msg_value_t *);
+        }
+
         for (p = start; p != start->prev; p = p->next) {
             if (p == &msg->fields)
                 continue;
@@ -640,6 +645,12 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
 
             if (f->tag != tag)
                 continue;
+
+            if (type == MRP_MSG_FIELD_ANY) {
+                *typep = f->type;
+                *valp  = *((mrp_msg_value_t *)&f->str);
+                goto next;
+            }
 
             if (f->type != type)
                 goto out;
@@ -679,6 +690,7 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
                     goto out;
             }
 
+        next:
             start = p->next;
             found = TRUE;
             break;

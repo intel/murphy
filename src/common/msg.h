@@ -64,6 +64,8 @@ typedef enum {
     MRP_MSG_FIELD_DOUBLE  = 0x0b,        /* double-prec. floating point */
     MRP_MSG_FIELD_BLOB    = 0x0c,        /* a blob (not allowed in arrays) */
     MRP_MSG_FIELD_MAX     = 0x0c,
+    MRP_MSG_FIELD_ANY     = 0xd,         /* any type of field when querying */
+
     MRP_MSG_FIELD_ARRAY   = 0x80,        /* bit-mask to mark arrays */
 } mrp_msg_field_type_t;
 #undef A
@@ -112,6 +114,10 @@ typedef enum {
     MRP_MSG_TAG_ARRAY((tag), DOUBLE, (cnt), (arr))
 #define MRP_MSG_TAG_BLOB_ARRAY(tag, cnt, arr) \
     MRP_MSG_TAG_ARRAY((tag), BLOB, (cnt), (arr))
+
+#define MRP_MSG_TAG_ANY(tag, typep, valuep) \
+    (tag), MRP_MSG_FIELD_ANY, (typep), (valuep)
+
 
 /** Sentinel to pass in as the last argument to mrp_msg_create. */
 #define MRP_MSG_FIELD_END NULL
