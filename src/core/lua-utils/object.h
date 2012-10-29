@@ -84,7 +84,12 @@
 
 #define MRP_LUA_FOREACH_FIELD(_L, _i, _n, _l)                           \
     for (lua_pushnil(_L);                                               \
-         lua_next(_L, _i) && (_n = luaL_checklstring(_L, -2, &_l));     \
+                                                                        \
+         lua_next(_L, _i) &&                                            \
+         (_n = (lua_type(_L, -2) == LUA_TSTRING) ?                      \
+          lua_tolstring(_L, -2, &_l) : ""       ) &&                    \
+         ((lua_type(_L, -2) == LUA_TSTRING) || !( _l = 0));             \
+                                                                        \
          lua_pop(_L, 1))
 
 typedef struct mrp_lua_classdef_s     mrp_lua_classdef_t;
@@ -106,11 +111,14 @@ struct mrp_lua_classdef_s {
 };
 
 void  mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *class);
+void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def);
+
 void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *class,
                             const char *name);
 void  mrp_lua_set_object_name(lua_State  *L, mrp_lua_classdef_t *def,
                               const char *name);
 void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int argnum);
+void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx);
 int   mrp_lua_push_object(lua_State *L, void *object);
 
 

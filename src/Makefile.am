@@ -572,12 +572,12 @@ libmurphy_lua_decision_ladir =					\
 		$(includedir)/murphy/core/lua-decision
 
 libmurphy_lua_decision_la_HEADERS =				\
-		core/lua-decision/mdb.h
-
+		core/lua-decision/mdb.h				\
+		core/lua-decision/element.h
 
 libmurphy_lua_decision_la_REGULAR_SOURCES =			\
-		core/lua-decision/mdb.c
-
+		core/lua-decision/mdb.c				\
+		core/lua-decision/element.c
 
 libmurphy_lua_decision_la_SOURCES =				\
 		$(libmurphy_lua_decision_la_REGULAR_SOURCES)	\

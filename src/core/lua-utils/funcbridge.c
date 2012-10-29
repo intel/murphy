@@ -34,6 +34,8 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include <murphy/common.h>
+
 #include <murphy/core/lua-utils/funcbridge.h>
 #include <murphy/core/lua-utils/object.h>
 
@@ -140,8 +142,8 @@ mrp_funcbridge_t *mrp_funcbridge_create_luafunc(lua_State *L, int f)
         break;
 
     default:
-        luaL_argcheck(L, fb != NULL, 1, "'builtin.method.xxx' or "
-                      "lua function expected");
+        luaL_argcheck(L, false, f < 0 ? lua_gettop(L) + f + 1 : f,
+                      "'builtin.method.xxx' or lua function expected");
         fb = NULL;
         break;
     }
@@ -154,6 +156,8 @@ mrp_funcbridge_t *mrp_funcbridge_ref(lua_State *L, mrp_funcbridge_t *fb)
 {
     if (fb->dead)
         return NULL;
+
+    MRP_UNUSED(L);
 
     fb->refcnt++;
 
@@ -324,7 +328,6 @@ static int call_from_lua(lua_State *L)
 
     mrp_funcbridge_t *fb = check_funcbridge(L, 1);
     int ret;
-    bool ok;
     int i, n, m, b, e;
     const char *s;
     char t;

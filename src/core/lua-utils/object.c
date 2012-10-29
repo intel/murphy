@@ -62,29 +62,57 @@ void mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
     lua_settable(L, -3);        /* metatable.__index = metatable */
     lua_pushcfunction(L, userdata_destructor);
     lua_setfield(L, -2, "__gc");
+    lua_pop(L, 1);
 
-    /* make a metatable for tables, ie. for LUA part of object instances */
+    /* make the class table */
+    luaL_openlib(L, def->constructor, def->methods, 0);
+
+    /* make a metatable for class, ie. for LUA part of object instances */
     luaL_newmetatable(L, def->class_id);
     lua_pushliteral(L, "__index");
     lua_pushvalue(L, -2);
     lua_settable(L, -3);        /* metatable.__index = metatable */
     luaL_openlib(L, NULL, def->overrides, 0);
-
-    /* make the constructor */
-    luaL_openlib(L, def->constructor, def->methods, 0);
-    lua_pushvalue(L, -2);
     lua_setmetatable(L, -2);
+    
+    lua_pop(L, 1);
+}
+
+void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
+{
+    const char *p;
+    char *q;
+    char tag[256];
+
+    lua_pushvalue(L, LUA_GLOBALSINDEX);
+
+    for (p = def->constructor, q = tag; *p;  p++) {
+        if ((*q++ = *p) == '.') {
+            q[-1] = '\0';
+            lua_getfield(L, -1, tag);
+            if (lua_type(L, -1) != LUA_TTABLE) {
+                lua_pop(L, 2);
+                lua_pushnil(L);
+                return;
+            }
+            lua_remove(L, -2);
+            q = tag;
+        }            
+    } /* for */
+
+    *q = '\0';
+
+    lua_getfield(L, -1, tag);
+    lua_remove(L, -2);
 }
 
 void *mrp_lua_create_object(lua_State          *L,
                             mrp_lua_classdef_t *def,
                             const char         *name)
 {
-    int class;
-    int object;
+    int class = 0;
     size_t size;
     userdata_t *userdata;
-    char buf[256];
 
     luaL_checktype(L, 1, LUA_TTABLE);
     luaL_checktype(L, 2, LUA_TTABLE);
@@ -93,29 +121,27 @@ void *mrp_lua_create_object(lua_State          *L,
         if (!valid_id(name))
             return NULL;
 
-        lua_getglobal(L, def->class_name);
+        lua_getglobal(L, def->constructor);
         luaL_checktype(L, -1, LUA_TTABLE);
         class = lua_gettop(L);
     }
 
     lua_createtable(L, 1, 1);
-    object = lua_gettop(L);
 
     luaL_getmetatable(L, def->class_id);
-    lua_setmetatable(L, object);
+    lua_setmetatable(L, -2);
 
     lua_pushliteral(L, "userdata");
 
     size = sizeof(userdata_t) + def->userdata_size;
     userdata = (userdata_t *)lua_newuserdata(L, size);
     memset(userdata, 0, size);
-
     luaL_getmetatable(L, def->userdata_id);
     lua_setmetatable(L, -2);
 
-    lua_rawset(L, object);
+    lua_rawset(L, -3);
 
-    lua_pushvalue(L, object);
+    lua_pushvalue(L, -1);
     userdata->self   = userdata;
     userdata->def    = def;
     userdata->luatbl = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -123,7 +149,7 @@ void *mrp_lua_create_object(lua_State          *L,
 
     if (name) {
         lua_pushstring(L, name);
-        lua_pushvalue(L, object);
+        lua_pushvalue(L, -2);
 
         lua_rawset(L, class);
     }
@@ -136,7 +162,7 @@ void mrp_lua_set_object_name(lua_State          *L,
                              const char         *name)
 {
     if (valid_id(name)) {
-        lua_getglobal(L, def->class_name);
+        mrp_lua_get_class_table(L, def);
         luaL_checktype(L, -1, LUA_TTABLE);
 
         lua_pushstring(L, name);
@@ -181,6 +207,34 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     return userdata ? (void *)userdata->data : NULL;
 }
 
+void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
+{
+    userdata_t *userdata;
+
+    luaL_checktype(L, idx, LUA_TTABLE);
+
+    lua_pushvalue(L, idx);
+    lua_pushliteral(L, "userdata");
+    lua_rawget(L, -2);
+
+    userdata = (userdata_t *)lua_touserdata(L, -1);
+
+    if (!userdata || !lua_getmetatable(L, -1)) {
+        lua_pop(L, 1);
+        return NULL;
+    }
+
+    lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
+
+    if (!lua_rawequal(L, -1, -2) || userdata != userdata->self)
+        userdata = NULL;
+
+    lua_pop(L, 3);
+
+    return userdata ? (void *)userdata->data : NULL;
+}
+
+
 
 int mrp_lua_push_object(lua_State *L, void *data)
 {
@@ -195,6 +249,8 @@ int mrp_lua_push_object(lua_State *L, void *data)
 
     return 1;
 }
+
+
 
 static bool valid_id(const char *id)
 {
@@ -230,6 +286,8 @@ static int userdata_destructor(lua_State *L)
 
     return 0;
 }
+
+
 
 /*
  * Local Variables:

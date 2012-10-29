@@ -45,6 +45,7 @@
 #include <murphy/core/lua-utils/strarray.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-decision/mdb.h>
+#include <murphy/core/lua-decision/element.h>
 
 
 #define VOLUME_CLASS   MRP_LUA_CLASS(volume, limit)
@@ -394,6 +395,7 @@ int main(int argc, char **argv)
     luaL_openlibs(L);
     mrp_create_funcbridge_class(L);
     mrp_lua_create_mdb_class(L);
+    mrp_lua_create_element_class(L);
     volume_openlib(L);
 
     mrp_funcbridge_create_cfunc(L, "my_update_func", "os",

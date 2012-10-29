@@ -27,30 +27,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_LUA_MDB_H__
-#define __MURPHY_LUA_MDB_H__
+#ifndef __MURPHY_LUA_ELEMENT_H__
+#define __MURPHY_LUA_ELEMENT_H__
 
-#include <murphy-db/mqi.h>
-
-typedef struct mrp_lua_mdb_table_s   mrp_lua_mdb_table_t;
-typedef struct mrp_lua_mdb_select_s  mrp_lua_mdb_select_t;
-
-
-void mrp_lua_create_mdb_class(lua_State *L);
-mrp_lua_mdb_table_t *mrp_lua_create_builtin_table(lua_State *L,
-                                                  mqi_handle_t handle);
-mrp_lua_mdb_table_t *mrp_lua_table_check(lua_State *L, int idx);
-mrp_lua_mdb_table_t *mrp_lua_to_table(lua_State *L, int idx);
-int mrp_lua_push_table(lua_State *L, mrp_lua_mdb_table_t *tbl);
-const char *mrp_lua_table_name(mrp_lua_mdb_table_t *tbl);
-
-mrp_lua_mdb_select_t *mrp_lua_select_check(lua_State *L, int idx);
-mrp_lua_mdb_select_t *mrp_lua_to_select(lua_State *L, int idx);
-int mrp_lua_push_select(lua_State *L, mrp_lua_mdb_select_t *sel);
-const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel);
+#define MRP_LUA_ELEMENT_FIELDS                  \
+    const char              *name;              \
+    mrp_lua_element_mask_t   inpmask;           \
+    size_t                   ninput;            \
+    mrp_lua_element_input_t *inputs;            \
+    size_t                   noutput;           \
+    mrp_lua_mdb_table_t    **outputs;           \
+    mrp_funcbridge_t        *update
 
 
-#endif  /* __MURPHY_LUA_MDB_H__ */
+typedef struct mrp_lua_element_s         mrp_lua_element_t;
+typedef struct mrp_lua_element_input_s   mrp_lua_element_input_t;
+typedef uint32_t                         mrp_lua_element_mask_t;
+
+void mrp_lua_create_element_class(lua_State *L);
+
+
+#endif  /* __MURPHY_LUA_ELEMENT_H__ */
 
 /*
  * Local Variables:

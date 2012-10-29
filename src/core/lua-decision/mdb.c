@@ -43,11 +43,13 @@
 #include <murphy/core/lua-utils/strarray.h>
 
 
-#define TABLE_CLASS   MRP_LUA_CLASS(mdb, table)
-#define SELECT_CLASS  MRP_LUA_CLASS(mdb, select)
+#define TABLE_CLASS         MRP_LUA_CLASS(mdb, table)
+#define SELECT_CLASS        MRP_LUA_CLASS(mdb, select)
+
+#define TABLE_ROW_CLASSID   MRP_LUA_CLASSID_ROOT "table_row"
+#define SELECT_ROW_CLASSID  MRP_LUA_CLASSID_ROOT "select_row"
 
 typedef enum   field_e        field_t;
-typedef struct select_s       select_t;
 typedef struct const_def_s    const_def_t;
 
 enum field_e {
@@ -70,7 +72,7 @@ struct mrp_lua_mdb_table_s {
 };
 
 
-struct select_s {
+struct mrp_lua_mdb_select_s {
     const char                *name;
     struct {
         mqi_handle_t  handle;
@@ -94,7 +96,6 @@ static int  table_getfield(lua_State *);
 static int  table_setfield(lua_State *);
 static int  table_tostring(lua_State *);
 static void table_destroy_from_lua(void *);
-static mrp_lua_mdb_table_t *table_check(lua_State *, int);
 
 static void table_row_class_create(lua_State *);
 static int  table_row_create(lua_State *, int, int);
@@ -106,14 +107,13 @@ static int  select_create_from_lua(lua_State *);
 static int  select_getfield(lua_State *);
 static int  select_setfield(lua_State *);
 static void select_destroy_from_lua(void *);
-static select_t *select_check(lua_State *, int);
 static int  select_update_from_lua(lua_State *);
 
 static void select_row_class_create(lua_State *);
 static int  select_row_create(lua_State *, int, int);
 static int  select_row_getfield(lua_State *);
 static int  select_row_setfield(lua_State *);
-static select_t *select_row_check(lua_State *, int, int *);
+static mrp_lua_mdb_select_t *select_row_check(lua_State *, int, int *);
 
 static bool define_constants(lua_State *);
 
@@ -185,7 +185,7 @@ MRP_LUA_CLASS_DEF (
 MRP_LUA_CLASS_DEF (
    mdb,                      /* class name */
    select,                   /* constructor name */
-   select_t,                 /* userdata type */
+   mrp_lua_mdb_select_t,     /* userdata type */
    select_destroy_from_lua,  /* userdata destructor */
    select_methods,           /* class methods */
    select_overrides          /* override methods */
@@ -212,6 +212,46 @@ mrp_lua_mdb_table_t *mrp_lua_create_builtin_table(lua_State    *L,
 
 
     return NULL;
+}
+
+mrp_lua_mdb_table_t *mrp_lua_table_check(lua_State *L, int idx)
+{
+    return (mrp_lua_mdb_table_t *)mrp_lua_check_object(L, TABLE_CLASS, idx);
+}
+
+mrp_lua_mdb_table_t *mrp_lua_to_table(lua_State *L, int idx)
+{
+    return (mrp_lua_mdb_table_t *)mrp_lua_to_object(L, TABLE_CLASS, idx);
+}
+
+int mrp_lua_push_table(lua_State *L, mrp_lua_mdb_table_t *tbl)
+{
+    return mrp_lua_push_object(L, tbl);
+}
+
+const char *mrp_lua_table_name(mrp_lua_mdb_table_t *tbl)
+{
+    return (tbl && tbl->name) ? tbl->name : "<unknown>";
+}
+
+mrp_lua_mdb_select_t *mrp_lua_select_check(lua_State *L, int idx)
+{
+    return (mrp_lua_mdb_select_t *)mrp_lua_check_object(L, SELECT_CLASS, idx);
+}
+
+mrp_lua_mdb_select_t *mrp_lua_to_select(lua_State *L, int idx)
+{
+    return (mrp_lua_mdb_select_t *)mrp_lua_to_object(L, SELECT_CLASS, idx);
+}
+
+int mrp_lua_push_select(lua_State *L, mrp_lua_mdb_select_t *sel)
+{
+    return mrp_lua_push_object(L, sel);
+}
+
+const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel)
+{
+    return (sel && sel->name) ? sel->name : "<unknown>";
 }
 
 static int table_create_from_lua(lua_State *L)
@@ -259,7 +299,7 @@ static int table_create_from_lua(lua_State *L)
 
 static int table_getfield(lua_State *L)
 {
-    mrp_lua_mdb_table_t *tbl = table_check(L, 1);
+    mrp_lua_mdb_table_t *tbl = mrp_lua_table_check(L, 1);
     field_t fld;
 
     if (lua_type(L, 2) == LUA_TNUMBER) {
@@ -288,7 +328,7 @@ static int table_getfield(lua_State *L)
 
 static int table_setfield(lua_State *L)
 {
-    mrp_lua_mdb_table_t *tbl = table_check(L, 1);
+    mrp_lua_mdb_table_t *tbl = mrp_lua_table_check(L, 1);
     size_t rowidx;
 
     if (lua_type(L, 2) != LUA_TNUMBER)
@@ -320,7 +360,7 @@ static int table_setfield(lua_State *L)
 
 static int table_tostring(lua_State *L)
 {
-    mrp_lua_mdb_table_t *tbl = table_check(L, 1);
+    mrp_lua_mdb_table_t *tbl = mrp_lua_table_check(L, 1);
 
     if (tbl && tbl->name)
         lua_pushstring(L, tbl->name);
@@ -341,15 +381,10 @@ static void table_destroy_from_lua(void *data)
     }
 }
 
-static mrp_lua_mdb_table_t *table_check(lua_State *L, int idx)
-{
-    return (mrp_lua_mdb_table_t *)mrp_lua_check_object(L, TABLE_CLASS, idx);
-}
-
 static void table_row_class_create(lua_State *L)
 {
     /* create a metatable for row's */
-    luaL_newmetatable(L, MRP_LUA_CLASSID_ROOT "table_row");
+    luaL_newmetatable(L, TABLE_ROW_CLASSID);
     lua_pushliteral(L, "__index");
     lua_pushvalue(L, -2);
     lua_settable(L, -3);        /* metatable.__index = metatable */
@@ -358,7 +393,7 @@ static void table_row_class_create(lua_State *L)
 
 static int table_row_create(lua_State *L, int tbl, int rowidx)
 {
-    return row_create(L, tbl, rowidx, MRP_LUA_CLASSID_ROOT "table_row");
+    return row_create(L, tbl, rowidx, TABLE_ROW_CLASSID);
 }
 
 static int table_row_getfield(lua_State *L)
@@ -397,14 +432,14 @@ static mrp_lua_mdb_table_t *table_row_check(lua_State *L,
 
 static int select_create_from_lua(lua_State *L)
 {
-    select_t *sel;
+    mrp_lua_mdb_select_t *sel;
     size_t fldnamlen;
     const char *fldnam;
     const char *condition;
     char  cols[1024];
     char  qry[2048];
 
-    sel = (select_t *)mrp_lua_create_object(L, SELECT_CLASS, NULL);
+    sel = (mrp_lua_mdb_select_t *)mrp_lua_create_object(L, SELECT_CLASS, NULL);
 
     MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
 
@@ -464,7 +499,7 @@ static int select_create_from_lua(lua_State *L)
 
 static int select_getfield(lua_State *L)
 {
-    select_t *sel = select_check(L, 1);
+    mrp_lua_mdb_select_t *sel = mrp_lua_select_check(L, 1);
     field_t fld;
     const char *fldnam;
 
@@ -502,7 +537,7 @@ static int select_getfield(lua_State *L)
 
 static int select_setfield(lua_State *L)
 {
-    select_t *sel = select_check(L, 1);
+    mrp_lua_mdb_select_t *sel = mrp_lua_select_check(L, 1);
 
     luaL_error(L, "'%s' is read-only", sel->name);
 
@@ -511,7 +546,7 @@ static int select_setfield(lua_State *L)
 
 static void select_destroy_from_lua(void *data)
 {
-    select_t *sel = (select_t *)data;
+    mrp_lua_mdb_select_t *sel = (mrp_lua_mdb_select_t *)data;
 
     if (sel) {
         mrp_lua_free_strarray(sel->columns);
@@ -522,14 +557,9 @@ static void select_destroy_from_lua(void *data)
     }
 }
 
-static select_t *select_check(lua_State *L, int idx)
-{
-    return (select_t *)mrp_lua_check_object(L, SELECT_CLASS, idx);
-}
-
 static int select_update_from_lua(lua_State *L)
 {
-    select_t *sel = select_check(L, 1);
+    mrp_lua_mdb_select_t *sel = mrp_lua_select_check(L, 1);
 
     printf("*** update request for select '%s'\n", sel->name);
 
@@ -542,7 +572,7 @@ static int select_update_from_lua(lua_State *L)
 static void select_row_class_create(lua_State *L)
 {
     /* create a metatable for row's */
-    luaL_newmetatable(L, MRP_LUA_CLASSID_ROOT "select_row");
+    luaL_newmetatable(L, SELECT_ROW_CLASSID);
     lua_pushliteral(L, "__index");
     lua_pushvalue(L, -2);
     lua_settable(L, -3);        /* metatable.__index = metatable */
@@ -551,12 +581,12 @@ static void select_row_class_create(lua_State *L)
 
 static int select_row_create(lua_State *L, int tbl, int rowidx)
 {
-    return row_create(L, tbl, rowidx, MRP_LUA_CLASSID_ROOT "select_row");
+    return row_create(L, tbl, rowidx, SELECT_ROW_CLASSID);
 }
 
 static int select_row_getfield(lua_State *L)
 {
-    select_t *sel;
+    mrp_lua_mdb_select_t *sel;
     int rowidx;
 
     sel = select_row_check(L, 1, &rowidx);
@@ -571,7 +601,7 @@ static int select_row_getfield(lua_State *L)
 
 static int select_row_setfield(lua_State *L)
 {
-    select_t *sel;
+    mrp_lua_mdb_select_t *sel;
     int rowidx;
 
     sel = select_row_check(L, 1, &rowidx);
@@ -582,9 +612,11 @@ static int select_row_setfield(lua_State *L)
     return 0;
 }
 
-static select_t *select_row_check(lua_State *L, int  idx, int *ret_rowidx)
+static mrp_lua_mdb_select_t *select_row_check(lua_State *L,
+                                              int idx,
+                                              int *ret_rowidx)
 {
-    return (select_t *)row_check(L, idx, SELECT_CLASS, ret_rowidx);
+    return (mrp_lua_mdb_select_t *)row_check(L, idx, SELECT_CLASS, ret_rowidx);
 }
 
 static bool define_constants(lua_State *L)
@@ -678,7 +710,7 @@ static mqi_column_def_t *check_coldefs(lua_State *L, int t, size_t *ret_len)
     t = (t < 0) ? lua_gettop(L) + t + 1 : t;
 
     luaL_checktype(L, t, LUA_TTABLE);
-    tlen  = luaL_getn(L, t);
+    tlen  = lua_objlen(L, t);
     size = sizeof(mqi_column_def_t) * (tlen + 1);
 
     if (!(coldefs = mrp_alloc(size)))
@@ -697,7 +729,7 @@ static mqi_column_def_t *check_coldefs(lua_State *L, int t, size_t *ret_len)
 
             luaL_checktype(L, -1, LUA_TTABLE);
 
-            dlen = luaL_getn(L, -1);
+            dlen = lua_objlen(L, -1);
 
             for (j = 0;  j < dlen;  j++) {
                 lua_pushnumber(L, (int)(j+1));
