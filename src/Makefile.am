@@ -906,6 +906,11 @@ endif
 ###################################
 # murphy daemon
 #
+if BUILD_RESOURCES
+RESOURCE_LIBRARY = libmurphy-resource.la
+else
+RESOURCE_LIBRARY =
+endif
 
 bin_PROGRAMS += murphyd
 EXTRA_DIST   += $(config_DATA)
@@ -925,7 +930,7 @@ murphyd_CFLAGS  =			\
 murphyd_LDADD  =			\
 		$(BUILTIN_LIBS)         \
 		$(LINKEDIN_PLUGINS)	\
-		libmurphy-resource.la   \
+		$(RESOURCE_LIBRARY)	\
 		libmurphy-resolver.la	\
 		libmurphy-core.la	\
 		libmurphy-common.la
