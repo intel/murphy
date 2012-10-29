@@ -89,6 +89,7 @@ mdb.select {
            condition = "key = 'speed'"
 }
 
+--[[
 print("mdb.select.speed.statement="..mdb.select.speed.statement)
 
 q = mdb.select.speed[0]
@@ -96,6 +97,8 @@ q = mdb.select.speed[0]
 mdb.select.speed:update()
 
 print_table(mdb)
+
+--]]
 
 element.lua {
    name    = "speed2volume",
@@ -112,7 +115,7 @@ element.lua {
 	     end
 }
 
-print_table(element)
+-- print_table(element)
 
 element.lua.speed2volume.inputs.bar = mdb.select {name = "rpm",
 						  table = "amb",

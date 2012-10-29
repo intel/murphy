@@ -108,6 +108,7 @@ static int  select_getfield(lua_State *);
 static int  select_setfield(lua_State *);
 static void select_destroy_from_lua(void *);
 static int  select_update_from_lua(lua_State *);
+static void select_install(lua_State *, mrp_lua_mdb_select_t *);
 
 static void select_row_class_create(lua_State *);
 static int  select_row_create(lua_State *, int, int);
@@ -494,6 +495,8 @@ static int select_create_from_lua(lua_State *L)
 
     mrp_lua_set_object_name(L, SELECT_CLASS, sel->name);
 
+    select_install(L, sel);
+
     return 1;
 }
 
@@ -568,6 +571,13 @@ static int select_update_from_lua(lua_State *L)
     return 1;
 }
 
+static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
+{
+    MRP_UNUSED(L);
+
+    printf("\nselect_%s: table_%s\n\tupdate(%s)\n",
+           sel->name, sel->table.name, sel->name);
+}
 
 static void select_row_class_create(lua_State *L)
 {
