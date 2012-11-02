@@ -107,7 +107,7 @@ fi
 AC_SUBST(WARNING_CFLAGS)
 
 # check for LUA
-PKG_CHECK_MODULES(LUA, lua >= 1.5.1)
+PKG_CHECK_MODULES(LUA, lua >= 5.1.1)
 AC_SUBST(LUA_CFLAGS)
 AC_SUBST(LUA_LIBS)
 
@@ -365,6 +365,7 @@ AM_CONDITIONAL(BUILTIN_PLUGIN_SIGNALLING, [check_if_internal signalling])
 AM_CONDITIONAL(BUILTIN_PLUGIN_RESOURCE_DBUS, [check_if_internal resource-dbus])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DOMAIN_CONTROL,
                [check_if_internal domain-control])
+AM_CONDITIONAL(BUILTIN_PLUGIN_LUA,      [check_if_internal lua])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 
