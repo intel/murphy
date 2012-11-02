@@ -440,6 +440,10 @@ int mrp_start_plugins(mrp_context_t *ctx)
         }
         else
             emit_plugin_event(PLUGIN_EVENT_STARTED, plugin);
+
+        /* XXX TODO: argh, ugly kludge for plugins loading plugins... */
+        if (plugin->hook.next != n)
+            n = plugin->hook.next;
     }
 
     return TRUE;
@@ -574,8 +578,10 @@ static int parse_plugin_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *parg)
 
     switch (parg->type) {
     case MRP_PLUGIN_ARG_TYPE_STRING:
-        if (arg->str != NULL)
+        if (arg->str != NULL) {
             parg->str = arg->str;
+            arg->str  = NULL;
+        }
         return TRUE;
 
     case MRP_PLUGIN_ARG_TYPE_BOOL:

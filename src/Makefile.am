@@ -106,6 +106,13 @@ lib_LTLIBRARIES += libmurphy-core.la
 EXTRA_DIST      += core/murphy-core.pc
 pkgconfig_DATA  += core/murphy-core.pc
 
+LUA_BINDINGS_SOURCES = 				\
+		core/lua-bindings/lua-murphy.c	\
+		core/lua-bindings/lua-plugin.c	\
+		core/lua-bindings/lua-log.c
+
+LUA_BINDINGS_HDRS = core/lua-bindings/murphy.h
+
 libmurphy_coreh_ladir      =		\
 		$(includedir)/murphy
 
@@ -122,7 +129,8 @@ libmurphy_core_la_HEADERS =		\
 		core/console.h		\
 		core/scripting.h	\
 		core/method.h		\
-		core/event.h
+		core/event.h		\
+		$(LUA_BINDINGS_HDRS)
 
 libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
@@ -130,21 +138,25 @@ libmurphy_core_la_REGULAR_SOURCES =	\
 		core/console.c		\
 		core/scripting.c	\
 		core/method.c		\
-		core/event.c
+		core/event.c		\
+		$(LUA_BINDINGS_SOURCES)
 
 libmurphy_core_la_SOURCES =		\
 		$(libmurphy_core_la_REGULAR_SOURCES) \
 		core-func-info.c
 
 libmurphy_core_la_CFLAGS  =		\
-		$(AM_CFLAGS)
+		$(AM_CFLAGS)		\
+		$(LUA_CFLAGS)
 
 libmurphy_core_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.core \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_core_la_LIBADD  =		\
-		libmurphy-common.la -ldl
+		libmurphy-common.la 	\
+		$(LUA_LIBS) 		\
+		-ldl
 
 libmurphy_core_la_DEPENDENCIES = linker-script.core libmurphy-common.la
 
@@ -902,6 +914,28 @@ test_domain_controller_LDADD   = libmurphy-domain-controller.la    \
 				 libmurphy-common.la \
 				 -lreadline
 endif
+
+
+# Lua plugin
+LUA_PLUGIN_SOURCES = plugins/plugin-lua.c
+LUA_PLUGIN_CFLAGS  = $(AM_CFLAGS) $(LUA_CFLAGS)
+LUA_PLUGIN_LIBS    =
+
+
+if BUILTIN_PLUGIN_LUA
+BUILTIN_PLUGINS += $(LUA_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(LUA_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(LUA_PLUGIN_LIBS)
+else
+plugin_lua_la_SOURCES = plugins/plugin-lua.c
+plugin_lua_la_CFLAGS  = $(LUA_PLUGIN_CFLAGS) \
+			$(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_lua_la_LDFLAGS = -module -avoid-version
+plugin_lua_la_LIBADD  = $(LUA_PLUGIN_LIBS) $(LUA_LIBS)
+
+plugin_LTLIBRARIES    += plugin-lua.la
+endif
+
 
 ###################################
 # murphy daemon

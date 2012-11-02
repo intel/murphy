@@ -6,6 +6,7 @@ includedir=@includedir@
 Name: murphy-core
 Description: Murphy policy framework, core library.
 Requires: murphy-common @PACKAGE_VERSION@
+Requires: lua
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lmurphy-common
 Cflags: -I${includedir}
