@@ -190,11 +190,17 @@ static method_list_t *lookup_method_list(const char *name)
 
 static inline int check_signatures(const char *sig1, const char *sig2)
 {
+    static int warned = FALSE;
+
     MRP_UNUSED(sig1);
     MRP_UNUSED(sig2);
 
-    mrp_log_warning("XXX TODO: implement signature checking (%s@%s:%d)",
-                    __FUNCTION__, __FILE__, __LINE__);
+    if (!warned) {
+        mrp_log_warning("XXX TODO: implement signature checking (%s@%s:%d)",
+                        __FUNCTION__, __FILE__, __LINE__);
+        warned = TRUE;
+    }
+
     return TRUE;
 }
 
