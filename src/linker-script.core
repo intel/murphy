@@ -32,6 +32,7 @@
         mrp_lookup_interpreter;
         mrp_lua_check_murphy_context;
         mrp_lua_get_lua_state;
+        mrp_lua_get_murphy_context;
         mrp_lua_register_murphy_bindings;
         mrp_lua_set_murphy_context;
         mrp_plugin_exists;
