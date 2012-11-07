@@ -502,7 +502,6 @@ libmurphy_resource_la_LIBADD =	    \
 		murphy-db/mdb/libmdb.la
 
 libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
-				     libmurphy-core.la      \
 				     libmurphy-common.la
 
 # debug file:line-function mapping generation
@@ -820,8 +819,8 @@ plugin_LTLIBRARIES += plugin-resource-native.la
 bin_PROGRAMS += resource-client
 
 resource_client_SOURCES = plugins/resource-native/resource-client.c
-resource_client_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
-resource_client_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la
+resource_client_CFLAGS  = $(AM_CFLAGS)
+resource_client_LDADD   =  libmurphy-common.la
 
 # debug file:line-function mapping generation
 plugin-resource-native-func-info.c: $(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)
@@ -1010,8 +1009,7 @@ murphy_console_CFLAGS  =		\
 		$(AM_CFLAGS)
 
 murphy_console_LDADD  =			\
-		libmurphy-common.la	\
-		$(BUILTIN_LIBS)
+		libmurphy-common.la
 
 if DBUS_ENABLED
 murphy_console_LDADD +=	libmurphy-dbus.la
