@@ -51,6 +51,46 @@ static int load_config(lua_State *L, const char *path)
 }
 
 
+
+static int luaR_compile(mrp_scriptlet_t *script)
+{
+    printf("*** %s: script %s\n", __FUNCTION__, script->source);
+
+    return 0;
+}
+
+
+static int luaR_prepare(mrp_scriptlet_t *script)
+{
+    printf("*** %s: script %s\n", __FUNCTION__, script->source);
+
+    return 0;
+}
+
+
+static int luaR_execute(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
+{
+    MRP_UNUSED(ctbl);
+
+    printf("*** %s: script %s\n", __FUNCTION__, script->source);
+
+    return TRUE;
+}
+
+
+static void luaR_cleanup(mrp_scriptlet_t *script)
+{
+    printf("*** %s: script %s\n", __FUNCTION__,
+           script->source ? script->source : "<none>");
+}
+
+
+MRP_REGISTER_INTERPRETER("lua",
+                         luaR_compile, luaR_prepare,
+                         luaR_execute, luaR_cleanup);
+
+
+
 static int plugin_init(mrp_plugin_t *plugin)
 {
     mrp_plugin_arg_t *args = plugin->args;
