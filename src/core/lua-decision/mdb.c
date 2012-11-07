@@ -38,10 +38,12 @@
 #include <murphy/common.h>
 #include <murphy-db/mql.h>
 
+#include <murphy/core/context.h>
+#include <murphy/core/scripting.h>
 #include <murphy/core/lua-decision/mdb.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-utils/strarray.h>
-
+#include <murphy/core/lua-bindings/murphy.h>
 
 #define TABLE_CLASS         MRP_LUA_CLASS(mdb, table)
 #define SELECT_CLASS        MRP_LUA_CLASS(mdb, select)
@@ -352,7 +354,7 @@ static int table_setfield(lua_State *L)
             luaL_checktype(L, -1, LUA_TTABLE);
         }
 
-        printf("*** setting row %d in table '%s'\n", rowidx+1, tbl->name);
+        printf("*** setting row %zd in table '%s'\n", rowidx+1, tbl->name);
 
     }
 
@@ -571,12 +573,56 @@ static int select_update_from_lua(lua_State *L)
     return 1;
 }
 
+static int select_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
+{
+    mrp_lua_mdb_select_t *sel = (mrp_lua_mdb_select_t *)script->data;
+
+    MRP_UNUSED(ctbl);
+
+    printf("*** should update element '%s'\n", sel->name);
+
+    return TRUE;
+}
+
+static mrp_interpreter_t select_updater = {
+    { NULL, NULL },
+    "select_updater",
+    NULL,
+    NULL,
+    NULL,
+    select_update_cb,
+    NULL
+};
+
+
 static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
 {
+    mrp_context_t *ctx;
+    char target[1024], table[1024];
+    const char *depends;
+
     MRP_UNUSED(L);
+
+    ctx = mrp_lua_get_murphy_context();
+
+    if (ctx == NULL || ctx->r == NULL) {
+        printf("Invalid or incomplete murphy context.\n");
+        return;
+    }
 
     printf("\nselect_%s: table_%s\n\tupdate(%s)\n",
            sel->name, sel->table.name, sel->name);
+
+    snprintf(target, sizeof(target), "select_%s", sel->name);
+    snprintf(table , sizeof(table) , "$%s", sel->table.name);
+
+    depends = table;
+
+    if (!mrp_resolver_add_prepared_target(ctx->r, target, &depends, 1,
+                                          &select_updater, NULL, sel)) {
+        printf("Failed to install resolver target for element '%s'.\n",
+               sel->name);
+    }
 }
 
 static void select_row_class_create(lua_State *L)

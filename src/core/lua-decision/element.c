@@ -30,18 +30,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <alloca.h>
 
 #include <lualib.h>
 #include <lauxlib.h>
 
 #include <murphy/common.h>
 
+#include <murphy/core/context.h>
+#include <murphy/core/scripting.h>
 #include <murphy/core/lua-decision/element.h>
 #include <murphy/core/lua-decision/mdb.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-utils/strarray.h>
 #include <murphy/core/lua-utils/funcbridge.h>
+#include <murphy/core/lua-bindings/murphy.h>
 
 
 #define ELEMENT_CLASS           MRP_LUA_CLASS(element, lua)
@@ -267,27 +270,74 @@ static mrp_lua_element_t *element_check(lua_State *L, int idx)
     return (mrp_lua_element_t *)mrp_lua_check_object(L, ELEMENT_CLASS, idx);
 }
 
+static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
+{
+    mrp_lua_element_t *el = (mrp_lua_element_t *)script->data;
+
+    MRP_UNUSED(ctbl);
+
+    printf("*** should update element '%s'\n", el->name);
+
+    return TRUE;
+}
+
+static mrp_interpreter_t element_updater = {
+    { NULL, NULL },
+    "element_updater",
+    NULL,
+    NULL,
+    NULL,
+    element_update_cb,
+    NULL
+};
+
+
 static void element_install(lua_State *L, mrp_lua_element_t *el)
 {
     mrp_lua_element_input_t *inp;
+    mrp_context_t *ctx;
     size_t i;
-    char buf[1024];
+    char buf[1024], target[1024];
+    const char **depends, *d;
+    int ndepend;
     char *p, *e;
 
     MRP_UNUSED(L);
+
+    ctx = mrp_lua_get_murphy_context();
+
+    if (ctx == NULL || ctx->r == NULL) {
+        printf("Invalid or incomplete murphy context.\n");
+        return;
+    }
+
+    depends = alloca(el->ninput * sizeof(depends[0]));
+    ndepend = el->ninput;
 
     for (i = 0, e = (p = buf) + sizeof(buf);  i < el->ninput && p < e;  i++) {
         inp = el->inputs + i;
 
         if (inp->type == SELECT) {
-            p += snprintf(p, e-p, " select_%s",
-                          mrp_lua_select_name(inp->select));
+            d  = mrp_lua_select_name(inp->select);
+            p += snprintf(p, e-p, " select_%s", d);
+
+            depends[i] = alloca(strlen(d) + 1);
+            strcpy((char *)depends[i], d);
         }
     }
 
     for (i = 0;   i < el->noutput;  i++) {
         printf("\ntable_%s:%s\n\tupdate(%s)\n\n",
                mrp_lua_table_name(el->outputs[i]), buf, el->name);
+
+        snprintf(target, sizeof(target), "table_%s",
+                 mrp_lua_table_name(el->outputs[i]));
+
+        if (!mrp_resolver_add_prepared_target(ctx->r, target, depends, ndepend,
+                                              &element_updater, NULL, el)) {
+            printf("Failed to install resolver target for element '%s'.\n",
+                   el->name);
+        }
     }
 }
 
@@ -457,7 +507,7 @@ static mrp_lua_element_input_t *element_input_create_userdata(lua_State *L,
                 i->type = SELECT;
                 i->select = mrp_lua_select_check(L, -1);
                 break;
-                
+
             default:
                 luaL_error(L, "invalid input type %s",
                            lua_typename(L, lua_type(L, -1)));
