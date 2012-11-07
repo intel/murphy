@@ -189,6 +189,19 @@ typedef enum {
         return KEY_##tkn;                               \
     } while (0)
 
+#define KEYWORD_TOKENV(tkn, val, size) do {             \
+        size_t  _size;                                  \
+        char   *_t;                                     \
+                                                        \
+        _size = size ? size : strlen(val);              \
+        _t    = save_token(parser, val, _size);         \
+        yy_res_lval.string.value = _t;                  \
+                                                        \
+        mrp_debug("KEY_%s ('%s')", #tkn, val);          \
+                                                        \
+        return KEY_##tkn;                               \
+    } while (0)
+
 
 #define STRING_TOKEN(tkn) do {                          \
         char *_t, *_v;                                  \
@@ -207,7 +220,7 @@ typedef enum {
         _t = save_token(parser, _v, _l);                \
         yy_res_lval.string.value = _t;                  \
                                                         \
-        mrp_debug("TKN_%s: '%s'", #tkn, _t);            \
+        mrp_debug("TKN_%s ('%s')", #tkn, _t);           \
                                                         \
         return TKN_##tkn;                               \
     } while (0)
@@ -249,6 +262,7 @@ typedef enum {
 %option nounput
 
 WS                    [ \t]+
+OWS                   [ \t]*
 ESCAPED_EOL           \\\n
 EOL                   \n
 COMMENT               #.*
@@ -260,8 +274,10 @@ AUTOUPDATE            ^auto-update-target
 DEPENDS_ON            depends\ on
 IDENT                 [a-zA-Z_][a-zA-Z0-9_]+
 FACT                  \${IDENT}(\.{IDENT})*
-UPDATE_SCRIPT         ^{WS}update\ script
+UPDATE_SCRIPT         ^{WS}(update\ script|update\ script{OWS}\({OWS}{IDENT}{OWS}\))
 END_SCRIPT            ^{WS}end\ script
+PAREN_OPEN            \(
+PAREN_CLOSE           \)
 SCRIPT_LINE           ^{WS}.*
 
 %x SCRIPT
@@ -274,7 +290,29 @@ SCRIPT_LINE           ^{WS}.*
 {IDENT}               { STRING_TOKEN(IDENT);                           }
 {FACT}                { STRING_TOKEN(FACT);                            }
 
-{UPDATE_SCRIPT}       { BEGIN(SCRIPT);  KEYWORD_TOKEN(UPDATE_SCRIPT);  }
+{UPDATE_SCRIPT}       {
+                        char   *type, *end, *p;
+                        size_t  len;
+
+                        BEGIN(SCRIPT);
+
+                        type = strchr(yy_res_text, '(');
+
+                        if (type != NULL) {
+                            end = strchr(type, ')');
+                            len = end - type - 1;
+                            p   = type + 1;
+                            while (*p == ' ' || *p == '\t')
+                                p++, len--;
+                            while (len > 0 &&
+                                   (p[len-1] == ' ' || p[len-1] == '\t'))
+                                len--;
+
+                            KEYWORD_TOKENV(UPDATE_SCRIPT, p, len);
+                        }
+                        else
+                            KEYWORD_TOKENV(UPDATE_SCRIPT, "simple", 0);
+                      }
 <SCRIPT>{END_SCRIPT}  { BEGIN(INITIAL); KEYWORD_TOKEN(END_SCRIPT);     }
 <SCRIPT>{SCRIPT_LINE} { STRING_TOKEN(SCRIPT_LINE);                     }
 

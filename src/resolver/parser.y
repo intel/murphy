@@ -33,7 +33,7 @@ static tkn_strarr_t *strarr_append(tkn_strarr_t *arr, char *str);
 
 %token          KEY_TARGET
 %token          KEY_DEPENDS_ON
-%token          KEY_UPDATE_SCRIPT
+%token <string> KEY_UPDATE_SCRIPT
 %token          KEY_END_SCRIPT
 %token          KEY_AUTOUPDATE
 %token <string> TKN_IDENT
@@ -136,7 +136,7 @@ optional_script:
     $$.source = NULL;
   }
 | KEY_UPDATE_SCRIPT script_source KEY_END_SCRIPT {
-    $$.type   = "simple"; /* "default"; */
+    $$.type   = $1.value;
     $$.source = $2.value;
   }
 ;
