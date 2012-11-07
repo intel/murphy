@@ -35,6 +35,7 @@
 
 #include <murphy/common/macros.h>
 #include <murphy/common/list.h>
+#include <murphy/common/log.h>
 
 
 MRP_CDECL_BEGIN
@@ -173,7 +174,7 @@ struct mrp_interpreter_s {
                                                                         \
         mrp_list_init(&interpreter.hook);                               \
                                                                         \
-        if (!mrp_resolver_register_interpreter(&interpreter))           \
+        if (!mrp_register_interpreter(&interpreter))                    \
             mrp_log_error("Failed to register interpreter '%s'.",       \
                           _type);                                       \
         else                                                            \
