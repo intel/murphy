@@ -139,12 +139,16 @@ static void load_configuration(mrp_context_t *ctx)
 }
 
 
+static void create_ruleset(mrp_context_t *ctx)
+{
+    ctx->r = mrp_resolver_create();
+}
+
+
 static void load_ruleset(mrp_context_t *ctx)
 {
     if (ctx->resolver_ruleset != NULL) {
-        ctx->r = mrp_resolver_parse(ctx, ctx->resolver_ruleset);
-
-        if (ctx->r != NULL)
+        if (mrp_resolver_parse(ctx->r, ctx, ctx->resolver_ruleset))
             mrp_log_info("Loaded resolver ruleset '%s'.",
                          ctx->resolver_ruleset);
         else {
@@ -224,10 +228,11 @@ int main(int argc, char *argv[])
     ctx = create_context();
 
     setup_signals(ctx);
+    create_ruleset(ctx);
     parse_cmdline(ctx, argc, argv);
     load_configuration(ctx);
-    load_ruleset(ctx);
     start_plugins(ctx);
+    load_ruleset(ctx);
     prepare_ruleset(ctx);
     daemonize(ctx);
     run_mainloop(ctx);
