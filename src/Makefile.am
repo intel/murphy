@@ -99,6 +99,110 @@ clean-func-infos::
 	-rm common-func-info.c
 
 ###################################
+# murphy lua utilities
+#
+
+lib_LTLIBRARIES += libmurphy-lua-utils.la
+EXTRA_DIST      += core/lua-utils/murphy-lua-utils.pc
+pkgconfig_DATA  += core/lua-utils/murphy-lua-utils.pc
+
+libmurphy_lua_utils_ladir =					\
+		$(includedir)/murphy/core/lua-utils
+
+libmurphy_lua_utils_la_HEADERS =				\
+		core/lua-utils/strarray.h			\
+		core/lua-utils/funcbridge.h			\
+		core/lua-utils/object.h
+
+libmurphy_lua_utils_la_REGULAR_SOURCES =			\
+		core/lua-utils/strarray.c			\
+		core/lua-utils/funcbridge.c			\
+		core/lua-utils/object.c
+
+libmurphy_lua_utils_la_SOURCES =				\
+		$(libmurphy_lua_utils_la_REGULAR_SOURCES)	\
+		lua-utils-func-info.c
+
+libmurphy_lua_utils_la_CFLAGS =					\
+		$(AM_CFLAGS)					\
+		$(LUA_CFLAGS)
+
+libmurphy_lua_utils_la_LDFLAGS =				\
+		-Wl,-version-script=linker-script.lua-utils	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_lua_utils_la_LIBADD =	    				\
+		$(LUA_LIBS)
+
+libmurphy_lua_utils_la_DEPENDENCIES = linker-script.lua-utils
+
+# debug file:line-function mapping generation
+lua-utils-func-info.c: $(libmurphy_lua_utils_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm lua-utils-func-info.c
+
+# lua-utils linker script generation
+linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.lua-utils
+
+
+###################################
+# murphy lua decision network
+#
+
+lib_LTLIBRARIES += libmurphy-lua-decision.la
+EXTRA_DIST      += core/lua-decision/murphy-lua-decision.pc
+pkgconfig_DATA  += core/lua-decision/murphy-lua-decision.pc
+
+libmurphy_lua_decision_ladir =					\
+		$(includedir)/murphy/core/lua-decision
+
+libmurphy_lua_decision_la_HEADERS =				\
+		core/lua-decision/mdb.h				\
+		core/lua-decision/element.h
+
+libmurphy_lua_decision_la_REGULAR_SOURCES =			\
+		core/lua-decision/mdb.c				\
+		core/lua-decision/element.c
+
+libmurphy_lua_decision_la_SOURCES =				\
+		$(libmurphy_lua_decision_la_REGULAR_SOURCES)	\
+		lua-decision-func-info.c
+
+libmurphy_lua_decision_la_CFLAGS =				\
+		$(AM_CFLAGS)					\
+		$(LUA_CFLAGS)
+
+libmurphy_lua_decision_la_LDFLAGS =				\
+		-Wl,-version-script=linker-script.lua-decision	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_lua_decision_la_LIBADD =	    			\
+		$(LUA_LIBS)
+
+libmurphy_lua_decision_la_DEPENDENCIES = linker-script.lua-decision
+
+# debug file:line-function mapping generation
+lua-decision-func-info.c: $(libmurphy_lua_decision_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm lua-decision-func-info.c
+
+# lua-decision linker script generation
+linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.lua-decision
+
+
+###################################
 # murphy core library
 #
 
@@ -154,9 +258,11 @@ libmurphy_core_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.core \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_core_la_LIBADD  =		\
-		libmurphy-common.la 	\
-		$(LUA_LIBS) 		\
+libmurphy_core_la_LIBADD  =			\
+		libmurphy-common.la 		\
+		libmurphy-lua-decision.la	\
+		libmurphy-lua-utils.la		\
+		$(LUA_LIBS) 			\
 		-ldl
 
 libmurphy_core_la_DEPENDENCIES = linker-script.core libmurphy-common.la
@@ -518,110 +624,6 @@ linker-script.resource: $(libmurphy_resource_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.resource
 endif
-
-###################################
-# murphy lua utilities
-#
-
-lib_LTLIBRARIES += libmurphy-lua-utils.la
-EXTRA_DIST      += core/lua-utils/murphy-lua-utils.pc
-pkgconfig_DATA  += core/lua-utils/murphy-lua-utils.pc
-
-libmurphy_lua_utils_ladir =					\
-		$(includedir)/murphy/core/lua-utils
-
-libmurphy_lua_utils_la_HEADERS =				\
-		core/lua-utils/strarray.h			\
-		core/lua-utils/funcbridge.h			\
-		core/lua-utils/object.h
-
-libmurphy_lua_utils_la_REGULAR_SOURCES =			\
-		core/lua-utils/strarray.c			\
-		core/lua-utils/funcbridge.c			\
-		core/lua-utils/object.c
-
-libmurphy_lua_utils_la_SOURCES =				\
-		$(libmurphy_lua_utils_la_REGULAR_SOURCES)	\
-		lua-utils-func-info.c
-
-libmurphy_lua_utils_la_CFLAGS =					\
-		$(AM_CFLAGS)					\
-		$(LUA_CFLAGS)
-
-libmurphy_lua_utils_la_LDFLAGS =				\
-		-Wl,-version-script=linker-script.lua-utils	\
-		-version-info @MURPHY_VERSION_INFO@
-
-libmurphy_lua_utils_la_LIBADD =	    				\
-		$(LUA_LIBS)
-
-libmurphy_lua_utils_la_DEPENDENCIES = linker-script.lua-utils
-
-# debug file:line-function mapping generation
-lua-utils-func-info.c: $(libmurphy_lua_utils_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm lua-utils-func-info.c
-
-# lua-utils linker script generation
-linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
-
-clean-linker-script::
-	-rm -f linker-script.lua-utils
-
-
-###################################
-# murphy lua decision network
-#
-
-lib_LTLIBRARIES += libmurphy-lua-decision.la
-EXTRA_DIST      += core/lua-decision/murphy-lua-decision.pc
-pkgconfig_DATA  += core/lua-decision/murphy-lua-decision.pc
-
-libmurphy_lua_decision_ladir =					\
-		$(includedir)/murphy/core/lua-decision
-
-libmurphy_lua_decision_la_HEADERS =				\
-		core/lua-decision/mdb.h				\
-		core/lua-decision/element.h
-
-libmurphy_lua_decision_la_REGULAR_SOURCES =			\
-		core/lua-decision/mdb.c				\
-		core/lua-decision/element.c
-
-libmurphy_lua_decision_la_SOURCES =				\
-		$(libmurphy_lua_decision_la_REGULAR_SOURCES)	\
-		lua-decision-func-info.c
-
-libmurphy_lua_decision_la_CFLAGS =				\
-		$(AM_CFLAGS)					\
-		$(LUA_CFLAGS)
-
-libmurphy_lua_decision_la_LDFLAGS =				\
-		-Wl,-version-script=linker-script.lua-decision	\
-		-version-info @MURPHY_VERSION_INFO@
-
-libmurphy_lua_decision_la_LIBADD =	    			\
-		$(LUA_LIBS)
-
-libmurphy_lua_decision_la_DEPENDENCIES = linker-script.lua-decision
-
-# debug file:line-function mapping generation
-lua-decision-func-info.c: $(libmurphy_lua_decision_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm lua-decision-func-info.c
-
-# lua-decision linker script generation
-linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
-
-clean-linker-script::
-	-rm -f linker-script.lua-decision
-
 
 ###################################
 # murphy plugins

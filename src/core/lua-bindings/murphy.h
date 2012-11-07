@@ -42,15 +42,17 @@ typedef struct {
 /** Set murphy context for the bindings. */
 lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx);
 
+/** Get murphy context for the bindings. */
+mrp_context_t *mrp_lua_get_murphy_context(void);
+
 /** Get the common Lua state for the bindings. */
 lua_State *mrp_lua_get_lua_state(void);
 
 /** Register the given lua murphy bindings. */
 int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b);
 
-/** Get murphy context for the bindings. */
+/** Check and get murphy context for the bindings. */
 mrp_context_t *mrp_lua_check_murphy_context(lua_State *L, int index);
-
 
 
 #endif /* __MURPHY_LUA_BINDINGS_H__ */

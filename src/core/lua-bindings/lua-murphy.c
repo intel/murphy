@@ -4,6 +4,9 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
 #include <murphy/core/plugin.h>
+#include <murphy/core/lua-utils/funcbridge.h>
+#include <murphy/core/lua-decision/mdb.h>
+#include <murphy/core/lua-decision/element.h>
 #include <murphy/core/lua-bindings/murphy.h>
 
 static mrp_context_t *context;
@@ -75,6 +78,19 @@ int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b)
 }
 
 
+static void init_lua_utils(lua_State *L)
+{
+    mrp_create_funcbridge_class(L);
+}
+
+
+static void init_lua_decision(lua_State *L)
+{
+    mrp_lua_create_mdb_class(L);
+    mrp_lua_create_element_class(L);
+}
+
+
 lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx)
 {
     lua_State          *L;
@@ -91,6 +107,9 @@ lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx)
 
             if (register_murphy(ctx)) {
                 success = TRUE;
+
+                init_lua_utils(L);
+                init_lua_decision(L);
 
                 mrp_list_foreach(&bindings, p, n) {
                     b = mrp_list_entry(p, typeof(*b), hook);
@@ -117,6 +136,12 @@ mrp_context_t *mrp_lua_check_murphy_context(lua_State *L, int index)
         luaL_error(L, "murphy context is not set");
 
     return *m->ctxp;
+}
+
+
+mrp_context_t *mrp_lua_get_murphy_context(void)
+{
+    return context;
 }
 
 
