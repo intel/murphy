@@ -41,16 +41,26 @@
 #include "fact.h"
 #include "resolver.h"
 
-mrp_resolver_t *mrp_resolver_parse(mrp_context_t *ctx, const char *path)
+
+mrp_resolver_t *mrp_resolver_create(void)
 {
-    yy_res_parser_t  parser;
-    mrp_resolver_t  *r;
+    return mrp_allocz(sizeof(mrp_resolver_t));
+}
+
+
+mrp_resolver_t *mrp_resolver_parse(mrp_resolver_t *r, mrp_context_t *ctx,
+                                   const char *path)
+{
+    yy_res_parser_t parser;
 
     mrp_clear(&parser);
-    r = mrp_allocz(sizeof(*r));
+
+    if (r == NULL) {
+        r = mrp_allocz(sizeof(*r));
+        r->ctx = ctx;
+    }
 
     if (r != NULL) {
-        r->ctx = ctx;
         if (parser_parse_file(&parser, path)) {
             if (create_targets(r, &parser) == 0 &&
                 sort_targets(r)            == 0 &&
@@ -110,21 +120,33 @@ int mrp_resolver_add_alias(mrp_resolver_t *r, const char *target,
 
 int mrp_resolver_add_prepared_target(mrp_resolver_t *r, const char *target,
                                      const char **depend, int ndepend,
-                                     mrp_scriptlet_t *script)
+                                     mrp_interpreter_t *interpreter,
+                                     void  *compiled_data, void *target_data)
 {
-    target_t *t;
+    mrp_scriptlet_t *script;
+    target_t        *t;
 
-    t = create_target(r, target, depend, ndepend, NULL, NULL);
+    script = mrp_allocz(sizeof(*script));
 
-    if (t != NULL) {
-        t->script      = script;
-        t->precompiled = TRUE;
-        t->prepared    = TRUE;
+    if (script != NULL) {
+        t = create_target(r, target, depend, ndepend, NULL, NULL);
 
-        return TRUE;
+        if (t != NULL) {
+            script->interpreter = interpreter;
+            script->data        = target_data;
+            script->compiled    = compiled_data;
+
+            t->script      = script;
+            t->precompiled = TRUE;
+            t->prepared    = TRUE;
+
+            return TRUE;
+        }
+
+        mrp_free(script);
     }
-    else
-        return FALSE;
+
+    return FALSE;
 }
 
 

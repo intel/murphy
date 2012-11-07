@@ -53,9 +53,12 @@ MRP_CDECL_BEGIN
 #define MRP_RESOLVER_TAG_TARGET ((uint16_t)1)
 #define MRP_RESOLVER_TAG_LEVEL  ((uint16_t)2)
 
+/** Just create a resolver context without parsing any input. */
+mrp_resolver_t *mrp_resolver_create(void);
 
 /** Parse the given resolver input file into a resolver context. */
-mrp_resolver_t *mrp_resolver_parse(mrp_context_t *ctx, const char *path);
+mrp_resolver_t *mrp_resolver_parse(mrp_resolver_t *r, mrp_context_t *ctx,
+                                   const char *path);
 
 /** Add a new target with the given parameters to the resolver context. */
 int mrp_resolver_add_target(mrp_resolver_t *r, const char *target,
@@ -66,7 +69,8 @@ int mrp_resolver_add_target(mrp_resolver_t *r, const char *target,
 /** Add a precompiled target to the resolver context. */
 int mrp_resolver_add_prepared_target(mrp_resolver_t *r, const char *target,
                                      const char **depend, int ndepend,
-                                     mrp_scriptlet_t *script);
+                                     mrp_interpreter_t *interpreter,
+                                     void *compiled_data, void *target_data);
 
 /** Add an alias for the given target. */
 int mrp_resolver_add_alias(mrp_resolver_t *r, const char *target,

@@ -50,8 +50,6 @@ int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
     int              auto_update;
 
     auto_update = -1;
-    r->ntarget  = 0;
-    r->targets  = NULL;
 
     mrp_list_foreach(&parser->targets, lp, ln) {
         pt = mrp_list_entry(lp, typeof(*pt), hook);
@@ -200,9 +198,12 @@ int compile_target_scripts(mrp_resolver_t *r)
     int       i;
 
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
-        if (mrp_compile_script(t->script) < 0) {
-            mrp_log_error("Failed to compile script for target '%s'.", t->name);
-            return -1;
+        if (!t->prepared) {
+            if (mrp_compile_script(t->script) < 0) {
+                mrp_log_error("Failed to compile script for target '%s'.",
+                              t->name);
+                return -1;
+            }
         }
     }
 
