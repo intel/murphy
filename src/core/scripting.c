@@ -90,6 +90,7 @@ struct mrp_context_tbl_s {
 
 int mrp_register_interpreter(mrp_interpreter_t *i)
 {
+    mrp_list_init(&i->hook);
     mrp_list_append(&interpreters, &i->hook);
 
     return TRUE;
@@ -99,6 +100,7 @@ int mrp_register_interpreter(mrp_interpreter_t *i)
 static void unregister_interpreter(mrp_interpreter_t *i)
 {
     mrp_list_delete(&i->hook);
+    mrp_list_init(&i->hook);
 }
 
 

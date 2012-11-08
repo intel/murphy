@@ -172,8 +172,6 @@ struct mrp_interpreter_s {
             .cleanup = _cleanup                                         \
         };                                                              \
                                                                         \
-        mrp_list_init(&interpreter.hook);                               \
-                                                                        \
         if (!mrp_register_interpreter(&interpreter))                    \
             mrp_log_error("Failed to register interpreter '%s'.",       \
                           _type);                                       \
