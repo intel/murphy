@@ -189,6 +189,10 @@ static void daemonize(mrp_context_t *ctx)
 static void prepare_ruleset(mrp_context_t *ctx)
 {
     if (ctx->r != NULL) {
+        if (!mrp_resolver_enable_autoupdate(ctx->r, "autoupdate")) {
+            mrp_log_error("Failed to enable resolver autoupdate.");
+            exit(1);
+        }
         if (mrp_resolver_prepare(ctx->r))
             mrp_log_info("Ruleset prepared for resolution.");
         else {

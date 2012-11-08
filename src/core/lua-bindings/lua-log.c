@@ -57,7 +57,6 @@ static int log_msg(lua_State *L, int level)
     int         line;
 
     if (!loaded) {
-        luaopen_base(L);
         luaopen_string(L);
         loaded = TRUE;
     }

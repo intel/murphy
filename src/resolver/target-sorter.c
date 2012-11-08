@@ -67,6 +67,18 @@ int sort_targets(mrp_resolver_t *r)
         dump_graph(g, stdout);
 
         status = 0;
+
+        for (i = 0; i < r->ntarget; i++) {
+            target_t *t = r->targets + i;
+
+            mrp_free(t->update_targets);
+            mrp_free(t->update_facts);
+            mrp_free(t->fact_stamps);
+            t->update_targets = NULL;
+            t->update_facts   = NULL;
+            t->fact_stamps    = NULL;
+        }
+
         for (i = 0; i < r->ntarget; i++) {
             if (sort_graph(g, i) < 0) {
                 mrp_log_error("Failed to determine update order for "

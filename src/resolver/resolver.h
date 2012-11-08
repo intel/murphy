@@ -76,6 +76,9 @@ int mrp_resolver_add_prepared_target(mrp_resolver_t *r, const char *target,
 int mrp_resolver_add_alias(mrp_resolver_t *r, const char *target,
                            const char *alias);
 
+/** Enable autoupdate, generate autoupdate target if needed. */
+int mrp_resolver_enable_autoupdate(mrp_resolver_t *r, const char *name);
+
 /** Destroy the given resolver context, freeing all associated resources. */
 void mrp_resolver_destroy(mrp_resolver_t *r);
 

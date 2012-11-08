@@ -3,15 +3,15 @@ m = murphy.get()
 -- try loading console plugin
 m:try_load_plugin('console')
 
--- load two instances of the test plugin
+-- load a test plugin
 if m:plugin_exists('test') then
-    m:load_plugin('test', 'test2', {
+    m:load_plugin('test', {
                        string2  = 'this is now string2',
                        boolean2 = true,
                        int32 = -981,
                        double = 2.73 })
-    m:load_plugin('test', 'test5')
-    m:info("Successfully loaded two instances of test...")
+--    m:load_plugin('test', 'test2')
+--    m:info("Successfully loaded two instances of test...")
 end
 
 -- load the dbus plugin if it exists

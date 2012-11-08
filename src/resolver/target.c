@@ -40,6 +40,7 @@
 #include "resolver.h"
 #include "fact.h"
 #include "events.h"
+#include "target-sorter.h"
 #include "target.h"
 
 
@@ -189,6 +190,42 @@ target_t *create_target(mrp_resolver_t *r, const char *target,
     mrp_reallocz(r->targets, old_size, new_size);
 
     return NULL;
+}
+
+
+int generate_autoupdate_target(mrp_resolver_t *r, const char *name)
+{
+    const char **depends;
+    int          ndepend, i, j;
+    target_t    *t, *at;
+
+    if (r->auto_update != NULL)
+        return FALSE;
+
+    depends = alloca(r->ntarget * sizeof(depends[0]));
+    ndepend = 0;
+
+    for (i = 0; i < r->ntarget; i++) {
+        t = r->targets + i;
+
+        for (j = 0; j < t->ndepend; j++) {
+            if (*t->depends[j] == '$') {
+                depends[ndepend] = t->name;
+                ndepend++;
+                break;
+            }
+        }
+    }
+
+    at = create_target(r, name, depends, ndepend, NULL, NULL);
+
+    if (at != NULL) {
+        r->auto_update = at;
+
+        return (sort_targets(r) == 0);
+    }
+    else
+        return FALSE;
 }
 
 

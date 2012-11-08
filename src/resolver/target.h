@@ -39,6 +39,7 @@ void destroy_targets(mrp_resolver_t *r);
 target_t *create_target(mrp_resolver_t *r, const char *target,
                         const char **depends, int ndepend,
                         const char *script_type, const char *script_source);
+int generate_autoupdate_target(mrp_resolver_t *r, const char *name);
 int compile_target_scripts(mrp_resolver_t *r);
 int prepare_target_scripts(mrp_resolver_t *r);
 

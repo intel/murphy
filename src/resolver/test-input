@@ -1,4 +1,4 @@
-auto-update-target all
+#auto-update-target all
 
 target all
     depends on video_route audio_route \
@@ -16,6 +16,7 @@ include "test-input-video"
 include "test-input-audio"
 
 target luatest
-    update script ( lua   )
-        print("This is a lua update script.")
+    depends on $audio_playback_owner
+    update script (lua)
+        print("Hello from a resolver update Lua scriptlet...")
     end script

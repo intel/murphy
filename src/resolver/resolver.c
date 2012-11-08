@@ -57,8 +57,9 @@ mrp_resolver_t *mrp_resolver_parse(mrp_resolver_t *r, mrp_context_t *ctx,
 
     if (r == NULL) {
         r = mrp_allocz(sizeof(*r));
-        r->ctx = ctx;
     }
+
+    r->ctx = ctx;
 
     if (r != NULL) {
         if (parser_parse_file(&parser, path)) {
@@ -147,6 +148,12 @@ int mrp_resolver_add_prepared_target(mrp_resolver_t *r, const char *target,
     }
 
     return FALSE;
+}
+
+
+int mrp_resolver_enable_autoupdate(mrp_resolver_t *r, const char *name)
+{
+    return generate_autoupdate_target(r, name);
 }
 
 
