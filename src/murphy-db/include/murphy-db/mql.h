@@ -144,7 +144,7 @@ mql_result_t *mql_exec_string(mql_result_type_t result_type,
  *          if (!mql_result_is_success(r))
  *            printf("exec failed %d: %s\n",
  *                   mql_result_error_get_code(r),
- *                   mql_result_erro_get_message(r));
+ *                   mql_result_error_get_message(r));
  *          else
  *            printf("query %d\n%s\n", i, mql_result_string_get(r));
  *        }
