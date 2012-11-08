@@ -16,6 +16,6 @@ include "test-input-video"
 include "test-input-audio"
 
 target luatest
-    update script ( lua   )
+    update script (lua)
         print("This is a lua update script.")
     end script
