@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <errno.h>
 
 #include <lualib.h>
 #include <lauxlib.h>
@@ -38,12 +38,14 @@
 #include <murphy/common.h>
 #include <murphy-db/mql.h>
 
+#include <murphy/common.h>
 #include <murphy/core/context.h>
 #include <murphy/core/scripting.h>
 #include <murphy/core/lua-decision/mdb.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-utils/strarray.h>
 #include <murphy/core/lua-bindings/murphy.h>
+
 
 #define TABLE_CLASS         MRP_LUA_CLASS(mdb, table)
 #define SELECT_CLASS        MRP_LUA_CLASS(mdb, select)
@@ -52,6 +54,7 @@
 #define SELECT_ROW_CLASSID  MRP_LUA_CLASSID_ROOT "select_row"
 
 typedef enum   field_e        field_t;
+typedef struct row_s          row_t;
 typedef struct const_def_s    const_def_t;
 
 enum field_e {
@@ -75,17 +78,21 @@ struct mrp_lua_mdb_table_s {
 
 
 struct mrp_lua_mdb_select_s {
-    const char                *name;
+    const char *name;
+    const char *table_name;
+    mrp_lua_strarray_t *columns;
+    const char *condition;
     struct {
-        mqi_handle_t  handle;
-        const char   *name;
-    }                          table;
-    mrp_lua_strarray_t        *columns;
-    const char                *condition;
-    struct {
-        const char      *string;
+        const char *string;
         mql_statement_t *precomp;
-    }                          statement;
+    } statement;
+    mql_result_t *result;
+    size_t nrow;
+};
+
+struct row_s {
+    int index;
+    void *data;
 };
 
 struct const_def_s {
@@ -100,22 +107,26 @@ static int  table_tostring(lua_State *);
 static void table_destroy_from_lua(void *);
 
 static void table_row_class_create(lua_State *);
-static int  table_row_create(lua_State *, int, int);
+static int  table_row_create(lua_State *, int, void *, int);
 static int  table_row_getfield(lua_State *);
 static int  table_row_setfield(lua_State *);
+static int  table_row_getlength(lua_State *);
 static mrp_lua_mdb_table_t *table_row_check(lua_State *, int, int *);
 
 static int  select_create_from_lua(lua_State *);
 static int  select_getfield(lua_State *);
 static int  select_setfield(lua_State *);
 static void select_destroy_from_lua(void *);
+static int  select_update(lua_State *, int, mrp_lua_mdb_select_t *);
 static int  select_update_from_lua(lua_State *);
+static int  select_update_from_resolver(mrp_scriptlet_t *,mrp_context_tbl_t *);
 static void select_install(lua_State *, mrp_lua_mdb_select_t *);
 
 static void select_row_class_create(lua_State *);
-static int  select_row_create(lua_State *, int, int);
+static int  select_row_create(lua_State *, int, void *, int);
 static int  select_row_getfield(lua_State *);
 static int  select_row_setfield(lua_State *);
+static int  select_row_getlength(lua_State *);
 static mrp_lua_mdb_select_t *select_row_check(lua_State *, int, int *);
 
 static bool define_constants(lua_State *);
@@ -127,11 +138,11 @@ static mqi_column_def_t *check_coldefs(lua_State *, int, size_t *);
 static int push_coldefs(lua_State *, mqi_column_def_t *, size_t);
 static void free_coldefs(mqi_column_def_t *);
 
-static int   row_create(lua_State *, int, int, const char *);
-static void *row_check(lua_State *, int, mrp_lua_classdef_t *, int *);
+static int row_create(lua_State *, int, void *, int, const char *);
+static row_t *row_check(lua_State *, int, const char *);
 
-static void adjust_table_size(lua_State *, int, size_t, size_t,
-                              mrp_lua_classdef_t *);
+static void adjust_lua_table_size(lua_State *, int, void *, size_t, size_t,
+                                  const char *);
 
 
 MRP_LUA_METHOD_LIST_TABLE (
@@ -160,6 +171,7 @@ MRP_LUA_METHOD_LIST_TABLE (
     table_row_overrides,     /* methodlist name */
     MRP_LUA_OVERRIDE_GETFIELD   (table_row_getfield)
     MRP_LUA_OVERRIDE_SETFIELD   (table_row_setfield)
+    MRP_LUA_OVERRIDE_GETLENGTH  (table_row_getlength)
 );
 
 MRP_LUA_METHOD_LIST_TABLE (
@@ -174,6 +186,7 @@ MRP_LUA_METHOD_LIST_TABLE (
     select_row_overrides,    /* methodlist name */
     MRP_LUA_OVERRIDE_GETFIELD   (select_row_getfield)
     MRP_LUA_OVERRIDE_SETFIELD   (select_row_setfield)
+    MRP_LUA_OVERRIDE_GETLENGTH  (select_row_getlength)
 );
 
 MRP_LUA_CLASS_DEF (
@@ -345,7 +358,8 @@ static int table_setfield(lua_State *L)
             luaL_error(L, "row index '%u' is out of sequence", rowidx);
 
         if (rowidx == tbl->nrow) {
-            adjust_table_size(L, 1, tbl->nrow, tbl->nrow+1, TABLE_CLASS);
+            adjust_lua_table_size(L, 1, tbl, tbl->nrow, tbl->nrow+1,
+                                  TABLE_ROW_CLASSID);
             tbl->nrow++;
         }
         else {
@@ -394,9 +408,9 @@ static void table_row_class_create(lua_State *L)
     luaL_openlib(L, NULL, table_row_overrides, 0);
 }
 
-static int table_row_create(lua_State *L, int tbl, int rowidx)
+static int table_row_create(lua_State *L, int tbl, void *data, int rowidx)
 {
-    return row_create(L, tbl, rowidx, TABLE_ROW_CLASSID);
+    return row_create(L, tbl, data, rowidx, TABLE_ROW_CLASSID);
 }
 
 static int table_row_getfield(lua_State *L)
@@ -425,11 +439,26 @@ static int table_row_setfield(lua_State *L)
     return 0;
 }
 
+static int  table_row_getlength(lua_State *L)
+{
+    mrp_lua_mdb_table_t *tbl = table_row_check(L, 1, NULL);
+    
+    lua_pushinteger(L, tbl->ncolumn);
+
+    return 1;
+}
+
+
 static mrp_lua_mdb_table_t *table_row_check(lua_State *L,
                                             int  idx,
                                             int *ret_rowidx)
 {
-    return (mrp_lua_mdb_table_t *)row_check(L, idx, TABLE_CLASS, ret_rowidx);
+    row_t *row = row_check(L, idx, TABLE_ROW_CLASSID);
+
+    if (ret_rowidx)
+        *ret_rowidx = row->index;
+
+    return (mrp_lua_mdb_table_t *)row->data;
 }
 
 
@@ -453,7 +482,7 @@ static int select_create_from_lua(lua_State *L)
             break;
 
         case TABLE:
-            sel->table.name = mrp_strdup(luaL_checkstring(L, -1));
+            sel->table_name = mrp_strdup(luaL_checkstring(L, -1));
             break;
 
         case COLUMNS:
@@ -477,7 +506,7 @@ static int select_create_from_lua(lua_State *L)
 
     if (!sel->name)
         luaL_error(L, "mandatory 'name' field is missing");
-    if (!sel->table.name)
+    if (!sel->table_name)
         luaL_error(L, "mandatory 'table' field is missing");
     if (!sel->columns || !sel->columns->nstring)
         luaL_error(L, "mandatory 'column' field is missing or invalid");
@@ -486,11 +515,11 @@ static int select_create_from_lua(lua_State *L)
 
     if (!sel->condition) {
         snprintf(qry, sizeof(qry), "SELECT %s FROM %s",
-                 cols, sel->table.name);
+                 cols, sel->table_name);
     }
     else {
         snprintf(qry, sizeof(qry), "SELECT %s FROM %s WHERE %s",
-                 cols, sel->table.name, sel->condition);
+                 cols, sel->table_name, sel->condition);
     }
 
     sel->statement.string = mrp_strdup(qry);
@@ -498,6 +527,8 @@ static int select_create_from_lua(lua_State *L)
     mrp_lua_set_object_name(L, SELECT_CLASS, sel->name);
 
     select_install(L, sel);
+
+    select_update(L, -1, sel);
 
     return 1;
 }
@@ -523,7 +554,7 @@ static int select_getfield(lua_State *L)
             if (fld) {
                 switch (fld) {
                 case NAME:      lua_pushstring(L, sel->name);            break;
-                case TABLE:     lua_pushstring(L, sel->table.name);      break;
+                case TABLE:     lua_pushstring(L, sel->table_name);      break;
                 case COLUMNS:   mrp_lua_push_strarray(L, sel->columns);  break;
                 case CONDITION: lua_pushstring(L, sel->condition);       break;
                 case STATEMENT: lua_pushstring(L,sel->statement.string); break;
@@ -556,47 +587,97 @@ static void select_destroy_from_lua(void *data)
     if (sel) {
         mrp_lua_free_strarray(sel->columns);
         mrp_free((void *)sel->name);
-        mrp_free((void *)sel->table.name);
+        mrp_free((void *)sel->table_name);
         mrp_free((void *)sel->condition);
         mrp_free((void *)sel->statement.string);
     }
 }
 
+static int select_update(lua_State *L, int tbl, mrp_lua_mdb_select_t *sel)
+{
+    mql_statement_t *statement;
+    mql_result_t *result;
+    int nrow;
+
+    if (!sel->statement.precomp)
+        sel->statement.precomp = mql_precompile(sel->statement.string);
+
+    if (!(statement = sel->statement.precomp))
+        nrow = 0;
+    else {
+        mql_result_free(sel->result);
+        sel->result = NULL;
+
+        result = mql_exec_statement(mql_result_rows, statement);
+        if (!mql_result_is_success(result)) {
+            nrow = -mql_result_error_get_code(result);
+        }
+        else {
+            sel->result = result;
+            nrow = mql_result_rows_get_row_column_count(result);
+        }
+    }
+
+    printf("*** query resulted %d rows\n", nrow);
+
+    if (nrow >= 0) {
+        adjust_lua_table_size(L, tbl,sel, sel->nrow, nrow, SELECT_ROW_CLASSID);
+        sel->nrow = nrow;
+    }
+
+    return nrow;
+}
+
 static int select_update_from_lua(lua_State *L)
 {
     mrp_lua_mdb_select_t *sel = mrp_lua_select_check(L, 1);
+    int nrow;
 
-    printf("*** update request for select '%s'\n", sel->name);
+    printf("*** update request for select '%s' (from lua)\n", sel->name);
 
-    lua_pushinteger(L, 0);
+    nrow = select_update(L, 1, sel);
+
+    lua_pushinteger(L, nrow < 0 ? 0 : nrow);
 
     return 1;
 }
 
-static int select_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
+static int select_update_from_resolver(mrp_scriptlet_t *script,
+                                       mrp_context_tbl_t *ctbl)
 {
     mrp_lua_mdb_select_t *sel = (mrp_lua_mdb_select_t *)script->data;
+    lua_State *L = mrp_lua_get_lua_state();
+    int nrow;
 
     MRP_UNUSED(ctbl);
 
-    printf("*** should update element '%s'\n", sel->name);
+    if (!sel || !L)
+        return -EINVAL;
 
-    return TRUE;
+    printf("*** update request for select '%s' (from resolver)\n", sel->name);
+
+    mrp_lua_push_object(L, sel);
+
+    nrow = select_update(L, -1, sel);
+
+    lua_pop(L, 1);
+
+    return nrow;
 }
-
-static mrp_interpreter_t select_updater = {
-    { NULL, NULL },
-    "select_updater",
-    NULL,
-    NULL,
-    NULL,
-    select_update_cb,
-    NULL
-};
 
 
 static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
 {
+    static mrp_interpreter_t select_updater = {
+        { NULL, NULL },
+        "select_updater",
+        NULL,
+        NULL,
+        NULL,
+        select_update_from_resolver,
+        NULL
+    };
+
     mrp_context_t *ctx;
     char target[1024], table[1024];
     const char *depends;
@@ -611,10 +692,10 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
     }
 
     printf("\nselect_%s: table_%s\n\tupdate(%s)\n",
-           sel->name, sel->table.name, sel->name);
+           sel->name, sel->table_name, sel->name);
 
     snprintf(target, sizeof(target), "select_%s", sel->name);
-    snprintf(table , sizeof(table) , "$%s", sel->table.name);
+    snprintf(table , sizeof(table) , "$%s", sel->table_name);
 
     depends = table;
 
@@ -635,22 +716,73 @@ static void select_row_class_create(lua_State *L)
     luaL_openlib(L, NULL, select_row_overrides, 0);
 }
 
-static int select_row_create(lua_State *L, int tbl, int rowidx)
+static int select_row_create(lua_State *L, int tbl, void *data, int rowidx)
 {
-    return row_create(L, tbl, rowidx, SELECT_ROW_CLASSID);
+    return row_create(L, tbl, data, rowidx, SELECT_ROW_CLASSID);
 }
 
 static int select_row_getfield(lua_State *L)
 {
     mrp_lua_mdb_select_t *sel;
+    mrp_lua_strarray_t *cols;
+    mql_result_t *rslt;
+    const char *fldnam;
     int rowidx;
+    int colidx;
+    const char *string;
+    lua_Number number;
+    char buf[1024];
 
-    sel = select_row_check(L, 1, &rowidx);
+    sel  = select_row_check(L, 1, &rowidx);
+    cols = sel->columns;
+    rslt = sel->result;
 
     printf("*** reading field in row %d of '%s' selection\n",
-           rowidx+1, sel->name);
+           rowidx+1, sel ? sel->name : "<unknwon>");
 
-    lua_pushnil(L);
+    if (!sel || !rslt || (size_t)rowidx >= sel->nrow)
+        lua_pushnil(L); /* we should never get here actually */
+
+
+    switch (lua_type(L, 2)) {
+    case LUA_TSTRING:
+        fldnam = lua_tostring(L, 2);
+        for (colidx = 0;   colidx < (int)cols->nstring;   colidx++) {
+            if (!strcmp(fldnam, cols->strings[colidx]))
+                break;
+        }
+        goto get_data;
+
+    case LUA_TNUMBER:
+        colidx = lua_tointeger(L, 2) - 1;
+        /* intentional fall through */
+
+    get_data:
+        if (colidx < 0 || colidx >= (int)cols->nstring)
+            goto no_data;
+ 
+        switch (mql_result_rows_get_row_column_type(rslt, colidx)) {
+        case mqi_string:
+            string = mql_result_rows_get_string(rslt, colidx, rowidx,
+                                                buf, sizeof(buf));
+            lua_pushstring(L, string);
+            break;
+        case mqi_integer:
+        case mqi_unsignd:
+        case mqi_floating:
+            number = mql_result_rows_get_floating(rslt, colidx, rowidx);
+            lua_pushnumber(L, number);
+            break;
+        default:
+            goto no_data;
+        }
+        break;
+
+    default:
+    no_data:
+        lua_pushnil(L);
+        break;
+    }
 
     return 1;
 }
@@ -668,11 +800,26 @@ static int select_row_setfield(lua_State *L)
     return 0;
 }
 
+static int  select_row_getlength(lua_State *L)
+{
+    mrp_lua_mdb_select_t *sel = select_row_check(L, 1, NULL);
+    
+    lua_pushinteger(L, sel->columns->nstring);
+
+    return 1;
+}
+
+
 static mrp_lua_mdb_select_t *select_row_check(lua_State *L,
                                               int idx,
                                               int *ret_rowidx)
 {
-    return (mrp_lua_mdb_select_t *)row_check(L, idx, SELECT_CLASS, ret_rowidx);
+    row_t *row = row_check(L, idx, SELECT_ROW_CLASSID);
+
+    if (ret_rowidx)
+        *ret_rowidx = row->index;
+
+    return (mrp_lua_mdb_select_t *)row->data;
 }
 
 static bool define_constants(lua_State *L)
@@ -871,59 +1018,44 @@ static void free_coldefs(mqi_column_def_t *coldefs)
     }
 }
 
-static int row_create(lua_State *L, int tbl, int rowidx, const char *class_id)
+static int row_create(lua_State *L, int tbl, void *data, int rowidx,
+                      const char *class_id)
 {
+    row_t *row;
+
     tbl = (tbl < 0) ? lua_gettop(L) + tbl + 1 : tbl;
 
     luaL_checktype(L, tbl, LUA_TTABLE);
 
-    lua_createtable(L, 2, 0);
+    row = lua_newuserdata(L, sizeof(row_t));
+
+    row->data = data;
+    row->index = rowidx;
 
     luaL_getmetatable(L, class_id);
     lua_setmetatable(L, -2);
 
-    lua_pushinteger(L, 1);
-    lua_pushinteger(L, rowidx);
-    lua_rawset(L, -3);
-
-    lua_pushinteger(L, 2);
-    lua_pushvalue(L, tbl);
-    lua_rawset(L, -3);
-
     return 1;
 }
 
-static void *row_check(lua_State *L,
-                       int  idx,
-                       mrp_lua_classdef_t *class_def,
-                       int *ret_rowidx)
+static row_t *row_check(lua_State *L, int  idx, const char *class_id)
 {
-    void *tbl;
-    int rowidx;
+    row_t *row;
 
-    luaL_checktype(L, idx, LUA_TTABLE);
+    idx = (idx < 0) ? lua_gettop(L) + idx + 1 : idx;
 
-    lua_pushinteger(L, 1);
-    lua_rawget(L, -2);
-    rowidx = luaL_checknumber(L, -1);
-    lua_pop(L, 1);
+    row = (row_t *)luaL_checkudata(L, idx, class_id);
 
-    lua_pushinteger(L, 2);
-    lua_rawget(L, -2);
-    tbl = mrp_lua_check_object(L, class_def, -1);
-    lua_pop(L, 1);
-
-    if (ret_rowidx)
-        *ret_rowidx = rowidx;
-
-    return tbl;
+    return row;
 }
 
-static void adjust_table_size(lua_State *L,
-                              int tbl,
-                              size_t old_size,
-                              size_t new_size,
-                              mrp_lua_classdef_t *def)
+
+static void adjust_lua_table_size(lua_State *L,
+                                  int tbl,
+                                  void *data,
+                                  size_t old_size,
+                                  size_t new_size,
+                                  const char *class_id)
 {
     size_t rowidx;
 
@@ -934,7 +1066,7 @@ static void adjust_table_size(lua_State *L,
     if (old_size < new_size) {
         for (rowidx = old_size;   rowidx < new_size;   rowidx++) {
             lua_pushinteger(L, (int)(rowidx+1));
-            row_create(L, tbl, rowidx, def->class_id);
+            row_create(L, tbl, data, rowidx, class_id);
             lua_rawset(L, tbl);
         }
         return;
