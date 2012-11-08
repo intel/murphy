@@ -150,7 +150,7 @@ AC_ARG_ENABLE(pulse,
 if test "$enable_pulse" != "no"; then
     PKG_CHECK_MODULES(PULSE, libpulse >= 0.9.22,
     			     [have_pulse=yes], [have_pulse=no])
-    if test "$have_pulse" = "no" -a "$enable_pulse" != "yes"; then
+    if test "$have_pulse" = "no" -a "$enable_pulse" = "yes"; then
         AC_MSG_ERROR([PulseAudio development libraries not found.])
     fi
 
@@ -183,7 +183,7 @@ AC_ARG_ENABLE(ecore,
 if test "$enable_ecore" != "no"; then
     PKG_CHECK_MODULES(ECORE, ecore,
                       [have_ecore=yes], [have_ecore=no])
-    if test "$have_ecore" = "no" -a "$enable_ecore" != "yes"; then
+    if test "$have_ecore" = "no" -a "$enable_ecore" = "yes"; then
         AC_MSG_ERROR([EFL/ecore development libraries not found.])
     fi
 
@@ -208,7 +208,7 @@ AC_ARG_ENABLE(glib,
 if test "$enable_glib" != "no"; then
     PKG_CHECK_MODULES(GLIB, glib-2.0,
                       [have_glib=yes], [have_glib=no])
-    if test "$have_glib" = "no" -a "$enable_glib" != "yes"; then
+    if test "$have_glib" = "no" -a "$enable_glib" = "yes"; then
         AC_MSG_ERROR([glib development libraries not found.])
     fi
 
