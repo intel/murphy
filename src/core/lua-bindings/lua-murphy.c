@@ -91,6 +91,20 @@ static void init_lua_decision(lua_State *L)
 }
 
 
+static lua_State *init_lua(void)
+{
+    lua_State *L = luaL_newstate();
+
+    if (L != NULL) {
+        luaopen_base(L);
+        init_lua_utils(L);
+        init_lua_decision(L);
+    }
+
+    return L;
+}
+
+
 lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx)
 {
     lua_State          *L;
@@ -99,7 +113,7 @@ lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx)
     int                 success;
 
     if (context == NULL) {
-        L = luaL_newstate();
+        L = init_lua();
 
         if (L != NULL) {
             ctx->lua_state = L;
