@@ -167,7 +167,8 @@ mrp_scriptlet_t *mrp_create_script(const char *type, const char *source)
 void mrp_destroy_script(mrp_scriptlet_t *script)
 {
     if (script != NULL) {
-        script->interpreter->cleanup(script);
+        if (script->interpreter && script->interpreter->cleanup)
+            script->interpreter->cleanup(script);
 
         mrp_free(script->source);
         mrp_free(script);
