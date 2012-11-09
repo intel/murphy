@@ -118,8 +118,29 @@ static mrp_debug_file_t file_4 = {
     .info = info_4
 };
 
-/* common/log.c */
+/* common/io-proxy.c */
 static mrp_debug_info_t info_5[] = {
+    { .line = 29, .func = "mrp_create_ioproxy" },
+    { .line = 49, .func = "mrp_destroy_ioproxy" },
+    { .line = 60, .func = "mrp_add_ioproxy_input" },
+    { .line = 72, .func = "mrp_ioproxy_mainloop" },
+    { .line = 78, .func = "output_cb" },
+    { .line = 107, .func = "mrp_ioproxy_buffered_output" },
+    { .line = 115, .func = "mrp_ioproxy_output_fd" },
+    { .line = 121, .func = "mrp_ioproxy_read_output" },
+    { .line = 134, .func = "mrp_attach_ioproxy_output" },
+    { .line = 174, .func = "mrp_detach_ioproxy_output" },
+    { .line = 196, .func = "mrp_attach_ioproxy_input" },
+    { .line = 207, .func = "mrp_detach_ioproxy_input" },
+    { .line = 0, .func = NULL }
+};
+static mrp_debug_file_t file_5 = {
+    .file = "common/io-proxy.c",
+    .info = info_5
+};
+
+/* common/log.c */
+static mrp_debug_info_t info_6[] = {
     { .line = 43, .func = "mrp_log_parse_levels" },
     { .line = 84, .func = "mrp_log_parse_target" },
     { .line = 97, .func = "mrp_log_enable" },
@@ -131,13 +152,13 @@ static mrp_debug_info_t info_5[] = {
     { .line = 226, .func = "set_default_logging" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_5 = {
+static mrp_debug_file_t file_6 = {
     .file = "common/log.c",
-    .info = info_5
+    .info = info_6
 };
 
 /* common/mainloop.c */
-static mrp_debug_info_t info_6[] = {
+static mrp_debug_info_t info_7[] = {
     { .line = 212, .func = "add_slave_io_watch" },
     { .line = 246, .func = "slave_io_events" },
     { .line = 265, .func = "free_io_watch" },
@@ -199,13 +220,13 @@ static mrp_debug_info_t info_6[] = {
     { .line = 1545, .func = "dump_pollfds" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_6 = {
+static mrp_debug_file_t file_7 = {
     .file = "common/mainloop.c",
-    .info = info_6
+    .info = info_7
 };
 
 /* common/mm.c */
-static mrp_debug_info_t info_7[] = {
+static mrp_debug_info_t info_8[] = {
     { .line = 95, .func = "setup" },
     { .line = 122, .func = "cleanup" },
     { .line = 133, .func = "memblk_alloc" },
@@ -247,13 +268,13 @@ static mrp_debug_info_t info_7[] = {
     { .line = 970, .func = "chunk_free" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_7 = {
+static mrp_debug_file_t file_8 = {
     .file = "common/mm.c",
-    .info = info_7
+    .info = info_8
 };
 
 /* common/msg.c */
-static mrp_debug_info_t info_8[] = {
+static mrp_debug_info_t info_9[] = {
     { .line = 49, .func = "destroy_field" },
     { .line = 83, .func = "create_field" },
     { .line = 257, .func = "msg_destroy" },
@@ -268,40 +289,40 @@ static mrp_debug_info_t info_8[] = {
     { .line = 459, .func = "mrp_msg_find" },
     { .line = 474, .func = "mrp_msg_get" },
     { .line = 588, .func = "mrp_msg_iterate_get" },
-    { .line = 705, .func = "field_type_name" },
-    { .line = 758, .func = "mrp_msg_dump" },
-    { .line = 893, .func = "mrp_msg_default_encode" },
-    { .line = 1045, .func = "mrp_msg_default_decode" },
-    { .line = 1271, .func = "guarded_array_size" },
-    { .line = 1310, .func = "counted_array_size" },
-    { .line = 1327, .func = "get_array_size" },
-    { .line = 1348, .func = "mrp_data_get_array_size" },
-    { .line = 1354, .func = "get_blob_size" },
-    { .line = 1381, .func = "mrp_data_get_blob_size" },
-    { .line = 1387, .func = "check_and_init_array_descr" },
-    { .line = 1420, .func = "mrp_msg_register_type" },
-    { .line = 1477, .func = "mrp_msg_find_type" },
-    { .line = 1497, .func = "cleanup_types" },
-    { .line = 1505, .func = "mrp_data_encode" },
-    { .line = 1670, .func = "member_type" },
-    { .line = 1684, .func = "mrp_data_decode" },
-    { .line = 1914, .func = "mrp_data_dump" },
-    { .line = 2029, .func = "mrp_data_free" },
-    { .line = 2064, .func = "mrp_msgbuf_write" },
-    { .line = 2082, .func = "mrp_msgbuf_read" },
-    { .line = 2089, .func = "mrp_msgbuf_cancel" },
-    { .line = 2096, .func = "mrp_msgbuf_ensure" },
-    { .line = 2122, .func = "mrp_msgbuf_reserve" },
-    { .line = 2154, .func = "mrp_msgbuf_pull" },
+    { .line = 717, .func = "field_type_name" },
+    { .line = 770, .func = "mrp_msg_dump" },
+    { .line = 905, .func = "mrp_msg_default_encode" },
+    { .line = 1057, .func = "mrp_msg_default_decode" },
+    { .line = 1283, .func = "guarded_array_size" },
+    { .line = 1322, .func = "counted_array_size" },
+    { .line = 1339, .func = "get_array_size" },
+    { .line = 1360, .func = "mrp_data_get_array_size" },
+    { .line = 1366, .func = "get_blob_size" },
+    { .line = 1393, .func = "mrp_data_get_blob_size" },
+    { .line = 1399, .func = "check_and_init_array_descr" },
+    { .line = 1432, .func = "mrp_msg_register_type" },
+    { .line = 1489, .func = "mrp_msg_find_type" },
+    { .line = 1509, .func = "cleanup_types" },
+    { .line = 1517, .func = "mrp_data_encode" },
+    { .line = 1682, .func = "member_type" },
+    { .line = 1696, .func = "mrp_data_decode" },
+    { .line = 1926, .func = "mrp_data_dump" },
+    { .line = 2041, .func = "mrp_data_free" },
+    { .line = 2076, .func = "mrp_msgbuf_write" },
+    { .line = 2094, .func = "mrp_msgbuf_read" },
+    { .line = 2101, .func = "mrp_msgbuf_cancel" },
+    { .line = 2108, .func = "mrp_msgbuf_ensure" },
+    { .line = 2134, .func = "mrp_msgbuf_reserve" },
+    { .line = 2166, .func = "mrp_msgbuf_pull" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_8 = {
+static mrp_debug_file_t file_9 = {
     .file = "common/msg.c",
-    .info = info_8
+    .info = info_9
 };
 
 /* common/stream-transport.c */
-static mrp_debug_info_t info_9[] = {
+static mrp_debug_info_t info_10[] = {
     { .line = 73, .func = "parse_address" },
     { .line = 191, .func = "strm_resolve" },
     { .line = 241, .func = "strm_open" },
@@ -319,13 +340,13 @@ static mrp_debug_info_t info_9[] = {
     { .line = 634, .func = "strm_senddata" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_9 = {
+static mrp_debug_file_t file_10 = {
     .file = "common/stream-transport.c",
-    .info = info_9
+    .info = info_10
 };
 
 /* common/transport.c */
-static mrp_debug_info_t info_10[] = {
+static mrp_debug_info_t info_11[] = {
     { .line = 47, .func = "check_request_callbacks" },
     { .line = 71, .func = "mrp_transport_register" },
     { .line = 87, .func = "mrp_transport_unregister" },
@@ -352,22 +373,22 @@ static mrp_debug_info_t info_10[] = {
     { .line = 505, .func = "recv_data" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_10 = {
+static mrp_debug_file_t file_11 = {
     .file = "common/transport.c",
-    .info = info_10
+    .info = info_11
 };
 
 /* common/utils.c */
-static mrp_debug_info_t info_11[] = {
+static mrp_debug_info_t info_12[] = {
     { .line = 45, .func = "notify_parent" },
     { .line = 58, .func = "mrp_daemonize" },
     { .line = 194, .func = "mrp_string_comp" },
     { .line = 200, .func = "mrp_string_hash" },
     { .line = 0, .func = NULL }
 };
-static mrp_debug_file_t file_11 = {
+static mrp_debug_file_t file_12 = {
     .file = "common/utils.c",
-    .info = info_11
+    .info = info_12
 };
 
 /* table of all files */
@@ -384,6 +405,7 @@ static mrp_debug_file_t *debug_files[] = {
     &file_9,
     &file_10,
     &file_11,
+    &file_12,
     NULL
 };
 
