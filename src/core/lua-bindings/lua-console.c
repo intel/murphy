@@ -15,12 +15,13 @@ static void eval_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     char       code[1024], *p;
     int        i, n, l, len;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     L = mrp_lua_get_lua_state();
 
     if (L == NULL) {
-        mrp_console_printf(c, "Lua runtime not available or initialized.");
+        printf("Lua runtime not available or initialized.");
         return;
     }
 
@@ -39,7 +40,7 @@ static void eval_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     }
 
     if (luaL_loadbuffer(L, code, len, "<console>") || lua_pcall(L, 0, 0, 0))
-        mrp_console_printf(c, "Lua error: %s\n", lua_tostring(L, -1));
+        printf("Lua error: %s\n", lua_tostring(L, -1));
 
     lua_settop(L, 0);
 }
@@ -54,10 +55,11 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     ssize_t      len;
     int          fd;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     if (argc != 3) {
-        mrp_console_printf(c, "Invalid arguments, expecting a single path.");
+        printf("Invalid arguments, expecting a single path.");
         return;
     }
     else
@@ -66,7 +68,7 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     L = mrp_lua_get_lua_state();
 
     if (L == NULL) {
-        mrp_console_printf(c, "Lua runtime not available or initialized.");
+        printf("Lua runtime not available or initialized.");
         return;
     }
 
@@ -83,19 +85,17 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
                 if (len > 0) {
                     if (luaL_loadbuffer(L, code, len, path) != 0 ||
                         lua_pcall(L, 0, 0, 0) != 0)
-                        mrp_console_printf(c, "Lua error: %s\n",
-                                           lua_tostring(L, -1));
+                        printf("Lua error: %s\n", lua_tostring(L, -1));
 
                     lua_settop(L, 0);
                 }
             }
             else
-                mrp_console_printf(c, "Failed to open %s (%d: %s).", path,
-                                   errno, strerror(errno));
+                printf("Failed to open %s (%d: %s).", path,
+                       errno, strerror(errno));
         }
         else
-            mrp_console_printf(c, "Failed to open %s (%d: %s).", path,
-                               errno, strerror(errno));
+            printf("Failed to open %s (%d: %s).", path, errno, strerror(errno));
     }
 }
 

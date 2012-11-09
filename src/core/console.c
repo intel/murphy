@@ -32,6 +32,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include <murphy/common/mm.h>
 #include <murphy/common/list.h>
@@ -53,6 +54,10 @@
 #define CNORM  COLOR""WHITE
 #define CWARN  COLOR""YELLOW
 #define CERR   COLOR""RED
+
+#define RFD 0
+#define WFD 1
+
 
 #define MRP_CFG_MAXLINE 4096             /* input line length limit */
 #define MRP_CFG_MAXARGS   64             /* command argument limit */
@@ -86,19 +91,23 @@ typedef struct {
     char                 prompt[MAX_PROMPT]; /* current prompt */
     input_t              in;                 /* input buffer */
     mrp_list_hook_t      hook;               /* to list of active consoles */
+    int                  pout[2];            /* pipe for output proxying */
+    int                  ofd;                /* saved fileno(stdout) */
+    int                  oblk;               /* saved O_NONBLOCK for ofd */
+    int                  efd;                /* saved fileno(stderr) */
+    int                  eblk;               /* saved O_NONBLOCK for efd */
 } console_t;
 
 
 static int check_destroy(mrp_console_t *mc);
 static int purge_destroyed(mrp_console_t *mc);
 static FILE *console_fopen(mrp_console_t *mc);
+static void console_release_output(console_t *c);
 
 static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size);
 static void disconnected_evt(mrp_console_t *c, int error);
 static ssize_t complete_evt(mrp_console_t *c, void *input, size_t isize,
                             char **completions, size_t csize);
-
-
 
 static void register_commands(mrp_context_t *ctx);
 static void unregister_commands(mrp_context_t *ctx);
@@ -162,6 +171,9 @@ mrp_console_t *mrp_create_console(mrp_context_t *ctx, mrp_console_req_t *req,
         c->in.line = 0;
         c->in.fd   = -1;
 
+        pipe(c->pout);
+        c->ofd = c->efd = -1;
+
         mrp_list_append(&ctx->consoles, &c->hook);
         mrp_set_console_prompt((mrp_console_t *)c);
     }
@@ -192,6 +204,10 @@ static int purge_destroyed(mrp_console_t *mc)
 
         fclose(c->stdout);
         fclose(c->stderr);
+
+        console_release_output(c);
+        close(c->pout[0]);
+        close(c->pout[1]);
 
         c->req.free(c->backend_data);
         mrp_free(c);
@@ -358,6 +374,54 @@ int mrp_console_del_core_group(mrp_console_group_t *group)
 }
 
 
+static void console_grab_output(console_t *c)
+{
+    int ofd = fileno(stdout);
+    int efd = fileno(stderr);
+    int blk;
+
+    if (c->ofd == -1 && c->pout[RFD] != -1) {
+        blk = fcntl(ofd, F_GETFL, 0);
+        c->oblk = (blk > 0 && (blk & O_NONBLOCK));
+        blk = fcntl(efd, F_GETFL, 0);
+        c->eblk = (blk > 0 && (blk & O_NONBLOCK));
+
+        c->ofd = dup(ofd);
+        dup2(c->pout[WFD], ofd);
+        fcntl(c->pout[RFD], F_SETFL, O_NONBLOCK);
+
+        c->efd = dup(efd);
+        dup2(c->pout[WFD], efd);
+        fcntl(c->pout[WFD], F_SETFL, O_NONBLOCK);
+    }
+}
+
+
+static void console_release_output(console_t *c)
+{
+    int ofd = fileno(stdout);
+    int efd = fileno(stderr);
+
+    if (c->ofd >= 0) {
+        dup2(c->ofd, ofd);
+        c->ofd = -1;
+        fcntl(ofd, F_SETFL, c->oblk);
+    }
+
+    if (c->efd >= 0) {
+        dup2(c->efd, efd);
+        c->efd = -1;
+        fcntl(efd, F_SETFL, c->eblk);
+    }
+}
+
+
+static int console_read_output(console_t *c, void *buf, size_t size)
+{
+    return read(c->pout[RFD], buf, size);
+}
+
+
 static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
 {
     console_t           *c = (console_t *)mc;
@@ -480,9 +544,29 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
 
  execute:
     if (cmd != NULL) {
+        console_grab_output(c);
+
+        clearerr(stdout);
+        clearerr(stderr);
+
         MRP_CONSOLE_BUSY(mc, {
                 cmd->tok(mc, grp->user_data, argc, argv);
             });
+
+        {
+            char data[1024];
+            int  size;
+
+            while ((size = console_read_output(c, data, sizeof(data))) > 0) {
+                dprintf(c->ofd, "%*.*s", size, size, data);
+                mrp_console_printf(mc, "%*.*s", size, size, data);
+            }
+
+            if (ferror(stdout) || ferror(stderr))
+                mrp_console_printf(mc, "[console output truncated...]\n");
+        }
+
+        console_release_output(c);
     }
     else {
     unknown_command:

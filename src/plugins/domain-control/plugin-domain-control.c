@@ -28,11 +28,12 @@ static void plugin_exit(mrp_plugin_t *plugin)
 
 static void cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 {
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    mrp_console_printf(c, "domctrl:%s() called...\n", __FUNCTION__);
+    printf("domctrl:%s() called...\n", __FUNCTION__);
 }
 
 

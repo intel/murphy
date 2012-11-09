@@ -126,7 +126,6 @@ void one_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     for (i = 0; i < argc; i++) {
         printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
-        mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
     }
 }
 
@@ -139,7 +138,6 @@ void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     for (i = 0; i < argc; i++) {
         printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
-        mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
     }
 }
 
@@ -152,7 +150,6 @@ void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     for (i = 0; i < argc; i++) {
         printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
-        mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
     }
 }
 
@@ -165,7 +162,6 @@ void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     for (i = 0; i < argc; i++) {
         printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
-        mrp_console_printf(c, "%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
     }
 }
 
@@ -181,10 +177,9 @@ void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     for (i = 2; i < argc; i++) {
         tx = mqi_begin_transaction();
         if (mql_exec_file(argv[i]) < 0)
-            mrp_console_printf(c, "failed to execute DB script: %s\n",
-                               strerror(errno));
+            printf("failed to execute DB script: %s\n", strerror(errno));
         else
-            mrp_console_printf(c, "DB script executed OK\n");
+            printf("DB script executed OK\n");
         mqi_commit_transaction(tx);
     }
 }
@@ -208,21 +203,20 @@ void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
         n -= l;
 
         if ((tx = mqi_begin_transaction()) == MQI_HANDLE_INVALID)
-            mrp_console_printf(c, "failed to create DB transaction\n");
+            printf("failed to create DB transaction\n");
         r = mql_exec_string(mql_result_string, buf);
 
         if (!mql_result_is_success(r)) {
-            mrp_console_printf(c, "failed to execute DB command '%s'\n",
-                               buf);
+            printf("failed to execute DB command '%s'\n", buf);
         }
         else {
-            mrp_console_printf(c, "DB command executed OK\n");
-            mrp_console_printf(c, "%s\n", mql_result_string_get(r));
+            printf("DB command executed OK\n");
+            printf("%s\n", mql_result_string_get(r));
         }
 
         mql_result_free(r);
         if (mqi_commit_transaction(tx) < 0)
-            mrp_console_printf(c, "failed to commit DB transaction\n");
+            printf("failed to commit DB transaction\n");
     }
 }
 
@@ -239,15 +233,15 @@ void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 
         if (ctx->r != NULL) {
             if (mrp_resolver_update_target(ctx->r, target, NULL) > 0)
-                mrp_console_printf(c, "'%s' updated OK.\n", target);
+                printf("'%s' updated OK.\n", target);
             else
-                mrp_console_printf(c, "Failed to update '%s'.\n", target);
+                printf("Failed to update '%s'.\n", target);
         }
         else
-            mrp_console_printf(c, "Resolver/ruleset is not available.\n");
+            printf("Resolver/ruleset is not available.\n");
     }
     else {
-        mrp_console_printf(c, "Usage: %s %s <target-name>\n", argv[0], argv[1]);
+        printf("Usage: %s %s <target-name>\n", argv[0], argv[1]);
     }
 }
 
@@ -507,7 +501,7 @@ static void success_cb(uint32_t tx, void *data)
 {
     mrp_console_t *c = data;
 
-    mrp_console_printf(c, "%s(): transaction %u\n", __FUNCTION__, tx);
+    printf("%s(): transaction %u\n", __FUNCTION__, tx);
 }
 
 
@@ -515,8 +509,8 @@ static void error_cb(uint32_t tx, mrp_tx_error_t err, void *data)
 {
     mrp_console_t *c = data;
 
-    mrp_console_printf(c, "%s(): transaction %u error: %s\n", __FUNCTION__,
-            tx, (err == MRP_TX_ERROR_NACKED) ? "NACK" : "no reply");
+    printf("%s(): transaction %u error: %s\n", __FUNCTION__,
+           tx, (err == MRP_TX_ERROR_NACKED) ? "NACK" : "no reply");
 }
 
 
@@ -587,15 +581,15 @@ void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     ret = mrp_tx_close_signal(tx);
 
-    mrp_console_printf(c, "%s(): tried to send a cancelled transction %u -- success %i\n",
-            __FUNCTION__, tx, ret);
+    printf("%s(): tried to send a cancelled transction %u -- success %i\n",
+           __FUNCTION__, tx, ret);
 }
 
 static void info_cb(char *msg, void *data)
 {
     mrp_console_t *c = data;
 
-    mrp_console_printf(c, "received msg '%s'\n", msg);
+    printf("received msg '%s'\n", msg);
 }
 
 void signalling_info_register_cb(mrp_console_t *c, void *user_data,
@@ -615,9 +609,9 @@ void signalling_info_register_cb(mrp_console_t *c, void *user_data,
     ret = mrp_info_register(ep, info_cb, c);
 
     if (ret < 0)
-        mrp_console_printf(c, "Failed to register back channel to EP '%s'\n", ep);
+        printf("Failed to register back channel to EP '%s'\n", ep);
     else
-        mrp_console_printf(c, "Registered back channel to EP '%s'\n", ep);
+        printf("Registered back channel to EP '%s'\n", ep);
 }
 
 
@@ -635,7 +629,7 @@ void signalling_info_unregister_cb(mrp_console_t *c, void *user_data,
 
     mrp_info_unregister(ep);
 
-    mrp_console_printf(c, "Unregistered back channel to EP '%s'\n", ep);
+    printf("Unregistered back channel to EP '%s'\n", ep);
 }
 
 
@@ -643,11 +637,11 @@ static void dump_decision(mrp_console_t *c, ep_decision_t *msg)
 {
     uint i;
 
-    mrp_console_printf(c, "Message contents:\n");
+    printf("Message contents:\n");
     for (i = 0; i < msg->n_rows; i++) {
-        mrp_console_printf(c, "row %d: '%s'\n", i+1, msg->rows[i]);
+        printf("row %d: '%s'\n", i+1, msg->rows[i]);
     }
-    mrp_console_printf(c, "%s required.\n\n",
+    printf("%s required.\n\n",
                 msg->reply_required ? "Reply" : "No reply");
 }
 
@@ -660,7 +654,7 @@ static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
 
-    mrp_console_printf(c, "Received message (0x%02x)\n", tag);
+    printf("Received message (0x%02x)\n", tag);
 
     switch (tag) {
         case TAG_POLICY_DECISION:
@@ -703,7 +697,7 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
     MRP_UNUSED(t);
     MRP_UNUSED(error);
 
-    mrp_console_printf(c, "Received closed event\n");
+    printf("Received closed event\n");
 }
 
 
@@ -736,13 +730,13 @@ void signalling_create_ep_cb(mrp_console_t *c, void *user_data,
     alen = mrp_transport_resolve(NULL, "internal:signalling", &addr, sizeof(addr), NULL);
 
     if (alen <= 0) {
-        mrp_console_printf(c, "Error: resolving address failed!\n");
+        printf("Error: resolving address failed!\n");
         return;
     }
 
     ret = mrp_transport_connect(t, &addr, alen);
     if (ret == 0) {
-        mrp_console_printf(c, "Error: connect failed!\n");
+        printf("Error: connect failed!\n");
         return;
     }
 
@@ -753,7 +747,7 @@ void signalling_create_ep_cb(mrp_console_t *c, void *user_data,
     ret = mrp_transport_senddata(t, &msg, TAG_REGISTER);
 
     if (!ret) {
-        mrp_console_printf(c, "Failed to send register message\n");
+        printf("Failed to send register message\n");
         return;
     }
 }

@@ -265,26 +265,28 @@ MRP_CONSOLE_GROUP(builtin_cmd_group, "", NULL, NULL, {
 static void debug_enable(mrp_console_t *c, void *user_data,
                          int argc, char **argv)
 {
+    MRP_UNUSED(c);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
     MRP_UNUSED(user_data);
 
     mrp_debug_enable(TRUE);
 
-    mrp_console_printf(c, "Debugging is now enabled.\n");
+    printf("Debugging is now enabled.\n");
 }
 
 
 static void debug_disable(mrp_console_t *c, void *user_data,
                           int argc, char **argv)
 {
+    MRP_UNUSED(c);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
     MRP_UNUSED(user_data);
 
     mrp_debug_enable(FALSE);
 
-    mrp_console_printf(c, "Debugging is now disabled.\n");
+    printf("Debugging is now disabled.\n");
 }
 
 
@@ -335,7 +337,7 @@ static void debug_reset(mrp_console_t *c, void *user_data,
 
     mrp_debug_reset();
 
-    mrp_console_printf(c, "Debugging configuration has been reset to default.");
+    printf("Debugging configuration has been reset to default.");
 }
 
 
