@@ -46,7 +46,7 @@ const char *mrp_lua_table_name(mrp_lua_mdb_table_t *tbl);
 
 mrp_lua_mdb_select_t *mrp_lua_select_check(lua_State *L, int idx);
 mrp_lua_mdb_select_t *mrp_lua_to_select(lua_State *L, int idx);
-int mrp_lua_push_select(lua_State *L, mrp_lua_mdb_select_t *sel);
+int mrp_lua_push_select(lua_State *L,mrp_lua_mdb_select_t *sel,bool singleval);
 const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel);
 
 

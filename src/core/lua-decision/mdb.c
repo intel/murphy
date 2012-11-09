@@ -53,9 +53,12 @@
 #define TABLE_ROW_CLASSID   MRP_LUA_CLASSID_ROOT "table_row"
 #define SELECT_ROW_CLASSID  MRP_LUA_CLASSID_ROOT "select_row"
 
+
 typedef enum   field_e        field_t;
 typedef struct row_s          row_t;
 typedef struct const_def_s    const_def_t;
+
+
 
 enum field_e {
     NAME = 1,
@@ -63,8 +66,10 @@ enum field_e {
     COLUMNS,
     TABLE,
     CONDITION,
-    STATEMENT
+    STATEMENT,
+    SINGLEVAL
 };
+
 
 struct mrp_lua_mdb_table_s {
     bool                builtin;
@@ -260,9 +265,38 @@ mrp_lua_mdb_select_t *mrp_lua_to_select(lua_State *L, int idx)
     return (mrp_lua_mdb_select_t *)mrp_lua_to_object(L, SELECT_CLASS, idx);
 }
 
-int mrp_lua_push_select(lua_State *L, mrp_lua_mdb_select_t *sel)
+int mrp_lua_push_select(lua_State *L,mrp_lua_mdb_select_t *sel,bool singleval)
 {
-    return mrp_lua_push_object(L, sel);
+    mql_result_t *rslt;
+    const char *str;
+    lua_Number num;
+    char buf[1024];
+
+    if (!singleval)
+        mrp_lua_push_object(L, sel);
+    else {
+        if (!(rslt = sel->result) || sel->nrow < 1)
+            lua_pushnil(L);
+        else {
+            switch (mql_result_rows_get_row_column_type(rslt, 0)) {
+            case mqi_string:
+                str = mql_result_rows_get_string(rslt, 0, 0, buf,sizeof(buf));
+                lua_pushstring(L, str);
+                break;
+            case mqi_integer:
+            case mqi_unsignd:
+            case mqi_floating:
+                num = mql_result_rows_get_floating(rslt, 0, 0);
+                lua_pushnumber(L, num);
+                break;
+            default:
+                lua_pushnil(L);
+                break;
+            }
+        }
+    }
+
+    return 1;
 }
 
 const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel)
@@ -558,6 +592,7 @@ static int select_getfield(lua_State *L)
                 case COLUMNS:   mrp_lua_push_strarray(L, sel->columns);  break;
                 case CONDITION: lua_pushstring(L, sel->condition);       break;
                 case STATEMENT: lua_pushstring(L,sel->statement.string); break;
+                case SINGLEVAL: mrp_lua_push_select(L, sel, true);       break;
                 default:        lua_pushnil(L);                          break;
                 }
             }
@@ -579,6 +614,7 @@ static int select_setfield(lua_State *L)
 
     return 0;
 }
+
 
 static void select_destroy_from_lua(void *data)
 {
@@ -825,10 +861,10 @@ static mrp_lua_mdb_select_t *select_row_check(lua_State *L,
 static bool define_constants(lua_State *L)
 {
     static const_def_t const_defs[] = {
-        { "string"  , mqi_string  },
-        { "integer" , mqi_integer },
-        { "floating", mqi_floating},
-        {    NULL   , mqi_unknown }
+        { "string"   , mqi_string   },
+        { "integer"  , mqi_integer  },
+        { "floating" , mqi_floating },
+        {    NULL    , mqi_unknown  }
     };
 
     const_def_t *cd;
@@ -893,6 +929,11 @@ static field_t field_name_to_type(const char *name, size_t len)
             return STATEMENT;
         if (!strcmp(name, "condition"))
             return CONDITION;
+        break;
+
+    case 12:
+        if (!strcmp(name, "single_value"))
+            return SINGLEVAL;
         break;
 
     default:

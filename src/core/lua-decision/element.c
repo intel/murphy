@@ -390,7 +390,7 @@ static int element_input_getfield(lua_State *L)
             switch (inp->type) {
             case NUMBER:    lua_pushnumber(L, inp->constant.floating);   break;
             case STRING:    lua_pushstring(L, inp->constant.string);     break;
-            case SELECT:    mrp_lua_push_select(L, inp->select);         break;
+            case SELECT:    mrp_lua_push_select(L, inp->select, false);  break;
             default:        lua_pushnil(L);                              break;
             }
             return 1;
