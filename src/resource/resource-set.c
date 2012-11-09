@@ -35,6 +35,8 @@
 #include <murphy/common/utils.h>
 #include <murphy/common/log.h>
 
+#include <murphy-db/mqi.h>
+
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/common-api.h>
 
@@ -109,6 +111,7 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
     uint32_t zoneid;
     mrp_list_hook_t *entry, *n;
     mrp_resource_t *res;
+    mqi_handle_t trh;
 
     if (rset) {
         state  = rset->state;
@@ -129,8 +132,12 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
             resource_set_count--;
 
         if (state == mrp_resource_acquire) {
+            trh = mqi_begin_transaction();
+
             mrp_resource_owner_update_zone(zoneid, NULL,
                                            MRP_RESOURCE_REQNO_INVALID);
+
+            mqi_commit_transaction(trh);
         }
     }
 }
@@ -270,6 +277,8 @@ int mrp_resource_set_write_attributes(mrp_resource_set_t *rset,
 
 void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 {
+    mqi_handle_t trh;
+
     MRP_ASSERT(rset, "invalid argument");
 
     rset->state = mrp_resource_acquire;
@@ -277,11 +286,16 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
     rset->request.stamp = get_request_stamp();
     
     mrp_application_class_move_resource_set(rset);
+
+    trh = mqi_begin_transaction();
     mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+    mqi_commit_transaction(trh);
 }
 
 void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
 {
+    mqi_handle_t trh;
+
     MRP_ASSERT(rset, "invalid argument");
 
     if (rset->state == mrp_resource_release) {
@@ -294,7 +308,10 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
         rset->request.stamp = get_request_stamp();
 
         mrp_application_class_move_resource_set(rset);
+
+        trh = mqi_begin_transaction();
         mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+        mqi_commit_transaction(trh);
     }
 }
 
