@@ -39,6 +39,7 @@
 #include <murphy/common/mainloop.h>
 #include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
+#include <murphy/common/debug.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
@@ -992,7 +993,8 @@ static void initiate_lua_configuration(mrp_plugin_t *plugin)
         mrp_lua_create_zone_class(L);
         mrp_lua_create_resource_class_class(L);
 
-        printf("**** lua resource ininitialised\n");
+        mrp_debug("lua classes are ready for resource "
+                  "configuration and management");
 
         initialised = true;
     }
