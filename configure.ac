@@ -471,6 +471,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/resolver/murphy-resolver.pc
 		 src/resolver/tests/Makefile
 		 src/resource/murphy-resource.pc
+		 src/plugins/domain-control/murphy-domain-controller.pc
 		 doc/Makefile
 		 doc/plugin-developer-guide/Makefile
 		 doc/plugin-developer-guide/db/Makefile

@@ -903,7 +903,16 @@ plugin_LTLIBRARIES              += plugin-domain-control.la
 endif
 
 # domain controller client library
-lib_LTLIBRARIES                        += libmurphy-domain-controller.la
+lib_LTLIBRARIES += libmurphy-domain-controller.la
+EXTRA_DIST      += plugins/domain-control/murphy-domain-controller.pc
+pkgconfig_DATA  += plugins/domain-control/murphy-domain-controller.pc
+
+libmurphy_domain_controller_ladir =			\
+		$(includedir)/murphy/domain-control
+
+libmurphy_domain_controller_la_HEADERS =		\
+		plugins/domain-control/client.h
+
 libmurphy_domain_controller_la_SOURCES  = plugins/domain-control/client.c      \
 					  plugins/domain-control/table-common.c\
 					  plugins/domain-control/message.c

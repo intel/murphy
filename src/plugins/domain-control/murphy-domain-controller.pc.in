@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: murphy-domain-controller
+Description: Murphy policy framework, domain controller library.
+Requires: murphy-common = @PACKAGE_VERSION@
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lmurphy-domain-controller
+Cflags: -I${includedir}
