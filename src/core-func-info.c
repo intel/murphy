@@ -42,6 +42,7 @@ static mrp_debug_file_t file_0 = {
 static mrp_debug_info_t info_1[] = {
     { .line = 36, .func = "mrp_context_create" },
     { .line = 55, .func = "mrp_context_destroy" },
+    { .line = 67, .func = "mrp_context_setstate" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_1 = {
@@ -164,23 +165,23 @@ static mrp_debug_info_t info_8[] = {
     { .line = 145, .func = "check_plugin_version" },
     { .line = 163, .func = "check_plugin_singleton" },
     { .line = 175, .func = "mrp_load_plugin" },
-    { .line = 301, .func = "load_plugin_cb" },
-    { .line = 323, .func = "mrp_load_all_plugins" },
-    { .line = 345, .func = "mrp_request_plugin" },
-    { .line = 362, .func = "mrp_unload_plugin" },
-    { .line = 413, .func = "mrp_start_plugins" },
-    { .line = 453, .func = "mrp_start_plugin" },
-    { .line = 462, .func = "mrp_stop_plugin" },
-    { .line = 481, .func = "find_plugin_instance" },
-    { .line = 498, .func = "find_plugin" },
-    { .line = 514, .func = "open_dynamic" },
-    { .line = 559, .func = "open_builtin" },
-    { .line = 575, .func = "parse_plugin_arg" },
-    { .line = 627, .func = "parse_plugin_args" },
-    { .line = 684, .func = "export_plugin_methods" },
-    { .line = 702, .func = "remove_plugin_methods" },
-    { .line = 721, .func = "import_plugin_methods" },
-    { .line = 739, .func = "release_plugin_methods" },
+    { .line = 304, .func = "load_plugin_cb" },
+    { .line = 326, .func = "mrp_load_all_plugins" },
+    { .line = 348, .func = "mrp_request_plugin" },
+    { .line = 365, .func = "mrp_unload_plugin" },
+    { .line = 416, .func = "mrp_start_plugins" },
+    { .line = 449, .func = "mrp_start_plugin" },
+    { .line = 473, .func = "mrp_stop_plugin" },
+    { .line = 493, .func = "find_plugin_instance" },
+    { .line = 510, .func = "find_plugin" },
+    { .line = 526, .func = "open_dynamic" },
+    { .line = 571, .func = "open_builtin" },
+    { .line = 587, .func = "parse_plugin_arg" },
+    { .line = 639, .func = "parse_plugin_args" },
+    { .line = 696, .func = "export_plugin_methods" },
+    { .line = 714, .func = "remove_plugin_methods" },
+    { .line = 733, .func = "import_plugin_methods" },
+    { .line = 751, .func = "release_plugin_methods" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_8 = {
