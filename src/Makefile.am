@@ -577,7 +577,8 @@ libmurphy_resource_la_HEADERS =			\
 		resource/client-api.h           \
 		resource/manager-api.h          \
 		resource/config-api.h           \
-		resource/protocol.h
+		resource/protocol.h		\
+		resource/config-lua.h
 
 libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/attribute.c		\
@@ -586,26 +587,29 @@ libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/application-class.c	\
 		resource/resource-owner.c	\
 		resource/resource-client.c	\
-		resource/zone.c
+		resource/zone.c			\
+		resource/config-lua.c
 
-libmurphy_resource_la_SOURCES =			\
+libmurphy_resource_la_SOURCES =					\
 		$(libmurphy_resource_la_REGULAR_SOURCES)	\
 		resource-func-info.c
 
 libmurphy_resource_la_CFLAGS =			\
 		$(AM_CFLAGS)			\
+		$(LUA_CFLAGS)			\
 		$(INCLUDES)
 
 libmurphy_resource_la_LDFLAGS =			\
 		-Wl,-version-script=linker-script.resource \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_resource_la_LIBADD =	    \
-		libmurphy-core.la   \
-		libmurphy-common.la \
-		murphy-db/mql/libmql.la \
-		murphy-db/mqi/libmqi.la \
-		murphy-db/mdb/libmdb.la
+libmurphy_resource_la_LIBADD =			\
+		libmurphy-core.la		\
+		libmurphy-common.la		\
+		murphy-db/mql/libmql.la		\
+		murphy-db/mqi/libmqi.la		\
+		murphy-db/mdb/libmdb.la		\
+		$(LUA_LIBS)
 
 libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
 				     libmurphy-common.la
@@ -801,13 +805,15 @@ PLUGIN_RESOURCE_NATIVE_SOURCES = 					\
 		$(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)		\
                 plugin-resource-native-func-info.c
 PLUGIN_RESOURCE_NATIVE_CFLAGS =						\
+		$(LUA_CFLAGS)						\
 		$(INCLUDES)
 PLUGIN_RESOURCE_NATIVE_LIBS =       					\
 		libmurphy-core.la					\
 		libmurphy-common.la					\
 		murphy-db/mqi/libmqi.la					\
 		murphy-db/mdb/libmdb.la					\
-		libmurphy-resource.la
+		libmurphy-resource.la					\
+		$(LUA_LIBS)
 
 plugin_resource_native_la_SOURCES = $(PLUGIN_RESOURCE_NATIVE_SOURCES)
 plugin_resource_native_la_CFLAGS  = $(PLUGIN_RESOURCE_NATIVE_CFLAGS)	\
