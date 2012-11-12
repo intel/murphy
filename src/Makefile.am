@@ -645,29 +645,30 @@ resolver/scripting/simple/simple-parser.c:	\
 	    resolver/scripting/simple/simple-parser.c
 
 ###################################
-# murphy resource library
+# murphy backend resource library
 #
 
-murphy_resource_headers =			\
-		resource/data-types.h           \
-		resource/common-api.h           \
-		resource/client-api.h           \
-		resource/manager-api.h          \
-		resource/config-api.h           \
-		resource/protocol.h		\
-		resource/config-lua.h
-
 if BUILD_RESOURCES
-lib_LTLIBRARIES += libmurphy-resource.la
-EXTRA_DIST      += resource/murphy-resource.pc
-pkgconfig_DATA  += resource/murphy-resource.pc
+lib_LTLIBRARIES += $(RESOURCE_LIBRARY)
+# EXTRA_DIST      += resource/murphy-resource.pc
+# pkgconfig_DATA  += resource/murphy-resource.pc
 
-libmurphy_resource_ladir =			\
+libmurphy_resource_backend_ladir =                     \
 		$(includedir)/murphy/resource
 
-libmurphy_resource_la_HEADERS = $(murphy_resource_headers)
+#libmurphy_resource_backend_la_HEADERS =                        \
+#		resource/data-types.h           \
+#		resource/common-api.h           \
+#		resource/client-api.h           \
+#		resource/manager-api.h          \
+#		resource/config-api.h           \
+#		resource/protocol.h		\
+#		resource/config-lua.h
 
-libmurphy_resource_la_REGULAR_SOURCES =		\
+
+libmurphy_resource_backend_la_HEADERS = $(murphy_resource_backend_headers)
+
+libmurphy_resource_backend_la_REGULAR_SOURCES =                \
 		resource/attribute.c		\
 		resource/resource.c		\
 		resource/resource-set.c		\
@@ -677,32 +678,32 @@ libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/zone.c			\
 		resource/config-lua.c
 
-libmurphy_resource_la_SOURCES =					\
-		$(libmurphy_resource_la_REGULAR_SOURCES)	\
+libmurphy_resource_backend_la_SOURCES =                        \
+		$(libmurphy_resource_backend_la_REGULAR_SOURCES)        \
 		resource-func-info.c
 
-libmurphy_resource_la_CFLAGS =			\
+libmurphy_resource_backend_la_CFLAGS =                 \
 		$(AM_CFLAGS)			\
 		$(LUA_CFLAGS)			\
 		$(INCLUDES)
 
-libmurphy_resource_la_LDFLAGS =			\
+libmurphy_resource_backend_la_LDFLAGS =                        \
 		-Wl,-version-script=linker-script.resource \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_resource_la_LIBADD =			\
-		libmurphy-core.la		\
-		libmurphy-common.la		\
-		murphy-db/mql/libmql.la		\
-		murphy-db/mqi/libmqi.la		\
-		murphy-db/mdb/libmdb.la		\
+libmurphy_resource_backend_la_LIBADD =     \
+		libmurphy-core.la   \
+		libmurphy-common.la \
+		murphy-db/mql/libmql.la \
+		murphy-db/mqi/libmqi.la \
+		murphy-db/mdb/libmdb.la \
 		$(LUA_LIBS)
 
-libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
-	$(filter %.la, $(libmurphy_resource_la_LIBADD))
+libmurphy_resource_backend_la_DEPENDENCIES = linker-script.resource \
+	$(filter %.la, $(libmurphy_resource_backend_la_LIBADD))
 
 # debug file:line-function mapping generation
-resource-func-info.c: $(libmurphy_resource_la_REGULAR_SOURCES)
+resource-func-info.c: $(libmurphy_resource_backend_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
 
 clean-func-infos::
@@ -710,7 +711,7 @@ clean-func-infos::
 endif
 
 # resource linker script generation
-linker-script.resource: $(murphy_resource_headers)
+linker-script.resource: $(murphy_resource_backend_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
@@ -917,7 +918,10 @@ if BUILD_RESOURCES
 if DBUS_ENABLED
 RESOURCE_DBUS_PLUGIN_SOURCES = plugins/plugin-resource-dbus.c
 RESOURCE_DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
-RESOURCE_DBUS_PLUGIN_LIBS    = libmurphy-resource.la libmurphy-dbus.la
+RESOURCE_DBUS_PLUGIN_LIBS    = libmurphy-resource-backend.la \
+					libmurphy-dbus.la
+					libmurphy-core.la					\
+					libmurphy-common.la
 
 if !DISABLED_PLUGIN_RESOURCE_DBUS
 if BUILTIN_PLUGIN_RESOURCE_DBUS
@@ -982,7 +986,7 @@ PLUGIN_RESOURCE_NATIVE_LIBS =       					\
 		libmurphy-common.la					\
 		murphy-db/mqi/libmqi.la					\
 		murphy-db/mdb/libmdb.la					\
-		libmurphy-resource.la					\
+		libmurphy-resource-backend.la
 		$(LUA_LIBS)
 
 plugin_resource_native_la_SOURCES = $(PLUGIN_RESOURCE_NATIVE_SOURCES)
@@ -1129,7 +1133,7 @@ endif
 # murphy daemon
 #
 if BUILD_RESOURCES
-RESOURCE_LIBRARY = libmurphy-resource.la
+RESOURCE_LIBRARY = libmurphy-resource-backend.la
 else
 RESOURCE_LIBRARY =
 endif
