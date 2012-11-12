@@ -36,6 +36,7 @@
 #include <lauxlib.h>
 
 #include <murphy/common.h>
+#include <murphy/common/debug.h>
 #include <murphy/core/lua-utils/object.h>
 
 #include "config-lua.h"
@@ -44,7 +45,6 @@
 #include "zone.h"
 #include "application-class.h"
 #include "resource.h"
-
 
 #define ZONE_CLASS           MRP_LUA_CLASS_SIMPLE(zone)
 #define APPCLASS_CLASS       MRP_LUA_CLASS_SIMPLE(application_class)
@@ -121,22 +121,22 @@ static int  appclass_create(lua_State *);
 static int  appclass_getfield(lua_State *);
 static int  appclass_setfield(lua_State *);
 static void appclass_destroy(void *);
-static appclass_t *check_appclass(lua_State *, int);
+/* static appclass_t *check_appclass(lua_State *, int); */
 static appclass_t *to_appclass(lua_State *, int);
 
 static int  zone_create(lua_State *);
 static int  zone_getfield(lua_State *);
 static int  zone_setfield(lua_State *);
 static void zone_destroy(void *);
-static zone_t *check_zone(lua_State *, int);
+/* static zone_t *check_zone(lua_State *, int); */
 static zone_t *to_zone(lua_State *, int);
 
 static int  zone_attr_create(lua_State *);
 static int  zone_attr_getfield(lua_State *);
 static int  zone_attr_setfield(lua_State *);
 static void zone_attr_destroy(void *);
-static attr_def_t *check_zone_attr(lua_State *, int);
-static attr_def_t *to_zone_attr(lua_State *, int);
+/* static attr_def_t *check_zone_attr(lua_State *, int); */
+/* static attr_def_t *to_zone_attr(lua_State *, int); */
 static bool fetch_zone_attribute(attr_t *, int, mrp_attr_t *);
 static bool update_zone_attribute(attr_t *, int, mrp_attr_t *);
 
@@ -144,7 +144,7 @@ static int  resclass_create_from_lua(lua_State *);
 static int  resclass_getfield(lua_State *);
 static int  resclass_setfield(lua_State *);
 static void resclass_destroy(void *);
-static resclass_t *check_resclass(lua_State *, int);
+/* static resclass_t *check_resclass(lua_State *, int); */
 static resclass_t *to_resclass(lua_State *, int);
 
 static mrp_attr_def_t *check_attrdefs(lua_State *, int, int *);
@@ -276,6 +276,9 @@ static int attributes_create(lua_State *L, int tbl,
                              attribute_access_t update)
 {
     attr_t *attr;
+    int tblref;
+
+    MRP_LUA_ENTER;
 
     tbl = (tbl < 0) ? lua_gettop(L) + tbl + 1 : tbl;
 
@@ -292,7 +295,9 @@ static int attributes_create(lua_State *L, int tbl,
     luaL_getmetatable(L, ATTRIBUTE_CLASSID);
     lua_setmetatable(L, -2);
 
-    return luaL_ref(L, LUA_REGISTRYINDEX);
+    tblref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    MRP_LUA_LEAVE(tblref);
 }
 
 static int attributes_getvalue(lua_State *L)
@@ -302,6 +307,8 @@ static int attributes_getvalue(lua_State *L)
     mrp_attr_def_t *def = attr->def->attrs + idx;
     mrp_attr_t av;
 
+    MRP_LUA_ENTER;
+
     if (idx < 0) {
         lua_pushnil(L);
         return 1;
@@ -310,12 +317,12 @@ static int attributes_getvalue(lua_State *L)
     if (!(def->access & MRP_RESOURCE_READ)) {
         luaL_error(L, "attempt to read a non-readable attribute %s",
                    def->name);
-        return 0;
+        MRP_LUA_LEAVE(0);
     }
 
     if (!attr->fetch(attr, idx, &av)) {
         lua_pushnil(L);
-        return 1;
+        MRP_LUA_LEAVE(1);
     }
 
     switch (def->type) {
@@ -337,7 +344,7 @@ static int attributes_getvalue(lua_State *L)
         break;
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int attributes_setvalue(lua_State *L)
@@ -346,6 +353,8 @@ static int attributes_setvalue(lua_State *L)
     int idx = check_attrindex(L, 2, attr->def);
     mrp_attr_def_t *def = attr->def->attrs + idx;
     mrp_attr_t av;
+
+    MRP_LUA_ENTER;
 
     if (idx < 0)
         luaL_error(L, "attribute %s dows not exist", def->name);
@@ -377,7 +386,7 @@ static int attributes_setvalue(lua_State *L)
     if (!attr->update(attr, idx, &av))
         luaL_error(L, "attribute update failed");
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 static int attributes_getlength(lua_State *L)
@@ -385,9 +394,11 @@ static int attributes_getlength(lua_State *L)
     attr_t *attr = check_attributes(L, 1);
     attr_def_t *def = attr->def;
 
+    MRP_LUA_ENTER;
+
     lua_pushinteger(L, def ? def->nattr : 0);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static attr_t *check_attributes(lua_State *L, int idx)
@@ -410,7 +421,7 @@ static int appclass_create(lua_State *L)
     int priority;
     const char *name = NULL;
 
-    printf("**** appclass create\n");
+    MRP_LUA_ENTER;
 
     MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
 
@@ -444,7 +455,9 @@ static int appclass_create(lua_State *L)
 
     appclass->name = name;
 
-    return 1;
+    mrp_log_info("application class '%s' created", name);
+
+    MRP_LUA_LEAVE(1);
 }
 
 static int appclass_getfield(lua_State *L)
@@ -452,6 +465,8 @@ static int appclass_getfield(lua_State *L)
     appclass_t *appclass = to_appclass(L, 1);
     field_t fld = field_check(L, 2, NULL);
     mrp_application_class_t *ac;
+
+    MRP_LUA_ENTER;
 
     lua_pop(L, 1);
 
@@ -465,25 +480,35 @@ static int appclass_getfield(lua_State *L)
         }
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int appclass_setfield(lua_State *L)
 {
+    MRP_LUA_ENTER;
+
     luaL_error(L, "can't modify application classes after definition");
-    return 0;
+
+    MRP_LUA_LEAVE(0);
 }
 
 static void appclass_destroy(void *data)
 {
     appclass_t *appclass = (appclass_t *)data;
+
+    MRP_LUA_ENTER;
+
     mrp_free((void *)appclass->name);
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
+#if 0
 static appclass_t *check_appclass(lua_State *L, int idx)
 {
     return (appclass_t *)mrp_lua_check_object(L, APPCLASS_CLASS, idx);
 }
+#endif
 
 static appclass_t *to_appclass(lua_State *L, int idx)
 {
@@ -500,12 +525,12 @@ static int zone_create(lua_State *L)
     const char *name = NULL;
     mrp_attr_t *attrs = NULL;
 
+    MRP_LUA_ENTER;
+
     MRP_ASSERT(zone_attr_defs, "invocation prior to initialization");
 
     if (!zone_attr_defs->attrs)
         luaL_error(L, "attempt to create zone before defining attributes");
-
-    printf("**** zone create\n");
 
     MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
 
@@ -542,13 +567,18 @@ static int zone_create(lua_State *L)
     zone->attr_tbl = attributes_create(L, -1, ZONE,zone, zone_attr_defs,
                                        fetch_zone_attribute,
                                        update_zone_attribute);
-    return 1;
+
+    mrp_log_info("zone '%s' created", name);
+
+    MRP_LUA_LEAVE(1);
 }
 
 static int zone_getfield(lua_State *L)
 {
     zone_t  *zone = to_zone(L, 1);
     field_t  fld  = field_check(L, 2, NULL);
+
+    MRP_LUA_ENTER;
 
     lua_pop(L, 1);
 
@@ -577,7 +607,7 @@ static int zone_getfield(lua_State *L)
         }
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int zone_setfield(lua_State *L)
@@ -585,23 +615,31 @@ static int zone_setfield(lua_State *L)
     zone_t *zone = to_zone(L, 1);
     field_t fld  = field_check(L, 2, NULL);
 
+    MRP_LUA_ENTER;
+
     if (zone || fld != ATTRIBUTES)
         luaL_error(L, "zones can't be exetended after definition");
-    else {
-        printf("**** zone.attributes setfield\n");
-    }
-    return 0;
+
+    MRP_LUA_LEAVE(1);
 }
 
 static void zone_destroy(void *data)
 {
-    zone_t *zone = (zone_t *)data;
+    /* zone_t *zone = (zone_t *)data; */
+
+    MRP_UNUSED(data);
+
+    MRP_LUA_ENTER;
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
+#if 0
 static zone_t *check_zone(lua_State *L, int idx)
 {
     return (zone_t *)mrp_lua_check_object(L, ZONE_CLASS, idx);
 }
+#endif
 
 static zone_t *to_zone(lua_State *L, int idx)
 {
@@ -610,13 +648,12 @@ static zone_t *to_zone(lua_State *L, int idx)
 
 static int zone_attr_create(lua_State *L)
 {
-    zone_t *zone;
     mrp_attr_def_t *attrs;
     int nattr;
 
-    MRP_ASSERT(zone_attr_defs, "invocation prior to initialization");
+    MRP_LUA_ENTER;
 
-    printf("**** zone attribute definitions\n");
+    MRP_ASSERT(zone_attr_defs, "invocation prior to initialization");
 
     if (zone_attr_defs->attrs)
         luaL_error(L, "zone attributes already defined");
@@ -631,7 +668,9 @@ static int zone_attr_create(lua_State *L)
 
     mrp_lua_push_object(L, zone_attr_defs);
 
-    return 1;
+    mrp_log_info("zone attributes defined");
+
+    MRP_LUA_LEAVE(1);
 }
 
 static int  zone_attr_getfield(lua_State *L)
@@ -639,44 +678,59 @@ static int  zone_attr_getfield(lua_State *L)
     zone_t *zone;
     int idx;
 
+    MRP_LUA_ENTER;
+
     MRP_ASSERT(zone_attr_defs, "invocation prior to initialization");
 
-
     if (!(zone = to_zone(L, 1))) {
-        printf("**** zone attribute definition getfield\n");
+        mrp_debug("zone attribute definition => attribute index");
         if ((idx = check_attrindex(L, 2, zone_attr_defs)) < 0)
             lua_pushnil(L);
         else
             lua_pushinteger(L, idx);
     }
     else {
-        printf("**** zone attribute getfield\n");
+        mrp_debug("zone attribute => nil");
         lua_pushnil(L);
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int  zone_attr_setfield(lua_State *L)
 {
-    return 0;
+    MRP_UNUSED(L);
+
+    MRP_LUA_ENTER;
+
+    MRP_LUA_LEAVE(0);
 }
 
 
 static void zone_attr_destroy(void *data)
 {
-    attr_def_t *attr = (attr_def_t *)data;
+    /* attr_def_t *attr = (attr_def_t *)data; */
+
+    MRP_UNUSED(data);
+
+    MRP_LUA_ENTER;
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
+#if 0
 static attr_def_t *check_zone_attr(lua_State *L, int idx)
 {
     return (attr_def_t *)mrp_lua_check_object(L, ZONE_ATTR_CLASS, idx);
 }
+#endif
 
+#if 0
 static attr_def_t *to_zone_attr(lua_State *L, int idx)
 {
     return (attr_def_t *)mrp_lua_to_object(L, ZONE_ATTR_CLASS, idx);
 }
+#endif
 
 static bool fetch_zone_attribute(attr_t *attr, int idx, mrp_attr_t *ret_value)
 {
@@ -697,6 +751,9 @@ static bool update_zone_attribute(attr_t *attr, int idx, mrp_attr_t *value)
 {
     mrp_zone_t *z;
     zone_t *zone;
+
+    MRP_UNUSED(idx);
+    MRP_UNUSED(value);
 
     if (attr->owner.type == ZONE && (zone = (zone_t *)attr->owner.data)) {
         if ((z = mrp_zone_find_by_id(zone->id))) {
@@ -723,7 +780,7 @@ static int resclass_create_from_lua(lua_State *L)
     mrp_resource_mgr_ftbl_t *ftbl = NULL;
     void *mgrdata = NULL;
 
-    printf("**** resclass create\n");
+    MRP_LUA_ENTER;
 
     MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
 
@@ -766,7 +823,9 @@ static int resclass_create_from_lua(lua_State *L)
     resclass->name = name;
     resclass->attrs = attrs;
 
-    return 1;
+    mrp_log_info("resource class '%s' created", name);
+
+    MRP_LUA_LEAVE(1);
 }
 
 static int resclass_getfield(lua_State *L)
@@ -774,6 +833,8 @@ static int resclass_getfield(lua_State *L)
     resclass_t *rc = to_resclass(L, 1);
     field_t fld = field_check(L, 2, NULL);
     mrp_resource_def_t *rd;
+
+    MRP_LUA_ENTER;
 
     lua_pop(L, 1);
 
@@ -787,26 +848,36 @@ static int resclass_getfield(lua_State *L)
         }
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int resclass_setfield(lua_State *L)
 {
+    MRP_LUA_ENTER;
+
     luaL_error(L, "can't modify resource classes after definition");
-    return 0;
+
+    MRP_LUA_LEAVE(1);
 }
 
 static void resclass_destroy(void *data)
 {
     resclass_t *rc = (resclass_t *)data;
+
+    MRP_LUA_ENTER;
+
     mrp_free((void *)rc->name);
     free_attrdefs(rc->attrs);
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
+#if 0
 static resclass_t *check_resclass(lua_State *L, int idx)
 {
     return (resclass_t *)mrp_lua_check_object(L, RESCLASS_CLASS, idx);
 }
+#endif
 
 static resclass_t *to_resclass(lua_State *L, int idx)
 {
