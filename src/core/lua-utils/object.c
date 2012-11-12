@@ -121,7 +121,7 @@ void *mrp_lua_create_object(lua_State          *L,
         if (!valid_id(name))
             return NULL;
 
-        lua_getglobal(L, def->constructor);
+        mrp_lua_get_class_table(L, def);
         luaL_checktype(L, -1, LUA_TTABLE);
         class = lua_gettop(L);
     }
