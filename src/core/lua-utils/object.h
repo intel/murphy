@@ -33,6 +33,19 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#define MRP_LUA_ENTER                           \
+    mrp_debug("enter")
+
+#define MRP_LUA_LEAVE(_v)                       \
+    do {                                        \
+        mrp_debug("leave (%d)", (_v));          \
+        return (_v);                            \
+    } while (0)
+
+#define MRP_LUA_LEAVE_NOARG                     \
+    mrp_debug("leave")
+
+
 #define MRP_LUA_CLASSID_ROOT              "LuaBook."
 
 #define MRP_LUA_CLASS(_name, _constr)     & _name ## _ ## _constr ## _class_def
