@@ -36,9 +36,9 @@
 #include <lauxlib.h>
 
 #include <murphy/common.h>
+#include <murphy/common/debug.h>
 #include <murphy-db/mql.h>
 
-#include <murphy/common.h>
 #include <murphy/core/context.h>
 #include <murphy/core/scripting.h>
 #include <murphy/core/lua-decision/mdb.h>
@@ -112,7 +112,7 @@ static int  table_tostring(lua_State *);
 static void table_destroy_from_lua(void *);
 
 static void table_row_class_create(lua_State *);
-static int  table_row_create(lua_State *, int, void *, int);
+/* static int  table_row_create(lua_State *, int, void *, int); */
 static int  table_row_getfield(lua_State *);
 static int  table_row_setfield(lua_State *);
 static int  table_row_getlength(lua_State *);
@@ -128,7 +128,7 @@ static int  select_update_from_resolver(mrp_scriptlet_t *,mrp_context_tbl_t *);
 static void select_install(lua_State *, mrp_lua_mdb_select_t *);
 
 static void select_row_class_create(lua_State *);
-static int  select_row_create(lua_State *, int, void *, int);
+/* static int  select_row_create(lua_State *, int, void *, int); */
 static int  select_row_getfield(lua_State *);
 static int  select_row_setfield(lua_State *);
 static int  select_row_getlength(lua_State *);
@@ -155,9 +155,11 @@ MRP_LUA_METHOD_LIST_TABLE (
     MRP_LUA_METHOD_CONSTRUCTOR  (table_create_from_lua)
 );
 
+#if 0
 MRP_LUA_METHOD_LIST_TABLE (
     table_row_methods,       /* methodlist name */
 );
+#endif
 
 MRP_LUA_METHOD_LIST_TABLE (
     select_methods,          /* methodlist name */
@@ -231,8 +233,10 @@ mrp_lua_mdb_table_t *mrp_lua_create_builtin_table(lua_State    *L,
 {
     mrp_lua_mdb_table_t *tbl = NULL;
 
+    MRP_UNUSED(L);
+    MRP_UNUSED(handle);
 
-    return NULL;
+    return tbl;
 }
 
 mrp_lua_mdb_table_t *mrp_lua_table_check(lua_State *L, int idx)
@@ -310,6 +314,8 @@ static int table_create_from_lua(lua_State *L)
     size_t fldnamlen;
     const char *fldnam;
 
+    MRP_LUA_ENTER;
+
     tbl = (mrp_lua_mdb_table_t *)mrp_lua_create_object(L, TABLE_CLASS, NULL);
 
     tbl->builtin = false;
@@ -344,22 +350,26 @@ static int table_create_from_lua(lua_State *L)
 
     mrp_lua_set_object_name(L, TABLE_CLASS, tbl->name);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int table_getfield(lua_State *L)
 {
     mrp_lua_mdb_table_t *tbl = mrp_lua_table_check(L, 1);
+    const char *fldnam;
     field_t fld;
 
-    if (lua_type(L, 2) == LUA_TNUMBER) {
-        lua_rawget(L, 1);
+    MRP_LUA_ENTER;
 
-        printf("*** reading row in table '%s'\n", tbl->name);
+    if (lua_type(L, 2) == LUA_TNUMBER) {
+        mrp_debug("reading row %d in '%s'", lua_tointeger(L,-1), tbl->name);
+        lua_rawget(L, 1);
     }
     else {
-        fld = field_check(L, 2, NULL);
+        fld = field_check(L, 2, &fldnam);
         lua_pop(L, 1);
+
+        mrp_debug("reading '%s' property of '%s'", fldnam, tbl->name);
 
         if (!tbl)
             lua_pushnil(L);
@@ -373,13 +383,17 @@ static int table_getfield(lua_State *L)
         }
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int table_setfield(lua_State *L)
 {
-    mrp_lua_mdb_table_t *tbl = mrp_lua_table_check(L, 1);
+    mrp_lua_mdb_table_t *tbl;
     size_t rowidx;
+
+    MRP_LUA_ENTER;
+
+    tbl = mrp_lua_table_check(L, 1);
 
     if (lua_type(L, 2) != LUA_TNUMBER)
         luaL_error(L, "'%s' is read-only", tbl->name);
@@ -402,34 +416,41 @@ static int table_setfield(lua_State *L)
             luaL_checktype(L, -1, LUA_TTABLE);
         }
 
-        printf("*** setting row %u in table '%s'\n", rowidx+1, tbl->name);
-
+        mrp_debug("setting row %u in table '%s'\n", rowidx+1, tbl->name);
     }
 
-    return 0;
+    MRP_LUA_LEAVE(1);
 }
 
 static int table_tostring(lua_State *L)
 {
-    mrp_lua_mdb_table_t *tbl = mrp_lua_table_check(L, 1);
+    mrp_lua_mdb_table_t *tbl;
+
+    MRP_LUA_ENTER;
+
+    tbl = mrp_lua_table_check(L, 1);
 
     if (tbl && tbl->name)
         lua_pushstring(L, tbl->name);
     else
         lua_pushstring(L, "<error>");
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static void table_destroy_from_lua(void *data)
 {
     mrp_lua_mdb_table_t *tbl = (mrp_lua_mdb_table_t *)data;
 
+    MRP_LUA_ENTER;
+
     if (tbl) {
         mrp_free((void *)tbl->name);
         mrp_lua_free_strarray(tbl->index);
         free_coldefs(tbl->columns);
     }
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
 static void table_row_class_create(lua_State *L)
@@ -442,23 +463,33 @@ static void table_row_class_create(lua_State *L)
     luaL_openlib(L, NULL, table_row_overrides, 0);
 }
 
+#if 0
 static int table_row_create(lua_State *L, int tbl, void *data, int rowidx)
 {
-    return row_create(L, tbl, data, rowidx, TABLE_ROW_CLASSID);
+    int n;
+
+    MRP_LUA_ENTER;
+
+    n = row_create(L, tbl, data, rowidx, TABLE_ROW_CLASSID);
+
+    MRP_LUA_LEAVE(n);
 }
+#endif
 
 static int table_row_getfield(lua_State *L)
 {
     mrp_lua_mdb_table_t *tbl;
     int rowidx;
 
+    MRP_LUA_ENTER;
+
     tbl = table_row_check(L, 1, &rowidx);
 
-    printf("*** reading field in row %d of '%s' table\n", rowidx+1, tbl->name);
+    mrp_debug("reading field in row %d of '%s' table\n", rowidx+1, tbl->name);
 
     lua_pushnil(L);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int table_row_setfield(lua_State *L)
@@ -466,20 +497,25 @@ static int table_row_setfield(lua_State *L)
     mrp_lua_mdb_table_t *tbl;
     int rowidx;
 
+    MRP_LUA_ENTER;
+
     tbl = table_row_check(L, 1, &rowidx);
 
-    printf("*** writing field in row %d of '%s' table\n", rowidx+1, tbl->name);
+    mrp_debug("writing field in row %d of '%s' table\n", rowidx+1, tbl->name);
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 static int  table_row_getlength(lua_State *L)
 {
-    mrp_lua_mdb_table_t *tbl = table_row_check(L, 1, NULL);
-    
+    mrp_lua_mdb_table_t *tbl;
+
+    MRP_LUA_ENTER;
+
+    tbl = table_row_check(L, 1, NULL);
     lua_pushinteger(L, tbl->ncolumn);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 
@@ -504,6 +540,8 @@ static int select_create_from_lua(lua_State *L)
     const char *condition;
     char  cols[1024];
     char  qry[2048];
+
+    MRP_LUA_ENTER;
 
     sel = (mrp_lua_mdb_select_t *)mrp_lua_create_object(L, SELECT_CLASS, NULL);
 
@@ -560,11 +598,13 @@ static int select_create_from_lua(lua_State *L)
 
     mrp_lua_set_object_name(L, SELECT_CLASS, sel->name);
 
+    mrp_debug("select '%s' created", sel->name);
+
     select_install(L, sel);
 
     select_update(L, -1, sel);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int select_getfield(lua_State *L)
@@ -573,17 +613,20 @@ static int select_getfield(lua_State *L)
     field_t fld;
     const char *fldnam;
 
+    MRP_LUA_ENTER;
+
     if (!sel)
         lua_pushnil(L);
     else {
         if (lua_type(L, 2) == LUA_TNUMBER) {
+            mrp_debug("reading row %d in '%s'", lua_tointeger(L,-1),sel->name);
             lua_rawget(L, 1);
-
-            printf("*** reading row in selection '%s'\n", sel->name);
         }
         else {
             fld = field_check(L, 2, &fldnam);
             lua_pop(L, 1);
+
+            mrp_debug("reading property %s in '%s'", fldnam, sel->name);
 
             if (fld) {
                 switch (fld) {
@@ -603,22 +646,28 @@ static int select_getfield(lua_State *L)
         }
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int select_setfield(lua_State *L)
 {
-    mrp_lua_mdb_select_t *sel = mrp_lua_select_check(L, 1);
+    mrp_lua_mdb_select_t *sel;
+
+    MRP_LUA_ENTER;
+
+    sel = mrp_lua_select_check(L, 1);
 
     luaL_error(L, "'%s' is read-only", sel->name);
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 
 static void select_destroy_from_lua(void *data)
 {
     mrp_lua_mdb_select_t *sel = (mrp_lua_mdb_select_t *)data;
+
+    MRP_LUA_ENTER;
 
     if (sel) {
         mrp_lua_free_strarray(sel->columns);
@@ -627,6 +676,8 @@ static void select_destroy_from_lua(void *data)
         mrp_free((void *)sel->condition);
         mrp_free((void *)sel->statement.string);
     }
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
 static int select_update(lua_State *L, int tbl, mrp_lua_mdb_select_t *sel)
@@ -634,6 +685,8 @@ static int select_update(lua_State *L, int tbl, mrp_lua_mdb_select_t *sel)
     mql_statement_t *statement;
     mql_result_t *result;
     int nrow;
+
+    MRP_LUA_ENTER;
 
     if (!sel->statement.precomp)
         sel->statement.precomp = mql_precompile(sel->statement.string);
@@ -654,28 +707,32 @@ static int select_update(lua_State *L, int tbl, mrp_lua_mdb_select_t *sel)
         }
     }
 
-    printf("*** query resulted %d rows\n", nrow);
+    mrp_debug("\"%s\" resulted %d rows", sel->statement.string, nrow);
 
     if (nrow >= 0) {
         adjust_lua_table_size(L, tbl,sel, sel->nrow, nrow, SELECT_ROW_CLASSID);
         sel->nrow = nrow;
     }
 
-    return nrow;
+    MRP_LUA_LEAVE(nrow);
 }
 
 static int select_update_from_lua(lua_State *L)
 {
-    mrp_lua_mdb_select_t *sel = mrp_lua_select_check(L, 1);
+    mrp_lua_mdb_select_t *sel;
     int nrow;
 
-    printf("*** update request for select '%s' (from lua)\n", sel->name);
+    MRP_LUA_ENTER;
+
+    sel = mrp_lua_select_check(L, 1);
+
+    mrp_debug("update request for select '%s'\n", sel->name);
 
     nrow = select_update(L, 1, sel);
 
     lua_pushinteger(L, nrow < 0 ? 0 : nrow);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int select_update_from_resolver(mrp_scriptlet_t *script,
@@ -685,12 +742,14 @@ static int select_update_from_resolver(mrp_scriptlet_t *script,
     lua_State *L = mrp_lua_get_lua_state();
     int nrow;
 
+    MRP_LUA_ENTER;
+
     MRP_UNUSED(ctbl);
 
     if (!sel || !L)
         return -EINVAL;
 
-    printf("*** update request for select '%s' (from resolver)\n", sel->name);
+    mrp_debug("update request for select '%s'", sel->name);
 
     mrp_lua_push_object(L, sel);
 
@@ -698,7 +757,7 @@ static int select_update_from_resolver(mrp_scriptlet_t *script,
 
     lua_pop(L, 1);
 
-    return nrow;
+    MRP_LUA_LEAVE(nrow);
 }
 
 
@@ -717,6 +776,8 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
     mrp_context_t *ctx;
     char target[1024], table[1024];
     const char *depends;
+
+    MRP_LUA_ENTER;
 
     MRP_UNUSED(L);
 
@@ -740,6 +801,8 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
         printf("Failed to install resolver target for element '%s'.\n",
                sel->name);
     }
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
 static void select_row_class_create(lua_State *L)
@@ -752,10 +815,18 @@ static void select_row_class_create(lua_State *L)
     luaL_openlib(L, NULL, select_row_overrides, 0);
 }
 
+#if 0
 static int select_row_create(lua_State *L, int tbl, void *data, int rowidx)
 {
-    return row_create(L, tbl, data, rowidx, SELECT_ROW_CLASSID);
+    int n;
+
+    MRP_LUA_ENTER;
+
+    n = row_create(L, tbl, data, rowidx, SELECT_ROW_CLASSID);
+
+    MRP_LUA_LEAVE(n);
 }
+#endif
 
 static int select_row_getfield(lua_State *L)
 {
@@ -769,12 +840,14 @@ static int select_row_getfield(lua_State *L)
     lua_Number number;
     char buf[1024];
 
+    MRP_LUA_ENTER;
+
     sel  = select_row_check(L, 1, &rowidx);
     cols = sel->columns;
     rslt = sel->result;
 
-    printf("*** reading field in row %d of '%s' selection\n",
-           rowidx+1, sel ? sel->name : "<unknwon>");
+    mrp_debug("reading field in row %d of '%s' selection\n",
+              rowidx+1, sel ? sel->name : "<unknwon>");
 
     if (!sel || !rslt || (size_t)rowidx >= sel->nrow)
         lua_pushnil(L); /* we should never get here actually */
@@ -820,7 +893,7 @@ static int select_row_getfield(lua_State *L)
         break;
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int select_row_setfield(lua_State *L)
@@ -828,21 +901,26 @@ static int select_row_setfield(lua_State *L)
     mrp_lua_mdb_select_t *sel;
     int rowidx;
 
+    MRP_LUA_ENTER;
+
     sel = select_row_check(L, 1, &rowidx);
 
     luaL_error(L, "attempt to write row %u of read-only selection '%s'",
                rowidx+1, sel->name);
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 static int  select_row_getlength(lua_State *L)
 {
-    mrp_lua_mdb_select_t *sel = select_row_check(L, 1, NULL);
-    
+    mrp_lua_mdb_select_t *sel;
+
+    MRP_LUA_ENTER;
+
+    sel = select_row_check(L, 1, NULL);
     lua_pushinteger(L, sel->columns->nstring);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 

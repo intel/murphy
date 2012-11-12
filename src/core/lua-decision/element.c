@@ -36,6 +36,7 @@
 #include <lauxlib.h>
 
 #include <murphy/common.h>
+#include <murphy/common/debug.h>
 
 #include <murphy/core/context.h>
 #include <murphy/core/scripting.h>
@@ -90,9 +91,6 @@ struct mrp_lua_element_input_s {
 struct mrp_lua_element_s {
     MRP_LUA_ELEMENT_FIELDS;
 };
-
-
-
 
 
 static int  element_create_from_lua(lua_State *);
@@ -162,6 +160,8 @@ static int element_create_from_lua(lua_State *L)
     size_t fldnamlen;
     const char *fldnam;
 
+    MRP_LUA_ENTER;
+
     el = (mrp_lua_element_t *)mrp_lua_create_object(L, ELEMENT_CLASS, NULL);
     table = lua_gettop(L);
 
@@ -210,17 +210,22 @@ static int element_create_from_lua(lua_State *L)
 
     mrp_lua_set_object_name(L, ELEMENT_CLASS, el->name);
 
+    mrp_debug("element '%s' created", el->name);
+
     if (el->inpmask == INPUT_MASK(el->ninput))
         element_install(L, el);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int element_getfield(lua_State *L)
 {
-    mrp_lua_element_t *el = element_check(L, 1);
+    mrp_lua_element_t *el;
     field_t fld;
 
+    MRP_LUA_ENTER;
+
+    el  = element_check(L, 1);
     fld = field_check(L, 2, NULL);
     lua_pop(L, 1);
 
@@ -232,37 +237,46 @@ static int element_getfield(lua_State *L)
     default:        lua_pushnil(L);                       break;
     }
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int element_setfield(lua_State *L)
 {
-    mrp_lua_element_t *el = element_check(L, 1);
+    mrp_lua_element_t *el;
 
+    MRP_LUA_ENTER;
+
+    el = element_check(L, 1);
     luaL_error(L, "'%s' is read-only", el->name);
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 static int element_tostring(lua_State *L)
 {
-    mrp_lua_element_t *el = element_check(L, 1);
+    mrp_lua_element_t *el;
 
-    if (el && el->name)
+    MRP_LUA_ENTER;
+
+    if ((el = element_check(L, 1)) && el->name)
         lua_pushstring(L, el->name);
     else
         lua_pushstring(L, "<error>");
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static void element_destroy_from_lua(void *data)
 {
     mrp_lua_element_t *el = (mrp_lua_element_t *)data;
 
+    MRP_LUA_ENTER;
+
     if (el) {
         mrp_free((void *)el->name);
     }
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
 static mrp_lua_element_t *element_check(lua_State *L, int idx)
@@ -276,24 +290,24 @@ static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
 
     MRP_UNUSED(ctbl);
 
-    printf("*** should update element '%s'\n", el->name);
+    mrp_debug("'%s'", el->name);
 
     return TRUE;
 }
 
-static mrp_interpreter_t element_updater = {
-    { NULL, NULL },
-    "element_updater",
-    NULL,
-    NULL,
-    NULL,
-    element_update_cb,
-    NULL
-};
-
 
 static void element_install(lua_State *L, mrp_lua_element_t *el)
 {
+    static mrp_interpreter_t element_updater = {
+        { NULL, NULL },
+        "element_updater",
+        NULL,
+        NULL,
+        NULL,
+        element_update_cb,
+        NULL
+    };
+
     mrp_lua_element_input_t *inp;
     mrp_context_t *ctx;
     size_t i;
@@ -303,6 +317,8 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
     char *p, *e;
 
     MRP_UNUSED(L);
+
+    MRP_LUA_ENTER;
 
     ctx = mrp_lua_get_murphy_context();
 
@@ -339,6 +355,8 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
                    el->name);
         }
     }
+
+    MRP_LUA_LEAVE_NOARG;
 }
 
 static void element_input_class_create(lua_State *L)
@@ -353,6 +371,8 @@ static void element_input_class_create(lua_State *L)
 
 static int element_input_create_luatbl(lua_State *L, int el)
 {
+    MRP_LUA_ENTER;
+
     el = (el < 0) ? lua_gettop(L) + el + 1 : el;
 
     luaL_checktype(L, el, LUA_TTABLE);
@@ -366,7 +386,7 @@ static int element_input_create_luatbl(lua_State *L, int el)
     lua_pushvalue(L, el);
     lua_rawset(L, -3);
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 static int element_input_getfield(lua_State *L)
@@ -376,13 +396,15 @@ static int element_input_getfield(lua_State *L)
     mrp_lua_element_input_t *inp;
     size_t i;
 
+    MRP_LUA_ENTER;
+
     lua_rawgeti(L, 1, INPUT_IDX);
     el = element_check(L, -1);
     lua_pop(L, 1);
 
     inpnam = luaL_checklstring(L, 2, NULL);
 
-    printf("*** reading %s.inputs.%s \n", el->name, inpnam);
+    mrp_debug("reading %s.inputs.%s", el->name, inpnam);
 
     for (i = 0;  i < el->ninput;  i++) {
         inp = el->inputs + i;
@@ -399,7 +421,7 @@ static int element_input_getfield(lua_State *L)
 
     lua_pushnil(L);
 
-    return 1;
+    MRP_LUA_LEAVE(1);
 }
 
 static int element_input_setfield(lua_State *L)
@@ -409,13 +431,15 @@ static int element_input_setfield(lua_State *L)
     mrp_lua_element_input_t *inp;
     size_t i;
 
+    MRP_LUA_ENTER;
+
     lua_rawgeti(L, 1, INPUT_IDX);
     el = element_check(L, -1);
     lua_pop(L, 1);
 
     inpnam = luaL_checklstring(L, 2, NULL);
 
-    printf("*** writing %s.inputs.%s \n", el->name, inpnam);
+    mrp_debug("writing %s.inputs.%s", el->name, inpnam);
 
     for (i = 0; i < el->ninput;  i++) {
         inp = el->inputs + i;
@@ -451,7 +475,7 @@ static int element_input_setfield(lua_State *L)
         }
     } /* for inp */
 
-    return 0;
+    MRP_LUA_LEAVE(0);
 }
 
 static mrp_lua_element_input_t *element_input_create_userdata(lua_State *L,
