@@ -91,7 +91,20 @@ static int load(lua_State *L, int may_fail)
 
             args[narg].type = MRP_PLUGIN_ARG_TYPE_STRING;
             args[narg].key  = mrp_strdup(lua_tostring(L, -2));
-            args[narg].str  = mrp_strdup(lua_tostring(L, -1));
+
+            switch (lua_type(L, -1)) {
+            case LUA_TSTRING:
+            case LUA_TNUMBER:
+                args[narg].str = mrp_strdup(lua_tostring(L, -1));
+                break;
+            case LUA_TBOOLEAN:
+                args[narg].str = mrp_strdup(lua_toboolean(L, -1) ?
+                                            "true" : "false");
+                break;
+            default:
+                argerr = "invalid argument table value";
+                goto arg_error;
+            }
             mrp_debug("lua: argument #%d: '%s' = '%s'", narg,
                       args[narg].key, args[narg].str);
             narg++;
