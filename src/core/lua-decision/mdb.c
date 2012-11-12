@@ -402,7 +402,7 @@ static int table_setfield(lua_State *L)
             luaL_checktype(L, -1, LUA_TTABLE);
         }
 
-        printf("*** setting row %zd in table '%s'\n", rowidx+1, tbl->name);
+        printf("*** setting row %u in table '%s'\n", rowidx+1, tbl->name);
 
     }
 
