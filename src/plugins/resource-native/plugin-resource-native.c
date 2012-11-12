@@ -31,6 +31,9 @@
 #include <string.h>
 #include <errno.h>
 
+#include <lualib.h>
+#include <lauxlib.h>
+
 #include <murphy/common/macros.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/mainloop.h>
@@ -39,6 +42,7 @@
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
+#include <murphy/core/lua-bindings/murphy.h>
 
 #include <murphy-db/mql.h>
 #include <murphy-db/mqi.h>
@@ -47,6 +51,7 @@
 #include <murphy/resource/config-api.h>
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
+#include <murphy/resource/config-lua.h>
 
 #define ATTRIBUTE_MAX   (sizeof(mrp_attribute_mask_t) * 8)
 
@@ -63,7 +68,6 @@ enum {
 
 
 enum {
-    ARG_CONFIG_FILE,
     ARG_ADDRESS,
 };
 
@@ -197,6 +201,7 @@ static void print_owners_cb(mrp_console_t *c, void *user_data,
     mrp_console_printf(c, "%s", buf);
 }
 
+#if 0
 static int set_default_configuration(void)
 {
     typedef struct {
@@ -254,7 +259,7 @@ static int set_default_configuration(void)
 
     return 0;
 }
-
+#endif
 
 static void reply_with_array(client_t *client, mrp_msg_t *msg,
                              uint16_t tag, const char **arr)
@@ -970,16 +975,40 @@ static int initiate_transport(mrp_plugin_t *plugin)
 }
 
 
+static void initiate_lua_configuration(mrp_plugin_t *plugin)
+{
+    static bool initialised = false;
+
+    lua_State *L;
+
+    MRP_UNUSED(plugin);
+
+    if (!initialised && (L =  mrp_lua_get_lua_state())) {
+
+        mrp_lua_create_application_class(L);
+        mrp_lua_create_zone_class(L);
+        mrp_lua_create_resource_class_class(L);
+
+        printf("**** lua resource ininitialised\n");
+
+        initialised = true;
+    }
+}
+
 static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
                      void *user_data)
 {
-    mrp_plugin_t     *plugin = (mrp_plugin_t *)user_data;
-    mrp_plugin_arg_t *args   = plugin->args;
-    resource_data_t  *data   = (resource_data_t *)plugin->data;
-    const char       *event  = mrp_get_event_name(id);
-    uint16_t          tag    = MRP_PLUGIN_TAG_INSTANCE;
+    mrp_plugin_t     *plugin   = (mrp_plugin_t *)user_data;
+#if 0
+    mrp_plugin_arg_t *args     = plugin->args;
+#endif
+    resource_data_t  *data     = (resource_data_t *)plugin->data;
+    const char       *event    = mrp_get_event_name(id);
+    uint16_t          tag_inst = MRP_PLUGIN_TAG_INSTANCE;
+    uint16_t          tag_name = MRP_PLUGIN_TAG_PLUGIN;
     const char       *inst;
-    const char       *cfgfile;
+    const char       *name;
+    int               success;
 
     MRP_UNUSED(w);
 
@@ -987,19 +1016,23 @@ static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
 
     if (data && event) {
         if (!strcmp(event, MRP_PLUGIN_EVENT_STARTED)) {
-            if (mrp_msg_get(event_data, MRP_MSG_TAG_STRING(tag, &inst),
-                            MRP_MSG_END) && !strcmp(inst, plugin->instance)) {
-                cfgfile = args[ARG_CONFIG_FILE].str;
+            success = mrp_msg_get(event_data,
+                                  MRP_MSG_TAG_STRING(tag_inst, &inst),
+                                  MRP_MSG_TAG_STRING(tag_name, &name),
+                                  MRP_MSG_END);
+            if (success) {
+                if (!strcmp(inst, plugin->instance)) {
+#if 0
+                    set_default_configuration();
+                    mrp_log_info("%s: built-in default configuration "
+                                 "is in use", plugin->instance);
+#endif
 
-                set_default_configuration();
-                mrp_log_info("%s: built-in default configuration is in use",
-                             plugin->instance);
-
-                initiate_transport(plugin);
-
-                return;
+                    initiate_lua_configuration(plugin);
+                    initiate_transport(plugin);
+                }
             }
-        }
+        } /* if PLUGIN_STARTED */
     }
 }
 
@@ -1038,15 +1071,13 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 
 static int resource_init(mrp_plugin_t *plugin)
 {
-    mrp_plugin_arg_t *args;
+#if 0
+    mrp_plugin_arg_t *args = plugin->args;
+#endif
     resource_data_t  *data;
 
     mrp_log_info("%s() called for resource instance '%s'...", __FUNCTION__,
                  plugin->instance);
-
-    args = plugin->args;
-    mrp_log_info(" config-file:  '%s'", args[ARG_CONFIG_FILE].str);
-
 
     if (!(data = mrp_allocz(sizeof(*data)))) {
         mrp_log_error("Failed to allocate private data for resource plugin "
@@ -1060,6 +1091,7 @@ static int resource_init(mrp_plugin_t *plugin)
     plugin->data = data;
 
     subscribe_events(plugin);
+    initiate_lua_configuration(plugin);
 
     return TRUE;
 }
@@ -1083,8 +1115,7 @@ static void resource_exit(mrp_plugin_t *plugin)
 #define DEF_ADDRESS          RESPROTO_DEFAULT_ADDRESS
 
 static mrp_plugin_arg_t args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_CONFIG_FILE, STRING, "config-file", DEF_CONFIG_FILE),
-    MRP_PLUGIN_ARGIDX(ARG_ADDRESS    , STRING, "address"    , DEF_ADDRESS    ),
+    MRP_PLUGIN_ARGIDX( ARG_ADDRESS, STRING, "address", DEF_ADDRESS ),
 };
 
 
