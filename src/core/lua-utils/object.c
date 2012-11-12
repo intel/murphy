@@ -114,9 +114,6 @@ void *mrp_lua_create_object(lua_State          *L,
     size_t size;
     userdata_t *userdata;
 
-    luaL_checktype(L, 1, LUA_TTABLE);
-    luaL_checktype(L, 2, LUA_TTABLE);
-
     if (name) {
         if (!valid_id(name))
             return NULL;
