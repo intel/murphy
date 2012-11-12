@@ -836,6 +836,44 @@ clean-linker-script::
 generate-linker-scripts: linker-script.breedline-glib
 
 ###################################
+# murphy resource external library
+
+# TODO: put this under conditional compilation
+
+lib_LTLIBRARIES += libmurphy-resource.la
+# EXTRA_DIST      += resource/murphy-resource.pc
+# pkgconfig_DATA  += resource/murphy-resource.pc
+
+libmurphy_resource_ladir =          \
+        $(includedir)/murphy/plugins/resource-native/libmurphy-resource
+
+libmurphy_resource_la_HEADERS =         \
+        plugins/resource-native/libmurphy-resource/resource-api.h     \
+        plugins/resource-native/libmurphy-resource/resource-private.h
+
+libmurphy_resource_la_SOURCES =         \
+        plugins/resource-native/libmurphy-resource/resource.c
+
+libmurphy_resource_la_CFLAGS =          \
+        $(AM_CFLAGS)            \
+        $(INCLUDES)
+
+libmurphy_resource_la_LIBADD =      \
+        libmurphy-core.la   \
+        libmurphy-common.la
+
+libmurphy_resource_la_DEPENDENCIES = libmurphy-core.la      \
+                     libmurphy-common.la
+
+# resource-api-test
+bin_PROGRAMS += resource-api-test
+
+resource_api_test_SOURCES = plugins/resource-native/libmurphy-resource/api_test.c
+resource_api_test_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
+resource_api_test_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la libmurphy-resource.la
+
+
+###################################
 # murphy plugins
 #
 
