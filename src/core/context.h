@@ -39,6 +39,15 @@ typedef struct mrp_context_s mrp_context_t;
 #include <murphy/resolver/resolver.h>
 
 
+typedef enum {
+    MRP_STATE_INITIAL = 0,
+    MRP_STATE_LOADING,
+    MRP_STATE_STARTING,
+    MRP_STATE_RUNNING,
+    MRP_STATE_STOPPING
+} mrp_context_state_t;
+
+
 struct mrp_context_s {
     /* logging settings, path configuration, etc. */
     int         log_mask;                  /* what to log */
@@ -52,6 +61,7 @@ struct mrp_context_s {
     char       *resolver_ruleset;          /* resolver ruleset file */
 
     /* actual runtime context data */
+    int              state;                /* context/daemon state */
     mrp_mainloop_t  *ml;                   /* mainloop */
     mrp_list_hook_t  plugins;              /* list of loaded plugins */
     mrp_list_hook_t  cmd_groups;           /* console command groups */
@@ -66,5 +76,7 @@ mrp_context_t *mrp_context_create(void);
 /** Destroy an existing murphy context. */
 void mrp_context_destroy(mrp_context_t *c);
 
+/** Set the context state to the given state. */
+void mrp_context_setstate(mrp_context_t *c, mrp_context_state_t state);
 
 #endif /* __MURPHY_CONTEXT_H__ */

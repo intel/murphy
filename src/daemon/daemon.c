@@ -121,6 +121,7 @@ static void load_configuration(mrp_context_t *ctx)
 {
     mrp_cfgfile_t *cfg;
 
+    mrp_context_setstate(ctx, MRP_STATE_LOADING);
     emit_daemon_event(DAEMON_EVENT_LOADING);
 
     cfg = mrp_parse_cfgfile(ctx->config_file);
@@ -162,6 +163,7 @@ static void load_ruleset(mrp_context_t *ctx)
 
 static void start_plugins(mrp_context_t *ctx)
 {
+    mrp_context_setstate(ctx, MRP_STATE_STARTING);
     emit_daemon_event(DAEMON_EVENT_STARTING);
 
     if (mrp_start_plugins(ctx))
@@ -205,6 +207,7 @@ static void prepare_ruleset(mrp_context_t *ctx)
 
 static void run_mainloop(mrp_context_t *ctx)
 {
+    mrp_context_setstate(ctx, MRP_STATE_RUNNING);
     emit_daemon_event(DAEMON_EVENT_RUNNING);
     mrp_mainloop_run(ctx->ml);
 }
@@ -214,6 +217,7 @@ static void stop_plugins(mrp_context_t *ctx)
 {
     MRP_UNUSED(ctx);
 
+    mrp_context_setstate(ctx, MRP_STATE_STOPPING);
     emit_daemon_event(DAEMON_EVENT_STOPPING);
 }
 
