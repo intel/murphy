@@ -3,31 +3,34 @@
 
 /* core/console.c */
 static mrp_debug_info_t info_0[] = {
-    { .line = 106, .func = "console_setup" },
-    { .line = 115, .func = "console_cleanup" },
-    { .line = 131, .func = "mrp_create_console" },
-    { .line = 184, .func = "purge_destroyed" },
-    { .line = 206, .func = "mrp_destroy_console" },
-    { .line = 228, .func = "check_destroy" },
-    { .line = 234, .func = "mrp_console_printf" },
-    { .line = 247, .func = "mrp_set_console_prompt" },
-    { .line = 274, .func = "find_group" },
-    { .line = 300, .func = "find_command" },
-    { .line = 317, .func = "mrp_console_add_group" },
-    { .line = 328, .func = "mrp_console_del_group" },
-    { .line = 339, .func = "mrp_console_add_core_group" },
-    { .line = 350, .func = "mrp_console_del_core_group" },
-    { .line = 361, .func = "input_evt" },
-    { .line = 505, .func = "disconnected_evt" },
-    { .line = 511, .func = "complete_evt" },
-    { .line = 528, .func = "cookie_write" },
-    { .line = 544, .func = "cookie_close" },
-    { .line = 552, .func = "console_fopen" },
-    { .line = 571, .func = "register_commands" },
-    { .line = 577, .func = "unregister_commands" },
-    { .line = 593, .func = "get_next_line" },
-    { .line = 630, .func = "skip_whitespace" },
-    { .line = 637, .func = "get_next_token" },
+    { .line = 115, .func = "console_setup" },
+    { .line = 124, .func = "console_cleanup" },
+    { .line = 140, .func = "mrp_create_console" },
+    { .line = 196, .func = "purge_destroyed" },
+    { .line = 222, .func = "mrp_destroy_console" },
+    { .line = 244, .func = "check_destroy" },
+    { .line = 250, .func = "mrp_console_printf" },
+    { .line = 263, .func = "mrp_set_console_prompt" },
+    { .line = 290, .func = "find_group" },
+    { .line = 316, .func = "find_command" },
+    { .line = 333, .func = "mrp_console_add_group" },
+    { .line = 344, .func = "mrp_console_del_group" },
+    { .line = 355, .func = "mrp_console_add_core_group" },
+    { .line = 366, .func = "mrp_console_del_core_group" },
+    { .line = 377, .func = "console_grab_output" },
+    { .line = 400, .func = "console_release_output" },
+    { .line = 419, .func = "console_read_output" },
+    { .line = 425, .func = "input_evt" },
+    { .line = 589, .func = "disconnected_evt" },
+    { .line = 595, .func = "complete_evt" },
+    { .line = 612, .func = "cookie_write" },
+    { .line = 628, .func = "cookie_close" },
+    { .line = 636, .func = "console_fopen" },
+    { .line = 655, .func = "register_commands" },
+    { .line = 661, .func = "unregister_commands" },
+    { .line = 677, .func = "get_next_line" },
+    { .line = 714, .func = "skip_whitespace" },
+    { .line = 721, .func = "get_next_token" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_0 = {
@@ -72,7 +75,7 @@ static mrp_debug_file_t file_2 = {
 /* core/lua-bindings/lua-console.c */
 static mrp_debug_info_t info_3[] = {
     { .line = 12, .func = "eval_cb" },
-    { .line = 48, .func = "source_cb" },
+    { .line = 49, .func = "source_cb" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_3 = {

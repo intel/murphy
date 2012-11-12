@@ -9,6 +9,7 @@
         mrp_console_printf;
         mrp_context_create;
         mrp_context_destroy;
+        mrp_context_setstate;
         mrp_create_console;
         mrp_create_context_table;
         mrp_create_script;

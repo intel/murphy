@@ -132,16 +132,17 @@ static void print_zones_cb(mrp_console_t *c, void *user_data,
     const char **zone_names;
     int i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    mrp_console_printf(c, "Zones:\n");
+    printf("Zones:\n");
 
     if ((zone_names = mrp_zone_get_all_names(0, NULL))) {
 
         for (i = 0;  zone_names[i];  i++)
-            mrp_console_printf (c, "   %s\n", zone_names[i]);
+            printf("   %s\n", zone_names[i]);
 
 
         mrp_free(zone_names);
@@ -155,17 +156,17 @@ static void print_classes_cb(mrp_console_t *c, void *user_data,
     const char **class_names;
     int i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    mrp_console_printf(c, "Application classes:\n");
+    printf("Application classes:\n");
 
     if ((class_names = mrp_application_class_get_all_names(0, NULL))) {
 
         for (i = 0;  class_names[i];  i++)
-            mrp_console_printf(c, "   %s\n", class_names[i]);
-
+            printf("   %s\n", class_names[i]);
 
         mrp_free(class_names);
     }
@@ -177,13 +178,14 @@ static void print_sets_cb(mrp_console_t *c, void *user_data,
 {
     char buf[8192];
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
     mrp_application_class_print(buf, sizeof(buf));
 
-    mrp_console_printf(c, "%s", buf);
+    printf("%s", buf);
 }
 
 
@@ -192,13 +194,14 @@ static void print_owners_cb(mrp_console_t *c, void *user_data,
 {
     char buf[2048];
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
     mrp_resource_owner_print(buf, sizeof(buf));
 
-    mrp_console_printf(c, "%s", buf);
+    printf("%s", buf);
 }
 
 #if 0

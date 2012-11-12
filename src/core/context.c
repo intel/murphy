@@ -63,3 +63,8 @@ void mrp_context_destroy(mrp_context_t *c)
 
 }
 
+
+void mrp_context_setstate(mrp_context_t *c, mrp_context_state_t state)
+{
+    c->state = state;
+}

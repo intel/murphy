@@ -286,6 +286,9 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 
         emit_plugin_event(PLUGIN_EVENT_LOADED, plugin);
 
+        if (ctx->state == MRP_STATE_STARTING || ctx->state == MRP_STATE_RUNNING)
+            mrp_start_plugin(plugin);
+
         return plugin;
     }
     else {
@@ -426,11 +429,6 @@ int mrp_start_plugins(mrp_context_t *ctx)
         }
 
         if (!mrp_start_plugin(plugin)) {
-            mrp_log_error("Failed to start plugin %s (%s).",
-                          plugin->instance, plugin->descriptor->name);
-
-            emit_plugin_event(PLUGIN_EVENT_FAILED, plugin);
-
             if (!plugin->may_fail)
                 return FALSE;
             else {
@@ -438,8 +436,6 @@ int mrp_start_plugins(mrp_context_t *ctx)
                 mrp_unload_plugin(plugin);
             }
         }
-        else
-            emit_plugin_event(PLUGIN_EVENT_STARTED, plugin);
 
         /* XXX TODO: argh, ugly kludge for plugins loading plugins... */
         if (plugin->hook.next != n)
@@ -452,8 +448,23 @@ int mrp_start_plugins(mrp_context_t *ctx)
 
 int mrp_start_plugin(mrp_plugin_t *plugin)
 {
-    if (plugin != NULL)
-        return plugin->descriptor->init(plugin);
+    if (plugin != NULL) {
+        if (plugin->state == MRP_PLUGIN_LOADED) {
+            if (!plugin->descriptor->init(plugin)) {
+                mrp_log_error("Failed to start plugin %s (%s).",
+                              plugin->instance, plugin->descriptor->name);
+
+                emit_plugin_event(PLUGIN_EVENT_FAILED, plugin);
+                return FALSE;
+            }
+            else {
+                plugin->state = MRP_PLUGIN_RUNNING;
+                emit_plugin_event(PLUGIN_EVENT_STARTED, plugin);
+            }
+        }
+
+        return TRUE;
+    }
     else
         return FALSE;
 }
@@ -466,6 +477,7 @@ int mrp_stop_plugin(mrp_plugin_t *plugin)
             emit_plugin_event(PLUGIN_EVENT_STOPPING, plugin);
             plugin->descriptor->exit(plugin);
             plugin->refcnt = 0;
+            plugin->state = MRP_PLUGIN_STOPPED;
             emit_plugin_event(PLUGIN_EVENT_STOPPED, plugin);
 
             return TRUE;

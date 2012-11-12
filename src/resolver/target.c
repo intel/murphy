@@ -29,6 +29,7 @@
 
 #include <stdarg.h>
 #include <errno.h>
+#include <alloca.h>
 
 #include <murphy/common/log.h>
 #include <murphy/common/mm.h>
