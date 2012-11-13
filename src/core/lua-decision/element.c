@@ -313,8 +313,10 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
     size_t i;
     char buf[1024], target[1024];
     const char **depends, *d;
+    char *dep;
     int ndepend;
     char *p, *e;
+    size_t len;
 
     MRP_UNUSED(L);
 
@@ -323,12 +325,12 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
     ctx = mrp_lua_get_murphy_context();
 
     if (ctx == NULL || ctx->r == NULL) {
-        printf("Invalid or incomplete murphy context.\n");
+        mrp_log_error("Invalid or incomplete murphy context");
         return;
     }
 
     depends = alloca(el->ninput * sizeof(depends[0]));
-    ndepend = el->ninput;
+    ndepend = 0;
 
     for (i = 0, e = (p = buf) + sizeof(buf);  i < el->ninput && p < e;  i++) {
         inp = el->inputs + i;
@@ -337,17 +339,18 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
             d  = mrp_lua_select_name(inp->select);
             p += snprintf(p, e-p, " select_%s", d);
 
-            depends[i] = alloca(strlen(d) + 1);
-            strcpy((char *)depends[i], d);
+            len = strlen(d) + 7 + 1;
+            depends[ndepend++] = dep = alloca(len);
+            sprintf(dep, "select_%s", d);
         }
     }
 
     for (i = 0;   i < el->noutput;  i++) {
-        printf("\ntable_%s:%s\n\tupdate(%s)\n\n",
-               mrp_lua_table_name(el->outputs[i]), buf, el->name);
-
-        snprintf(target, sizeof(target), "table_%s",
+        snprintf(target, sizeof(target), "$%s",
                  mrp_lua_table_name(el->outputs[i]));
+
+        printf("\%s:%s\n\tupdate(%s)\n\n", target, buf, el->name);
+
 
         if (!mrp_resolver_add_prepared_target(ctx->r, target, depends, ndepend,
                                               &element_updater, NULL, el)) {
