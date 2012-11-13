@@ -127,24 +127,27 @@ int mrp_resolver_add_prepared_target(mrp_resolver_t *r, const char *target,
     mrp_scriptlet_t *script;
     target_t        *t;
 
-    script = mrp_allocz(sizeof(*script));
+    t = create_target(r, target, depend, ndepend, NULL, NULL);
 
-    if (script != NULL) {
-        t = create_target(r, target, depend, ndepend, NULL, NULL);
+    if (t != NULL) {
+        if (interpreter != NULL) {
+            script = mrp_allocz(sizeof(*script));
 
-        if (t != NULL) {
-            script->interpreter = interpreter;
-            script->data        = target_data;
-            script->compiled    = compiled_data;
+            if (script != NULL) {
+                script->interpreter = interpreter;
+                script->data        = target_data;
+                script->compiled    = compiled_data;
 
-            t->script      = script;
-            t->precompiled = TRUE;
-            t->prepared    = TRUE;
-
-            return TRUE;
+                t->script = script;
+            }
+            else
+                return FALSE;
         }
 
-        mrp_free(script);
+        t->precompiled = TRUE;
+        t->prepared    = TRUE;
+
+        return TRUE;
     }
 
     return FALSE;
