@@ -122,8 +122,8 @@ static mrp_debug_file_t file_5 = {
 static mrp_debug_info_t info_6[] = {
     { .line = 10, .func = "plugin_exists" },
     { .line = 28, .func = "load" },
-    { .line = 140, .func = "load_plugin" },
-    { .line = 146, .func = "try_load_plugin" },
+    { .line = 153, .func = "load_plugin" },
+    { .line = 159, .func = "try_load_plugin" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_6 = {
