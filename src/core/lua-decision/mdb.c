@@ -805,8 +805,8 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
     };
 
     mrp_context_t *ctx;
-    char target[1024], table[1024];
-    const char *depends;
+    char target[1024], table[1024], fact[1024];
+    const char *depends, *table_depends;
 
     MRP_LUA_ENTER;
 
@@ -819,19 +819,31 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
         return;
     }
 
-    printf("\nselect_%s: table_%s\n\tupdate(%s)\n",
-           sel->name, sel->table_name, sel->name);
-
-    snprintf(target, sizeof(target), "select_%s", sel->name);
-    snprintf(table , sizeof(table) , "$%s", sel->table_name);
+    snprintf(target, sizeof(target), "_select_%s", sel->name);
+    snprintf(table , sizeof(table) , "_table_%s" , sel->table_name);
 
     depends = table;
+
+    printf("\n%s: %s\n\tupdate(%s)\n", target, depends, sel->name);
+
+
 
     if (!mrp_resolver_add_prepared_target(ctx->r, target, &depends, 1,
                                           &select_updater, NULL, sel)) {
         printf("Failed to install resolver target for element '%s'.\n",
                sel->name);
     }
+
+    snprintf(fact, sizeof(fact), "$%s", sel->table_name);
+
+    table_depends = fact;
+    if (!mrp_resolver_add_prepared_target(ctx->r, table, &table_depends, 1,
+                                          NULL, NULL, NULL)) {
+        printf("Failed to install table fact dependency for table '%s'.\n",
+               sel->table_name);
+    }
+
+    printf("\n%s: %s\n\tupdate(%s)\n", table, table_depends, sel->name);
 
     MRP_LUA_LEAVE_NOARG;
 }

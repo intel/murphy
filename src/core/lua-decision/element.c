@@ -337,16 +337,16 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
 
         if (inp->type == SELECT) {
             d  = mrp_lua_select_name(inp->select);
-            p += snprintf(p, e-p, " select_%s", d);
+            p += snprintf(p, e-p, " _select_%s", d);
 
             len = strlen(d) + 7 + 1;
             depends[ndepend++] = dep = alloca(len);
-            sprintf(dep, "select_%s", d);
+            sprintf(dep, "_select_%s", d);
         }
     }
 
     for (i = 0;   i < el->noutput;  i++) {
-        snprintf(target, sizeof(target), "$%s",
+        snprintf(target, sizeof(target), "_table_%s",
                  mrp_lua_table_name(el->outputs[i]));
 
         printf("\%s:%s\n\tupdate(%s)\n\n", target, buf, el->name);
