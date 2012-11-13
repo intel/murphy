@@ -127,3 +127,19 @@ mdb.select {
            columns = {"application_class"},
            condition = "zone_name = 'driver'",
 }
+
+element.lua {
+   name    = "speed2volume",
+   inputs  = { owner = mdb.select.audio_owner, param = 5 },
+   outputs = {  mdb.table { name = "speedvol",
+			    index = {"zone", "device"},
+			    columns = {{"zone", mdb.string, 16},
+				       {"device", mdb.string, 16},
+				       {"value", mdb.floating}},
+                            create = true
+			   }
+	     },
+   update  = function(self)
+		print("*** element "..self.name.." update "..self.inputs.owner.single_value)
+	     end
+}
