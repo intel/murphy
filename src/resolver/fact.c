@@ -94,6 +94,14 @@ uint32_t fact_stamp(mrp_resolver_t *r, int id)
 }
 
 
+const char *fact_name(mrp_resolver_t *r, int id)
+{
+   fact_t *fact = r->facts + id;
+
+   return fact->name;
+}
+
+
 fact_t *lookup_fact(mrp_resolver_t *r, const char *name)
 {
     fact_t *f;

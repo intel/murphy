@@ -197,7 +197,7 @@ target_t *create_target(mrp_resolver_t *r, const char *target,
 int generate_autoupdate_target(mrp_resolver_t *r, const char *name)
 {
     const char **depends;
-    int          ndepend, i, j;
+    int          ndepend, i;
     target_t    *t, *at;
 
     if (r->auto_update != NULL)
@@ -206,16 +206,17 @@ int generate_autoupdate_target(mrp_resolver_t *r, const char *name)
     depends = alloca(r->ntarget * sizeof(depends[0]));
     ndepend = 0;
 
-    for (i = 0; i < r->ntarget; i++) {
-        t = r->targets + i;
+    mrp_debug("constructing autoupdate target '%s'...", name);
 
-        for (j = 0; j < t->ndepend; j++) {
-            if (*t->depends[j] == '$') {
-                depends[ndepend] = t->name;
-                ndepend++;
-                break;
-            }
+    for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
+        if (t->update_facts != NULL && t->update_facts[0] >= 0) {
+            mrp_debug("  including target '%s' (%s)", t->name,
+                      fact_name(r, t->update_facts[0]));
+            depends[ndepend] = t->name;
+            ndepend++;
         }
+        else
+            mrp_debug("  excluding target '%s'", t->name);
     }
 
     at = create_target(r, name, depends, ndepend, NULL, NULL);
