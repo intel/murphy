@@ -37,6 +37,7 @@
 
 #include <murphy/common.h>
 #include <murphy/common/debug.h>
+#include <murphy-db/mqi.h>
 #include <murphy-db/mql.h>
 
 #include <murphy/core/context.h>
@@ -67,7 +68,8 @@ enum field_e {
     TABLE,
     CONDITION,
     STATEMENT,
-    SINGLEVAL
+    SINGLEVAL,
+    CREATE
 };
 
 
@@ -148,6 +150,7 @@ static row_t *row_check(lua_State *, int, const char *);
 
 static void adjust_lua_table_size(lua_State *, int, void *, size_t, size_t,
                                   const char *);
+static bool create_mdb_table(mrp_lua_mdb_table_t *);
 
 
 MRP_LUA_METHOD_LIST_TABLE (
@@ -318,7 +321,8 @@ static int table_create_from_lua(lua_State *L)
 
     tbl = (mrp_lua_mdb_table_t *)mrp_lua_create_object(L, TABLE_CLASS, NULL);
 
-    tbl->builtin = false;
+    tbl->builtin = true;
+    tbl->handle = MQI_HANDLE_INVALID;
 
     MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
 
@@ -326,6 +330,7 @@ static int table_create_from_lua(lua_State *L)
 
         case NAME:
             tbl->name = mrp_strdup(luaL_checkstring(L, -1));
+            tbl->handle = mqi_get_table_handle((char *)tbl->name);
             break;
 
         case INDEX:
@@ -334,6 +339,14 @@ static int table_create_from_lua(lua_State *L)
 
         case COLUMNS:
             tbl->columns = check_coldefs(L, -1, &tbl->ncolumn);
+            break;
+
+        case CREATE:
+            if (!lua_isboolean(L, -1)) {
+                luaL_error(L, "attempt to assign non-boolean "
+                           "value to 'create' field");
+            }
+            tbl->builtin = !lua_toboolean(L, -1);
             break;
 
         default:
@@ -345,8 +358,26 @@ static int table_create_from_lua(lua_State *L)
 
     if (!tbl->name)
         luaL_error(L, "mandatory 'name' field is unspecified");
-    if (!tbl->columns || !tbl->ncolumn)
-        luaL_error(L, "mandatory 'column' field is unspecified or invalid");
+
+    if (tbl->builtin) {
+        if (tbl->handle == MQI_HANDLE_INVALID)
+            luaL_error(L, "table '%s' do not exist", tbl->name);
+        if (tbl->columns && tbl->ncolumn > 0)
+            luaL_error(L, "can't specify columns for an existing table");
+    }
+    else {
+        if (tbl->handle != MQI_HANDLE_INVALID) {
+            luaL_error(L, "attempt to create an already existing table '%s'",
+                       tbl->name);
+        }
+        if (tbl->columns && tbl->ncolumn > 0) {
+            if (!create_mdb_table(tbl))
+                luaL_error(L, "failed to create MDB table '%s'", tbl->name);
+        }
+        else {
+            luaL_error(L,"mandatory 'column' field is unspecified or invalid");
+        }
+    }
 
     mrp_lua_set_object_name(L, TABLE_CLASS, tbl->name);
 
@@ -997,6 +1028,11 @@ static field_t field_name_to_type(const char *name, size_t len)
             return TABLE;
         break;
 
+    case 6:
+        if (!strcmp(name, "create"))
+            return CREATE;
+        break;
+
     case 7:
         if (!strcmp(name, "columns"))
             return COLUMNS;
@@ -1201,6 +1237,29 @@ static void adjust_lua_table_size(lua_State *L,
     }
 }
 
+static bool create_mdb_table(mrp_lua_mdb_table_t *tbl)
+{
+    char **index;
+
+    if (!tbl->columns || !tbl->ncolumn)
+        tbl->handle = MQI_HANDLE_INVALID;
+    else {
+        if (!tbl->index || !tbl->index->nstring)
+            index = NULL;
+        else
+            index = (char **)tbl->index->strings;
+
+        tbl->handle = mqi_create_table((char *)tbl->name, MQI_TEMPORARY,
+                                       index, tbl->columns);
+
+        if (tbl->handle == MQI_HANDLE_INVALID)
+            mrp_debug("failed to create table '%s'", tbl->name);
+        else
+            mrp_debug("table '%s' has been sucessfully created", tbl->name);
+    }
+
+    return (tbl->handle != MQI_HANDLE_INVALID);
+}
 
 
 /*
