@@ -1089,7 +1089,7 @@ static void client_cleanup(client_t *c)
 static void client_run(client_t *c)
 {
     if (mrp_domctl_connect(c->dc, c->addrstr, 0))
-        info_msg("Connected to server at %s.", c->addrstr);
+        info_msg("Trying to connect to server at %s...", c->addrstr);
     else
         error_msg("Failed to connect to server at %s.", c->addrstr);
 
