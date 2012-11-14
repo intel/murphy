@@ -140,6 +140,11 @@ element.lua {
 			   }
 	     },
    update  = function(self)
-		print("*** element "..self.name.." update "..self.inputs.owner.single_value)
+                if (self.inputs.owner.single_value) then
+                   print("*** element "..self.name.." update "..
+                          self.inputs.owner.single_value)
+                else
+                   print("*** element "..self.name.." update <nil>")
+                end
 	     end
 }
