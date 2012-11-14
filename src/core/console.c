@@ -171,7 +171,8 @@ mrp_console_t *mrp_create_console(mrp_context_t *ctx, mrp_console_req_t *req,
         c->in.line = 0;
         c->in.fd   = -1;
 
-        pipe(c->pout);
+        if (pipe(c->pout) < 0)
+            mrp_log_warning("Failed to create console redirection pipe.");
         c->ofd = c->efd = -1;
 
         mrp_list_append(&ctx->consoles, &c->hook);
