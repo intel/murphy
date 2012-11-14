@@ -122,6 +122,7 @@ void one_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 {
     int i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     for (i = 0; i < argc; i++) {
@@ -134,6 +135,7 @@ void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 {
     int i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     for (i = 0; i < argc; i++) {
@@ -146,6 +148,7 @@ void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 {
     int i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     for (i = 0; i < argc; i++) {
@@ -158,6 +161,7 @@ void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 {
     int i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     for (i = 0; i < argc; i++) {
@@ -171,6 +175,7 @@ void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     mqi_handle_t tx;
     int          i;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     tx = mqi_begin_transaction();
@@ -192,6 +197,7 @@ void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     char          buf[1024], *p;
     int           i, n, l;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     p = buf;
@@ -226,6 +232,7 @@ void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     mrp_context_t  *ctx = c->ctx;
     const char     *target;
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     if (argc == 3) {
@@ -501,6 +508,8 @@ static void success_cb(uint32_t tx, void *data)
 {
     mrp_console_t *c = data;
 
+    MRP_UNUSED(c);
+
     printf("%s(): transaction %u\n", __FUNCTION__, tx);
 }
 
@@ -508,6 +517,8 @@ static void success_cb(uint32_t tx, void *data)
 static void error_cb(uint32_t tx, mrp_tx_error_t err, void *data)
 {
     mrp_console_t *c = data;
+
+    MRP_UNUSED(c);
 
     printf("%s(): transaction %u error: %s\n", __FUNCTION__,
            tx, (err == MRP_TX_ERROR_NACKED) ? "NACK" : "no reply");
@@ -589,6 +600,8 @@ static void info_cb(char *msg, void *data)
 {
     mrp_console_t *c = data;
 
+    MRP_UNUSED(c);
+
     printf("received msg '%s'\n", msg);
 }
 
@@ -622,6 +635,7 @@ void signalling_info_unregister_cb(mrp_console_t *c, void *user_data,
 
     char *ep = "foobar";
 
+    MRP_UNUSED(c);
     MRP_UNUSED(user_data);
 
     if (argc == 1)
@@ -636,6 +650,8 @@ void signalling_info_unregister_cb(mrp_console_t *c, void *user_data,
 static void dump_decision(mrp_console_t *c, ep_decision_t *msg)
 {
     uint i;
+
+    MRP_UNUSED(c);
 
     printf("Message contents:\n");
     for (i = 0; i < msg->n_rows; i++) {
@@ -692,10 +708,9 @@ static void recv_evt(mrp_transport_t *t, void *data, uint16_t tag, void *user_da
 
 static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 {
-    mrp_console_t *c = user_data;
-
     MRP_UNUSED(t);
     MRP_UNUSED(error);
+    MRP_UNUSED(user_data);
 
     printf("Received closed event\n");
 }

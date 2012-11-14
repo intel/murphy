@@ -1160,6 +1160,8 @@ static int prepare_subloop(mrp_subloop_t *sl)
     int                 nfd, npollfd, n, i;
     int                 nmatch;
 
+    MRP_UNUSED(dump_pollfds);
+
     pollfds = sl->pollfds;
     npollfd = sl->npollfd;
 

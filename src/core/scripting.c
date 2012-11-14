@@ -90,6 +90,8 @@ struct mrp_context_tbl_s {
 
 int mrp_register_interpreter(mrp_interpreter_t *i)
 {
+    MRP_UNUSED(default_interpreter);
+
     mrp_list_init(&i->hook);
     mrp_list_append(&interpreters, &i->hook);
 

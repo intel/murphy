@@ -496,6 +496,8 @@ static mrp_plugin_t *find_plugin_instance(mrp_context_t *ctx,
     mrp_list_hook_t *p, *n;
     mrp_plugin_t    *plg;
 
+    MRP_UNUSED(find_plugin);
+
     mrp_list_foreach(&ctx->plugins, p, n) {
         plg = mrp_list_entry(p, typeof(*plg), hook);
 

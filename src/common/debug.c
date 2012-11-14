@@ -53,6 +53,7 @@ static mrp_htbl_t *files;                   /* table of per-file debug info */
 static MRP_LIST_HOOK(debug_files);
 
 static void populate_file_table(void);
+static void flush_file_table(void);
 
 static void free_rule_cb(void *key, void *entry)
 {
@@ -65,6 +66,8 @@ static void free_rule_cb(void *key, void *entry)
 static int init_rules(void)
 {
     mrp_htbl_config_t hcfg;
+
+    MRP_UNUSED(flush_file_table);
 
     mrp_clear(&hcfg);
     hcfg.comp = mrp_string_comp;

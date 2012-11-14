@@ -307,6 +307,8 @@ static tkn_strarr_t *strarr_append(tkn_strarr_t *arr, char *str)
 
 int simple_parser_setup(yy_smpl_parser_t *parser, const char *script)
 {
+    MRP_UNUSED(strarr_append);
+
     mrp_clear(parser);
 
     mrp_list_init(&parser->statements);

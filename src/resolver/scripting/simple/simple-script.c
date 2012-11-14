@@ -138,6 +138,7 @@ static int simple_execute(mrp_scriptlet_t *s, mrp_context_tbl_t *tbl)
 static void simple_cleanup(mrp_scriptlet_t *s)
 {
     MRP_UNUSED(s);
+    MRP_UNUSED(simple_dump);
 
     return;
 }
