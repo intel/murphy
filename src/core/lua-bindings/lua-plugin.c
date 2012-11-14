@@ -38,25 +38,25 @@ static int load(lua_State *L, int may_fail)
     n   = lua_gettop(L);
 
     if (n < 2 || n > 4)
-        luaL_error(L, "%s called with incorrect arguments", __FUNCTION__);
+        return luaL_error(L, "%s called with incorrect arguments",
+                          __FUNCTION__);
 
     luaL_checktype(L, 2, LUA_TSTRING);
     snprintf(name, sizeof(name), "%s", lua_tostring(L, 2));
-    narg = 0;
+    instance = NULL;
+    narg     = 0;
 
     mrp_debug("lua: %sload-plugin '%s'", may_fail ? "try-" : "", name);
 
     switch (n) {
     case 2:
-        instance = NULL;
         break;
 
     case 3:
         type = lua_type(L, 3);
 
         if (type == LUA_TTABLE) {
-            instance = NULL;
-            t        = 3;
+            t = 3;
             goto parse_arguments;
         }
         else if (type == LUA_TSTRING) {
@@ -64,8 +64,8 @@ static int load(lua_State *L, int may_fail)
             instance = instbuf;
         }
         else
-            luaL_error(L, "%s expects string or table as 2nd argument",
-                       __FUNCTION__);
+            return luaL_error(L, "%s expects string or table as 2nd argument",
+                              __FUNCTION__);
         break;
 
     case 4:
@@ -125,8 +125,8 @@ static int load(lua_State *L, int may_fail)
         success = FALSE;
 
         if (!may_fail)
-            luaL_error(L, "failed to load plugin %s (as instance %s)",
-                       name, instance ? instance : name);
+            return luaL_error(L, "failed to load plugin %s (as instance %s)",
+                              name, instance ? instance : name);
     }
 
     while (narg > 0) {
@@ -145,8 +145,7 @@ static int load(lua_State *L, int may_fail)
         narg--;
     }
 
-    luaL_error(L, "plugin argument table error: %s", argerr);
-    return 0;
+    return luaL_error(L, "plugin argument table error: %s", argerr);
 }
 
 

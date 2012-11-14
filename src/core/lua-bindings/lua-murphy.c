@@ -147,9 +147,9 @@ mrp_context_t *mrp_lua_check_murphy_context(lua_State *L, int index)
     luaL_argcheck(L, m, index, "murphy object expected");
 
     if (*m->ctxp == NULL)
-        luaL_error(L, "murphy context is not set");
-
-    return *m->ctxp;
+        return (void *)(ptrdiff_t)luaL_error(L, "murphy context is not set");
+    else
+        return *m->ctxp;
 }
 
 
