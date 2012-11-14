@@ -170,6 +170,23 @@ void mrp_lua_set_object_name(lua_State          *L,
     }
 }
 
+int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def,const char *name)
+{
+    if (!name)
+        lua_pushnil(L);
+    else {
+        mrp_lua_get_class_table(L, def);
+        luaL_checktype(L, -1, LUA_TTABLE);
+
+        lua_pushstring(L, name);
+        lua_rawget(L, -2);
+
+        lua_remove(L, -2);
+    }
+
+    return 1;
+}
+
 
 void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
