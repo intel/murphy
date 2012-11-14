@@ -38,6 +38,7 @@ const char *mqi_data_type_str(mqi_data_type_t type)
     case mqi_integer:  return "integer";
     case mqi_unsignd:  return "unsigned";
     case mqi_varchar:  return "varchar";
+    case mqi_floating: return "floating";
     case mqi_blob:     return "blob";
     default:           return "unknown";
     }
