@@ -1118,13 +1118,13 @@ mrp_mainloop_t *mrp_mainloop_create(void)
 void mrp_mainloop_destroy(mrp_mainloop_t *ml)
 {
     if (ml != NULL) {
+        mrp_clear_superloop(ml);
         purge_io_watches(ml);
         purge_timers(ml);
         purge_deferred(ml);
         purge_sighandlers(ml);
         purge_subloops(ml);
         purge_deleted(ml);
-
 
         mrp_free(ml->events);
         mrp_free(ml);
