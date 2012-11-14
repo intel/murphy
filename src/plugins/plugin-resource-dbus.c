@@ -880,7 +880,7 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
     char resbuf[128];
     int ret;
     mrp_htbl_config_t resources_conf;
-    resource_set_o_t *rset;
+    resource_set_o_t *rset = NULL;
     char **resources_arr;
     char **available_resources_arr;
 
@@ -1202,7 +1202,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         dbus_message_iter_init(msg, &msg_iter);
 
-        if (!dbus_message_iter_get_arg_type(&msg_iter) == DBUS_TYPE_STRING) {
+        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_STRING) {
             error_msg = "Missing resource property key";
             goto error_reply;
         }
@@ -1216,7 +1216,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         dbus_message_iter_next(&msg_iter);
 
-        if (!dbus_message_iter_get_arg_type(&msg_iter) == DBUS_TYPE_VARIANT) {
+        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_VARIANT) {
             error_msg = "Resource property value not wrapped in variant";
             goto error_reply;
         }
@@ -1232,8 +1232,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             dbus_bool_t value;
             dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
 
-            if (!dbus_message_iter_get_arg_type(&variant_iter)
-                        == DBUS_TYPE_BOOLEAN) {
+            if (dbus_message_iter_get_arg_type(&variant_iter)
+                        != DBUS_TYPE_BOOLEAN) {
                 mrp_free(tmp);
                 goto error_reply;
             }
@@ -1247,8 +1247,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             dbus_bool_t value;
             dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
 
-            if (!dbus_message_iter_get_arg_type(&variant_iter)
-                        == DBUS_TYPE_BOOLEAN) {
+            if (dbus_message_iter_get_arg_type(&variant_iter)
+                        != DBUS_TYPE_BOOLEAN) {
                 mrp_free(tmp);
                 goto error_reply;
             }
@@ -1276,8 +1276,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
             conf = mrp_htbl_create(&map_conf);
 
-            if (!dbus_message_iter_get_arg_type(&variant_iter)
-                        == DBUS_TYPE_ARRAY) {
+            if (dbus_message_iter_get_arg_type(&variant_iter)
+                        != DBUS_TYPE_ARRAY) {
                 mrp_htbl_destroy(conf, TRUE);
                 error_msg = "Resource configuration attribute array missing";
                 goto error_reply;
@@ -1670,7 +1670,7 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         dbus_message_iter_init(msg, &msg_iter);
 
-        if (!dbus_message_iter_get_arg_type(&msg_iter) == DBUS_TYPE_STRING) {
+        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_STRING) {
             goto error_reply;
         }
 
@@ -1682,15 +1682,15 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
         dbus_message_iter_next(&msg_iter);
 
-        if (!dbus_message_iter_get_arg_type(&msg_iter) == DBUS_TYPE_VARIANT) {
+        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_VARIANT) {
             goto error_reply;
         }
 
         dbus_message_iter_recurse(&msg_iter, &variant_iter);
 
         if (strcmp(name, PROP_CLASS) == 0) {
-            if (!dbus_message_iter_get_arg_type(&variant_iter)
-                        == DBUS_TYPE_STRING) {
+            if (dbus_message_iter_get_arg_type(&variant_iter)
+                        != DBUS_TYPE_STRING) {
                 goto error_reply;
             }
 
