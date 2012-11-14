@@ -286,11 +286,22 @@ static mrp_lua_element_t *element_check(lua_State *L, int idx)
 
 static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
 {
+    lua_State *L = mrp_lua_get_lua_state();
     mrp_lua_element_t *el = (mrp_lua_element_t *)script->data;
+    mrp_funcbridge_value_t args[1] = { { .pointer = el } };
+    mrp_funcbridge_value_t ret;
+    char t;
 
     MRP_UNUSED(ctbl);
 
     mrp_debug("'%s'", el->name);
+
+    if (el->update) {
+        if (!mrp_funcbridge_call_from_c(L, el->update, "o", args, &t, &ret)) {
+            mrp_log_error("failed to call %s:update method", el->name);
+            return FALSE;
+        }
+    }
 
     return TRUE;
 }
