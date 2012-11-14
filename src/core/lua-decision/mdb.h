@@ -32,9 +32,9 @@
 
 #include <murphy-db/mqi.h>
 
-typedef struct mrp_lua_mdb_table_s   mrp_lua_mdb_table_t;
-typedef struct mrp_lua_mdb_select_s  mrp_lua_mdb_select_t;
-
+typedef struct mrp_lua_mdb_table_s        mrp_lua_mdb_table_t;
+typedef struct mrp_lua_mdb_select_s       mrp_lua_mdb_select_t;
+typedef struct mrp_lua_mdb_dependency_s   mrp_lua_mdb_dependency_t;
 
 void mrp_lua_create_mdb_class(lua_State *L);
 mrp_lua_mdb_table_t *mrp_lua_create_builtin_table(lua_State *L,
@@ -48,6 +48,8 @@ mrp_lua_mdb_select_t *mrp_lua_select_check(lua_State *L, int idx);
 mrp_lua_mdb_select_t *mrp_lua_to_select(lua_State *L, int idx);
 int mrp_lua_push_select(lua_State *L,mrp_lua_mdb_select_t *sel,bool singleval);
 const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel);
+
+int mrp_lua_dependency_add(lua_State *L, const char *name);
 
 
 #endif  /* __MURPHY_LUA_MDB_H__ */
