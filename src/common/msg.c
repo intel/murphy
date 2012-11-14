@@ -636,6 +636,8 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
             typep = va_arg(ap, uint16_t *);
             valp  = va_arg(ap, mrp_msg_value_t *);
         }
+        else
+            typep = NULL;
 
         for (p = start; p != start->prev; p = p->next) {
             if (p == &msg->fields)
