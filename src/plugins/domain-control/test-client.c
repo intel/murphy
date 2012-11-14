@@ -449,8 +449,8 @@ void update_devices(mrp_domctl_data_t *data)
     int                 i;
 
     if (data->nrow != 0 && data->ncolumn != DEVICE_NCOLUMN) {
-        error_msg("incorrect number of columns (%d) in device update",
-                  data->ncolumn);
+        error_msg("incorrect number of columns in device update (%d != %d)",
+                  data->ncolumn, DEVICE_NCOLUMN);
         return;
     }
 
@@ -495,8 +495,8 @@ void update_streams(mrp_domctl_data_t *data)
     int                 i;
 
     if (data->nrow != 0 && data->ncolumn != STREAM_NCOLUMN) {
-        error_msg("incorrect number of columns (%d) in stream update",
-                  data->ncolumn);
+        error_msg("incorrect number of columns in stream update (%d != %d)",
+                  data->ncolumn, STREAM_NCOLUMN);
         return;
     }
 
@@ -541,8 +541,8 @@ void update_zones(mrp_domctl_data_t *data)
     int                 i;
 
     if (data->nrow != 0 && data->ncolumn != ZONE_NCOLUMN) {
-        error_msg("incorrect number of columns (%d) in zone update",
-                  data->ncolumn);
+        error_msg("incorrect number of columns in zone update (%d != %d)",
+                  data->ncolumn, ZONE_NCOLUMN);
         return;
     }
 
@@ -585,8 +585,8 @@ void update_calls(mrp_domctl_data_t *data)
     int                 i;
 
     if (data->nrow != 0 && data->ncolumn != CALL_NCOLUMN) {
-        error_msg("incorrect number of columns (%d) in call update.",
-               data->ncolumn);
+        error_msg("incorrect number of columns in call update (%d != %d)",
+                  data->ncolumn, CALL_NCOLUMN);
         return;
     }
 
@@ -846,12 +846,71 @@ static void connect_notify(mrp_domctl_t *dc, int connected, int errcode,
 }
 
 
+static void dump_data(mrp_domctl_data_t *table)
+{
+    mrp_domctl_value_t *row;
+    int                 i, j;
+    char                buf[1024], *p;
+    const char         *t;
+    int                 n, l;
+
+    info_msg("Table #%d: %d rows x %d columns", table->id,
+             table->nrow, table->ncolumn);
+
+    for (i = 0; i < table->nrow; i++) {
+        row = table->rows[i];
+        p   = buf;
+        n   = sizeof(buf);
+
+        for (j = 0, t = ""; j < table->ncolumn; j++, t = ", ") {
+            switch (row[j].type) {
+            case MRP_DOMCTL_STRING:
+                l  = snprintf(p, n, "%s'%s'", t, row[j].str);
+                p += l;
+                n -= l;
+                break;
+            case MRP_DOMCTL_INTEGER:
+                l  = snprintf(p, n, "%s%d", t, row[j].s32);
+                p += l;
+                n -= l;
+                break;
+            case MRP_DOMCTL_UNSIGNED:
+                l  = snprintf(p, n, "%s%u", t, row[j].u32);
+                p += l;
+                n -= l;
+                break;
+            case MRP_DOMCTL_DOUBLE:
+                l  = snprintf(p, n, "%s%f", t, row[j].dbl);
+                p += l;
+                n -= l;
+                break;
+            default:
+                l  = snprintf(p, n, "%s<invalid column 0x%x>",
+                              t, row[j].type);
+                p += l;
+                n -= l;
+            }
+        }
+
+        info_msg("row #%d: { %s }", i, buf);
+    }
+}
+
+
 static void data_notify(mrp_domctl_t *dc, mrp_domctl_data_t *tables,
                         int ntable, void *user_data)
 {
     client_t *client = (client_t *)user_data;
 
     MRP_UNUSED(dc);
+
+    if (client->verbose) {
+        int i;
+
+        for (i = 0; i < ntable; i++) {
+            dump_data(tables + i);
+        }
+    }
 
     update_imports(client, tables, ntable);
 }
@@ -1029,7 +1088,7 @@ static void client_cleanup(client_t *c)
 
 static void client_run(client_t *c)
 {
-    if (mrp_domctl_connect(c->dc, c->addrstr))
+    if (mrp_domctl_connect(c->dc, c->addrstr, 0))
         info_msg("Connected to server at %s.", c->addrstr);
     else
         error_msg("Failed to connect to server at %s.", c->addrstr);

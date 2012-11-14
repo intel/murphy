@@ -104,8 +104,12 @@ mrp_domctl_t *mrp_domctl_create(const char *name, mrp_mainloop_t *ml,
 /** Destroy the given policy domain controller. */
 void mrp_domctl_destroy(mrp_domctl_t *dc);
 
-/** Connect and register the given controller to the server. */
-int mrp_domctl_connect(mrp_domctl_t *dc, const char *address);
+/**
+ * Connect and register the given controller to the server. If timeout
+ * is non-negative, it will be used to automatically attempt re-connecting
+ * to the server this often (in seconds) whenever the connection goes down.
+ */
+int mrp_domctl_connect(mrp_domctl_t *dc, const char *address, int timeout);
 
 /** Close the connection to the server. */
 void mrp_domctl_disconnect(mrp_domctl_t *dc);

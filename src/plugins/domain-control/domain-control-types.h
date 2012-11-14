@@ -22,6 +22,11 @@ typedef struct pdp_s       pdp_t;
 struct mrp_domctl_s {
     char                    *name;       /* enforcment point name */
     mrp_mainloop_t          *ml;         /* main loop */
+    mrp_sockaddr_t           addr;       /* server address */
+    socklen_t                addrlen;    /* address length */
+    mrp_timer_t             *ctmr;       /* connection timer */
+    int                      cival;      /* connection attempt interval */
+    const char              *ttype;      /* transport type */
     mrp_transport_t         *t;          /* transport towards murphy */
     int                      connected;  /* transport is up */
     mrp_domctl_table_t      *tables;     /* owned tables */

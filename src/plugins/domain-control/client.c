@@ -122,7 +122,7 @@ static void destroy_domctl(mrp_domctl_t *dc)
 {
     int i;
 
-    mrp_free(dc->name);
+    purge_pending(dc);
 
     for (i = 0; i < dc->ntable; i++) {
         mrp_free((char *)dc->tables[i].table);
@@ -138,6 +138,7 @@ static void destroy_domctl(mrp_domctl_t *dc)
     }
     mrp_free(dc->watches);
 
+    mrp_free(dc->name);
     mrp_free(dc);
 }
 
@@ -200,7 +201,7 @@ static int domctl_register(mrp_domctl_t *dc)
 }
 
 
-int mrp_domctl_connect(mrp_domctl_t *dc, const char *address)
+static int try_connect(mrp_domctl_t *dc)
 {
     static mrp_transport_evt_t evt = {
         .closed      = closed_cb,
@@ -208,6 +209,55 @@ int mrp_domctl_connect(mrp_domctl_t *dc, const char *address)
         .recvmsgfrom = recvfrom_cb,
     };
 
+    dc->t = mrp_transport_create(dc->ml, dc->ttype, &evt, dc, 0);
+
+    if (dc->t != NULL) {
+        if (mrp_transport_connect(dc->t, &dc->addr, dc->addrlen))
+            if (domctl_register(dc))
+                return TRUE;
+
+        mrp_transport_destroy(dc->t);
+        dc->t = NULL;
+    }
+
+    return FALSE;
+}
+
+
+static void stop_reconnect(mrp_domctl_t *dc)
+{
+    mrp_del_timer(dc->ctmr);
+    dc->ctmr = NULL;
+}
+
+
+static void reconnect_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
+{
+    mrp_domctl_t *dc = (mrp_domctl_t *)user_data;
+
+    if (try_connect(dc))
+        stop_reconnect(dc);
+}
+
+
+static int start_reconnect(mrp_domctl_t *dc)
+{
+    int interval;
+
+    if (dc->ctmr == NULL && dc->cival >= 0) {
+        interval = dc->cival ? 1000 * dc->cival : 5000;
+        dc->ctmr = mrp_add_timer(dc->ml, interval, reconnect_cb, dc);
+
+        if (dc->ctmr == NULL)
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+int mrp_domctl_connect(mrp_domctl_t *dc, const char *address, int interval)
+{
     mrp_sockaddr_t  addr;
     socklen_t       addrlen;
     const char     *type;
@@ -218,16 +268,16 @@ int mrp_domctl_connect(mrp_domctl_t *dc, const char *address)
     addrlen = mrp_transport_resolve(NULL, address, &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
-        dc->t = mrp_transport_create(dc->ml, type, &evt, dc, 0);
+        dc->addr    = addr;
+        dc->addrlen = addrlen;
+        dc->cival   = interval;
+        dc->ttype   = type;
 
-        if (dc->t != NULL) {
-            if (mrp_transport_connect(dc->t, &addr, addrlen))
-                if (domctl_register(dc))
-                    return TRUE;
+        if (try_connect(dc))
+            return TRUE;
 
-            mrp_transport_destroy(dc->t);
-            dc->t = NULL;
-        }
+        if (interval >= 0)
+            return start_reconnect(dc);
     }
 
     return FALSE;
@@ -237,6 +287,7 @@ int mrp_domctl_connect(mrp_domctl_t *dc, const char *address)
 void mrp_domctl_disconnect(mrp_domctl_t *dc)
 {
     if (dc->t != NULL) {
+        stop_reconnect(dc);
         mrp_transport_destroy(dc->t);
         dc->t         = NULL;
         dc->connected = FALSE;
@@ -383,9 +434,8 @@ static void process_notify(mrp_domctl_t *dc, mrp_msg_t *msg, uint32_t seq)
 static void recv_cb(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
 {
     mrp_domctl_t  *dc = (mrp_domctl_t *)user_data;
-    uint16_t       type, nchange, ntotal;
+    uint16_t       type;
     uint32_t       seq;
-    int            ntable, ncolumn;
     int32_t        error;
     const char    *errmsg;
 
@@ -423,15 +473,7 @@ static void recv_cb(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
         break;
 
     case MRP_PEPMSG_NOTIFY:
-        if (mrp_msg_get(msg,
-                        MRP_PEPMSG_UINT16(NCHANGE, &nchange),
-                        MRP_PEPMSG_UINT16(NTOTAL , &ntotal),
-                        MRP_MSG_END)) {
-            ntable  = nchange;
-            ncolumn = ntotal;
-
-            process_notify(dc, msg, seq);
-        }
+        process_notify(dc, msg, seq);
         break;
 
     default:
@@ -474,8 +516,10 @@ static void closed_cb(mrp_transport_t *t, int error, void *user_data)
 
     if (error)
         notify_disconnect(dc, error, strerror(error));
-    else
+    else {
         notify_disconnect(dc, ECONNRESET, "server has closed the connection");
+        start_reconnect(dc);
+    }
 }
 
 
