@@ -1131,7 +1131,7 @@ where_clause:
   }
 | TKN_WHERE conditional_expression {
     cond->type = mqi_operator;
-    cond->operator = mqi_end;
+    cond->u.operator = mqi_end;
     cond++;
   };
 
@@ -1167,7 +1167,7 @@ column_value: TKN_IDENTIFIER {
         MQL_ERROR(ENOENT, "no column with name '%s'", $1);
 
     cond->type = mqi_column;
-    cond->column = cx;
+    cond->u.column = cx;
     cond++;
 };
 
@@ -1176,9 +1176,9 @@ string_variable: TKN_QUOTED_STRING {
         MQL_ERROR(EOVERFLOW, "too complex condition");
     strs[nstr] = $1;
     cond->type = mqi_variable;
-    cond->variable.flags = 0;
-    cond->variable.type = mqi_varchar;
-    cond->variable.varchar = strs + nstr++;
+    cond->u.variable.flags = 0;
+    cond->u.variable.type = mqi_varchar;
+    cond->u.variable.v.varchar = strs + nstr++;
     cond++;
 };
 
@@ -1187,8 +1187,8 @@ integer_variable: sign TKN_NUMBER {
         MQL_ERROR(EOVERFLOW, "too complex condition");
     ints[nint] = $1 * $2;
     cond->type = mqi_variable;
-    cond->variable.type = mqi_integer;
-    cond->variable.integer = ints + nint++;
+    cond->u.variable.type = mqi_integer;
+    cond->u.variable.v.integer = ints + nint++;
     cond++;
 };
 
@@ -1197,9 +1197,9 @@ unsigned_variable: TKN_NUMBER {
         MQL_ERROR(EOVERFLOW, "too complex condition");
     uints[nuint] = $1;
     cond->type = mqi_variable;
-    cond->variable.flags = 0;
-    cond->variable.type = mqi_unsignd;
-    cond->variable.unsignd = uints + nuint++;
+    cond->u.variable.flags = 0;
+    cond->u.variable.type = mqi_unsignd;
+    cond->u.variable.v.unsignd = uints + nuint++;
     cond++;
 };
 
@@ -1208,9 +1208,9 @@ floating_variable: floating_value {
         MQL_ERROR(EOVERFLOW, "too complex condition");
     floats[nfloat] = $1;
     cond->type = mqi_variable;
-    cond->variable.flags = 0;
-    cond->variable.type = mqi_floating;
-    cond->variable.floating = floats + nfloat++;
+    cond->u.variable.flags = 0;
+    cond->u.variable.type = mqi_floating;
+    cond->u.variable.v.floating = floats + nfloat++;
     cond++;
 };
 
@@ -1232,9 +1232,9 @@ parameter_value: TKN_PARAMETER {
         MQL_ERROR(EOVERFLOW, "too complex condition");
     }
     cond->type = mqi_variable;
-    cond->variable.flags = MQL_BINDABLE | MQL_BIND_INDEX(binds++);
-    cond->variable.type = $1;
-    cond->variable.generic = NULL;
+    cond->u.variable.flags = MQL_BINDABLE | MQL_BIND_INDEX(binds++);
+    cond->u.variable.type = $1;
+    cond->u.variable.v.generic = NULL;
     cond++;
 };
 
@@ -1243,7 +1243,7 @@ expression_value:
     if (cond - conds >= MQI_COND_MAX)
         MQL_ERROR(EOVERFLOW, "too complex condition");
     cond->type = mqi_operator;
-    cond->operator = mqi_begin;
+    cond->u.operator = mqi_begin;
     cond++;
   }
   conditional_expression
@@ -1251,7 +1251,7 @@ expression_value:
     if (cond - conds >= MQI_COND_MAX)
         MQL_ERROR(EOVERFLOW, "too complex condition");
     cond->type = mqi_operator;
-    cond->operator = mqi_end;
+    cond->u.operator = mqi_end;
     cond++;
   }
 ;
@@ -1266,7 +1266,7 @@ sign:
 unary_operator:
   TKN_NOT {
       cond->type = mqi_operator;
-      cond->operator = mqi_not;
+      cond->u.operator = mqi_not;
       cond++;
   }
 ;
@@ -1274,27 +1274,27 @@ unary_operator:
 relational_operator:
   TKN_LESS {
       cond->type = mqi_operator;
-      cond->operator = mqi_less;
+      cond->u.operator = mqi_less;
       cond++;
   }
 | TKN_LESS_OR_EQUAL {
     cond->type = mqi_operator;
-    cond->operator = mqi_leq;
+    cond->u.operator = mqi_leq;
     cond++;
   }
 | TKN_EQUAL {
     cond->type = mqi_operator;
-    cond->operator = mqi_eq;
+    cond->u.operator = mqi_eq;
     cond++;
   }
 | TKN_GREATER_OR_EQUAL {
     cond->type = mqi_operator;
-    cond->operator = mqi_geq;
+    cond->u.operator = mqi_geq;
     cond++;
   }
 | TKN_GREATER {
     cond->type = mqi_operator;
-    cond->operator = mqi_gt;
+    cond->u.operator = mqi_gt;
     cond++;
   }
 ;
@@ -1302,12 +1302,12 @@ relational_operator:
 logical_operator:
   TKN_LOGICAL_AND {
       cond->type = mqi_operator;
-      cond->operator = mqi_and;
+      cond->u.operator = mqi_and;
       cond++;
   }
 | TKN_LOGICAL_OR {
     cond->type = mqi_operator;
-    cond->operator = mqi_or;
+    cond->u.operator = mqi_or;
     cond++;
   }
 ;

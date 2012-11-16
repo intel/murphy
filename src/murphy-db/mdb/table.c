@@ -386,7 +386,7 @@ int mdb_table_select_by_index(mdb_table_t *tbl,
             return -1;
         }
 
-        mdb_column_write(col, data, &src, var->generic);
+        mdb_column_write(col, data, &src, var->v.generic);
     }
 
     return select_by_index(tbl, idxlen,idxval, cds, result);

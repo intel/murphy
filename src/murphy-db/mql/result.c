@@ -134,7 +134,7 @@ struct result_list_s {
             uint32_t  unsignd[0];
             double    floating[0];
             int       generic[0];
-        };
+        } v;
     }                     value;
 };
 
@@ -1272,12 +1272,12 @@ mql_result_t *mql_result_list_create(mqi_data_type_t type,
         rslt->value.type = type;
 
         if (type != mqi_varchar)
-            memcpy(rslt->value.generic, values, datalen);
+            memcpy(rslt->value.v.generic, values, datalen);
         else {
             strs = (char **)values;
-            strpool = (char *)&rslt->value.varchar[length];
+            strpool = (char *)&rslt->value.v.varchar[length];
             for (i = 0;  i < length;  i++) {
-                rslt->value.varchar[i] = memcpy(strpool, strs[i], slen[i]);
+                rslt->value.v.varchar[i] = memcpy(strpool, strs[i], slen[i]);
                 strpool += slen[i];
             }
         }
@@ -1311,9 +1311,9 @@ const char *mql_result_list_get_string(mql_result_t *r, int idx,
 
     case mqi_varchar:
         if (!v)
-            v = rslt->value.varchar[idx];
+            v = rslt->value.v.varchar[idx];
         else {
-            strncpy(v, rslt->value.varchar[idx], len);
+            strncpy(v, rslt->value.v.varchar[idx], len);
             v[len-1] = '\0';
         }
         break;
@@ -1322,21 +1322,21 @@ const char *mql_result_list_get_string(mql_result_t *r, int idx,
         if (!v)
             v = "";
         else
-            snprintf(v, len, "%d", rslt->value.integer[idx]);
+            snprintf(v, len, "%d", rslt->value.v.integer[idx]);
         break;
 
     case mqi_unsignd:
         if (!v)
             v = "";
         else
-            snprintf(v, len, "%u", rslt->value.unsignd[idx]);
+            snprintf(v, len, "%u", rslt->value.v.unsignd[idx]);
         break;
 
     case mqi_floating:
         if (!v)
             v = "";
         else
-            snprintf(v, len, "%lf", rslt->value.floating[idx]);
+            snprintf(v, len, "%lf", rslt->value.v.floating[idx]);
         break;
 
     default:
@@ -1356,11 +1356,11 @@ int32_t mql_result_list_get_integer(mql_result_t *r, int idx)
                  idx >= 0 && idx < rslt->length, 0);
 
     switch (rslt->value.type) {
-    case mqi_varchar:   v = strtol(rslt->value.varchar[idx], NULL, 10);  break;
-    case mqi_integer:   v = rslt->value.integer[idx];                    break;
-    case mqi_unsignd:   v = rslt->value.unsignd[idx];                    break;
-    case mqi_floating:  v = rslt->value.floating[idx];                   break;
-    default:            v = 0;                                           break;
+    case mqi_varchar:  v = strtol(rslt->value.v.varchar[idx], NULL, 10); break;
+    case mqi_integer:  v = rslt->value.v.integer[idx];                   break;
+    case mqi_unsignd:  v = rslt->value.v.unsignd[idx];                   break;
+    case mqi_floating: v = rslt->value.v.floating[idx];                  break;
+    default:           v = 0;                                            break;
     }
 
     return v;
@@ -1375,11 +1375,11 @@ int32_t mql_result_list_get_unsigned(mql_result_t *r, int idx)
                  idx >= 0 && idx < rslt->length, 0);
 
     switch (rslt->value.type) {
-    case mqi_varchar:   v = strtoul(rslt->value.varchar[idx], NULL, 10); break;
-    case mqi_integer:   v = rslt->value.integer[idx];                    break;
-    case mqi_unsignd:   v = rslt->value.unsignd[idx];                    break;
-    case mqi_floating:  v = rslt->value.floating[idx];                   break;
-    default:            v = 0;                                           break;
+    case mqi_varchar:  v = strtoul(rslt->value.v.varchar[idx], NULL, 10);break;
+    case mqi_integer:  v = rslt->value.v.integer[idx];                   break;
+    case mqi_unsignd:  v = rslt->value.v.unsignd[idx];                   break;
+    case mqi_floating: v = rslt->value.v.floating[idx];                  break;
+    default:           v = 0;                                            break;
     }
 
     return v;
@@ -1394,11 +1394,11 @@ double mql_result_list_get_floating(mql_result_t *r, int idx)
                  idx >= 0 && idx < rslt->length, 0);
 
     switch (rslt->value.type) {
-    case mqi_varchar:   v = strtod(rslt->value.varchar[idx], NULL);  break;
-    case mqi_integer:   v = rslt->value.integer[idx];                break;
-    case mqi_unsignd:   v = rslt->value.unsignd[idx];                break;
-    case mqi_floating:  v = rslt->value.floating[idx];               break;
-    default:            v = 0;                                       break;
+    case mqi_varchar:   v = strtod(rslt->value.v.varchar[idx], NULL);  break;
+    case mqi_integer:   v = rslt->value.v.integer[idx];                break;
+    case mqi_unsignd:   v = rslt->value.v.unsignd[idx];                break;
+    case mqi_floating:  v = rslt->value.v.floating[idx];               break;
+    default:            v = 0;                                         break;
     }
 
     return v;

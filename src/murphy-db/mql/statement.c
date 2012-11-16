@@ -46,7 +46,7 @@ typedef struct {
         uint32_t     unsignd;
         double       floating;
         void        *generic;
-    };
+    } v;
 } value_t;
 
 typedef struct {
@@ -619,11 +619,11 @@ static void count_condition_values(int               ncond,
         ce = conds + i;
 
         if (ce->type == mqi_variable) {
-            var   = &ce->variable;
+            var   = &ce->u.variable;
             flags = var->flags;
 
             if (!(flags & MQL_BINDABLE)) {
-                if (var->type == mqi_varchar && (str = *(var->varchar)))
+                if (var->type == mqi_varchar && (str = *(var->v.varchar)))
                     poollen += strlen(str) + 1;
                 nconst++;
             }
@@ -676,17 +676,17 @@ static void copy_column_values(int                 ncol,
             case mqi_varchar:
                 str = *(char **)vptr;
                 len = strlen(str) + 1;
-                val->varchar = (char *)memcpy(strpool, str, len);
+                val->v.varchar = (char *)memcpy(strpool, str, len);
                 strpool += len;
                 break;
             case mqi_integer:
-                val->integer = *(int32_t *)vptr;
+                val->v.integer = *(int32_t *)vptr;
                 break;
             case mqi_unsignd:
-                val->unsignd  = *(uint32_t *)vptr;
+                val->v.unsignd  = *(uint32_t *)vptr;
                 break;
             case mqi_floating:
-                val->floating = *(double *)vptr;
+                val->v.floating = *(double *)vptr;
                 break;
             default:
                 break;
@@ -694,7 +694,7 @@ static void copy_column_values(int                 ncol,
         }
 
         val->type   = type;
-        col->offset = (void *)&val->generic - values;
+        col->offset = (void *)&val->v.generic - values;
     }
 
     col = dst_cols + i;
@@ -729,7 +729,7 @@ static void copy_conditions_and_values(int                ncond,
         *(cond = dst_conds + i) = src_conds[i];
 
         if (cond->type == mqi_variable) {
-            var   = &cond->variable;
+            var   = &cond->u.variable;
             type  = var->type;
             flags = var->flags;
 
@@ -740,19 +740,19 @@ static void copy_conditions_and_values(int                ncond,
 
                 switch (type) {
                 case mqi_varchar:
-                    str = *(var->varchar);
+                    str = *(var->v.varchar);
                     len = strlen(str) + 1;
-                    val->varchar = (char *)memcpy(strpool, str, len);
+                    val->v.varchar = (char *)memcpy(strpool, str, len);
                     strpool += len;
                     break;
                 case mqi_integer:
-                    val->integer = *(var->integer);
+                    val->v.integer = *(var->v.integer);
                     break;
                 case mqi_unsignd:
-                    val->unsignd = *(var->unsignd);
+                    val->v.unsignd = *(var->v.unsignd);
                     break;
                 case mqi_floating:
-                    val->floating = *(var->floating);
+                    val->v.floating = *(var->v.floating);
                     break;
                 default:
                     break;
@@ -760,7 +760,7 @@ static void copy_conditions_and_values(int                ncond,
             }
 
             val->type = type;
-            var->generic = (void *)&val->generic;
+            var->v.generic = (void *)&val->v.generic;
         }
     }
 
@@ -1003,11 +1003,11 @@ static int bind_value(value_t *v, mqi_data_type_t type, va_list data)
 {
     if (type == v->type) {
         switch (type) {
-        case mqi_varchar:   v->varchar  = va_arg(data, char *);     return 0;
-        case mqi_integer:   v->integer  = va_arg(data, int32_t);    return 0;
-        case mqi_unsignd:   v->unsignd  = va_arg(data, uint32_t);   return 0;
-        case mqi_floating:  v->floating = va_arg(data, double);     return 0;
-        default:                                                    break;
+        case mqi_varchar:   v->v.varchar  = va_arg(data, char *);     return 0;
+        case mqi_integer:   v->v.integer  = va_arg(data, int32_t);    return 0;
+        case mqi_unsignd:   v->v.unsignd  = va_arg(data, uint32_t);   return 0;
+        case mqi_floating:  v->v.floating = va_arg(data, double);     return 0;
+        default:                                                      break;
         }
     }
 

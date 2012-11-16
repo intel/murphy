@@ -171,7 +171,7 @@ struct mqi_variable_s {
         double      *floating;
         void       **blob;
         void        *generic;
-    };
+    } v;
 };
 
 
@@ -181,7 +181,7 @@ struct mqi_cond_entry_s {
         mqi_operator_t     operator;
         mqi_variable_t     variable;
         int                column;     /* column index actually */
-    };
+    } u;
 };
 
 

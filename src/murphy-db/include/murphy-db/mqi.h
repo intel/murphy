@@ -54,16 +54,16 @@
 #define MQI_BLOB(s)       mqi_blob,    s
 
 #define MQI_COLUMN(column_index)  \
-    {.type=mqi_column, .column=column_index}
+    {.type=mqi_column, .u.column=column_index}
 
 #define MQI_VALUE(typ, val)  \
-    {.type=mqi_##typ, .typ=val}
+    {.type=mqi_##typ, .v.typ=val}
 
 #define MQI_VARIABLE(typ, val) \
-    {.type=mqi_variable, .variable=MQI_VALUE(typ, val)}
+    {.type=mqi_variable, .u.variable=MQI_VALUE(typ, val)}
 
 #define MQI_OPERATOR(op) \
-    {.type=mqi_operator, .operator=mqi_##op}
+    {.type=mqi_operator, .u.operator=mqi_##op}
 
 
 #define MQI_EXPRESSION(seq)        MQI_OPERATOR(begin), seq, MQI_OPERATOR(end),

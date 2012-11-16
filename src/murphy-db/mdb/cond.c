@@ -56,7 +56,7 @@ typedef struct {
         uint32_t     unsignd;
         void        *blob;
         void        *data;
-    };
+    } v;
 } cond_data_t;
 
 #define PRECEDENCE_DATA 256
@@ -106,17 +106,17 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
         switch (cond->type) {
 
         case mqi_operator:
-            pr  = precedence[cond->operator];
+            pr  = precedence[cond->u.operator];
             sp += cond_eval(sp, lastop, pr);
 
-            switch (cond->operator) {
+            switch (cond->u.operator) {
 
             case mqi_begin:
                 cond++;
                 result = mdb_cond_evaluate(tbl, &cond, data);
                 cond++;
 
-                sp->data.integer = result >= 0 ? result : 0;
+                sp->data.v.integer = result >= 0 ? result : 0;
                 sp->precedence   = PRECEDENCE_DATA;
                 sp->data.type    = mqi_integer;
                 sp++;
@@ -131,7 +131,7 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
                     errno = ENOENT;
                     return -1;
                 }
-                return sp->data.integer ? 1 : 0;
+                return sp->data.v.integer ? 1 : 0;
 
             case mqi_and:
             case mqi_or:
@@ -143,7 +143,7 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
             case mqi_not:
                 lastop = sp++;
                 lastop->precedence = pr;
-                lastop->operator = cond->operator;
+                lastop->operator = cond->u.operator;
                 cond++;
                 break;
 
@@ -181,28 +181,28 @@ static int cond_get_data(cond_stack_t     *sp,
 
     case mqi_variable:
         sd  = &sp->data;
-        var = &cond->variable;
+        var = &cond->u.variable;
 
-        if (!var->generic)
+        if (!var->v.generic)
             ok = 0;
         else {
             switch ((sp->data.type = var->type)) {
-            case mqi_varchar:   sd->varchar = *var->varchar;  ok = 1;   break;
-            case mqi_integer:   sd->integer = *var->integer;  ok = 1;   break;
-            case mqi_unsignd:   sd->unsignd = *var->unsignd;  ok = 1;   break;
-            case mqi_blob:      sd->blob    = *var->blob;     ok = 1;   break;
-            default:                                          ok = 0;   break;
+            case mqi_varchar:  sd->v.varchar = *var->v.varchar;  ok = 1; break;
+            case mqi_integer:  sd->v.integer = *var->v.integer;  ok = 1; break;
+            case mqi_unsignd:  sd->v.unsignd = *var->v.unsignd;  ok = 1; break;
+            case mqi_blob:     sd->v.blob    = *var->v.blob;     ok = 1; break;
+            default:                                             ok = 0; break;
             }
         }
         break;
 
     case mqi_column: {
-        col_desc = columns + cond->column;
-        sp_desc[0].cindex  = cond->column;
+        col_desc = columns + cond->u.column;
+        sp_desc[0].cindex  = cond->u.column;
         sp_desc[0].offset = 0;
         sp_desc[1].cindex  = -1;
         sp_desc[1].offset = -1;
-        mdb_column_read(sp_desc, &sp->data.data, col_desc, data);
+        mdb_column_read(sp_desc, &sp->data.v.data, col_desc, data);
         sp->data.type = col_desc->type;
         ok = 1;
         }
@@ -231,7 +231,7 @@ static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
         case mqi_begin:
             /* stack: (0)begin, (1)operand => (0)result */
             newsp = (result = lastop) + 1;
-            value = (lastop+1)->data.integer;
+            value = (lastop+1)->data.v.integer;
             new_precedence = INT_MAX;
             goto store_on_stack;
 
@@ -266,7 +266,7 @@ static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
         store_on_stack:
             result->precedence   = PRECEDENCE_DATA;
             result->data.type    = mqi_integer;
-            result->data.integer = value;
+            result->data.v.integer = value;
             /* intentional fall over */
 
         default:
@@ -291,29 +291,29 @@ static int cond_relop(mqi_operator_t op, cond_stack_t *v1, cond_stack_t *v2)
     {
         switch (d1->type) {
         case mqi_varchar:
-            if (!d1->varchar && !d2->varchar)
+            if (!d1->v.varchar && !d2->v.varchar)
                 cmp = 0;
-            else if (!d1->varchar)
+            else if (!d1->v.varchar)
                 cmp = -1;
-            else if (!d2->varchar)
+            else if (!d2->v.varchar)
                 cmp = 1;
             else
-                cmp = strcmp(d1->varchar, d2->varchar);
+                cmp = strcmp(d1->v.varchar, d2->v.varchar);
             break;
 
         case mqi_integer:
-            if (d1->integer > d2->integer)
+            if (d1->v.integer > d2->v.integer)
                 cmp = 1;
-            else if (d1->integer == d2->integer)
+            else if (d1->v.integer == d2->v.integer)
                 cmp = 0;
             else
                 cmp = -1;
             break;
 
         case mqi_unsignd:
-            if (d1->unsignd > d2->unsignd)
+            if (d1->v.unsignd > d2->v.unsignd)
                 cmp = 1;
-            else if (d1->unsignd == d2->unsignd)
+            else if (d1->v.unsignd == d2->v.unsignd)
                 cmp = 0;
             else
                 cmp = -1;
@@ -351,16 +351,16 @@ static int cond_binary_logicop(mqi_operator_t op,
 
         case mqi_and:
             switch (d1->type) {
-            case mqi_integer:   return d1->integer && d2->integer;
-            case mqi_unsignd:   return d1->unsignd && d2->unsignd;
+            case mqi_integer:   return d1->v.integer && d2->v.integer;
+            case mqi_unsignd:   return d1->v.unsignd && d2->v.unsignd;
             default:            return 0;
             }
             break;
 
         case mqi_or:
             switch (d1->type) {
-            case mqi_integer:   return d1->integer || d2->integer;
-            case mqi_unsignd:   return d1->unsignd || d2->unsignd;
+            case mqi_integer:   return d1->v.integer || d2->v.integer;
+            case mqi_unsignd:   return d1->v.unsignd || d2->v.unsignd;
             default:            return 0;
             }
             break;
@@ -379,9 +379,9 @@ static int cond_unary_logicop(mqi_operator_t op, cond_stack_t *v)
 
     if (v->precedence >= PRECEDENCE_DATA && op == mqi_not) {
         switch (d->type) {
-        case mqi_varchar:  return d->varchar && d->varchar[0] ? 0 : 1;
-        case mqi_integer:  return d->integer ? 0 : 1;
-        case mqi_unsignd:  return d->unsignd ? 0 : 1;
+        case mqi_varchar:  return d->v.varchar && d->v.varchar[0] ? 0 : 1;
+        case mqi_integer:  return d->v.integer ? 0 : 1;
+        case mqi_unsignd:  return d->v.unsignd ? 0 : 1;
         default:           return 0;
         }
     }
