@@ -9,14 +9,16 @@
 #include <murphy/core/console.h>
 #include <murphy/core/lua-bindings/murphy.h>
 
-static void eval_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+static void eval_cb(mrp_console_t *c, void *user_data, const char *grp,
+                    const char *cmd, char *code)
 {
     lua_State *L;
-    char       code[1024], *p;
-    int        i, n, l, len;
+    int        len;
 
     MRP_UNUSED(c);
     MRP_UNUSED(user_data);
+    MRP_UNUSED(grp);
+    MRP_UNUSED(cmd);
 
     L = mrp_lua_get_lua_state();
 
@@ -25,20 +27,7 @@ static void eval_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
         return;
     }
 
-    p   = code;
-    l   = sizeof(code);
-    len = 0;
-    for (i = 2; i < argc; i++) {
-        n = snprintf(p, l, "%s", argv[i]);
-
-        if (n >= l)
-            return;
-
-        l   -= n;
-        p   += n;
-        len += n;
-    }
-
+    len = strlen(code);
     if (luaL_loadbuffer(L, code, len, "<console>") || lua_pcall(L, 0, 0, 0))
         printf("Lua error: %s\n", lua_tostring(L, -1));
 
@@ -91,11 +80,12 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
                 }
             }
             else
-                printf("Failed to open %s (%d: %s).", path,
+                printf("Failed to open %s (%d: %s).\n", path,
                        errno, strerror(errno));
         }
         else
-            printf("Failed to open %s (%d: %s).", path, errno, strerror(errno));
+            printf("Failed to open %s (%d: %s).\n", path,
+                   errno, strerror(errno));
     }
 }
 
@@ -104,7 +94,7 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     "Lua commands allows one to evaluate Lua code either from\n" \
     "the console command line itself, or from sourced files.\n"
 
-#define EVAL_SYNTAX      "eval <lua-code>"
+#define EVAL_SYNTAX      "<lua-code>"
 #define EVAL_SUMMARY     "evaluate the given snippet of Lua code"
 #define EVAL_DESCRIPTION                                               \
     "Evaluate the given snippet of Lua code. Currently you have to\n"  \
@@ -118,8 +108,9 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 #define SOURCE_DESCRIPTION "Read and evaluate the contents of <lua-file>.\n"
 
 MRP_CORE_CONSOLE_GROUP(lua_group, "lua", LUA_GROUP_DESCRIPTION, NULL, {
-        MRP_TOKENIZED_CMD("eval", eval_cb, TRUE,
-                          EVAL_SYNTAX, EVAL_SUMMARY, EVAL_DESCRIPTION),
         MRP_TOKENIZED_CMD("source", source_cb, FALSE,
                           SOURCE_SYNTAX, SOURCE_SUMMARY, SOURCE_DESCRIPTION),
+        MRP_RAWINPUT_CMD("eval", eval_cb,
+                         MRP_CONSOLE_CATCHALL | MRP_CONSOLE_SELECTABLE,
+                         EVAL_SYNTAX, EVAL_SUMMARY, EVAL_DESCRIPTION),
     });

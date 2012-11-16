@@ -64,8 +64,6 @@ void one_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_cb_1(mrp_console_t *c, void *user_data, int argc, char **argv);
 void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv);
@@ -84,10 +82,6 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           "three [args]", "command 3", "description 3"),
         MRP_TOKENIZED_CMD("four" , four_cb , TRUE,
                           "four [args]", "command 4", "description 4"),
-        MRP_TOKENIZED_CMD("db-script" , db_script_cb , TRUE,
-                          "db-script <file>", "run DB script", "run DB script"),
-        MRP_TOKENIZED_CMD("db-cmd" , db_cmd_cb , TRUE,
-                          "db-cmd <DB command>", "run DB command", "run DB command"),
         MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
                           "update <target>", "update target", "update target"),
         MRP_TOKENIZED_CMD("signalling_1" , signalling_cb_1 , TRUE,
@@ -114,7 +108,6 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           "signalling_create_ep_cb [args]",
                           "signalling internal EP creation command",
                           "Create internal enforcement point for signalling")
-
 });
 
 
@@ -166,63 +159,6 @@ void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 
     for (i = 0; i < argc; i++) {
         printf("%s(): #%d: '%s'\n", __FUNCTION__, i, argv[i]);
-    }
-}
-
-
-void db_script_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
-{
-    mqi_handle_t tx;
-    int          i;
-
-    MRP_UNUSED(c);
-    MRP_UNUSED(user_data);
-
-    tx = mqi_begin_transaction();
-    for (i = 2; i < argc; i++) {
-        tx = mqi_begin_transaction();
-        if (mql_exec_file(argv[i]) < 0)
-            printf("failed to execute DB script: %s\n", strerror(errno));
-        else
-            printf("DB script executed OK\n");
-        mqi_commit_transaction(tx);
-    }
-}
-
-
-void db_cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
-{
-    mql_result_t *r;
-    mqi_handle_t  tx;
-    char          buf[1024], *p;
-    int           i, n, l;
-
-    MRP_UNUSED(c);
-    MRP_UNUSED(user_data);
-
-    p = buf;
-    n = sizeof(buf);
-
-    for (i = 2; i < argc; i++) {
-        l = snprintf(p, n, "%s ", argv[i]);
-        p += l;
-        n -= l;
-
-        if ((tx = mqi_begin_transaction()) == MQI_HANDLE_INVALID)
-            printf("failed to create DB transaction\n");
-        r = mql_exec_string(mql_result_string, buf);
-
-        if (!mql_result_is_success(r)) {
-            printf("failed to execute DB command '%s'\n", buf);
-        }
-        else {
-            printf("DB command executed OK\n");
-            printf("%s\n", mql_result_string_get(r));
-        }
-
-        mql_result_free(r);
-        if (mqi_commit_transaction(tx) < 0)
-            printf("failed to commit DB transaction\n");
     }
 }
 
