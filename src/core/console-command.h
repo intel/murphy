@@ -48,28 +48,25 @@
     };
 
 /** Macro to declare a console command that wants tokenized input. */
-#define MRP_TOKENIZED_CMD(_name, _cb, _selectable, _syntax, _summ, _descr) { \
-        .name        = _name,                                                \
-        .syntax      = _syntax,                                              \
-        .summary     = _summ,                                                \
-        .description = _descr,                                               \
-        .flags       =                                                       \
-                      (_selectable ? MRP_CONSOLE_SELECTABLE : 0),            \
-      { .tok         = _cb, }                                                \
+#define MRP_TOKENIZED_CMD(_name, _cb, _flags, _syntax, _summ, _descr) {     \
+        .name        = _name,                                               \
+        .syntax      = _syntax,                                             \
+        .summary     = _summ,                                               \
+        .description = _descr,                                              \
+        .flags       = ((_flags) == 0x1 ? MRP_CONSOLE_SELECTABLE : _flags), \
+      { .tok         = _cb, }                                               \
     }
 
-#if 0 /* XXX TODO: implement handling of raw input mode commands */
 /** Macro to declare a console command that wants a raw input. */
-#define MRP_RAWINPUT_CMD(_name, _cb, _selectable, _syntax, _summ, _descr) { \
+#define MRP_RAWINPUT_CMD(_name, _cb, _flags, _syntax, _summ, _descr) {      \
         .name        = _name,                                               \
         .syntax      = _syntax,                                             \
         .summary     = _summ,                                               \
         .description = _descr,                                              \
         .flags       = MRP_CONSOLE_RAWINPUT |                               \
-                      (_selectable ? MRP_CONSOLE_SELECTABLE : 0),           \
-        .raw         = _cb                                                  \
+                       ((_flags) == 0x1 ? MRP_CONSOLE_SELECTABLE : _flags), \
+      { .raw         = _cb, }                                               \
     }
-#endif
 
 typedef struct mrp_console_s mrp_console_t;
 
@@ -80,8 +77,9 @@ typedef struct mrp_console_s mrp_console_t;
 
 typedef enum {
     MRP_CONSOLE_TOKENIZE   = 0x0,        /* wants tokenized input */
-    MRP_CONSOLE_RAWINPUT   = 0x1,        /* wants raw input */
-    MRP_CONSOLE_SELECTABLE = 0x2,        /* selectable as command mode */
+    MRP_CONSOLE_RAWINPUT   = 0x2,        /* wants raw input */
+    MRP_CONSOLE_SELECTABLE = 0x4,        /* selectable as command mode */
+    MRP_CONSOLE_CATCHALL   = 0x8,        /* catch-all command handler */
 } mrp_console_flag_t;
 
 
@@ -97,7 +95,8 @@ typedef struct {
     mrp_console_flag_t  flags;           /* command flags */
     union {                              /* tokenized or raw input cb */
         void   (*tok)(mrp_console_t *c, void *user_data, int argc, char **argv);
-        int    (*raw)(mrp_console_t *c, void *user_data, char *input);
+        void   (*raw)(mrp_console_t *c, void *user_data, const char *grp,
+                      const char *cmd, char *args);
     };
 } mrp_console_cmd_t;
 

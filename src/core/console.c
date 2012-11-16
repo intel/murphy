@@ -64,11 +64,11 @@
 
 typedef struct {
     char  buf[MRP_CFG_MAXLINE];          /* input buffer */
+    char  raw[MRP_CFG_MAXLINE];          /* raw input */
     char *token;                         /* current token */
     char *in;                            /* filling pointer */
     char *out;                           /* consuming pointer */
     char *next;                          /* next token buffer position */
-    int   fd;                            /* input file */
     int   error;                         /* whether has encounted and error */
     char *file;                          /* file being processed */
     int   line;                          /* line number */
@@ -169,7 +169,6 @@ mrp_console_t *mrp_create_console(mrp_context_t *ctx, mrp_console_req_t *req,
 
         c->in.file = "<console input>";
         c->in.line = 0;
-        c->in.fd   = -1;
 
         if (pipe(c->pout) < 0)
             mrp_log_warning("Failed to create console redirection pipe.");
@@ -315,26 +314,51 @@ static mrp_console_group_t *find_group(mrp_context_t *ctx, const char *name)
 
 
 static mrp_console_cmd_t *find_command(mrp_console_group_t *group,
-                                       const char *command)
+                                       const char *command, int *fallback)
 {
+    mrp_console_cmd_t *any = NULL;
     mrp_console_cmd_t *cmd;
     int                i;
+
+    if (fallback != NULL)
+        *fallback = FALSE;
 
     if (group != NULL) {
         for (i = 0, cmd = group->commands; i < group->ncommand; i++, cmd++) {
             if (!strcmp(cmd->name, command))
                 return cmd;
+            if (cmd->flags & MRP_CONSOLE_CATCHALL) {
+                any = cmd;
+                if (fallback != NULL)
+                    *fallback = TRUE;
+            }
         }
     }
 
-    return NULL;
+    return any;
 }
 
 
 int mrp_console_add_group(mrp_context_t *ctx, mrp_console_group_t *group)
 {
+    mrp_console_cmd_t *cmd, *catchall;
+    int                i;
+
     if (group != NULL && find_group(ctx, group->name) == NULL) {
         mrp_list_append(&ctx->cmd_groups, &group->hook);
+
+        catchall = NULL;
+        for (i = 0, cmd = group->commands; i < group->ncommand; i++, cmd++) {
+            if (cmd->flags & MRP_CONSOLE_CATCHALL) {
+                if (catchall == NULL)
+                    catchall = cmd;
+                else
+                    mrp_log_warning("Console group '%s' has multiple "
+                                    "catch-all commands: (%s, %s).",
+                                    group->name, catchall->name, cmd->name);
+            }
+        }
+
         return TRUE;
     }
     else
@@ -355,8 +379,24 @@ int mrp_console_del_group(mrp_context_t *ctx, mrp_console_group_t *group)
 
 int mrp_console_add_core_group(mrp_console_group_t *group)
 {
+    mrp_console_cmd_t *cmd, *catchall;
+    int                i;
+
     if (group != NULL && find_group(NULL, group->name) == NULL) {
         mrp_list_append(&core_groups, &group->hook);
+
+        catchall = NULL;
+        for (i = 0, cmd = group->commands; i < group->ncommand; i++, cmd++) {
+            if (cmd->flags & MRP_CONSOLE_CATCHALL) {
+                if (catchall == NULL)
+                    catchall = cmd;
+                else
+                    mrp_log_warning("Console group '%s' has multiple "
+                                    "catch-all commands: (%s, %s).",
+                                    group->name, catchall->name, cmd->name);
+            }
+        }
+
         return TRUE;
     }
     else
@@ -423,6 +463,31 @@ static int console_read_output(console_t *c, void *buf, size_t size)
 }
 
 
+static char *raw_argument(char *raw, const char *grp, const char *cmd)
+{
+#define SKIP_WHITESPACE(_p)            \
+    while (*_p == ' ' || *_p == '\t')  \
+        _p++
+
+#define SKIP_PREFIX(_p, _prfx) do {                                       \
+        int _l = strlen(_prfx);                                           \
+                                                                          \
+        if (!strncmp(_p, _prfx, _l) && (_p[_l] == ' ' || _p[_l] == '\t')) \
+            _p += _l;                                                     \
+    } while (0)
+
+    SKIP_WHITESPACE(raw);
+    SKIP_PREFIX(raw, grp);
+    SKIP_WHITESPACE(raw);
+    SKIP_PREFIX(raw, cmd);
+
+    return raw;
+
+#undef SKIP_WHITESPACE
+#undef SKIP_PREFIX
+}
+
+
 static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
 {
     console_t           *c = (console_t *)mc;
@@ -430,8 +495,8 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
     mrp_console_cmd_t   *cmd;
     char                *args[MRP_CFG_MAXARGS];
     int                  argc;
-    char               **argv;
-    int                  len;
+    char               **argv, *raw;
+    int                  len, fallback;
 
     /*
      * parse the given command to tokens
@@ -471,7 +536,7 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
      */
 
     grp = find_group(c->ctx, "");
-    cmd = find_command(grp, argv[0]);
+    cmd = find_command(grp, argv[0], NULL);
 
     if (cmd != NULL) {
         argv[-1] = "";
@@ -494,9 +559,10 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
         }
         else {
             if (c->cmd == NULL) {
-                cmd = find_command(c->grp, argv[0]);
+                cmd = find_command(c->grp, argv[0], &fallback);
 
-                if (cmd != NULL && cmd->flags & MRP_CONSOLE_SELECTABLE) {
+                if (cmd != NULL &&
+                    (cmd->flags & MRP_CONSOLE_SELECTABLE) && !fallback) {
                     c->cmd = cmd;
                     goto prompt;
                 }
@@ -520,7 +586,7 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
         }
         else {
             grp = c->grp;
-            cmd = find_command(grp, argv[0]);
+            cmd = find_command(grp, argv[0], NULL);
 
             if (cmd == NULL)
                 goto unknown_command;
@@ -540,7 +606,7 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
 
     if (argc > 1) {
         grp = find_group(c->ctx, argv[0]);
-        cmd = find_command(grp, argv[1]);
+        cmd = find_command(grp, argv[1], NULL);
     }
 
  execute:
@@ -551,7 +617,12 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
         clearerr(stderr);
 
         MRP_CONSOLE_BUSY(mc, {
-                cmd->tok(mc, grp->user_data, argc, argv);
+                if (cmd->flags & MRP_CONSOLE_RAWINPUT) {
+                    raw = raw_argument(buf, grp->name, cmd->name);
+                    cmd->raw(mc, grp->user_data, grp->name, cmd->name, raw);
+                }
+                else
+                    cmd->tok(mc, grp->user_data, argc, argv);
             });
 
         {
@@ -721,10 +792,9 @@ static inline void skip_whitespace(input_t *in)
 
 static char *get_next_token(input_t *in)
 {
-    ssize_t len;
-    int     diff, size;
-    int     quote, quote_line;
-    char   *p, *q;
+    int   diff, size;
+    int   quote, quote_line;
+    char *p, *q;
 
     /*
      * Newline:
@@ -755,33 +825,6 @@ static char *get_next_token(input_t *in)
         in->in   -= diff;
         in->next  = in->buf;
         *in->in   = '\0';
-    }
-
-    /*
-     * refill the buffer if we're empty or just flushed all tokens
-     */
-
-    if (in->token == in->buf && in->fd != -1) {
-        size = sizeof(in->buf) - 1 - (in->in - in->buf);
-        len  = read(in->fd, in->in, size);
-
-        if (len < size) {
-            close(in->fd);
-            in->fd = -1;
-        }
-
-        if (len < 0) {
-            mrp_log_error("Failed to read from config file (%d: %s).",
-                          errno, strerror(errno));
-            in->error = TRUE;
-            close(in->fd);
-            in->fd = -1;
-
-            return NULL;
-        }
-
-        in->in += len;
-        *in->in = '\0';
     }
 
     if (in->out >= in->in)
@@ -921,16 +964,9 @@ static char *get_next_token(input_t *in)
         }
     }
 
-    if (in->fd == -1) {
-        *q = '\0';
-        in->out = p;
-        in->in = q;
+    *q = '\0';
+    in->out = p;
+    in->in = q;
 
-        return in->token;
-    }
-    else {
-        mrp_log_error("Input line %d of file %s exceeds allowed length.",
-                      in->line, in->file);
-        return NULL;
-    }
+    return in->token;
 }
