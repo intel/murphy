@@ -66,7 +66,7 @@ typedef struct {
         int32_t     integer;
         uint32_t    unsignd;
         double      floating;
-    };
+    } v;
 } attribute_t;
 
 typedef struct {
@@ -218,7 +218,7 @@ static void attribute_array_free(attribute_array_t *arr)
             mrp_free((void *)attr->name);
 
             if (attr->type == 's')
-                mrp_free((void *)attr->string);
+                mrp_free((void *)attr->v.string);
         }
         mrp_free(arr);
     }
@@ -259,19 +259,19 @@ static attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr)
 
         switch ((dattr->type = sattr->type)) {
         case 's':
-            if (!(dattr->string = mrp_strdup(sattr->string))) {
+            if (!(dattr->v.string = mrp_strdup(sattr->v.string))) {
                 err = ENOMEM;
                 goto failed;
             }
             break;
         case 'i':
-            dattr->integer = sattr->integer;
+            dattr->v.integer = sattr->v.integer;
             break;
         case 'u':
-            dattr->unsignd = sattr->unsignd;
+            dattr->v.unsignd = sattr->v.unsignd;
             break;
         case 'f':
-            dattr->floating = sattr->floating;
+            dattr->v.floating = sattr->v.floating;
             break;
         default:
             errno = EINVAL;
@@ -315,11 +315,11 @@ static int attribute_array_print(attribute_array_t *arr, const char *hdr,
 
             if (p < e) {
                 switch (attr->type) {
-                case 's':  p += snprintf(p, e-p, "'%s'", attr->string);  break;
-                case 'i':  p += snprintf(p, e-p, "%d",   attr->integer); break;
-                case 'u':  p += snprintf(p, e-p, "%u",   attr->unsignd); break;
-                case 'f':  p += snprintf(p, e-p, "%.2lf",attr->floating);break;
-                default:   p += snprintf(p, e-p, "<unknown>");           break;
+                case 's': p += snprintf(p,e-p, "'%s'", attr->v.string);  break;
+                case 'i': p += snprintf(p,e-p, "%d",   attr->v.integer); break;
+                case 'u': p += snprintf(p,e-p, "%u",   attr->v.unsignd); break;
+                case 'f': p += snprintf(p,e-p, "%.2lf",attr->v.floating);break;
+                default:  p += snprintf(p,e-p, "<unknown>");             break;
                 }
             }
 
@@ -615,19 +615,19 @@ static bool fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
         switch (type) {
         case MRP_MSG_FIELD_STRING:
             attr->type = 's';
-            attr->string = value.str;
+            attr->v.string = value.str;
             break;
         case MRP_MSG_FIELD_SINT32:
             attr->type = 'i';
-            attr->integer = value.s32;
+            attr->v.integer = value.s32;
             break;
         case MRP_MSG_FIELD_UINT32:
             attr->type = 'u';
-            attr->unsignd = value.u32;
+            attr->v.unsignd = value.u32;
             break;
         case MRP_MSG_FIELD_DOUBLE:
             attr->type = 'f';
-            attr->floating = value.dbl;
+            attr->v.floating = value.dbl;
             break;
         default:
             return false;
