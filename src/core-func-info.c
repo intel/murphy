@@ -76,8 +76,8 @@ static mrp_debug_file_t file_2 = {
 
 /* core/lua-bindings/lua-console.c */
 static mrp_debug_info_t info_3[] = {
-    { .line = 12, .func = "eval_cb" },
-    { .line = 38, .func = "source_cb" },
+    { .line = 41, .func = "eval_cb" },
+    { .line = 67, .func = "source_cb" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_3 = {
@@ -87,11 +87,11 @@ static mrp_debug_file_t file_3 = {
 
 /* core/lua-bindings/lua-log.c */
 static mrp_debug_info_t info_4[] = {
-    { .line = 8, .func = "call_function" },
-    { .line = 51, .func = "log_msg" },
-    { .line = 91, .func = "log_info" },
-    { .line = 97, .func = "log_warning" },
-    { .line = 104, .func = "log_error" },
+    { .line = 37, .func = "call_function" },
+    { .line = 80, .func = "log_msg" },
+    { .line = 120, .func = "log_info" },
+    { .line = 126, .func = "log_warning" },
+    { .line = 133, .func = "log_error" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_4 = {
@@ -101,17 +101,17 @@ static mrp_debug_file_t file_4 = {
 
 /* core/lua-bindings/lua-murphy.c */
 static mrp_debug_info_t info_5[] = {
-    { .line = 16, .func = "create_murphy_object" },
-    { .line = 31, .func = "register_murphy" },
-    { .line = 50, .func = "register_bindings" },
-    { .line = 67, .func = "mrp_lua_register_murphy_bindings" },
-    { .line = 81, .func = "init_lua_utils" },
-    { .line = 87, .func = "init_lua_decision" },
-    { .line = 94, .func = "init_lua" },
-    { .line = 108, .func = "mrp_lua_set_murphy_context" },
-    { .line = 142, .func = "mrp_lua_check_murphy_context" },
-    { .line = 156, .func = "mrp_lua_get_murphy_context" },
-    { .line = 162, .func = "mrp_lua_get_lua_state" },
+    { .line = 45, .func = "create_murphy_object" },
+    { .line = 60, .func = "register_murphy" },
+    { .line = 79, .func = "register_bindings" },
+    { .line = 96, .func = "mrp_lua_register_murphy_bindings" },
+    { .line = 110, .func = "init_lua_utils" },
+    { .line = 116, .func = "init_lua_decision" },
+    { .line = 123, .func = "init_lua" },
+    { .line = 137, .func = "mrp_lua_set_murphy_context" },
+    { .line = 171, .func = "mrp_lua_check_murphy_context" },
+    { .line = 185, .func = "mrp_lua_get_murphy_context" },
+    { .line = 191, .func = "mrp_lua_get_lua_state" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_5 = {
@@ -121,10 +121,10 @@ static mrp_debug_file_t file_5 = {
 
 /* core/lua-bindings/lua-plugin.c */
 static mrp_debug_info_t info_6[] = {
-    { .line = 10, .func = "plugin_exists" },
-    { .line = 28, .func = "load" },
-    { .line = 152, .func = "load_plugin" },
-    { .line = 158, .func = "try_load_plugin" },
+    { .line = 39, .func = "plugin_exists" },
+    { .line = 57, .func = "load" },
+    { .line = 181, .func = "load_plugin" },
+    { .line = 187, .func = "try_load_plugin" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_6 = {
