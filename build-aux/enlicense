@@ -2,6 +2,7 @@
 
 TOP="${0%/*}/.."
 LICENSE="$TOP/LICENSE-BSD"
+EXCLUDE=""
 
 show_usage () {
     echo "usage: $0 [options]"
@@ -9,6 +10,7 @@ show_usage () {
     echo "  --dry-run|-n         Just find files lacking license info."
     echo "  --license|-L <file>  Use file to obtain license text."
     echo "  --git|-g             Add license only to files in the repository."
+    echo "  --exclude|-e <pat>   Exclude files matching egrep pattern <pat>."
     echo "  --help|-h            Show this help and exit."
 }
 
@@ -51,7 +53,11 @@ find_missing_licenses () {
     local _lacking _files _f
 
     _lacking=""
-    _files="`find . -name '*.[hc]'`"
+    if [ -z "$EXCLUDE" ]; then
+        _files="`find . -name '*.[hc]'`"
+    else
+        _files="`find . -name '*.[hc]' | egrep -v -e $EXCLUDE`"
+    fi
 
     for _f in $_files; do
         _f="${_f#./}"
@@ -87,6 +93,14 @@ while [ "${1#-}" != "$1" -a -n "$1" ]; do
             ;;
         --git|-g)
             GIT="y"
+            ;;
+        --exclude|-e)
+            if [ -n "$2" ]; then
+                shift
+                EXCLUDE="$1"
+            else
+                fatal 1 "missing exclusion pattern"
+            fi
             ;;
         --help|-h)
             show_usage
