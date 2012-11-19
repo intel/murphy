@@ -978,7 +978,7 @@ static int select_row_getfield(lua_State *L)
     get_data:
         if (colidx < 0 || colidx >= (int)cols->nstring)
             goto no_data;
- 
+
         switch (mql_result_rows_get_row_column_type(rslt, colidx)) {
         case mqi_string:
             string = mql_result_rows_get_string(rslt, colidx, rowidx,
@@ -1077,6 +1077,7 @@ static bool define_constants(lua_State *L)
     static const_def_t const_defs[] = {
         { "string"   , mqi_string   },
         { "integer"  , mqi_integer  },
+        { "unsigned" , mqi_unsignd  },
         { "floating" , mqi_floating },
         {    NULL    , mqi_unknown  }
     };
@@ -1213,6 +1214,7 @@ static mqi_column_def_t *check_coldefs(lua_State *L, int t, size_t *ret_len)
             if ( cd->name == NULL        ||
                 (cd->type != mqi_string  &&
                  cd->type != mqi_integer &&
+                 cd->type != mqi_unsignd &&
                  cd->type != mqi_floating ))
                  goto error;
         }
