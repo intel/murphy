@@ -922,14 +922,13 @@ libmurphy_domain_controller_la_LIBADD   = libmurphy-common.la     \
 					  murphy-db/mqi/libmqi.la \
 					  murphy-db/mdb/libmdb.la
 
-# test domain controller
-bin_PROGRAMS += test-domain-controller
-
-test_domain_controller_SOURCES = plugins/domain-control/test-client.c
-test_domain_controller_CFLAGS  = $(AM_CFLAGS)
-test_domain_controller_LDADD   = libmurphy-domain-controller.la    \
-				 libmurphy-common.la \
-				 -lreadline
+# test domain controller (disabled until we have a readline replacement)
+#bin_PROGRAMS += test-domain-controller
+#
+#test_domain_controller_SOURCES = plugins/domain-control/test-client.c
+#test_domain_controller_CFLAGS  = $(AM_CFLAGS)
+#test_domain_controller_LDADD   = libmurphy-domain-controller.la    \
+#				 libmurphy-common.la
 endif
 
 
@@ -1032,7 +1031,7 @@ if DBUS_ENABLED
 murphy_console_LDADD +=	libmurphy-dbus.la
 endif
 
-murphy_console_LDFLAGS = -rdynamic -lreadline
+murphy_console_LDFLAGS = -rdynamic
 endif
 
 # cleanup

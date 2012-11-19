@@ -228,31 +228,17 @@ AC_SUBST(GLIB_LIBS)
 # Check if building murphy-console was enabled.
 AC_ARG_ENABLE(console,
               [  --enable-console        build Murphy console],
-	      [enable_console=$enableval], [enable_console=auto])
+	      [enable_console=$enableval], [enable_console=yes])
 
-if test "$enable_console" != "no"; then
-    AC_HAVE_LIBRARY([readline], [have_readline=yes], [have_readline=no])
-    if test "$have_readline" = "no" -a "$enable_console" = "yes"; then
-        AC_MSG_ERROR([Readline development libraries not found.])
-    fi
-
-    if test "$enable_gpl" = "no"; then
-        if test "$enable_console" = "yes"; then
-           AC_MSG_ERROR([Console support requires the --enable-gpl option.])
-        else
-           enable_console="no"
-        fi
-    else
-        enable_console="$have_readline"
-    fi
-else
+if test "$enable_console" = "no"; then
     AC_MSG_NOTICE([Murphy console binary is disabled.])
+else
+    AC_MSG_NOTICE([Murphy console binary is currently forcibly disabled.])
+    enable_console=no
 fi
 
 if test "$enable_console" = "yes"; then
     AC_DEFINE([CONSOLE_ENABLED], 1, [Build Murphy console ?])
-    READLINE_CFLAGS=""
-    READLINE_LIBS="-lreadline"
 fi
 AM_CONDITIONAL(CONSOLE_ENABLED, [test "$enable_console" = "yes"])
 AC_SUBST(CONSOLE_ENABLED)
