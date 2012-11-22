@@ -40,7 +40,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include <glib.h>
 #include <dbus/dbus.h>
 
 #include <murphy/config.h>
@@ -57,6 +56,12 @@
 #ifdef ECORE_ENABLED
 #  include <Ecore.h>
 #  include <murphy/common/ecore-glue.h>
+#endif
+
+#ifdef GLIB_ENABLED
+#  include <glib.h>
+#  include "glib-pump.c"
+#  include <murphy/common/glib-glue.h>
 #endif
 
 #define info(fmt, args...) do {                                           \
@@ -586,7 +591,7 @@ static void check_quit(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
 
 
 
-
+#ifdef GLIB_ENABLED
 /*
  * glib timers
  */
@@ -845,6 +850,8 @@ static void check_glib_io(void)
     }
 }
 
+#endif
+
 
 /*
  * DBUS tests (quite a mess the whole shebang...)
@@ -870,7 +877,9 @@ typedef struct {
 } dbus_test_t;
 
 
+#ifdef GLIB_ENABLED
 static void glib_pump_cleanup(void);
+#endif
 
 static dbus_test_t dbus_test = { pipe: { -1, -1 } };
 
@@ -1053,7 +1062,9 @@ static void setup_dbus_client(mrp_mainloop_t *ml)
     cfg.ndbus_signal = nsignal;
 
     mrp_mainloop_quit(ml, 0);
+#ifdef GLIB_ENABLED
     glib_pump_cleanup();
+#endif
     mrp_mainloop_destroy(ml);
 
     for (i = 3; i < 1024; i++)
@@ -1238,7 +1249,6 @@ static void check_dbus(void)
 
 
 
-#include "glib-pump.c"
 #include "dbus-pump.c"
 
 
@@ -1602,11 +1612,13 @@ int main(int argc, char *argv[])
     setup_io(ml);
     setup_signals(ml);
 
+#ifdef GLIB_ENABLED
     if (cfg.ngio > 0 || cfg.ngtimer > 0)
         glib_pump_setup(ml);
 
     setup_glib_io();
     setup_glib_timers();
+#endif
 
     dbus_test.ml = ml;
     setup_dbus_tests(ml);
@@ -1621,16 +1633,20 @@ int main(int argc, char *argv[])
     check_timers();
     check_signals();
 
+#ifdef GLIB_ENABLED
     check_glib_io();
     check_glib_timers();
+#endif
 
     if (dbus_test.client != 0)
         close(dbus_test.pipe[1]);   /* let the client continue */
 
     check_dbus();
 
+#ifdef GLIB_ENABLED
     if (cfg.ngio > 0 || cfg.ngtimer > 0)
         glib_pump_cleanup();
+#endif
 
     mainloop_cleanup(&cfg);
 }
