@@ -44,6 +44,8 @@ typedef int (*mrp_dbus_handler_t)(mrp_dbus_t *, DBusMessage *, void *);
 /** Create a new connection to the given bus. */
 mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
                              DBusError *errp);
+#define mrp_dbus_get mrp_dbus_connect
+
 
 /** Set up a DBusConnection with a mainloop. */
 int mrp_dbus_setup_connection(mrp_mainloop_t *ml, DBusConnection *conn);

@@ -45,6 +45,7 @@
 
 
 struct mrp_dbus_s {
+    char            *address;            /* bus address */
     DBusConnection  *conn;               /* actual D-BUS connection */
     mrp_mainloop_t  *ml;                 /* murphy mainloop */
     mrp_htbl_t      *methods;            /* method handler table */
@@ -120,6 +121,15 @@ typedef struct {
 } call_t;
 
 
+typedef struct {
+    mrp_mainloop_t *ml;                  /* mainloop for bus connection */
+    const char     *address;             /* address of bus */
+} bus_spec_t;
+
+static mrp_htbl_t *buses;
+
+
+
 static DBusHandlerResult dispatch_signal(DBusConnection *c,
                                          DBusMessage *msg, void *data);
 static DBusHandlerResult dispatch_method(DBusConnection *c,
@@ -130,6 +140,8 @@ static void handler_list_free_cb(void *key, void *entry);
 static void handler_free(handler_t *h);
 static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
 static void call_free(call_t *call);
+
+
 
 
 static int purge_filters(void *key, void *entry, void *user_data)
@@ -155,6 +167,8 @@ static int purge_filters(void *key, void *entry, void *user_data)
 void dbus_disconnect(mrp_dbus_t *dbus)
 {
     if (dbus) {
+        mrp_htbl_remove(buses, dbus->conn, FALSE);
+
         if (dbus->signals) {
             mrp_htbl_foreach(dbus->signals, purge_filters, dbus);
             mrp_htbl_destroy(dbus->signals, TRUE);
@@ -176,10 +190,65 @@ void dbus_disconnect(mrp_dbus_t *dbus)
         purge_name_trackers(dbus);
         purge_calls(dbus);
 
+        mrp_free(dbus->address);
         dbus->conn = NULL;
         dbus->ml   = NULL;
 
         mrp_free(dbus);
+    }
+}
+
+
+static int bus_cmp(const void *key1, const void *key2)
+{
+    return key2 - key1;
+}
+
+
+static uint32_t bus_hash(const void *key)
+{
+    uint32_t h;
+
+    h   = (ptrdiff_t)key;
+    h >>= 2 * sizeof(key);
+
+    return h;
+}
+
+
+static int find_bus_by_spec(void *key, void *object, void *user_data)
+{
+    mrp_dbus_t *dbus = (mrp_dbus_t *)object;
+    bus_spec_t *spec = (bus_spec_t *)user_data;
+
+    MRP_UNUSED(key);
+
+    if (dbus->ml == spec->ml && !strcmp(dbus->address, spec->address))
+        return TRUE;
+    else
+        return FALSE;
+}
+
+
+static mrp_dbus_t *dbus_get(mrp_mainloop_t *ml, const char *address)
+{
+    mrp_htbl_config_t hcfg;
+    bus_spec_t        spec;
+
+    if (buses == NULL) {
+        hcfg.comp = bus_cmp;
+        hcfg.hash = bus_hash;
+        hcfg.free = NULL;
+
+        buses = mrp_htbl_create(&hcfg);
+
+        return NULL;
+    }
+    else {
+        spec.ml      = ml;
+        spec.address = address;
+
+        return mrp_htbl_find(buses, find_bus_by_spec, &spec);
     }
 }
 
@@ -193,6 +262,9 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
 
     mrp_htbl_config_t  hcfg;
     mrp_dbus_t        *dbus;
+
+    if ((dbus = dbus_get(ml, address)) != NULL)
+        return mrp_dbus_ref(dbus);
 
     if ((dbus = mrp_allocz(sizeof(*dbus))) == NULL)
         return NULL;
@@ -225,6 +297,7 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
     if (dbus->conn == NULL)
         goto fail;
 
+    dbus->address     = mrp_strdup(address);
     dbus->unique_name = dbus_bus_get_unique_name(dbus->conn);
 
     /*
@@ -291,7 +364,8 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
     mrp_list_init(&dbus->name_trackers);
     dbus->call_id = 1;
 
-    return dbus;
+    if (mrp_htbl_insert(buses, dbus->conn, dbus))
+        return dbus;
 
  fail:
     dbus_disconnect(dbus);
