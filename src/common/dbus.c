@@ -54,6 +54,8 @@ struct mrp_dbus_s {
     uint32_t         call_id;            /* next call id */
     const char      *unique_name;        /* our unique D-BUS address */
     int              priv;               /* whether a private connection */
+    int              signal_filter;      /* if signal dispatching is set up */
+    int              register_fallback;  /* if the fallback object is set up */
     mrp_refcnt_t     refcnt;             /* reference count */
 };
 
@@ -161,8 +163,11 @@ void dbus_disconnect(mrp_dbus_t *dbus)
             mrp_htbl_destroy(dbus->methods, TRUE);
 
         if (dbus->conn != NULL) {
-            dbus_connection_remove_filter(dbus->conn, dispatch_signal, dbus);
-            dbus_connection_unregister_object_path(dbus->conn, "/");
+            if (dbus->signal_filter)
+                dbus_connection_remove_filter(dbus->conn, dispatch_signal,
+                        dbus);
+            if (dbus->register_fallback)
+                dbus_connection_unregister_object_path(dbus->conn, "/");
             if (dbus->priv)
                 dbus_connection_close(dbus->conn);
             dbus_connection_unref(dbus->conn);
@@ -238,12 +243,14 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
                        "Failed to set up signal dispatching.");
         goto fail;
     }
+    dbus->signal_filter = TRUE;
 
     if (!dbus_connection_register_fallback(dbus->conn, "/", &vtable, dbus)) {
         dbus_set_error(errp, DBUS_ERROR_FAILED,
                        "Failed to set up method dispatching.");
         goto fail;
     }
+    dbus->register_fallback = TRUE;
 
     mrp_clear(&hcfg);
     hcfg.comp = mrp_string_comp;
