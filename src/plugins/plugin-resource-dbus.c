@@ -84,9 +84,6 @@
 
 #define SIG_PROPERTYCHANGED         "propertyChanged"
 
-
-#define HAVE_TO_DEFINE_RESOURCES
-
 enum {
     ARG_DBUS_SERVICE,
     ARG_DBUS_TRACK_CLIENTS,
@@ -1903,43 +1900,6 @@ error:
     return NULL;
 }
 
-#ifdef HAVE_TO_DEFINE_RESOURCES
-#include <murphy/resource/manager-api.h>
-#include <murphy/resource/config-api.h>
-
-
-static void tmp_create_resources()
-{
-    /* FIXME: this is the wrong place to do this */
-
-    static mrp_resource_mgr_ftbl_t audio_playback_manager;
-    static mrp_resource_mgr_ftbl_t audio_record_manager;
-
-    static mrp_attr_def_t audio_attrs[] = {
-        { "role",  MRP_RESOURCE_RW, mqi_string , .value.string="music" },
-        { "pid",   MRP_RESOURCE_RW, mqi_unsignd, .value.unsignd=0      },
-        { "scale", MRP_RESOURCE_RW, mqi_floating,.value.floating=3.14  },
-        { "num",   MRP_RESOURCE_RW, mqi_integer, .value.integer=8      },
-        {  NULL ,        0        , mqi_unknown, .value.string=NULL    }
-    };
-
-    mrp_zone_definition_create(NULL);
-
-    mrp_zone_create("default", NULL);
-
-    mrp_application_class_create("default", 0);
-    mrp_application_class_create("player", 1);
-    mrp_application_class_create("sound", 2);
-    mrp_application_class_create("camera", 3);
-    mrp_application_class_create("phone", 4);
-
-    mrp_resource_definition_create("audio_playback", true, audio_attrs,
-                &audio_playback_manager, NULL);
-
-    mrp_resource_definition_create("audio_record", true, NULL,
-                &audio_record_manager, NULL);
-}
-#endif
 
 static int dbus_resource_init(mrp_plugin_t *plugin)
 {
@@ -1954,10 +1914,6 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
         mrp_log_error("Failed to connect to D-Bus");
         goto error;
     }
-
-#ifdef HAVE_TO_DEFINE_RESOURCES
-    tmp_create_resources();
-#endif
 
     ctx->mgr = create_manager(ctx);
 
