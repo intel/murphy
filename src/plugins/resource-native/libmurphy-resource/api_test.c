@@ -14,50 +14,77 @@ typedef struct my_app_data {
 static bool accept_input;
 
 /* state callback for murphy connection */
-static void state_callback(murphy_resource_context *cx, enum murphy_resource_error, void *ud);
+static void state_callback(murphy_resource_context *cx,
+			   murphy_resource_error,
+			   void *ud);
+
 /* callback for resource set update */
 static void resource_callback(murphy_resource_context *cx,
-            murphy_resource_set *rs, void *userdata);
+			      const murphy_resource_set *rs,
+			      void *userdata);
 
 void acquire_resources(my_app_data *app_data)
 {
-    murphy_resource *resource;
+    murphy_resource *resource= NULL;
 
-    /* create resources and add them to the resource set */
-    app_data->rs = murphy_create_resource_set("player");
-    murphy_set_resource_set_callback(app_data->rs, resource_callback, app_data);
+    /* create resource set and resources */
+    app_data->rs = murphy_resource_set_create(app_data->cx,
+					      "player",
+					      resource_callback,
+					      (void*)app_data);
 
-    resource = murphy_resource_create(app_data->cx, "audio_playback", true, false);
-    murphy_add_resource(app_data->rs, resource);
+    if (app_data->rs == NULL) {
+    	printf("Couldn't create resource set\n");
+    	return;
+    }
 
-    resource = murphy_resource_create(app_data->cx, "video_playback", true, false);
-    murphy_add_resource(app_data->rs, resource);
+    resource = murphy_resource_create(app_data->cx,
+				      app_data->rs,
+				      "audio_playback",
+				      true,
+				      false);
 
-    /* identify ourselves, ask for the resource set and assign resource callback */
-    murphy_acquire_resources(app_data->cx, app_data->rs);
+    if (resource == NULL) {
+    	printf("Couldn't create audio resource\n");
+    	murphy_resource_set_delete(app_data->rs);
+    	return;
+    }
+
+    resource = murphy_resource_create(app_data->cx,
+				      app_data->rs,
+				      "video_playback",
+				      true,
+				      false);
+
+
+    if (resource == NULL) {
+    	printf("Couldn't create video resource\n");
+    	murphy_resource_set_delete(app_data->rs);
+    	return;
+    }
+
+    /* acquire the resources */
+    murphy_resource_set_acquire(app_data->cx, app_data->rs);
 }
 
 void giveup_resources(my_app_data *app_data)
 {
-    int i = 0;
-
     printf("giving up resources\n");
 
-    /* set all resource states to lost -> give up resource */
-    for (i = 0; i < app_data->rs->num_resources; i++)
-        app_data->rs->resources[i]->state = murphy_resource_lost;
-
-    /* identify ourselves, ask for the resource set and assing resource callback */
-    murphy_release_resources(app_data->cx, app_data->rs);
+    /* release resources */
+    murphy_resource_set_release(app_data->cx, app_data->rs);
 }
 
 static void state_callback(murphy_resource_context *context,
-            enum murphy_resource_error err, void *userdata)
+			   murphy_resource_error err,
+			   void *userdata)
 {
-    int i = 0;
-    const char **app_classes = NULL;
-    int num_classes;
-    murphy_resource_set *rs;
+    int i = 0, j = 0;
+    const murphy_string_array *app_classes = NULL;
+    const murphy_resource_set *rs;
+    murphy_resource **resource;
+    murphy_string_array *attributes = NULL;
+    murphy_resource_attribute *attr;
     bool system_handles_audio = FALSE;
     bool system_handles_video = FALSE;
 
@@ -73,52 +100,74 @@ static void state_callback(murphy_resource_context *context,
         case murphy_connected:
             printf("connected to murphy\n");
 
-            if (murphy_list_application_classes(context, &app_classes, &num_classes) >= 0) {
-                for (i = 0; i < num_classes; i++) {
-                    printf("app class %d is %s\n", i, app_classes[i]);
+            if ((app_classes = murphy_application_class_list(context)) != NULL) {
+                printf("listing all application classes in the system\n");
+
+                for (i = 0; i < app_classes->num_strings; i++) {
+                    printf("app class %d is %s\n", i, app_classes->strings[i]);
                 }
-#if 0
-                for (i = 0; i < num_classes; i++) {
-                    free(app_classes[i]);
-                }
-                free(app_classes);
-#endif
             }
 
-            murphy_list_resources(context, &rs);
+            if ((rs = murphy_resource_set_list(context)) != NULL) {
+                printf("listing all resources available in the system\n");
+                resource = rs->resources;
 
-            printf("listing all resources available in the system\n");
-            for (i = 0; i < rs->num_resources; i++) {
-                printf("resource %d is %s\n", i, rs->resources[i]->name);
-                if (strcmp(rs->resources[i]->name, "audio_playback") == 0)
-                    system_handles_audio = TRUE;
-                if (strcmp(rs->resources[i]->name, "video_playback") == 0)
-                    system_handles_video = TRUE;
+                for (i = 0; i < rs->num_resources; i++) {
+
+                    printf("resource %d is %s\n", i, rs->resources[i]->name);
+                    if (strcmp(rs->resources[i]->name, "audio_playback") == 0)
+                        system_handles_audio = TRUE;
+                    if (strcmp(rs->resources[i]->name, "video_playback") == 0)
+                        system_handles_video = TRUE;
+
+                    murphy_attribute_list(context, resource[i], &attributes);
+
+                    for (j = 0; j < attributes->num_strings; j++) {
+                        murphy_attribute_get_by_name(context,
+                                resource[i],
+                                attributes->strings[i],
+                                &attr);
+                        printf("attr %s has ", attr->name);
+                        switch(attr->type) {
+                            case murphy_string:
+                                printf("type string and value %s\n", attr->string);
+                            case murphy_int32:
+                                printf("type string and value %d\n", attr->integer);
+                            case murphy_uint32:
+                                printf("type string and value %d\n", attr->unsignd);
+                            case murphy_double:
+                                printf("type string and value %f\n", attr->floating);
+                            default:
+                                printf("type unknown\n");
+                        }
+
+                    }
+                }
             }
 
             if (system_handles_audio && system_handles_video) {
                 printf("system provides all necessary resources\n");
                 accept_input = TRUE;
             }
-            murphy_delete_resource_set(rs);
 
             break;
 
         case murphy_disconnected:
             printf("disconnected from murphy\n");
-            murphy_delete_resource_set(app_data->rs);
+            murphy_resource_set_delete(app_data->rs);
             murphy_destroy(app_data->cx);
             exit(1);
     }
 }
 
 static void resource_callback(murphy_resource_context *cx,
-            murphy_resource_set *rs, void *userdata)
+			      const murphy_resource_set *rs,
+			      void *userdata)
 {
     my_app_data *my_data = (my_app_data *) userdata;
     int i;
 
-    if (!murphy_same_resource_sets(rs, my_data->rs))
+    if (!murphy_resource_set_equals(rs, my_data->rs))
         return;
 
     for (i = 0; i < rs->num_resources; i++) {
@@ -133,10 +182,10 @@ static void resource_callback(murphy_resource_context *cx,
      * It's up to the user to make sure that there's a working reference
      * to the resource set.
      */
-    murphy_delete_resource_set(my_data->rs);
+    murphy_resource_set_delete(my_data->rs);
 
     /* copying must also have no semantic meaning */
-    my_data->rs = murphy_copy_resource_set(rs);
+    my_data->rs = murphy_resource_set_copy(rs);
 
 
     /* acquiring a copy of an existing release set means:
@@ -147,35 +196,6 @@ static void resource_callback(murphy_resource_context *cx,
      */
 
 }
-
-#if 0
-static gboolean handle_input(GIOChannel *ch, GIOCondition cond, gpointer data)
-{
-    char cmd[5];
-
-    (void)ch;
-    (void)cond;
-    (void)data;
-
-    if (fgets(cmd, 2, stdin) == NULL) {
-       printf("input error\n");
-       return FALSE;
-   }
-
-   if (accept_input) {
-       switch (cmd[0]) {
-           case 'C':  acquire_resources();              break;
-           case 'D':  giveup_resources();               break;
-           default:                                     break;
-       }
-   }
-   else {
-       printf("not connected to Murphy\n");
-   }
-
-   return TRUE;
-}
-#endif
 
 static void handle_input(mrp_mainloop_t *ml, mrp_io_watch_t *watch, int fd,
                     mrp_io_event_t events, void *user_data)

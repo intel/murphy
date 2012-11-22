@@ -10,7 +10,7 @@ typedef struct {
 
 typedef struct {
     const char     *name;
-    char            type;       /* s:char *, i:int32_t, u:uint32_t, f:double */
+    murphy_attribute_type type;       /* s:char *, i:int32_t, u:uint32_t, f:double */
     union {
         const char *string;
         int32_t     integer;
@@ -38,7 +38,10 @@ struct murphy_resource_private_s {
     murphy_resource *pub; /* composition */
     murphy_resource_set *set; /* owning set */
 
-    attribute_array_t *attrs;
+    bool                       mandatory;
+    bool                       shared;
+    int                        num_attributes;
+    murphy_resource_attribute  *attrs;
 };
 
 struct murphy_resource_set_private_s {
@@ -48,6 +51,9 @@ struct murphy_resource_set_private_s {
 
     murphy_resource_callback cb;
     void *user_data;
+
+    int num_resources;
+    murphy_resource **resources;
 
     mrp_list_hook_t hook;
 };
@@ -68,6 +74,9 @@ struct murphy_resource_context_private_s {
     /* do we know the resource and class states? */
     string_array_t *classes;
     resource_def_array_t *available_resources;
+
+    murphy_string_array *master_classes;
+    murphy_resource_set *master_resource_set;
 
     /* sometimes we need to know which query was answered */
     uint32_t next_seqno;
