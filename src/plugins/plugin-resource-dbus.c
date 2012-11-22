@@ -87,6 +87,8 @@
 enum {
     ARG_DBUS_SERVICE,
     ARG_DBUS_TRACK_CLIENTS,
+    ARG_DBUS_DEFAULT_ZONE,
+    ARG_DBUS_DEFAULT_CLASS
 };
 
 typedef struct manager_o_s manager_o_t;
@@ -95,6 +97,10 @@ typedef struct {
     /* configuration */
     mrp_dbus_t *dbus;
     const char *addr;
+
+    const char *default_zone;
+    const char *default_class;
+
     bool tracking;
 
     /* resource management */
@@ -923,7 +929,8 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
         goto error;
 
     rset->class_prop = create_property(mgr->ctx, rset->path,
-            RSET_IFACE, "s", PROP_CLASS, mrp_strdup("default"), free_value);
+            RSET_IFACE, "s", PROP_CLASS,
+            mrp_strdup(rset->mgr->ctx->default_class), free_value);
     rset->class_prop->writable = TRUE;
 
     if (!rset->class_prop)
@@ -1889,7 +1896,7 @@ static manager_o_t *create_manager(dbus_data_t *ctx)
     if (!mgr->client)
         goto error;
 
-    mgr->zone = "default";
+    mgr->zone = ctx->default_zone;
 
     return mgr;
 
@@ -1909,6 +1916,8 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     ctx->addr = args[ARG_DBUS_SERVICE].str;
     ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, "system", NULL);
     ctx->tracking = args[ARG_DBUS_TRACK_CLIENTS].bln;
+    ctx->default_zone = args[ARG_DBUS_DEFAULT_ZONE].str;
+    ctx->default_class = args[ARG_DBUS_DEFAULT_CLASS].str;
 
     if (ctx->dbus == NULL) {
         mrp_log_error("Failed to connect to D-Bus");
@@ -1980,6 +1989,8 @@ static void dbus_resource_exit(mrp_plugin_t *plugin)
  */
 static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_DBUS_SERVICE, STRING, "dbus_service", "org.Murphy"),
+    MRP_PLUGIN_ARGIDX(ARG_DBUS_DEFAULT_ZONE, STRING, "default_zone", "default"),
+    MRP_PLUGIN_ARGIDX(ARG_DBUS_DEFAULT_CLASS, STRING, "default_class", "default"),
     MRP_PLUGIN_ARGIDX(ARG_DBUS_TRACK_CLIENTS, BOOL, "dbus_track", TRUE),
 };
 
