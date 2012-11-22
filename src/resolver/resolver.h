@@ -54,7 +54,7 @@ MRP_CDECL_BEGIN
 #define MRP_RESOLVER_TAG_LEVEL  ((uint16_t)2)
 
 /** Just create a resolver context without parsing any input. */
-mrp_resolver_t *mrp_resolver_create(void);
+mrp_resolver_t *mrp_resolver_create(mrp_context_t *ctx);
 
 /** Parse the given resolver input file into a resolver context. */
 mrp_resolver_t *mrp_resolver_parse(mrp_resolver_t *r, mrp_context_t *ctx,

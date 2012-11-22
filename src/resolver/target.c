@@ -207,6 +207,11 @@ int generate_autoupdate_target(mrp_resolver_t *r, const char *name)
 
     mrp_debug("constructing autoupdate target '%s'...", name);
 
+    if (sort_targets(r) != 0) {
+        mrp_debug("failed to sort dependency graph");
+        return FALSE;
+    }
+
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
         if (t->update_facts != NULL && t->update_facts[0] >= 0) {
             mrp_debug("  including target '%s' (%s)", t->name,

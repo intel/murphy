@@ -42,9 +42,23 @@
 #include "resolver.h"
 
 
-mrp_resolver_t *mrp_resolver_create(void)
+mrp_resolver_t *mrp_resolver_create(mrp_context_t *ctx)
 {
-    return mrp_allocz(sizeof(mrp_resolver_t));
+    mrp_resolver_t *r;
+
+    r = mrp_allocz(sizeof(mrp_resolver_t));
+
+    if (r != NULL) {
+        r->ctx  = ctx;
+        r->ctbl = mrp_create_context_table();
+
+        if (r->ctbl != NULL)
+            return r;
+
+        mrp_free(r);
+    }
+
+    return NULL;
 }
 
 
@@ -56,24 +70,22 @@ mrp_resolver_t *mrp_resolver_parse(mrp_resolver_t *r, mrp_context_t *ctx,
     mrp_clear(&parser);
 
     if (r == NULL) {
-        r = mrp_allocz(sizeof(*r));
+        r = mrp_resolver_create(ctx);
+
+        if (r == NULL)
+            return NULL;
     }
 
-    r->ctx = ctx;
-
-    if (r != NULL) {
-        if (parser_parse_file(&parser, path)) {
-            if (create_targets(r, &parser) == 0 &&
-                sort_targets(r)            == 0 &&
-                compile_target_scripts(r)  == 0 &&
-                (r->ctbl = mrp_create_context_table()) != NULL) {
-                parser_cleanup(&parser);
-                return r;
-            }
+    if (parser_parse_file(&parser, path)) {
+        if (create_targets(r, &parser) == 0 &&
+            sort_targets(r)            == 0 &&
+            compile_target_scripts(r)  == 0) {
+            parser_cleanup(&parser);
+            return r;
         }
-        else
-            mrp_log_error("Failed to parse resolver input.");
     }
+    else
+        mrp_log_error("Failed to parse resolver input.");
 
     mrp_resolver_destroy(r);
     parser_cleanup(&parser);

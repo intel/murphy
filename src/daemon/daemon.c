@@ -142,7 +142,7 @@ static void load_configuration(mrp_context_t *ctx)
 
 static void create_ruleset(mrp_context_t *ctx)
 {
-    ctx->r = mrp_resolver_create();
+    ctx->r = mrp_resolver_create(ctx);
 }
 
 
