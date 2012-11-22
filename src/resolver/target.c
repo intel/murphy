@@ -186,9 +186,8 @@ target_t *create_target(mrp_resolver_t *r, const char *target,
 
  undo_and_fail:
     purge_target(t);
-    old_size = new_size;
-    new_size = old_size - 1;
-    mrp_reallocz(r->targets, old_size, new_size);
+    mrp_realloc(r->targets, old_size);
+    r->ntarget--;
 
     return NULL;
 }
