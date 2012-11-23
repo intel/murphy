@@ -33,6 +33,21 @@ else
     m:info("No native resource plugin found...")
 end
 
+-- load the dbus resource plugin
+if m:plugin_exists('resource-dbus') then
+    m:load_plugin('resource-dbus', {
+        dbus_bus = "system",
+        dbus_service = "org.Murphy",
+        dbus_track = true,
+        default_zone = "driver",
+        default_class = "implicit"
+      })
+    m:info("dbus resource plugin loaded")
+else
+    m:info("No dbus resource plugin found...")
+end
+
+
 -- load the domain control plugin if it exists
 if m:plugin_exists('domain-control') then
     m:load_plugin('domain-control')
