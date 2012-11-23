@@ -216,7 +216,11 @@ LUA_BINDINGS_SOURCES = 				\
 		core/lua-bindings/lua-log.c	\
 		core/lua-bindings/lua-console.c
 
-LUA_BINDINGS_HDRS = core/lua-bindings/murphy.h
+libmurphy_core_lua_bindings_ladir =			\
+		$(includedir)/murphy/core/lua-bindings
+
+libmurphy_core_lua_bindings_la_HEADERS =		\
+		core/lua-bindings/murphy.h
 
 libmurphy_coreh_ladir      =		\
 		$(includedir)/murphy
@@ -234,8 +238,7 @@ libmurphy_core_la_HEADERS =		\
 		core/console.h		\
 		core/scripting.h	\
 		core/method.h		\
-		core/event.h		\
-		$(LUA_BINDINGS_HDRS)
+		core/event.h
 
 libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
