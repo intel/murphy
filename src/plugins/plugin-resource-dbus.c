@@ -85,10 +85,11 @@
 #define SIG_PROPERTYCHANGED         "propertyChanged"
 
 enum {
-    ARG_DBUS_SERVICE,
-    ARG_DBUS_TRACK_CLIENTS,
-    ARG_DBUS_DEFAULT_ZONE,
-    ARG_DBUS_DEFAULT_CLASS
+    ARG_DR_BUS,
+    ARG_DR_SERVICE,
+    ARG_DR_TRACK_CLIENTS,
+    ARG_DR_DEFAULT_ZONE,
+    ARG_DR_DEFAULT_CLASS,
 };
 
 typedef struct manager_o_s manager_o_t;
@@ -97,7 +98,7 @@ typedef struct {
     /* configuration */
     mrp_dbus_t *dbus;
     const char *addr;
-
+    const char *bus;
     const char *default_zone;
     const char *default_class;
 
@@ -1498,10 +1499,10 @@ static int add_resource_cb(void *key, void *object, void *user_data)
 
     int count = 0;
 
+    MRP_UNUSED(key);
+
     /* count the attributes */
     mrp_htbl_foreach(r->conf_prop->value, count_keys_cb, &count);
-
-    MRP_UNUSED(key);
 
     if (mrp_resource_set_add_resource(rset->set, name, shared, NULL, mandatory)
                 >= 0) {
@@ -1913,11 +1914,12 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     mrp_plugin_arg_t *args = plugin->args;
     dbus_data_t *ctx = mrp_allocz(sizeof(dbus_data_t));
 
-    ctx->addr = args[ARG_DBUS_SERVICE].str;
-    ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, "system", NULL);
-    ctx->tracking = args[ARG_DBUS_TRACK_CLIENTS].bln;
-    ctx->default_zone = args[ARG_DBUS_DEFAULT_ZONE].str;
-    ctx->default_class = args[ARG_DBUS_DEFAULT_CLASS].str;
+    ctx->addr = args[ARG_DR_SERVICE].str;
+    ctx->tracking = args[ARG_DR_TRACK_CLIENTS].bln;
+    ctx->default_zone = args[ARG_DR_DEFAULT_ZONE].str;
+    ctx->default_class = args[ARG_DR_DEFAULT_CLASS].str;
+    ctx->bus = args[ARG_DR_BUS].str;
+    ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, ctx->bus, NULL);
 
     if (ctx->dbus == NULL) {
         mrp_log_error("Failed to connect to D-Bus");
@@ -1988,16 +1990,17 @@ static void dbus_resource_exit(mrp_plugin_t *plugin)
  *    - security settings?
  */
 static mrp_plugin_arg_t args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_DBUS_SERVICE, STRING, "dbus_service", "org.Murphy"),
-    MRP_PLUGIN_ARGIDX(ARG_DBUS_DEFAULT_ZONE, STRING, "default_zone", "default"),
-    MRP_PLUGIN_ARGIDX(ARG_DBUS_DEFAULT_CLASS, STRING, "default_class", "default"),
-    MRP_PLUGIN_ARGIDX(ARG_DBUS_TRACK_CLIENTS, BOOL, "dbus_track", TRUE),
+    MRP_PLUGIN_ARGIDX(ARG_DR_BUS, STRING, "dbus_bus", "system"),
+    MRP_PLUGIN_ARGIDX(ARG_DR_SERVICE, STRING, "dbus_service", "org.Murphy"),
+    MRP_PLUGIN_ARGIDX(ARG_DR_DEFAULT_ZONE, STRING, "default_zone", "default"),
+    MRP_PLUGIN_ARGIDX(ARG_DR_DEFAULT_CLASS, STRING, "default_class", "default"),
+    MRP_PLUGIN_ARGIDX(ARG_DR_TRACK_CLIENTS, BOOL, "dbus_track", TRUE),
 };
 
 
 MURPHY_REGISTER_PLUGIN("resource-dbus",
                        DBUS_RESOURCE_VERSION, DBUS_RESOURCE_DESCRIPTION,
                        DBUS_RESOURCE_AUTHORS, DBUS_RESOURCE_HELP,
-                       MRP_SINGLETON, dbus_resource_init, dbus_resource_exit,
+                       MRP_MULTIPLE, dbus_resource_init, dbus_resource_exit,
                        args, MRP_ARRAY_SIZE(args),
                        NULL, 0, NULL, 0, NULL);
