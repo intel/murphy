@@ -1,0 +1,43 @@
+Breedline is a BSD-licensed simplistic alternative to readline.
+Please see the LICENSE-BSD file for the exact license.
+
+Breedline provides a limited alternative to readline. It has
+only support for the most basic readline-like editing interface
+as well as a callback-based interface for integrating to various
+mainloops. Glib and murphy mainloop integration convenience
+libraries are readily provided.
+
+Breedline should work with most terminal emulators that support
+just the following set of VT100 escape sequences:
+
+  - move cursor to beginning of line (ESC[0G)
+  - move cursor right by %d (ESC[%dC)
+  - erase right of cursor til the end of line (ESC[0K)
+
+I have tested it only with xterm, vt100, ansi, and linux console
+terminal settings in practice but in principle it should work with
+almost all non-dumb terminals out there.
+
+Currently breedline supports the following editing commands:
+
+- basic cursor positioning:
+  o left: left arrow/ctrl-b
+  o right: right arrow/ctrl-f
+  o beginning of line: home/ctrl-a/
+  o end of line: end/ctrl-e
+  o word left: ctrl left arrow
+  o word right: ctrl right arrow
+
+- basic editing:
+  o erase: backspace
+  o delete: ctrl-d
+  o kill line: ctrl-u (saves to yank buffer)
+  o kill rest of line: ctrl-k (saves to yank buffer)
+  o yank: ctrl-y
+
+- basic history:
+  o previous: up arrow/ctrl-p
+  o next: down arrow/ctrl-n
+
+- miscallanea:
+  o redraw line: ctrl-l

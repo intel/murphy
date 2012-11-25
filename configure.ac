@@ -448,6 +448,10 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/core/murphy-core.pc
                  src/core/lua-utils/murphy-lua-utils.pc
                  src/core/lua-decision/murphy-lua-decision.pc
+		 src/breedline/breedline.pc
+		 src/breedline/breedline-murphy.pc
+		 src/breedline/breedline-glib.pc
+		 src/breedline/tests/Makefile
 		 src/murphy-db/Makefile
 		 src/murphy-db/mdb/Makefile
 		 src/murphy-db/mqi/Makefile

@@ -1,6 +1,8 @@
 SUBDIRS         = murphy-db . \
-		  common/tests core/tests core/lua-decision/tests \
-		  daemon/tests resolver/tests plugins/tests
+		  common/tests breedline/tests core/tests \
+		  core/lua-decision/tests resolver/tests \
+		  daemon/tests  plugins/tests
+
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
@@ -631,6 +633,110 @@ linker-script.resource: $(libmurphy_resource_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.resource
 endif
+
+##########################
+# readline replacement
+#
+lib_LTLIBRARIES += libbreedline.la
+EXTRA_DIST      += breedline/breedline.pc
+pkgconfig_DATA  += breedline/breedline.pc
+
+libbreedline_ladir      =		\
+		$(includedir)/breedline
+
+libbreedline_la_HEADERS =		\
+		breedline/breedline.h	\
+		breedline/macros.h
+
+libbreedline_la_SOURCES =		\
+		breedline/breedline.c
+
+libbreedline_la_CFLAGS  =		\
+		$(AM_CFLAGS)
+
+libbreedline_la_LDFLAGS =					\
+		-Wl,-version-script=linker-script.breedline	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libbreedline_la_LIBADD =
+
+libbreedline_la_DEPENDENCIES = linker-script.breedline
+
+libbreedlineincludedir      = $(includedir)/breedline
+libbreedlineinclude_HEADERS = $(libbreedline_la_HEADERS)
+
+# linker script generation
+linker-script.breedline: $(libbreedline_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	    -p '^brl_' -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.breedline
+
+##########################
+# breedline murphy glue library
+#
+lib_LTLIBRARIES += libbreedline-murphy.la
+EXTRA_DIST      += breedline/breedline-murphy.pc
+pkgconfig_DATA  += breedline/breedline-murphy.pc
+
+libbreedline_murphy_ladir      = $(includedir)/breedline
+
+libbreedline_murphy_la_HEADERS = breedline/breedline-murphy.h
+libbreedline_murphy_la_SOURCES = breedline/breedline-murphy.c
+libbreedline_murphy_la_CFLAGS  = $(AM_CFLAGS)
+
+libbreedline_murphy_la_LDFLAGS =	\
+		-Wl,-version-script=linker-script.breedline-murphy	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libbreedline_murhy_la_LIBADD = libmurphy-common.la
+
+libbreedline_murphy_la_DEPENDENCIES = linker-script.breedline-murphy
+
+libbreedline_murphyincludedir      = $(includedir)/breedline
+libbreedline_murphyinclude_HEADERS = $(libbreedline_murphy_la_HEADERS)
+
+# linker script generation
+linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	    -p '^brl_' -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.breedline-murphy
+
+
+##########################
+# breedline glib glue library
+#
+lib_LTLIBRARIES += libbreedline-glib.la
+EXTRA_DIST      += breedline/breedline-glib.pc
+pkgconfig_DATA  += breedline/breedline-glib.pc
+
+libbreedline_glib_ladir      = $(includedir)/breedline
+
+libbreedline_glib_la_HEADERS = breedline/breedline-glib.h
+libbreedline_glib_la_SOURCES = breedline/breedline-glib.c
+libbreedline_glib_la_CFLAGS  = $(AM_CFLAGS) $(GLIB_CFLAGS)
+
+libbreedline_glib_la_LDFLAGS = \
+		-Wl,-version-script=linker-script.breedline-glib	\
+		-version-info @MURPHY_VERSION_INFO@
+
+libbreedline_glib_la_LIBADD = $(GLIB_LIBS)
+
+libbreedline_glib_la_DEPENDENCIES = linker-script.breedline-glib
+
+libbreedline_glibincludedir      = $(includedir)/breedline
+libbreedline_glibinclude_HEADERS = $(libbreedline_glib_la_HEADERS)
+
+# linker script generation
+linker-script.breedline-glib: $(libbreedline_glib_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	    -p '^brl_' -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.breedline-glib
 
 ###################################
 # murphy plugins

@@ -108,7 +108,7 @@
 #    define MRP_UNUSED(var)
 #endif
 
-/** Macro that can be used to pass the location of it's usage. */
+/** Macro that can be used to pass the location of its usage. */
 #    define __LOC__ __FILE__, __LINE__, __FUNCTION__
 
 /** Assertions. */

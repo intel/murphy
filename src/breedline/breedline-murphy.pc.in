@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: breedline-glib
+Description: GLIB mainloop glue library for breedline.
+Version: @PACKAGE_VERSION@
+Requires: breedline murphy-common
+Libs: -L${libdir} -lbreedline-murphy
+Cflags: -I${includedir}
