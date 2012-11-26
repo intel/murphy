@@ -190,6 +190,7 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
     int i;
     int sp;
     mrp_funcbridge_value_t *a;
+    int sts;
     bool success;
 
     if (!fb)
@@ -198,11 +199,14 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
         switch (fb->type) {
 
         case MRP_C_FUNCTION:
-            if (strcmp(signature, fb->c.signature))
-                success = false;
+            if (!strcmp(signature, fb->c.signature))
+                success = fb->c.func(L, fb->c.data, signature, args, ret_type,
+                                     ret_value);
             else {
-                success = fb->c.func(L, fb->c.data, signature, args,
-                                     ret_type, ret_value);
+                *ret_type = MRP_FUNCBRIDGE_STRING;
+                ret_value->string = mrp_strdup("mismatching signature "
+                                               "@ C invocation");
+                success = false;
             }
             break;
 
@@ -232,12 +236,15 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 }
             }
 
-            lua_call(L, i, 1);
+            sts = lua_pcall(L, i, 1, 0);
+
+            MRP_ASSERT(!sts || (sts && lua_type(L, -1) == LUA_TSTRING),
+                       "lua pcall did not return error string when failed");
 
             switch (lua_type(L, -1)) {
             case LUA_TSTRING:
                 *ret_type = MRP_FUNCBRIDGE_STRING;
-                ret_value->string = lua_tolstring(L, -1, NULL);
+                ret_value->string = mrp_strdup(lua_tolstring(L, -1, NULL));
                 break;
             case LUA_TNUMBER:
                 *ret_type = MRP_FUNCBRIDGE_FLOATING;
@@ -248,8 +255,7 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 memset(ret_value, 0, sizeof(*ret_value));
                 break;
             }
-
-            success = true;
+            success = !sts;
         done:
             lua_settop(L, sp);
             break;

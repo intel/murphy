@@ -412,7 +412,7 @@ int main(int argc, char **argv)
         if ((v = args[0].pointer = vols[0]) && (fb = v->update)) {
             char value[32];
             if (!mrp_funcbridge_call_from_c(L, fb, "os", args, &t, &ret))
-                printf("*** call failed\n");
+                printf("*** call failed: %s\n", ret.string);
             else {
                 switch (t) {
                 case MRP_FUNCBRIDGE_NO_DATA:

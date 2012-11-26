@@ -298,7 +298,9 @@ static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
 
     if (el->update) {
         if (!mrp_funcbridge_call_from_c(L, el->update, "o", args, &t, &ret)) {
-            mrp_log_error("failed to call %s:update method", el->name);
+            mrp_log_error("failed to call %s:update method (%s)",
+                          el->name, ret.string);
+            mrp_free((void *)ret.string);
             return FALSE;
         }
     }
