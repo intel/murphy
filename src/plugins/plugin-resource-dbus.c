@@ -1974,7 +1974,7 @@ static void dbus_resource_exit(mrp_plugin_t *plugin)
     ctx->dbus = NULL;
 
     mrp_htbl_destroy(ctx->mgr->rsets, TRUE);
-    mrp_free(ctx->mgr);
+    destroy_manager(ctx->mgr);
     mrp_free(ctx);
 
     plugin->data = NULL;
