@@ -40,13 +40,12 @@
 #define _GNU_SOURCE
 #include <getopt.h>
 
-#include <readline/readline.h>
-#include <readline/history.h>
-
 #include <murphy/common.h>
+#include <breedline/breedline-murphy.h>
+
 #include "client.h"
 
-#define DEFAULT_PROMPT "test-controller> "
+#define DEFAULT_PROMPT "test-controller"
 
 
 /*
@@ -59,8 +58,7 @@ typedef struct {
     int              verbose;            /* verbose mode */
     mrp_mainloop_t  *ml;                 /* murphy mainloop */
     void            *dc;                 /* domain controller */
-    int              fd;                 /* fd for terminal input */
-    mrp_io_watch_t  *iow;                /* I/O watch for terminal input */
+    brl_t           *brl;                /* breedline for terminal input */
 } client_t;
 
 
@@ -240,8 +238,6 @@ static void fatal_msg(int error, const char *format, ...);
 static void error_msg(const char *format, ...);
 static void info_msg(const char *format, ...);
 
-static void terminal_input_cb(char *input);
-
 static void export_data(client_t *c);
 
 
@@ -330,7 +326,7 @@ static void list_streams(void)
 }
 
 
-static void set_zone_state(client_t *c, char *config)
+static void set_zone_state(client_t *c, const char *config)
 {
     zone_t *z;
     int     occupied, active, changed, len;
@@ -668,24 +664,6 @@ void update_imports(client_t *c, mrp_domctl_data_t *data, int ntable)
 
 
 
-static void terminal_prompt_erase(void)
-{
-    int n = strlen(DEFAULT_PROMPT);
-
-    printf("\r");
-    while (n-- > 0)
-        printf(" ");
-    printf("\r");
-}
-
-
-static void terminal_prompt_display(void)
-{
-    rl_callback_handler_remove();
-    rl_callback_handler_install(DEFAULT_PROMPT, terminal_input_cb);
-}
-
-
 static void show_help(void)
 {
 #define P info_msg
@@ -705,14 +683,16 @@ static void show_help(void)
 }
 
 
-static void terminal_process_input(char *input)
+static void input_cb(brl_t *brl, const char *input, void *user_data)
 {
     int len;
 
-    add_history(input);
+    MRP_UNUSED(user_data);
+
+    brl_add_history(brl, input);
 
     if (input == NULL || !strcmp(input, "exit")) {
-        terminal_prompt_erase();
+        brl_destroy(brl);
         exit(0);
     }
     else if (!strcmp(input, "help")) {
@@ -749,49 +729,31 @@ static void terminal_process_input(char *input)
 }
 
 
-static void terminal_input_cb(char *input)
-{
-    terminal_process_input(input);
-    free(input);
-}
-
-
-static void terminal_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                        mrp_io_event_t events, void *user_data)
-{
-    MRP_UNUSED(w);
-    MRP_UNUSED(fd);
-    MRP_UNUSED(user_data);
-
-    if (events & MRP_IO_EVENT_IN)
-        rl_callback_read_char();
-
-    if (events & MRP_IO_EVENT_HUP)
-        mrp_mainloop_quit(ml, 0);
-}
-
-
 static void terminal_setup(client_t *c)
 {
-    mrp_io_event_t events;
+    int         fd;
+    const char *prompt;
 
-    c->fd  = fileno(stdin);
-    events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
-    c->iow = mrp_add_io_watch(c->ml, c->fd, events, terminal_cb, c);
+    fd     = fileno(stdin);
+    prompt = DEFAULT_PROMPT;
+    c->brl = brl_create_with_murphy(fd, prompt, c->ml, input_cb, c);
 
-    if (c->iow == NULL)
-        fatal_msg(1, "Failed to create terminal input I/O watch.");
-    else
-        terminal_prompt_display();
+    if (c->brl != NULL) {
+        brl_show_prompt(c->brl);
+    }
+    else {
+        mrp_log_error("Failed to breedline for console input.");
+        exit(1);
+    }
 }
 
 
 static void terminal_cleanup(client_t *c)
 {
-    mrp_del_io_watch(c->iow);
-    c->iow = NULL;
-
-    rl_callback_handler_remove();
+    if (c->brl != NULL) {
+        brl_destroy(c->brl);
+        c->brl = NULL;
+    }
 }
 
 
@@ -799,7 +761,7 @@ static void fatal_msg(int error, const char *format, ...)
 {
     va_list ap;
 
-    terminal_prompt_erase();
+    brl_hide_prompt(client->brl);
 
     fprintf(stderr, "fatal error: ");
     va_start(ap, format);
@@ -816,7 +778,7 @@ static void error_msg(const char *format, ...)
 {
     va_list ap;
 
-    terminal_prompt_erase();
+    brl_hide_prompt(client->brl);
 
     fprintf(stderr, "error: ");
     va_start(ap, format);
@@ -825,7 +787,7 @@ static void error_msg(const char *format, ...)
     fprintf(stderr, "\n");
     fflush(stderr);
 
-    terminal_prompt_display();
+    brl_show_prompt(client->brl);
 }
 
 
@@ -833,7 +795,7 @@ static void info_msg(const char *format, ...)
 {
     va_list ap;
 
-    terminal_prompt_erase();
+    brl_hide_prompt(client->brl);
 
     va_start(ap, format);
     vfprintf(stdout, format, ap);
@@ -841,7 +803,7 @@ static void info_msg(const char *format, ...)
     fprintf(stdout, "\n");
     fflush(stdout);
 
-    terminal_prompt_display();
+    brl_show_prompt(client->brl);
 }
 
 
