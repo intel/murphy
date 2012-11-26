@@ -1134,6 +1134,8 @@ murphy_console_CFLAGS  =		\
 		$(AM_CFLAGS)
 
 murphy_console_LDADD  =			\
+		libbreedline-murphy.la	\
+		libbreedline.la		\
 		libmurphy-common.la
 
 if DBUS_ENABLED

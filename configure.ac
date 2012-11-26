@@ -233,8 +233,7 @@ AC_ARG_ENABLE(console,
 if test "$enable_console" = "no"; then
     AC_MSG_NOTICE([Murphy console binary is disabled.])
 else
-    AC_MSG_NOTICE([Murphy console binary is currently forcibly disabled.])
-    enable_console=no
+    AC_MSG_NOTICE([Murphy console binary is enabled.])
 fi
 
 if test "$enable_console" = "yes"; then
