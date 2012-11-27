@@ -513,6 +513,7 @@ int mrp_msg_get(mrp_msg_t *msg, ...)
      */
 
     start = msg->fields.next;
+    found = FALSE;
 
     while ((tag = va_arg(ap, unsigned int)) != MRP_MSG_FIELD_INVALID) {
         type  = va_arg(ap, unsigned int);
@@ -627,6 +628,7 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
      */
 
     start = (*it) ? (mrp_list_hook_t *)*it : msg->fields.next;
+    found = FALSE;
 
     while ((tag = va_arg(ap, unsigned int)) != MRP_MSG_FIELD_INVALID) {
         type  = va_arg(ap, unsigned int);
@@ -636,8 +638,10 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
             typep = va_arg(ap, uint16_t *);
             valp  = va_arg(ap, mrp_msg_value_t *);
         }
-        else
+        else {
             typep = NULL;
+            valp  = NULL;
+        }
 
         for (p = start; p != start->prev; p = p->next) {
             if (p == &msg->fields)
