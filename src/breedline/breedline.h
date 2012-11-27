@@ -53,12 +53,12 @@ int brl_use_mainloop(brl_t *brl, void *ml, brl_mainloop_ops_t *ops,
 
 /** Memory allocation operations. */
 typedef struct {
-    void *(*alloc)(size_t size, const char *file, int line, const char *func);
-    void *(*realloc)(void *ptr, size_t size, const char *file, int line,
-                     const char *func);
-    char *(*strdup)(const char *str, const char *file, int line,
-                    const char *func);
-    void  (*free)(void *ptr, const char *file, int line, const char *func);
+    void *(*allocfn)(size_t size, const char *file, int line, const char *func);
+    void *(*reallocfn)(void *ptr, size_t size, const char *file, int line,
+                       const char *func);
+    char *(*strdupfn)(const char *str, const char *file, int line,
+                      const char *func);
+    void  (*freefn)(void *ptr, const char *file, int line, const char *func);
 } brl_allocator_t;
 
 /** Override the default memory allocator. */

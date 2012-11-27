@@ -63,10 +63,10 @@ static void del_watch(void *wp)
 
 
 static brl_allocator_t allocator = {
-    .alloc   = mrp_mm_alloc,
-    .realloc = mrp_mm_realloc,
-    .strdup  = mrp_mm_strdup,
-    .free    = mrp_mm_free
+    .allocfn   = mrp_mm_alloc,
+    .reallocfn = mrp_mm_realloc,
+    .strdupfn  = mrp_mm_strdup,
+    .freefn    = mrp_mm_free
 };
 
 

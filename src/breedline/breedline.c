@@ -1235,10 +1235,10 @@ static void _brl_default_free(void *ptr,
 
 /* By default we use the libc memory allocator. */
 brl_allocator_t __brl_mm = {
-    .alloc   = _brl_default_alloc,
-    .realloc = _brl_default_realloc,
-    .strdup  = _brl_default_strdup,
-    .free    = _brl_default_free
+    .allocfn   = _brl_default_alloc,
+    .reallocfn = _brl_default_realloc,
+    .strdupfn  = _brl_default_strdup,
+    .freefn    = _brl_default_free
 };
 
 /* Once an allocation is done, this will block changing the allocator. */
