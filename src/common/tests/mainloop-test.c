@@ -1613,8 +1613,10 @@ int main(int argc, char *argv[])
     setup_signals(ml);
 
 #ifdef GLIB_ENABLED
-    if (cfg.ngio > 0 || cfg.ngtimer > 0)
-        glib_pump_setup(ml);
+    if (cfg.mainloop_type != MAINLOOP_GLIB) {
+        if (cfg.ngio > 0 || cfg.ngtimer > 0)
+            glib_pump_setup(ml);
+    }
 
     setup_glib_io();
     setup_glib_timers();
@@ -1644,8 +1646,10 @@ int main(int argc, char *argv[])
     check_dbus();
 
 #ifdef GLIB_ENABLED
-    if (cfg.ngio > 0 || cfg.ngtimer > 0)
-        glib_pump_cleanup();
+    if (cfg.mainloop_type != MAINLOOP_GLIB) {
+        if (cfg.ngio > 0 || cfg.ngtimer > 0)
+            glib_pump_cleanup();
+    }
 #endif
 
     mainloop_cleanup(&cfg);
