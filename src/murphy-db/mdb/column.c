@@ -72,6 +72,10 @@ void mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
             *(uint32_t *)dst = *(uint32_t *)src;
             break;
 
+        case mqi_floating:
+            *(double *)dst = *(double *)src;
+            break;
+
         case mqi_blob:
             memcpy(dst, src, lgh);
             break;
@@ -108,6 +112,10 @@ void mdb_column_read(mqi_column_desc_t *dst_desc, void *dst_data,
 
         case mqi_unsignd:
             *(uint32_t *)dst = *(uint32_t *)src;
+            break;
+
+        case mqi_floating:
+            *(double *)dst = *(double *)src;
             break;
 
         case mqi_blob:
