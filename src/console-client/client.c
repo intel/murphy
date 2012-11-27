@@ -208,11 +208,7 @@ void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 int client_setup(client_t *c, const char *addrstr)
 {
-    static mrp_transport_evt_t evt = {
-        .closed      = closed_evt,
-        .recvmsg     = recv_evt,
-        .recvmsgfrom = recvfrom_evt,
-    };
+    static mrp_transport_evt_t evt;
 
     mrp_sockaddr_t  addr;
     socklen_t       addrlen;
@@ -221,6 +217,10 @@ int client_setup(client_t *c, const char *addrstr)
     addrlen = mrp_transport_resolve(NULL, addrstr, &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
+        evt.closed      = closed_evt;
+        evt.recvmsg     = recv_evt;
+        evt.recvmsgfrom = recvfrom_evt;
+
         c->t = mrp_transport_create(c->ml, type, &evt, c, 0);
 
         if (c->t == NULL) {
