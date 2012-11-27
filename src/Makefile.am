@@ -1088,12 +1088,14 @@ murphyd_CFLAGS  =			\
 		$(AM_CFLAGS)		\
 		$(BUILTIN_CFLAGS)
 
-murphyd_LDADD  =			\
-		$(BUILTIN_LIBS)         \
-		$(LINKEDIN_PLUGINS)	\
-		$(RESOURCE_LIBRARY)	\
-		libmurphy-resolver.la	\
-		libmurphy-core.la	\
+murphyd_LDADD  =				\
+		$(BUILTIN_LIBS)         	\
+		$(LINKEDIN_PLUGINS)		\
+		$(RESOURCE_LIBRARY)		\
+		libmurphy-resolver.la		\
+		libmurphy-lua-decision.la	\
+		libmurphy-core.la		\
+		libmurphy-lua-utils.la		\
 		libmurphy-common.la
 
 murphyd_LDFLAGS = -rdynamic
