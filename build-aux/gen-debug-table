@@ -12,6 +12,10 @@ error () {
     echo "error: $*" 1>&2
 }
 
+warning () {
+    echo "warning: $*" 1>&2
+}
+
 info () {
     echo "$*" 1>&2
 }
@@ -90,6 +94,13 @@ emit_function_info() {
     emit ""
 }
 
+emit_no_function_info() {
+    emit "/* No ctags found, could not generate debug info... */"
+    emit "static mrp_debug_file_t *debug_files[] = {"
+    emit "    NULL"
+    emit "};"
+    emit ""
+}
 
 # set up defaults
 SYMBOL="mrp_debug\("                  # symbol to look for
@@ -150,7 +161,13 @@ touch $OUTPUT
 # generate the output
 emit_preamble
 
-ctags -x --c-kinds=f $SOURCE | tr -s '\t' ' ' | \
-    cut -d ' '  -f 1,3,4 | sort -k 3,3 -k 2,2n | emit_function_info
+which ctags >& /dev/null
+if [ "$?" = "0" ]; then
+    ctags -x --c-kinds=f $SOURCE | tr -s '\t' ' ' | \
+        cut -d ' '  -f 1,3,4 | sort -k 3,3 -k 2,2n | emit_function_info
+else
+    warning "No ctags found, generating empty debug tables..."
+    emit_no_function_info
+fi
 
 emit_postamble
