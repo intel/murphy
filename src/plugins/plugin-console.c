@@ -249,13 +249,7 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
 static void connection_evt(mrp_transport_t *lt, void *user_data)
 {
-    static mrp_console_req_t req = {
-        .write      = write_req,
-        .close      = tcp_close_req,
-        .free       = free_req,
-        .set_prompt = set_prompt_req,
-    };
-
+    static mrp_console_req_t req;
 
     data_t    *data  = (data_t *)user_data;
     int        flags;
@@ -266,6 +260,11 @@ static void connection_evt(mrp_transport_t *lt, void *user_data)
         c->t  = mrp_transport_accept(lt, c, flags);
 
         if (c->t != NULL) {
+            req.write      = write_req;
+            req.close      = tcp_close_req;
+            req.free       = free_req;
+            req.set_prompt = set_prompt_req;
+
             c->mc = mrp_create_console(data->ctx, &req, c);
 
             if (c->mc != NULL)
@@ -285,12 +284,7 @@ enum {
 
 static int strm_setup(data_t *data)
 {
-    static mrp_transport_evt_t evt = {
-        .closed      = closed_evt,
-        .recvmsg     = recv_evt,
-        .recvmsgfrom = NULL,
-        .connection  = connection_evt,
-    };
+    static mrp_transport_evt_t evt;
 
     mrp_transport_t *t;
     mrp_sockaddr_t   addr;
@@ -303,6 +297,11 @@ static int strm_setup(data_t *data)
                                     &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
+        evt.closed      = closed_evt;
+        evt.recvmsg     = recv_evt;
+        evt.recvmsgfrom = NULL;
+        evt.connection  = connection_evt;
+
         flags = MRP_TRANSPORT_REUSEADDR;
         t     = mrp_transport_create(data->ctx->ml, type, &evt, data, flags);
 
@@ -332,18 +331,8 @@ static int strm_setup(data_t *data)
 
 static int dgrm_setup(data_t *data)
 {
-    static mrp_transport_evt_t evt = {
-        .recvmsg     = recv_evt,
-        .recvmsgfrom = recvfrom_evt,
-        .closed      = NULL,
-    };
-
-    static mrp_console_req_t req = {
-        .write      = write_req,
-        .close      = udp_close_req,
-        .free       = free_req,
-        .set_prompt = set_prompt_req,
-    };
+    static mrp_transport_evt_t evt;
+    static mrp_console_req_t   req;
 
     console_t       *c;
     mrp_transport_t *t;
@@ -358,11 +347,20 @@ static int dgrm_setup(data_t *data)
 
     if (addrlen > 0) {
         if ((c = mrp_allocz(sizeof(*c))) != NULL) {
+            evt.recvmsg     = recv_evt;
+            evt.recvmsgfrom = recvfrom_evt;
+            evt.closed      = NULL;
+
             f = MRP_TRANSPORT_REUSEADDR;
             t = mrp_transport_create(data->ctx->ml, type, &evt, c, f);
 
             if (t != NULL) {
                 if (mrp_transport_bind(t, &addr, addrlen)) {
+                    req.write      = write_req;
+                    req.close      = udp_close_req;
+                    req.free       = free_req;
+                    req.set_prompt = set_prompt_req;
+
                     c->t  = t;
                     c->mc = mrp_create_console(data->ctx, &req, c);
 
