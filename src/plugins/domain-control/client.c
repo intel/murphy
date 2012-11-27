@@ -232,11 +232,11 @@ static int domctl_register(mrp_domctl_t *dc)
 
 static int try_connect(mrp_domctl_t *dc)
 {
-    static mrp_transport_evt_t evt = {
-        .closed      = closed_cb,
-        .recvmsg     = recv_cb,
-        .recvmsgfrom = recvfrom_cb,
-    };
+    static mrp_transport_evt_t evt;
+
+    evt.closed      = closed_cb;
+    evt.recvmsg     = recv_cb;
+    evt.recvmsgfrom = recvfrom_cb;
 
     dc->t = mrp_transport_create(dc->ml, dc->ttype, &evt, dc, 0);
 

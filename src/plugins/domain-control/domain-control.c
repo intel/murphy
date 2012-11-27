@@ -352,12 +352,7 @@ static void closed_cb(mrp_transport_t *t, int error, void *user_data)
 
 static int create_ext_transport(pdp_t *pdp)
 {
-    static mrp_transport_evt_t evt = {
-        .closed      = closed_cb,
-        .recvmsg     = recv_cb,
-        .recvmsgfrom = NULL,
-        .connection  = connect_cb,
-    };
+    static mrp_transport_evt_t evt;
 
     mrp_transport_t *t;
     mrp_sockaddr_t   addr;
@@ -370,6 +365,11 @@ static int create_ext_transport(pdp_t *pdp)
                                     &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
+        evt.closed      = closed_cb;
+        evt.recvmsg     = recv_cb;
+        evt.recvmsgfrom = NULL;
+        evt.connection  = connect_cb;
+
         flags = MRP_TRANSPORT_REUSEADDR;
         t     = mrp_transport_create(pdp->ctx->ml, type, &evt, pdp, flags);
 
