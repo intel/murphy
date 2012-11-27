@@ -273,7 +273,8 @@ libmurphy_core_la_LIBADD  =			\
 libmurphy_core_la_DEPENDENCIES = linker-script.core libmurphy-common.la
 
 # core linker script generation
-linker-script.core: $(libmurphy_core_la_HEADERS)
+linker-script.core: $(libmurphy_core_la_HEADERS) \
+		    $(libmurphy_core_lua_bindings_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
