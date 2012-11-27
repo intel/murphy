@@ -125,6 +125,8 @@ void *mrp_lua_create_object(lua_State          *L,
 
     lua_createtable(L, 1, 1);
 
+    luaL_openlib(L, NULL, def->methods, 0);
+
     luaL_getmetatable(L, def->class_id);
     lua_setmetatable(L, -2);
 
