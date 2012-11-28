@@ -691,7 +691,7 @@ libbreedline_murphy_la_LDFLAGS =	\
 		-Wl,-version-script=linker-script.breedline-murphy	\
 		-version-info @MURPHY_VERSION_INFO@
 
-libbreedline_murhy_la_LIBADD = libmurphy-common.la
+libbreedline_murphy_la_LIBADD = libmurphy-common.la
 
 libbreedline_murphy_la_DEPENDENCIES = linker-script.breedline-murphy
 
