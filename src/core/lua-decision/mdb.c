@@ -58,6 +58,7 @@
 
 typedef enum   field_e        field_t;
 typedef struct row_s          row_t;
+typedef union  value_u        value_t;
 typedef struct const_def_s    const_def_t;
 
 
@@ -107,6 +108,13 @@ struct row_s {
     void *data;
 };
 
+union value_u {
+    char *string;
+    int32_t integer;
+    uint32_t unsignd;
+    double floating;
+};
+
 struct const_def_s {
     const char *name;
     mqi_data_type_t value;
@@ -118,6 +126,10 @@ static int  table_create_from_lua(lua_State *);
 static int  table_getfield(lua_State *);
 static int  table_setfield(lua_State *);
 static int  table_tostring(lua_State *);
+static int  table_insert(lua_State *);
+static int  table_replace(lua_State *);
+static int  table_update(lua_State *);
+static int  table_delete(lua_State *);
 static void table_destroy_from_lua(void *);
 
 static void table_row_class_create(lua_State *);
@@ -125,6 +137,10 @@ static void table_row_class_create(lua_State *);
 static int  table_row_getfield(lua_State *);
 static int  table_row_setfield(lua_State *);
 static int  table_row_getlength(lua_State *);
+static int  table_row_getvalues(lua_State *, mrp_lua_mdb_table_t *, int, bool,
+                                mqi_column_desc_t *, value_t *);
+static void table_row_resetvalues(mrp_lua_mdb_table_t *, mqi_column_desc_t *,
+                                  value_t *);
 static mrp_lua_mdb_table_t *table_row_check(lua_State *, int, int *);
 
 static int  select_create_from_lua(lua_State *);
@@ -162,11 +178,16 @@ static row_t *row_check(lua_State *, int, const char *);
 static void adjust_lua_table_size(lua_State *, int, void *, size_t, size_t,
                                   const char *);
 static bool create_mdb_table(mrp_lua_mdb_table_t *);
+static mqi_cond_entry_t *condition_check(lua_State *,int,mrp_lua_mdb_table_t*);
 
 
 MRP_LUA_METHOD_LIST_TABLE (
     table_methods,           /* methodlist name */
     MRP_LUA_METHOD_CONSTRUCTOR  (table_create_from_lua)
+    MRP_LUA_METHOD     (insert,  table_insert         )
+    MRP_LUA_METHOD     (replace, table_replace        )
+    MRP_LUA_METHOD     (update,  table_update         )
+    MRP_LUA_METHOD     (delete,  table_delete         )
 );
 
 #if 0
@@ -377,6 +398,9 @@ static int table_create_from_lua(lua_State *L)
     mrp_lua_mdb_table_t *tbl;
     size_t fldnamlen;
     const char *fldnam;
+    mqi_column_def_t defs[MQI_COLUMN_MAX+1], *d;
+    int ndef;
+    size_t i;
 
     MRP_LUA_ENTER;
 
@@ -425,6 +449,15 @@ static int table_create_from_lua(lua_State *L)
             luaL_error(L, "table '%s' do not exist", tbl->name);
         if (tbl->columns && tbl->ncolumn > 0)
             luaL_error(L, "can't specify columns for an existing table");
+        if ((ndef = mqi_describe(tbl->handle, defs, MQI_COLUMN_MAX)) < 0)
+            luaL_error(L, "can't get column definitions of '%s'", tbl->name);
+
+        tbl->ncolumn = ndef;
+        tbl->columns = mrp_allocz(sizeof(mqi_column_def_t) * (ndef + 1));
+
+        memcpy(tbl->columns, defs, sizeof(mqi_column_def_t) * ndef);
+        for (d = tbl->columns;  d->name;  d++)
+            d->name = mrp_strdup(d->name);
     }
     else {
         if (tbl->handle != MQI_HANDLE_INVALID) {
@@ -434,6 +467,14 @@ static int table_create_from_lua(lua_State *L)
         if (tbl->columns && tbl->ncolumn > 0) {
             if (!create_mdb_table(tbl))
                 luaL_error(L, "failed to create MDB table '%s'", tbl->name);
+            if (tbl->index) {
+                for (d = tbl->columns;  d->name;   d++) {
+                    for (i = 0;  i < tbl->index->nstring;  i++) {
+                        if (!strcmp(d->name, tbl->index->strings[i]))
+                            d->flags |= MQI_COLUMN_KEY;
+                    }
+                }
+            }
         }
         else {
             luaL_error(L,"mandatory 'column' field is unspecified or invalid");
@@ -514,6 +555,7 @@ static int table_setfield(lua_State *L)
     MRP_LUA_LEAVE(1);
 }
 
+
 static int table_tostring(lua_State *L)
 {
     mrp_lua_mdb_table_t *tbl;
@@ -530,6 +572,163 @@ static int table_tostring(lua_State *L)
     MRP_LUA_LEAVE(1);
 }
 
+static int table_insert(lua_State *L)
+{
+    mrp_lua_mdb_table_t *tbl;
+    mqi_column_desc_t desc[MQI_COLUMN_MAX+1];
+    value_t values[MQI_COLUMN_MAX];
+    void *data[2];
+    mqi_handle_t th;
+    int inserted;
+    int sts;
+
+    MRP_LUA_ENTER;
+
+    inserted = -1;
+
+    tbl = mrp_lua_table_check(L, 1);
+    sts = table_row_getvalues(L, tbl, 2, true, desc, values);
+
+    data[0] = values;
+    data[1] = NULL;
+
+    if (!sts)
+        luaL_error(L, "insert failed: some columns do not have value");
+    else {
+        th = mqi_begin_transaction();
+
+        if ((inserted = MQI_INSERT_INTO(tbl->handle, desc, data)) == 1)
+            mqi_commit_transaction(th);
+        else {
+            mqi_rollback_transaction(th);
+            table_row_resetvalues(tbl, desc, values);
+            luaL_error(L, "insert failed: %s", strerror(errno));
+        }
+
+        table_row_resetvalues(tbl, desc, values);
+    }
+
+    lua_pushinteger(L, inserted);
+
+    MRP_LUA_LEAVE(1);
+}
+
+static int table_replace(lua_State *L)
+{
+    mrp_lua_mdb_table_t *tbl;
+    mqi_column_desc_t desc[MQI_COLUMN_MAX+1];
+    value_t values[MQI_COLUMN_MAX];
+    void *data[2];
+    mqi_handle_t th;
+    int inserted;
+    int sts;
+
+    MRP_LUA_ENTER;
+
+    inserted = -1;
+
+    tbl = mrp_lua_table_check(L, 1);
+    sts = table_row_getvalues(L, tbl, 2, true, desc, values);
+
+    data[0] = values;
+    data[1] = NULL;
+
+    if (!sts)
+        luaL_error(L, "replace failed: some columns do not have value");
+    else {
+        th = mqi_begin_transaction();
+
+        if ((inserted = MQI_REPLACE(tbl->handle, desc, data)) >= 0)
+            mqi_commit_transaction(th);
+        else {
+            mqi_rollback_transaction(th);
+            table_row_resetvalues(tbl, desc, values);
+            luaL_error(L, "replace failed: %s", strerror(errno));
+        }
+
+        table_row_resetvalues(tbl, desc, values);
+    }
+
+    lua_pushinteger(L, inserted);
+
+    MRP_LUA_LEAVE(1);
+}
+
+static int table_update(lua_State *L)
+{
+    int narg;
+    mrp_lua_mdb_table_t *tbl;
+    mqi_column_desc_t desc[MQI_COLUMN_MAX+1];
+    value_t values[MQI_COLUMN_MAX];
+    mqi_cond_entry_t *cond;
+    mqi_handle_t th;
+    int updated;
+    int sts;
+
+    MRP_LUA_ENTER;
+
+    narg = lua_gettop(L);
+    tbl  = mrp_lua_table_check(L, 1);
+    sts  = table_row_getvalues(L, tbl, 2, false, desc, values);
+    cond = NULL;
+
+    if (!sts)
+        luaL_error(L, "update failed: no values");
+    else if (narg > 2 && !(cond = condition_check(L, 3, tbl)))
+        luaL_error(L, "update failed: invalid condition");
+    else {
+        th = mqi_begin_transaction();
+
+        if ((updated = MQI_UPDATE(tbl->handle, desc, &values, cond)) >= 0)
+            mqi_commit_transaction(th);
+        else {
+            mqi_rollback_transaction(th);
+            table_row_resetvalues(tbl, desc, values);
+            luaL_error(L, "update failed: %s", strerror(errno));
+        }
+
+        table_row_resetvalues(tbl, desc, values);
+    }
+
+    lua_pushinteger(L, updated);
+
+    MRP_LUA_LEAVE(1);
+}
+
+
+static int table_delete(lua_State *L)
+{
+    int narg;
+    mrp_lua_mdb_table_t *tbl;
+    mqi_cond_entry_t *cond;
+    mqi_handle_t th;
+    int deleted;
+
+    MRP_LUA_ENTER;
+
+    narg = lua_gettop(L);
+    tbl  = mrp_lua_table_check(L, 1);
+    cond = NULL;
+
+    if (narg > 1 && !(cond = condition_check(L, 2, tbl)))
+        luaL_error(L, "delete failed: invalid condition");
+    else {
+        th = mqi_begin_transaction();
+
+        if ((deleted = MQI_DELETE(tbl->handle, cond)) >= 0)
+            mqi_commit_transaction(th);
+        else {
+            mqi_rollback_transaction(th);
+            luaL_error(L, "delete failed: %s", strerror(errno));
+        }
+    }
+
+    lua_pushinteger(L, deleted);
+
+    MRP_LUA_LEAVE(1);
+}
+
+
 static void table_destroy_from_lua(void *data)
 {
     mrp_lua_mdb_table_t *tbl = (mrp_lua_mdb_table_t *)data;
@@ -544,6 +743,7 @@ static void table_destroy_from_lua(void *data)
 
     MRP_LUA_LEAVE_NOARG;
 }
+
 
 static void table_row_class_create(lua_State *L)
 {
@@ -598,7 +798,7 @@ static int table_row_setfield(lua_State *L)
     MRP_LUA_LEAVE(0);
 }
 
-static int  table_row_getlength(lua_State *L)
+static int table_row_getlength(lua_State *L)
 {
     mrp_lua_mdb_table_t *tbl;
 
@@ -608,6 +808,91 @@ static int  table_row_getlength(lua_State *L)
     lua_pushinteger(L, tbl->ncolumn);
 
     MRP_LUA_LEAVE(1);
+}
+
+static int table_row_getvalues(lua_State *L, mrp_lua_mdb_table_t *tbl,
+                               int idx, bool all_fields,
+                               mqi_column_desc_t *desc, value_t *values)
+{
+    int sts = 0;
+    mqi_column_def_t *c;
+    mqi_column_desc_t *d;
+    value_t *v;
+    size_t i;
+    int nfield;
+
+    idx = (idx < 0) ? lua_gettop(L) + idx + 1 : idx;
+
+    MRP_LUA_ENTER;
+
+    if (desc && values) {
+        for (i = 0, nfield = 0, sts = 1;    sts && i < tbl->ncolumn;    i++) {
+            c = tbl->columns + i;
+            d = desc + nfield;
+            v = values + nfield;
+
+            d->cindex = i;
+            d->offset = sizeof(value_t) * nfield;
+
+            lua_pushstring(L, c->name);
+            lua_gettable(L, idx);
+
+            if (lua_isnil(L, -1)) {
+                if (all_fields)
+                    sts = 0;
+            }
+            else {
+                switch (c->type) {
+                case mqi_string:
+                    v->string = mrp_strdup(luaL_checklstring(L, -1, NULL));
+                    break;
+                case mqi_integer:
+                    v->integer = luaL_checkinteger(L, -1);
+                    break;
+                case mqi_unsignd:
+                    if ((v->integer = luaL_checkinteger(L, -1)) < 0)
+                        sts = 0;
+                    break;
+                case mqi_floating:
+                    v->floating = luaL_checknumber(L, -1);
+                    break;
+                default:
+                    sts = 0;
+                    break;
+                }
+
+                nfield++;
+            }
+
+            lua_pop(L, 1);
+        } /* for */
+
+        d = desc + nfield;
+        d->cindex = -1;
+        d->offset = -1;
+
+        if (!nfield)
+            sts = 0;
+        if (!sts)
+            table_row_resetvalues(tbl, desc, values);
+    }
+
+    MRP_LUA_LEAVE(sts);
+}
+
+static void table_row_resetvalues(mrp_lua_mdb_table_t *tbl,
+                                  mqi_column_desc_t *desc,
+                                  value_t *values)
+{
+    int cidx;
+    mqi_column_desc_t *d;
+
+    for (d = desc;  (cidx = d->cindex) >= 0;  d++) {
+        if (tbl->columns[cidx].type == mqi_string)
+            mrp_free(*(void **)((void *)values + d->offset));
+    }
+
+    memset(values, 0, sizeof(value_t) * tbl->ncolumn);
 }
 
 
@@ -1066,6 +1351,7 @@ static int dependency_setfield(lua_State *L)
 static void dependency_destroy(void *data)
 {
     /* mrp_lua_mdb_dependency_t *sel = (mrp_lua_mdb_dependency_t *)data; */
+    MRP_UNUSED(data);
 
     MRP_LUA_ENTER;
 
@@ -1177,11 +1463,9 @@ static mqi_column_def_t *check_coldefs(lua_State *L, int t, size_t *ret_len)
     tlen  = lua_objlen(L, t);
     size = sizeof(mqi_column_def_t) * (tlen + 1);
 
-    if (!(coldefs = mrp_alloc(size)))
+    if (!(coldefs = mrp_allocz(size)))
         luaL_error(L, "can't allocate %d byte long memory", size);
     else {
-        memset(coldefs, 0, size);
-
         for (i = 0;  i < tlen;  i++) {
             cd = coldefs + i;
 
@@ -1211,7 +1495,8 @@ static mqi_column_def_t *check_coldefs(lua_State *L, int t, size_t *ret_len)
 
             lua_pop(L, 1);
 
-            if ( cd->name == NULL        ||
+            if ( cd->name == NULL ||
+                 field_name_to_type(cd->name, strlen(cd->name)) ||
                 (cd->type != mqi_string  &&
                  cd->type != mqi_integer &&
                  cd->type != mqi_unsignd &&
@@ -1366,6 +1651,117 @@ static bool create_mdb_table(mrp_lua_mdb_table_t *tbl)
     }
 
     return (tbl->handle != MQI_HANDLE_INVALID);
+}
+
+static mqi_cond_entry_t *condition_check(lua_State *L,
+                                         int idx,
+                                         mrp_lua_mdb_table_t *tbl)
+{
+#define ALIGN(x)  ((((x) + (sizeof(void*)-1)) / sizeof(void*)) * sizeof(void*))
+
+    mqi_column_def_t *col;
+    mqi_variable_t *var;
+    mqi_cond_entry_t *cond, *conds;
+    size_t ncond;
+    const char *fldnam;
+    size_t fldnamlen;
+    size_t total_size, cond_size, pool_size;
+    int i;
+    size_t sl, pl;
+    char *pool;
+    const char *s;
+
+    idx = (idx < 0) ? lua_gettop(L) + idx + 1 : idx;
+
+    luaL_checktype(L, idx, LUA_TTABLE);
+
+    cond_size  = ALIGN(sizeof(mqi_cond_entry_t) * (MQI_COND_MAX));
+    pool_size  = 16384;
+    total_size = cond_size + pool_size;
+
+    conds = mrp_alloc(total_size);
+    pool  = (char *)conds + cond_size;
+
+    pl = 0;
+    ncond = 0;
+
+    MRP_LUA_FOREACH_FIELD(L, idx, fldnam, fldnamlen) {
+        if ((i = mqi_get_column_index(tbl->handle, (char *)fldnam)) < 0)
+            luaL_error(L, "invalid field name '%s' in condition", fldnam);
+
+        MRP_ASSERT(i < (int)tbl->ncolumn, "internal error: column index is "
+                   "out of range");
+
+        col = tbl->columns + i;
+
+        if (ncond + 4 >= MQI_COND_MAX ||
+            pl + (col->length + sizeof(void *)) > pool_size)
+            goto too_complex;
+
+        if (ncond > 0) {
+            cond = conds + ncond++;
+            cond->type = mqi_operator;
+            cond->u.operator = mqi_and;
+        }
+
+        cond = conds + ncond++;
+        cond->type = mqi_column;
+        cond->u.column = i;
+
+        cond = conds + ncond++;
+        cond->type = mqi_operator;
+        cond->u.operator = mqi_eq;
+
+        cond = conds + ncond++;
+        cond->type = mqi_variable;
+        var = &cond->u.variable;
+
+        var->type = col->type;
+        var->flags = col->flags;
+        var->v.generic = pool + pl;
+
+        switch (col->type) {
+        case mqi_string:
+            if (!(s = luaL_checklstring(L,-1,&sl)) || (int)sl >= col->length) {
+                luaL_error(L, "expect max %u character long string for '%s'",
+                           col->length, col->name);
+            }
+            *var->v.varchar = pool + (pl += sizeof(void *));
+            memcpy(pool + pl, s, sl+1);
+            break;
+        case mqi_integer:
+            *var->v.integer = luaL_checkinteger(L, -1);
+            break;
+        case mqi_unsignd:
+            if ((*var->v.integer = luaL_checkinteger(L, -1)) < 0) {
+                luaL_error(L, "attempt to compare '%s' to negative value",
+                           col->name);
+            }
+            break;
+        case mqi_floating:
+            *var->v.floating = luaL_checknumber(L, -1);
+            break;
+        default:
+            luaL_error(L, "unsupported type '%s' in condition (column '%s')",
+                       mqi_data_type_str(col->type), col->name);
+            break;
+        }
+
+        pl = ALIGN(pl + col->length);
+    }
+
+    cond = conds + ncond++;
+    cond->type = mqi_operator;
+    cond->u.operator = mqi_end;
+
+
+    return conds;
+
+ too_complex:
+    luaL_error(L, "condition is too complex");
+    return NULL;
+
+#undef ALIGN
 }
 
 
