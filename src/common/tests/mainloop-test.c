@@ -44,6 +44,7 @@
 
 #include <murphy/config.h>
 #include <murphy/common/macros.h>
+#include <murphy/common/debug.h>
 #include <murphy/common/log.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/mainloop.h>
@@ -62,6 +63,10 @@
 #  include <glib.h>
 #  include "glib-pump.c"
 #  include <murphy/common/glib-glue.h>
+#endif
+
+#ifdef QT_ENABLED
+#include <murphy/common/qt-glue.h>
 #endif
 
 #define info(fmt, args...) do {                                           \
@@ -94,7 +99,8 @@ enum {
     MAINLOOP_NATIVE,
     MAINLOOP_PULSE,
     MAINLOOP_ECORE,
-    MAINLOOP_GLIB
+    MAINLOOP_GLIB,
+    MAINLOOP_QT
 };
 
 
@@ -139,6 +145,9 @@ typedef struct {
 #include "mainloop-pulse-test.c"
 #include "mainloop-ecore-test.c"
 #include "mainloop-glib-test.c"
+#ifdef QT_ENABLED
+#  include "mainloop-qt-test.h"
+#endif
 
 
 static test_config_t cfg;
@@ -1298,7 +1307,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -l, --log-level=LEVELS         logging level to use\n"
            "      LEVELS is a comma separated list of info, error and warning\n"
            "  -v, --verbose                  increase logging verbosity\n"
-           "  -d, --debug                    enable debug messages\n"
+           "  -d, --debug site               enable debug messages for <site>\n"
 #ifdef PULSE_ENABLED
            "  -p, --pulse                    use pulse mainloop\n"
 #endif
@@ -1307,6 +1316,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 #endif
 #ifdef GLIB_ENABLED
            "  -g, --glib                     use glib mainloop\n"
+#endif
+#ifdef QT_ENABLED
+           "  -q, --qt                       use qt mainloop\n"
 #endif
            "  -h, --help                     show help on usage\n",
            argv0);
@@ -1335,9 +1347,15 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 #else
 #    define GLIB_OPTION ""
 #endif
+#ifdef QT_ENABLED
+#    define QT_OPTION "q"
+#else
+#    define QT_OPTION ""
+#endif
 
-#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vdh" \
-        PULSE_OPTION""ECORE_OPTION""GLIB_OPTION
+
+#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vd:h" \
+        PULSE_OPTION""ECORE_OPTION""GLIB_OPTION""QT_OPTION
     struct option options[] = {
         { "runtime"     , required_argument, NULL, 'r' },
         { "ios"         , required_argument, NULL, 'i' },
@@ -1356,17 +1374,19 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 #ifdef GLIB_ENABLED
         { "glib"        , no_argument      , NULL, 'g' },
 #endif
+#ifdef QT_ENABLED
+        { "qt"          , no_argument      , NULL, 'q' },
+#endif
         { "log-level"   , required_argument, NULL, 'l' },
         { "log-target"  , required_argument, NULL, 'o' },
         { "verbose"     , optional_argument, NULL, 'v' },
-        { "debug"       , no_argument      , NULL, 'd' },
+        { "debug"       , required_argument, NULL, 'd' },
         { "help"        , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
     char *end;
-    int   opt, debug;
+    int   opt;
 
-    debug = FALSE;
     config_set_defaults(cfg);
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
@@ -1445,6 +1465,12 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
             break;
 #endif
 
+#ifdef QT_ENABLED
+        case 'q':
+            cfg->mainloop_type = MAINLOOP_QT;
+            break;
+#endif
+
         case 'v':
             cfg->log_mask <<= 1;
             cfg->log_mask  |= 1;
@@ -1463,7 +1489,9 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
             break;
 
         case 'd':
-            debug = TRUE;
+            cfg->log_mask |= MRP_LOG_MASK_DEBUG;
+            mrp_debug_set_config(optarg);
+            mrp_debug_enable(TRUE);
             break;
 
         case 'h':
@@ -1475,9 +1503,6 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
             print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
-
-    if (debug)
-        cfg->log_mask |= MRP_LOG_MASK_DEBUG;
 
     return TRUE;
 }
@@ -1500,6 +1525,10 @@ static mrp_mainloop_t *mainloop_create(test_config_t *cfg)
 
     case MAINLOOP_GLIB:
         glib_mainloop_create(cfg);
+        break;
+
+    case MAINLOOP_QT:
+        cfg->ml = qt_mainloop_create();
         break;
 
     default:
@@ -1535,6 +1564,10 @@ static void mainloop_run(test_config_t *cfg)
         glib_mainloop_run(cfg);
         break;
 
+    case MAINLOOP_QT:
+        qt_mainloop_run();
+        break;
+
     default:
         mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
         exit(1);
@@ -1561,6 +1594,10 @@ static void mainloop_quit(test_config_t *cfg)
         glib_mainloop_quit(cfg);
         break;
 
+    case MAINLOOP_QT:
+        qt_mainloop_quit();
+        break;
+
     default:
         mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
         exit(1);
@@ -1584,6 +1621,10 @@ void mainloop_cleanup(test_config_t *cfg)
 
     case MAINLOOP_GLIB:
         glib_mainloop_cleanup(cfg);
+        break;
+
+    case MAINLOOP_QT:
+        if (qt_mainloop_cleanup(cfg->ml) == TRUE) cfg->ml = NULL;
         break;
 
     default:

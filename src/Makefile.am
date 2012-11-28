@@ -3,6 +3,8 @@ SUBDIRS         = murphy-db . \
 		  core/lua-decision/tests resolver/tests \
 		  daemon/tests  plugins/tests
 
+BUILT_SOURCES   =
+
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   = 
 pkgconfigdir    = ${libdir}/pkgconfig
@@ -466,6 +468,53 @@ linker-script.glib: $(libmurphy_glib_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.glib
+endif
+
+###################################
+# murphy qt glue library
+#
+
+if QT_ENABLED
+lib_LTLIBRARIES += libmurphy-qt.la
+EXTRA_DIST      += common/murphy-qt.pc
+pkgconfig_DATA  += common/murphy-qt.pc
+
+BUILT_SOURCES   += common/qt-glue-priv.moc.h
+
+libmurphy_qt_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_qt_la_HEADERS =		\
+		common/qt-glue.h
+
+libmurphy_qt_la_SOURCES =		\
+		common/qt-glue.cpp
+
+libmurphy_qt_la_CPPFLAGS  =		\
+		$(AM_CFLAGS)		\
+		$(QTCORE_CFLAGS)
+
+libmurphy_qt_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.qt \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_qt_la_LIBADD  = $(QTCORE_LIBS)
+
+libmurphy_qt_la_DEPENDENCIES = linker-script.qt
+
+libqtincludedir      = $(includedir)/murphy/qt
+libqtinclude_HEADERS = $(libmurphy_qt_la_HEADERS)
+
+# run moc to generate Qt meta objects
+common/qt-glue-priv.moc.h: common/qt-glue-priv.h
+	$(QUIET_GEN)$(QT_MOC) -DQT_ENABLED=1 $< -o$@
+
+# linker script generation
+linker-script.qt: $(libmurphy_qt_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.qt
 endif
 
 ###################################

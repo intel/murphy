@@ -106,8 +106,13 @@ fi
 
 AC_SUBST(WARNING_CFLAGS)
 
-# check for LUA
-PKG_CHECK_MODULES(LUA, lua >= 5.1.1)
+# check for Lua
+PKG_CHECK_MODULES(LUA, lua >= 5.1.1, [try_lua51=no], [try_lua51=yes])
+
+# At least Ubuntu packages lua 5.1 as lua51... try that if needed.
+if test "$try_lua51" = "yes"; then
+    PKG_CHECK_MODULES(LUA, lua51 >= 5.1.1)
+fi
 AC_SUBST(LUA_CFLAGS)
 AC_SUBST(LUA_LIBS)
 
@@ -202,7 +207,7 @@ AC_SUBST(ECORE_LIBS)
 
 # Check if glib mainloop support was enabled.
 AC_ARG_ENABLE(glib,
-              [  --enable-glib          enable glib mainloop support],
+              [  --enable-glib           enable glib mainloop support],
 	      [enable_glib=$enableval], [enable_glib=auto])
 
 if test "$enable_glib" != "no"; then
@@ -224,6 +229,34 @@ AM_CONDITIONAL(GLIB_ENABLED, [test "$enable_glib" = "yes"])
 AC_SUBST(GLIB_ENABLED)
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
+
+# Check if qt mainloop support was enabled.
+AC_ARG_ENABLE(qt,
+              [  --enable-qt             enable qt mainloop support],
+              [enable_qt=$enableval], [enable_qt=auto])
+
+if test "$enable_qt" != "no"; then
+    AC_PROG_CXX
+    PKG_CHECK_MODULES(QTCORE, QtCore,
+                      [have_qt=yes], [have_qt=no])
+    if test "$have_qt" = "no" -a "$enable_qt" = "yes"; then
+        AC_MSG_ERROR([Qt(Core) development libraries not found.])
+    fi
+
+    enable_qt="$have_qt"
+else
+    AC_MSG_NOTICE([Qt mainloop support is disabled.])
+fi
+
+if test "$enable_qt" = "yes"; then
+    AC_DEFINE([QT_ENABLED], 1, [Enable qt mainloop support ?])
+    QT_MOC="`pkg-config --variable moc_location QtCore`"
+    AC_SUBST(QT_MOC)
+fi
+AM_CONDITIONAL(QT_ENABLED, [test "$enable_qt" = "yes"])
+AC_SUBST(QT_ENABLED)
+AC_SUBST(QTCORE_CFLAGS)
+AC_SUBST(QTCORE_LIBS)
 
 # Check if building murphy-console was enabled.
 AC_ARG_ENABLE(console,
@@ -444,9 +477,10 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-pulse.pc
 		 src/common/murphy-ecore.pc
 		 src/common/murphy-glib.pc
+         src/common/murphy-qt.pc
 		 src/core/murphy-core.pc
-                 src/core/lua-utils/murphy-lua-utils.pc
-                 src/core/lua-decision/murphy-lua-decision.pc
+         src/core/lua-utils/murphy-lua-utils.pc
+         src/core/lua-decision/murphy-lua-decision.pc
 		 src/breedline/breedline.pc
 		 src/breedline/breedline-murphy.pc
 		 src/breedline/breedline-glib.pc
@@ -476,6 +510,7 @@ echo "D-Bus support: $enable_dbus"
 echo "PulseAudio mainloop support: $enable_pulse"
 echo "EFL/ecore mainloop support: $enable_ecore"
 echo "glib mainloop support: $enable_glib"
+echo "Qt mainloop support: $enable_qt"
 echo "Murphy console plugin and client: $enable_console"
 echo "Resource management support: $with_resources"
 echo "Plugins:"
