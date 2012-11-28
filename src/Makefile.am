@@ -710,6 +710,8 @@ clean-linker-script::
 ##########################
 # breedline glib glue library
 #
+
+if GLIB_ENABLED
 lib_LTLIBRARIES += libbreedline-glib.la
 EXTRA_DIST      += breedline/breedline-glib.pc
 pkgconfig_DATA  += breedline/breedline-glib.pc
@@ -738,6 +740,7 @@ linker-script.breedline-glib: $(libbreedline_glib_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.breedline-glib
+endif
 
 ###################################
 # murphy plugins
