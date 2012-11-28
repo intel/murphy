@@ -408,7 +408,7 @@ int mdb_table_update(mdb_table_t       *tbl,
 
     if (MDB_TABLE_HAS_INDEX(tbl)) {
         for (i = 0;   (cindex = cds[i].cindex) >= 0;    i++) {
-            col = tbl->columns + i;
+            col = tbl->columns + cindex;
             if ((col->flags & MQI_COLUMN_KEY)) {
                 index_update = 1;
                 break;
