@@ -1611,6 +1611,7 @@ int main(int argc, char *argv[])
     setup_timers(ml);
     setup_io(ml);
     setup_signals(ml);
+    MRP_UNUSED(setup_deferred);   /* XXX TODO: add deferred tests... */
 
 #ifdef GLIB_ENABLED
     if (cfg.mainloop_type != MAINLOOP_GLIB) {
