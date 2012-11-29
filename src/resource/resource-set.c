@@ -281,10 +281,15 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 
     MRP_ASSERT(rset, "invalid argument");
 
+    if (!rset->class.ptr) {
+        /* TODO: proper error handling */
+        return;
+    }
+
     rset->state = mrp_resource_acquire;
     rset->request.id = reqid;
     rset->request.stamp = get_request_stamp();
-    
+
     mrp_application_class_move_resource_set(rset);
 
     trh = mqi_begin_transaction();
@@ -297,6 +302,11 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
     mqi_handle_t trh;
 
     MRP_ASSERT(rset, "invalid argument");
+
+    if (!rset->class.ptr) {
+        /* TODO: proper error handling */
+        return;
+    }
 
     if (rset->state == mrp_resource_release) {
         if (rset->event)
