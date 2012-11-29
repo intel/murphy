@@ -1613,9 +1613,16 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             /* add the resources */
             mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
 
-            mrp_application_class_add_resource_set(
+            if (mrp_application_class_add_resource_set(
                     (char *) rset->class_prop->value,
-                    rset->mgr->zone, rset->set, 0);
+                    rset->mgr->zone, rset->set, 0) < 0) {
+                /* This is actually quite serious, since most likely we cannot
+                 * ever get this to work. The zone is most likely not defined.
+                 * The resource library is known to crash if the rset->set
+                 * pointer is used for acquiring.
+                 */
+                goto error;
+            }
         }
 
         rset->acquired = TRUE;
