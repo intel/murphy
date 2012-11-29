@@ -82,7 +82,6 @@ static void state_callback(murphy_resource_context *context,
     int i = 0, j = 0;
     const murphy_string_array *app_classes = NULL;
     const murphy_resource_set *rs;
-    murphy_resource **resource;
     murphy_string_array *attributes = NULL;
     murphy_resource_attribute *attr;
     bool system_handles_audio = FALSE;
@@ -109,36 +108,48 @@ static void state_callback(murphy_resource_context *context,
             }
 
             if ((rs = murphy_resource_set_list(context)) != NULL) {
+                murphy_string_array *resource_names;
+
                 printf("listing all resources available in the system\n");
-                resource = rs->resources;
 
-                for (i = 0; i < rs->num_resources; i++) {
+                resource_names = murphy_resource_list_names(context, rs);
 
-                    printf("resource %d is %s\n", i, rs->resources[i]->name);
-                    if (strcmp(rs->resources[i]->name, "audio_playback") == 0)
+                for (i = 0; i < resource_names->num_strings; i++) {
+
+                    murphy_resource *resource;
+
+                    resource = murphy_resource_get_by_name(context, rs,
+                            resource_names->strings[i]);
+
+                    printf("resource %d is %s\n", i, resource->name);
+                    if (strcmp(resource->name, "audio_playback") == 0)
                         system_handles_audio = TRUE;
-                    if (strcmp(rs->resources[i]->name, "video_playback") == 0)
+                    if (strcmp(resource->name, "video_playback") == 0)
                         system_handles_video = TRUE;
 
-                    murphy_attribute_list(context, resource[i], &attributes);
+                    attributes = murphy_attribute_list_names(context, resource);
 
                     for (j = 0; j < attributes->num_strings; j++) {
-                        murphy_attribute_get_by_name(context,
-                                resource[i],
-                                attributes->strings[i],
-                                &attr);
+                        attr = murphy_attribute_get_by_name(context,
+                                resource,
+                                attributes->strings[i]);
                         printf("attr %s has ", attr->name);
                         switch(attr->type) {
                             case murphy_string:
                                 printf("type string and value %s\n", attr->string);
+                                break;
                             case murphy_int32:
                                 printf("type string and value %d\n", attr->integer);
+                                break;
                             case murphy_uint32:
-                                printf("type string and value %d\n", attr->unsignd);
+                                printf("type string and value %u\n", attr->unsignd);
+                                break;
                             case murphy_double:
                                 printf("type string and value %f\n", attr->floating);
+                                break;
                             default:
                                 printf("type unknown\n");
+                                break;
                         }
 
                     }
@@ -165,16 +176,32 @@ static void resource_callback(murphy_resource_context *cx,
 			      void *userdata)
 {
     my_app_data *my_data = (my_app_data *) userdata;
-    int i;
+    murphy_resource *res;
 
     if (!murphy_resource_set_equals(rs, my_data->rs))
         return;
 
-    for (i = 0; i < rs->num_resources; i++) {
-        /* here compare the resource set difference */
-        printf("resource %d name %s\n", i, rs->resources[i]->name);
-        printf("resource %d state %d\n", i, rs->resources[i]->state);
+    /* here compare the resource set difference */
+
+    res = murphy_resource_get_by_name(cx, rs, "audio_playback");
+
+    if (!res) {
+        printf("audio_playback not present in resource set");
+        return;
     }
+
+    printf("resource 0 name %s\n", res->name);
+    printf("resource 0 state %d\n", res->state);
+
+    res = murphy_resource_get_by_name(cx, rs, "video_playback");
+
+    if (!res) {
+        printf("video_playback not present in resource set");
+        return;
+    }
+
+    printf("resource 1 name %s\n", res->name);
+    printf("resource 1 state %d\n", res->state);
 
     /* let's copy the changed set for ourselves */
 

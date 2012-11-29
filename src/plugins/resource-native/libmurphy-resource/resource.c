@@ -666,7 +666,7 @@ void priv_attr_to_murphy_attr(attribute_t *attr, murphy_resource_attribute *attr
     switch (attr->type) {
         case 's':
             attribute->type = murphy_string;
-            attribute->string = mrp_strdup(attr->name);
+            attribute->string = mrp_strdup(attr->string);
             break;
         case 'i':
             attribute->type = murphy_int32;
@@ -1534,39 +1534,6 @@ const murphy_resource_set * murphy_resource_set_list(murphy_resource_context *cx
     return cx->priv->master_resource_set;
 }
 
-#if 0
-int murphy_resource_set_list_to_context(murphy_resource_context *cx,
-                    murphy_resource_set **set)
-{
-    int i = 0;
-
-    murphy_resource_set *rs = create_resource_set("implicit");
-
-    rs->num_resources = cx->priv->available_resources->dim;
-
-    if (rs->num_resources > MAX_LEN)
-        goto error;
-
-    for (i = 0; i < rs->num_resources; i++) {
-        rs->resources[i] = create_resource(cx, cx->priv->available_resources->defs[i].name);
-        if (!rs->resources[i]) {
-            rs->num_resources = i; /* only allocated this much */
-            goto error;
-        }
-    }
-
-    *set = rs;
-
-    return 0;
-
-error:
-    printf("murphy_list_resources error\n");
-    delete_resource_set(rs);
-
-    return -1;
-}
-#endif
-
 int murphy_resource_set_acquire(murphy_resource_context *cx,
                 murphy_resource_set *rset)
 {
@@ -1700,17 +1667,6 @@ error:
     return -1;
 }
 
-#if 0
-void murphy_resource_set_set_callback(murphy_resource_set *rset,
-                      murphy_resource_callback cb,
-                      void *userdata)
-{
-    if (!rset)
-        return;
-
-}
-#endif
-
 bool murphy_resource_set_equals(const murphy_resource_set *a,
                 const murphy_resource_set *b)
 {
@@ -1731,7 +1687,7 @@ murphy_resource_set *murphy_resource_set_create(murphy_resource_context *cx,
 }
 
 
-murphy_resource_set *murphy_resource_set_copy(murphy_resource_set *original)
+murphy_resource_set *murphy_resource_set_copy(const murphy_resource_set *original)
 {
     murphy_resource_set *copy = NULL;
     int i;
@@ -1775,27 +1731,6 @@ void murphy_resource_set_delete(murphy_resource_set *set)
     printf("> murphy_delete_resource_set\n");
     delete_resource_set(set);
 }
-
-
-#if 0
-murphy_resource *murphy_resource_create(murphy_resource_context *cx,
-                    const char *name,
-                    bool mandatory,
-                    bool shared)
-{
-    murphy_resource *rs = create_resource(cx, name);
-
-    if (!rs)
-        goto error;
-
-    rs->mandatory = mandatory;
-    rs->shared = shared;
-    return rs;
-
-error:
-    return NULL;
-}
-#endif
 
 void murphy_resource_delete(murphy_resource_set *set, murphy_resource *res)
 {
@@ -1841,130 +1776,53 @@ bool murphy_resource_delete_by_name(murphy_resource_set *rs, const char *name)
     return true;
 }
 
-#if 0
-char **get_attribute_names(murphy_resource_context *cx, murphy_resource
-                *res)
+murphy_string_array * murphy_resource_list_names(murphy_resource_context *cx,
+                const murphy_resource_set *rs)
 {
     int i;
-    char **arr;
+    murphy_string_array *ret;
 
-    if (!cx || !res)
+    if (!cx || !rs)
         return NULL;
 
-    arr = mrp_alloc_array(char *, res->priv->attrs->dim + 1);
+    ret = mrp_allocz(sizeof(murphy_string_array));
 
-    for (i = 0; i < res->priv->attrs->dim; i++) {
-        arr[i] = mrp_strdup(res->priv->attrs->elems[i].name);
+    ret->num_strings = rs->priv->num_resources;
+    ret->strings = mrp_allocz_array(const char *, rs->priv->num_resources);
+
+    for (i = 0; i < rs->priv->num_resources; i++) {
+        ret->strings[i] = mrp_strdup(rs->priv->resources[i]->name);
     }
 
-    arr[i] = NULL;
-
-    return arr;
-}
-
-enum murphy_attribute_type get_attribute_type(murphy_resource_context *cx, murphy_resource
-                *res, const char *attribute_name)
-{
-    int i;
-    char **arr;
-
-    if (!cx || !res)
-        return murphy_invalid;
-
-    arr = mrp_alloc_array(char *, res->priv->attrs->dim + 1);
-
-    for (i = 0; i < res->priv->attrs->dim; i++) {
-        attribute_t *elem = &res->priv->attrs->elems[i];
-        if (strcmp(elem->name, attribute_name) == 0) {
-            switch (elem->type) {
-                case 's':
-                    return murphy_string;
-                case 'u':
-                    return murphy_uint32;
-                case 'i':
-                    return murphy_int32;
-                case 'f':
-                    return murphy_double;
-                default:
-                    return murphy_invalid;
-            }
-        }
-    }
-
-    return murphy_invalid;
-}
-
-
-const void *murphy_get_attribute(murphy_resource_context *cx, murphy_resource
-                *res, const char *attribute_name)
-{
-    int i;
-    const void *ret = NULL;
-
-    if (!cx || !res)
-        return NULL;
-
-    for (i = 0; i < res->priv->attrs->dim; i++) {
-        attribute_t *elem = &res->priv->attrs->elems[i];
-        if (strcmp(elem->name, attribute_name) == 0) {
-            switch (elem->type) {
-                case 's':
-                    ret = elem->string;
-                case 'u':
-                    ret = &elem->unsignd;
-                case 'i':
-                    ret = &elem->integer;
-                case 'f':
-                    ret = &elem->floating;
-                default:
-                    break;
-            }
-            break;
-        }
-    }
     return ret;
 }
 
-
-bool murphy_set_attribute(murphy_resource_context *cx, murphy_resource
-                *res, const char *attribute_name, void *value)
+murphy_resource * murphy_resource_get_by_name(murphy_resource_context *cx,
+                 const murphy_resource_set *rs,
+                 const char *name)
 {
     int i;
 
-    if (!cx || !res || !value)
-        return false;
+    if (!cx || !rs)
+        return NULL;
 
-    for (i = 0; i < res->priv->attrs->dim; i++) {
-        attribute_t *elem = &res->priv->attrs->elems[i];
-        if (strcmp(elem->name, attribute_name) == 0) {
-            switch (elem->type) {
-                case 's':
-                    elem->string = mrp_strdup(value);
-                case 'u':
-                    elem->unsignd = *(uint32_t *) value;
-                case 'i':
-                    elem->integer = *(int32_t *) value;
-                case 'f':
-                    elem->floating = *(double *) value;
-                default:
-                    return false;
-            }
-            return true;
+    for (i = 0; i < rs->priv->num_resources; i++) {
+        if (strcmp(name, rs->priv->resources[i]->name) == 0) {
+            return rs->priv->resources[i];
         }
     }
-    return false;
-}
-#endif
 
-int murphy_attribute_list(murphy_resource_context *cx,
-        murphy_resource *res,
-        murphy_string_array **names)
+    return NULL;
+}
+
+murphy_string_array * murphy_attribute_list_names(murphy_resource_context *cx,
+        const murphy_resource *res)
 {
     int i;
     murphy_string_array *ret;
 
     if (!cx || !res)
-        return -1;
+        return NULL;
 
     ret = mrp_allocz(sizeof(murphy_string_array));
 
@@ -1972,39 +1830,26 @@ int murphy_attribute_list(murphy_resource_context *cx,
     ret->strings = mrp_allocz_array(const char *, res->priv->num_attributes);
 
     for (i = 0; i < res->priv->num_attributes; i++) {
-        ret->strings[i] = res->priv->attrs[i].name;
+        ret->strings[i] = mrp_strdup(res->priv->attrs[i].name);
     }
 
-    *names = ret;
-
-    return 0;
+    return ret;
 }
 
-int murphy_attribute_get_by_name(murphy_resource_context *cx,
+murphy_resource_attribute * murphy_attribute_get_by_name(murphy_resource_context *cx,
                  murphy_resource *res,
-                 const char *name,
-                 murphy_resource_attribute **attribute)
+                 const char *name)
 {
     int i;
 
     if (!cx || !res)
-        return -1;
+        return NULL;
 
     for (i = 0; i < res->priv->num_attributes; i++) {
         if (strcmp(name, res->priv->attrs[i].name) == 0) {
-            *attribute = &res->priv->attrs[i];
-            return 0;
+            return &res->priv->attrs[i];
         }
     }
 
-    return -1;
+    return NULL;
 }
-
-#if 0
-int murphy_attribute_set(murphy_resource_context *cx,
-             murphy_resource *res,
-             const murphy_resource_attribute *attribute)
-{
-    return 0;
-}
-#endif

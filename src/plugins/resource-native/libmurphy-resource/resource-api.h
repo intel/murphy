@@ -166,7 +166,7 @@ void murphy_resource_set_delete(murphy_resource_set *set);
  *
  * @return pointer to a copy of the resource set.
  */
-murphy_resource_set *murphy_resource_set_copy(murphy_resource_set *orig);
+murphy_resource_set *murphy_resource_set_copy(const murphy_resource_set *orig);
 
 /**
  * You might have assigned the same update callback for
@@ -229,6 +229,33 @@ murphy_resource *murphy_resource_create(murphy_resource_context *cx,
                     bool shared);
 
 /**
+ * Get the names of all resources in this resource set.
+ *
+ * @param cx murphy context.
+ * @param rs resource set where the resource are.
+ * @param names pointer where the name array with content will
+ * be allocated.
+ *
+ * @return murphy error code
+ */
+murphy_string_array * murphy_resource_list_names(murphy_resource_context *cx,
+                const murphy_resource_set *rs);
+
+/**
+ * Delete resource by name from resource set.
+ *
+ * @param cx connnection to Murphy resource engine.
+ * @param rs resource set where you want to get the resource.
+ * @param name name of the resource you want to get.
+ * @param pointer to resource pointer to be assigned.
+ *
+ * @return 0 if resource found.
+ */
+murphy_resource * murphy_resource_get_by_name(murphy_resource_context *cx,
+                    const murphy_resource_set *rs,
+                    const char *name);
+
+/**
  * Delete a resource from a resource set.
  *
  * @param set resource the resource will deleted from.
@@ -259,9 +286,8 @@ bool murphy_resource_delete_by_name(murphy_resource_set *rs,
  *
  * @return murphy error code
  */
-int murphy_attribute_list_names(murphy_resource_context *cx,
-                murphy_resource *res,
-                murphy_string_array **names);
+murphy_string_array * murphy_attribute_list_names(murphy_resource_context *cx,
+                const murphy_resource *res);
 
 /**
  * Get the particular resource attribute by name from the resource.
@@ -273,10 +299,9 @@ int murphy_attribute_list_names(murphy_resource_context *cx,
  *
  * @return murphy error code.
  */
-int murphy_attribute_get_by_name(murphy_resource_context *cx,
+murphy_resource_attribute * murphy_attribute_get_by_name(murphy_resource_context *cx,
                  murphy_resource *res,
-                 const char *name,
-                 murphy_resource_attribute **attr);
+                 const char *name);
 
 /**
  * Set new attribute value to resource.
