@@ -672,10 +672,14 @@ static int table_update(lua_State *L)
     sts  = table_row_getvalues(L, tbl, 2, false, desc, values);
     cond = NULL;
 
-    if (!sts)
+    if (!sts) {
         luaL_error(L, "update failed: no values");
-    else if (narg > 2 && !(cond = condition_check(L, 3, tbl)))
+        updated = FALSE; /* not reached, avoid uninitialized usage warning */
+    }
+    else if (narg > 2 && !(cond = condition_check(L, 3, tbl))) {
         luaL_error(L, "update failed: invalid condition");
+        updated = FALSE; /* not reached, avoid uninitialized usage warning */
+    }
     else {
         th = mqi_begin_transaction();
 
@@ -710,8 +714,10 @@ static int table_delete(lua_State *L)
     tbl  = mrp_lua_table_check(L, 1);
     cond = NULL;
 
-    if (narg > 1 && !(cond = condition_check(L, 2, tbl)))
+    if (narg > 1 && !(cond = condition_check(L, 2, tbl))) {
         luaL_error(L, "delete failed: invalid condition");
+        deleted = FALSE; /* not reached, avoid uninitialized usage warning */
+    }
     else {
         th = mqi_begin_transaction();
 
