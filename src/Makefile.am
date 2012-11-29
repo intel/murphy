@@ -618,7 +618,11 @@ libmurphy_resource_la_LIBADD =			\
 		$(LUA_LIBS)
 
 libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
-				     libmurphy-common.la
+		libmurphy-core.la		\
+		libmurphy-common.la		\
+		murphy-db/mql/libmql.la		\
+		murphy-db/mqi/libmqi.la		\
+		murphy-db/mdb/libmdb.la
 
 # debug file:line-function mapping generation
 resource-func-info.c: $(libmurphy_resource_la_REGULAR_SOURCES)
