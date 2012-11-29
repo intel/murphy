@@ -418,7 +418,7 @@ static int appclass_create(lua_State *L)
     appclass_t *appclass;
     size_t fldnamlen;
     const char *fldnam;
-    int priority;
+    int priority = 0;
     const char *name = NULL;
 
     MRP_LUA_ENTER;
