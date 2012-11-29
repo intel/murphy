@@ -3,6 +3,7 @@ pkglib_LTLIBRARIES = libmql.la
 PARSER_PREFIX   = yy_mql_
 AM_YFLAGS       = -p $(PARSER_PREFIX)
 LEX_OUTPUT_ROOT = ./lex.$(PARSER_PREFIX)
+BUILT_SOURCES   = mql-scanner.c mql-parser.c
 
 LINKER_SCRIPT = linker-script.mql
 QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
@@ -35,7 +36,7 @@ mql-parser.h mql-parser.c: mql-parser.y
 	mv -f y.tab.h mql-parser.h
 	mv -f y.tab.c mql-parser.c
 
-mql-scanner.c: mql-scanner.l mql-parser.h
+mql-scanner.c: mql-scanner.l mql-parser.c
 	$(LEXCOMPILE) $<
 	mv lex.$(PARSER_PREFIX).c $@
 
