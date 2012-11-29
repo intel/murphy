@@ -34,9 +34,6 @@
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
 
-#include <murphy-db/mql.h>
-#include <murphy-db/mqi.h>
-
 #include <murphy/plugins/signalling/signalling.h>
 #include <murphy/plugins/signalling/signalling-protocol.h>
 
@@ -744,8 +741,6 @@ static int test_init(mrp_plugin_t *plugin)
     test_imports();
 
     subscribe_events(plugin);
-
-    mqi_open();
 
     return !args[ARG_FAILINIT].bln;
 }
