@@ -289,12 +289,12 @@ int brl_set_prompt(brl_t *brl, const char *prompt)
 void brl_hide_prompt(brl_t *brl)
 {
     char buf[32];
-    int  n;
+    int  n, o;
 
     brl->hidden = TRUE;
 
     n = snprintf(buf, sizeof(buf), "%s%s", BRL_CURSOR_START, BRL_ERASE_RIGHT);
-    write(brl->fd, buf, n);
+    o = write(brl->fd, buf, n);
     restore_rawmode(brl);
 }
 
@@ -666,7 +666,7 @@ static void redraw_prompt(brl_t *brl)
 {
     char *prompt, *buf, *p;
     int   plen, dlen, space, start, trunc;
-    int   l, n;
+    int   l, n, o;
 
     prompt = brl->prompt ? brl->prompt : "";
     plen   = strlen(prompt) + 2;            /* '> ' or '><' */
@@ -724,7 +724,7 @@ static void redraw_prompt(brl_t *brl)
     l -= n;
 
     /* okay, perform the actions collected so far */
-    write(brl->fd, buf, (p - buf));
+    o = write(brl->fd, buf, (p - buf));
 
     l = plen + dlen + 64;
     p = buf;
@@ -734,7 +734,7 @@ static void redraw_prompt(brl_t *brl)
                   plen + brl->offs - start);
     p += n;
     l -= n;
-    write(brl->fd, buf, (p - buf));
+    o = write(brl->fd, buf, (p - buf));
 }
 
 
