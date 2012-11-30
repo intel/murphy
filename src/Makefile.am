@@ -18,6 +18,7 @@ LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 
 INCLUDES        = -I$(top_builddir)/src/murphy-db/include -I$(top_builddir)
+BUILT_SOURCES   =
 
 ###################################
 # murphy common library
@@ -270,7 +271,10 @@ libmurphy_core_la_LIBADD  =			\
 		$(LUA_LIBS) 			\
 		-ldl
 
-libmurphy_core_la_DEPENDENCIES = linker-script.core libmurphy-common.la
+libmurphy_core_la_DEPENDENCIES = linker-script.core        \
+				 libmurphy-common.la       \
+				 libmurphy-lua-decision.la \
+				 libmurphy-lua-utils.la
 
 # core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS) \
@@ -474,6 +478,8 @@ lib_LTLIBRARIES += libmurphy-resolver.la
 EXTRA_DIST      += resolver/murphy-resolver.pc
 pkgconfig_DATA  += resolver/murphy-resolver.pc
 
+BUILT_SOURCES   += resolver/scanner.c resolver/parser.c
+
 libmurphy_resolver_ladir =			\
 		$(includedir)/murphy/resolver
 
@@ -526,14 +532,12 @@ libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver  \
 # resolver lexical analyser and parser generation
 RESOLVER_PARSER_PREFIX = yy_res_
 
-resolver/scanner.c: resolver/scanner.l resolver/parser.h
+resolver/scanner.c: resolver/scanner.l resolver/parser.c
 	$(LEXCOMPILE) -P $(RESOLVER_PARSER_PREFIX) $<
 	mv lex.$(RESOLVER_PARSER_PREFIX).c $@
 
 resolver/parser.h resolver/parser.c: resolver/parser.y
-	$(YACCCOMPILE) -p $(RESOLVER_PARSER_PREFIX) $<
-	mv -f y.tab.h resolver/parser.h
-	mv -f y.tab.c resolver/parser.c
+	$(YACCCOMPILE) -p $(RESOLVER_PARSER_PREFIX) $< -o resolver/parser.c
 
 # debug file:line-function mapping generation
 resolver-func-info.c: $(libmurphy_resolver_la_REGULAR_SOURCES)
@@ -550,11 +554,13 @@ clean-linker-script::
 	-rm -f linker-script.resolver
 
 # simple interpreter lexical analyser and parser generation
-SIMPLE_PARSER_PREFIX = yy_smpl_
+SIMPLE_PARSER_PREFIX  = yy_smpl_
+BUILT_SOURCES        += resolver/scripting/simple/simple-scanner.c \
+                        resolver/scripting/simple/simple-parser.c
 
 resolver/scripting/simple/simple-scanner.c:		\
     resolver/scripting/simple/simple-scanner.l		\
-    resolver/scripting/simple/simple-parser.h
+    resolver/scripting/simple/simple-parser.c
 	$(LEXCOMPILE) -P $(SIMPLE_PARSER_PREFIX) $<
 	mv lex.$(SIMPLE_PARSER_PREFIX).c $@
 
@@ -562,9 +568,8 @@ resolver/scripting/simple/simple-scanner.c:		\
 resolver/scripting/simple/simple-parser.h 	\
 resolver/scripting/simple/simple-parser.c:	\
     resolver/scripting/simple/simple-parser.y
-	$(YACCCOMPILE) -p $(SIMPLE_PARSER_PREFIX) $<
-	mv -f y.tab.h resolver/scripting/simple/simple-parser.h
-	mv -f y.tab.c resolver/scripting/simple/simple-parser.c
+	$(YACCCOMPILE) -p $(SIMPLE_PARSER_PREFIX) $< -o \
+	    resolver/scripting/simple/simple-parser.c
 
 ###################################
 # murphy resource library
