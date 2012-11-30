@@ -30,12 +30,14 @@
 #include <murphy/config.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
+#include <murphy/common/mainloop.h>
+
+#include "mainloop-qt-test.h"
 
 #ifdef QT_ENABLED
 #include <QCoreApplication>
 #include <murphy/common/qt-glue.h>
 
-#include "mainloop-qt-test.h"
 
 typedef struct qt_config_s {
     QCoreApplication *app;

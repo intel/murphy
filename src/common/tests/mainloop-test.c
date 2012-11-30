@@ -145,10 +145,7 @@ typedef struct {
 #include "mainloop-pulse-test.c"
 #include "mainloop-ecore-test.c"
 #include "mainloop-glib-test.c"
-#ifdef QT_ENABLED
-#  include "mainloop-qt-test.h"
-#endif
-
+#include "mainloop-qt-test.h"
 
 static test_config_t cfg;
 
