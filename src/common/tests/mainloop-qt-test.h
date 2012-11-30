@@ -36,9 +36,9 @@
 
 MRP_CDECL_BEGIN
 
-mrp_mainloop_t * qt_mainloop_create();
-int qt_mainloop_run();
-int qt_mainloop_quit();
+mrp_mainloop_t *qt_mainloop_create(void);
+int qt_mainloop_run(void);
+int qt_mainloop_quit(void);
 int qt_mainloop_cleanup(mrp_mainloop_t *ml);
 
 MRP_CDECL_END

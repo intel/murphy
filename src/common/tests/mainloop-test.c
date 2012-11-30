@@ -1624,7 +1624,8 @@ void mainloop_cleanup(test_config_t *cfg)
         break;
 
     case MAINLOOP_QT:
-        if (qt_mainloop_cleanup(cfg->ml) == TRUE) cfg->ml = NULL;
+        qt_mainloop_cleanup(cfg->ml);
+        cfg->ml = NULL;
         break;
 
     default:
