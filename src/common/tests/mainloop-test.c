@@ -1653,7 +1653,7 @@ int main(int argc, char *argv[])
     MRP_UNUSED(setup_deferred);   /* XXX TODO: add deferred tests... */
 
 #ifdef GLIB_ENABLED
-    if (cfg.mainloop_type != MAINLOOP_GLIB) {
+    if (cfg.mainloop_type != MAINLOOP_GLIB && cfg.mainloop_type != MAINLOOP_QT) {
         if (cfg.ngio > 0 || cfg.ngtimer > 0)
             glib_pump_setup(ml);
     }
