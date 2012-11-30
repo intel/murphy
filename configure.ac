@@ -109,9 +109,9 @@ AC_SUBST(WARNING_CFLAGS)
 # check for Lua
 PKG_CHECK_MODULES(LUA, lua >= 5.1.1, [try_lua51=no], [try_lua51=yes])
 
-# At least Ubuntu packages lua 5.1 as lua51... try that if needed.
+# At least Ubuntu packages lua 5.1 as lua5.1... try that if needed.
 if test "$try_lua51" = "yes"; then
-    PKG_CHECK_MODULES(LUA, lua51 >= 5.1.1)
+    PKG_CHECK_MODULES(LUA, lua5.1 >= 5.1.1)
 fi
 AC_SUBST(LUA_CFLAGS)
 AC_SUBST(LUA_LIBS)
