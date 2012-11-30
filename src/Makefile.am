@@ -272,9 +272,7 @@ libmurphy_core_la_LIBADD  =			\
 		-ldl
 
 libmurphy_core_la_DEPENDENCIES = linker-script.core        \
-				 libmurphy-common.la       \
-				 libmurphy-lua-decision.la \
-				 libmurphy-lua-utils.la
+	$(filter %.la, $(libmurphy_core_la_LIBADD))
 
 # core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS) \
@@ -523,11 +521,7 @@ libmurphy_resolver_la_LIBADD =	    	\
 		murphy-db/mdb/libmdb.la
 
 libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver  \
-				     libmurphy-core.la       \
-				     libmurphy-common.la     \
-				     murphy-db/mql/libmql.la \
-				     murphy-db/mqi/libmqi.la \
-				     murphy-db/mdb/libmdb.la
+	$(filter %.la, $(libmurphy_resolver_la_LIBADD))
 
 # resolver lexical analyser and parser generation
 RESOLVER_PARSER_PREFIX = yy_res_
@@ -623,11 +617,7 @@ libmurphy_resource_la_LIBADD =			\
 		$(LUA_LIBS)
 
 libmurphy_resource_la_DEPENDENCIES = linker-script.resource \
-		libmurphy-core.la		\
-		libmurphy-common.la		\
-		murphy-db/mql/libmql.la		\
-		murphy-db/mqi/libmqi.la		\
-		murphy-db/mdb/libmdb.la
+	$(filter %.la, $(libmurphy_resource_la_LIBADD))
 
 # debug file:line-function mapping generation
 resource-func-info.c: $(libmurphy_resource_la_REGULAR_SOURCES)
@@ -702,7 +692,8 @@ libbreedline_murphy_la_LDFLAGS =	\
 
 libbreedline_murphy_la_LIBADD = libmurphy-common.la
 
-libbreedline_murphy_la_DEPENDENCIES = linker-script.breedline-murphy
+libbreedline_murphy_la_DEPENDENCIES = linker-script.breedline-murphy \
+	$(filter %.la,$(libbreedline_murphy_la_LIBADD))
 
 libbreedline_murphyincludedir      = $(includedir)/breedline
 libbreedline_murphyinclude_HEADERS = $(libbreedline_murphy_la_HEADERS)
@@ -1003,11 +994,7 @@ libmurphy_plugin_domain_control_la_LIBADD =		\
 
 libmurphy_plugin_domain_control_la_DEPENDENCIES =	\
 		linker-script.domain-control		\
-		libmurphy-core.la			\
-		libmurphy-common.la			\
-		murphy-db/mql/libmql.la			\
-		murphy-db/mqi/libmqi.la			\
-		murphy-db/mdb/libmdb.la
+	$(filter %.la, $(libmurphy_plugin_domain_control_la_LIBADD))
 
 # linkedin domain control plugin linker script generation
 linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
