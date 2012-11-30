@@ -34,6 +34,9 @@ AC_DISABLE_STATIC
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99
+# We need AC_PROG_CXX if Qt support is enabled but (at least some
+# versions of autotools) cannot handle conditional use of this.
+AC_PROG_CXX
 AC_PROG_AWK
 AC_PROG_INSTALL
 AM_PROG_CC_C_O
@@ -236,7 +239,6 @@ AC_ARG_ENABLE(qt,
               [enable_qt=$enableval], [enable_qt=auto])
 
 if test "$enable_qt" != "no"; then
-    AC_PROG_CXX
     PKG_CHECK_MODULES(QTCORE, QtCore,
                       [have_qt=yes], [have_qt=no])
     if test "$have_qt" = "no" -a "$enable_qt" = "yes"; then
