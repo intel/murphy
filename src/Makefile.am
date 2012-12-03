@@ -96,6 +96,8 @@ linker-script.common: $(libmurphy_common_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.common
 
+generate-linker-scripts: linker-script.common
+
 # debug file:line-function mapping generation
 common-func-info.c: $(libmurphy_common_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
@@ -155,6 +157,7 @@ linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.lua-utils
 
+generate-linker-scripts: linker-script.lua-utils
 
 ###################################
 # murphy lua decision network
@@ -206,6 +209,7 @@ linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.lua-decision
 
+generate-linker-scripts: linker-script.lua-decision
 
 ###################################
 # murphy core library
@@ -284,6 +288,8 @@ linker-script.core: $(libmurphy_core_la_HEADERS) \
 clean-linker-script::
 	-rm -f linker-script.core
 
+generate-linker-scripts: linker-script.core
+
 # debug file:line-function mapping generation
 core-func-info.c: $(libmurphy_core_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
@@ -339,6 +345,8 @@ linker-script.dbus: $(libmurphy_dbus_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.dbus
 
+generate-linker-scripts: linker-script.dbus
+
 # debug file:line-function mapping generation
 dbus-func-info.c: $(libmurphy_dbus_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
@@ -388,6 +396,8 @@ clean-linker-script::
 	-rm -f linker-script.pulse
 endif
 
+generate-linker-scripts: linker-script.pulse
+
 ###################################
 # murphy ecore glue library
 #
@@ -429,6 +439,8 @@ clean-linker-script::
 	-rm -f linker-script.ecore
 endif
 
+generate-linker-scripts: linker-script.ecore
+
 ###################################
 # murphy glib glue library
 #
@@ -469,6 +481,8 @@ linker-script.glib: $(libmurphy_glib_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.glib
 endif
+
+generate-linker-scripts: linker-script.glib
 
 ###################################
 # murphy qt glue library
@@ -516,6 +530,8 @@ linker-script.qt: $(libmurphy_qt_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.qt
 endif
+
+generate-linker-scripts: linker-script.qt
 
 ###################################
 # murphy resolver library
@@ -596,6 +612,8 @@ linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.resolver
 
+
+generate-linker-scripts: linker-script.resolver
 # simple interpreter lexical analyser and parser generation
 SIMPLE_PARSER_PREFIX  = yy_smpl_
 BUILT_SOURCES        += resolver/scripting/simple/simple-scanner.c \
@@ -683,6 +701,8 @@ clean-linker-script::
 	-rm -f linker-script.resource
 endif
 
+generate-linker-scripts: linker-script.resource
+
 ##########################
 # readline replacement
 #
@@ -722,6 +742,8 @@ linker-script.breedline: $(libbreedline_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.breedline
 
+generate-linker-scripts: linker-script.breedline
+
 ##########################
 # breedline murphy glue library
 #
@@ -755,6 +777,7 @@ linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.breedline-murphy
 
+generate-linker-scripts: linker-script.breedline-murphy
 
 ##########################
 # breedline glib glue library
@@ -790,6 +813,8 @@ linker-script.breedline-glib: $(libbreedline_glib_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.breedline-glib
 endif
+
+generate-linker-scripts: linker-script.breedline-glib
 
 ###################################
 # murphy plugins
@@ -1060,6 +1085,8 @@ plugin_domain_control_la_LIBADD  = $(DOMAIN_CONTROL_PLUGIN_LIBS)
 plugin_LTLIBRARIES              += plugin-domain-control.la
 endif
 
+generate-linker-scripts: linker-script.domain-control
+
 # domain controller client library
 lib_LTLIBRARIES += libmurphy-domain-controller.la
 EXTRA_DIST      += plugins/domain-control/murphy-domain-controller.pc
@@ -1197,6 +1224,9 @@ endif
 
 murphy_console_LDFLAGS = -rdynamic
 endif
+
+generate-linker-scripts:
+	$(MAKE) -C murphy-db $@
 
 # cleanup
 clean-local:: # clean-linker-script clean-func-infos
