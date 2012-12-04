@@ -108,14 +108,17 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
 void mrp_resource_set_destroy(mrp_resource_set_t *rset)
 {
     mrp_resource_state_t state;
-    uint32_t zoneid;
     mrp_list_hook_t *entry, *n;
     mrp_resource_t *res;
     mqi_handle_t trh;
 
     if (rset) {
-        state  = rset->state;
-        zoneid = rset->zone;
+        state = rset->state;
+
+        rset->event = NULL; /* make sure nothing is sent any more */
+
+        if (state == mrp_resource_acquire)
+            mrp_resource_set_release(rset, MRP_RESOURCE_REQNO_INVALID);
 
         mrp_list_foreach(&rset->resource.list, entry, n) {
             res = mrp_list_entry(entry, mrp_resource_t, list);
@@ -130,15 +133,6 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
 
         if (resource_set_count > 0)
             resource_set_count--;
-
-        if (state == mrp_resource_acquire) {
-            trh = mqi_begin_transaction();
-
-            mrp_resource_owner_update_zone(zoneid, NULL,
-                                           MRP_RESOURCE_REQNO_INVALID);
-
-            mqi_commit_transaction(trh);
-        }
     }
 }
 
