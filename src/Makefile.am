@@ -301,6 +301,10 @@ clean-func-infos::
 # murphy dbus library
 #
 
+murphy_dbus_headers = 			\
+		common/dbus.h		\
+		common/dbus-transport.h
+
 if DBUS_ENABLED
 lib_LTLIBRARIES += libmurphy-dbus.la
 EXTRA_DIST      += common/murphy-dbus.pc
@@ -309,9 +313,8 @@ pkgconfig_DATA  += common/murphy-dbus.pc
 libmurphy_dbus_ladir      =		\
 		$(includedir)/murphy/common
 
-libmurphy_dbus_la_HEADERS =		\
-		common/dbus.h		\
-		common/dbus-transport.h
+libmurphy_dbus_la_HEADERS = $(murphy_dbus_headers)
+
 
 libmurphy_dbus_la_REGULAR_SOURCES =	\
 		common/dbus.c		\
@@ -338,15 +341,6 @@ libmurphy_dbus_la_DEPENDENCIES = linker-script.dbus
 libdbusincludedir      = $(includedir)/murphy/dbus
 libdbusinclude_HEADERS = $(libmurphy_dbus_la_HEADERS)
 
-# linker script generation
-linker-script.dbus: $(libmurphy_dbus_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
-
-clean-linker-script::
-	-rm -f linker-script.dbus
-
-generate-linker-scripts: linker-script.dbus
-
 # debug file:line-function mapping generation
 dbus-func-info.c: $(libmurphy_dbus_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
@@ -355,9 +349,22 @@ clean-func-infos::
 	-rm dbus-func-info.c
 endif
 
+# linker script generation
+linker-script.dbus: $(murphy_dbus_headers)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.dbus
+
+generate-linker-scripts: linker-script.dbus
+
+
 ###################################
 # murphy pulse glue library
 #
+
+murphy_pulse_headers =			\
+		common/pulse-glue.h
 
 if PULSE_ENABLED
 lib_LTLIBRARIES += libmurphy-pulse.la
@@ -367,8 +374,7 @@ pkgconfig_DATA  += common/murphy-pulse.pc
 libmurphy_pulse_ladir      =		\
 		$(includedir)/murphy/common
 
-libmurphy_pulse_la_HEADERS =		\
-		common/pulse-glue.h
+libmurphy_pulse_la_HEADERS = $(murphy_pulse_headers)
 
 libmurphy_pulse_la_SOURCES =		\
 		common/pulse-glue.c
@@ -387,20 +393,23 @@ libmurphy_pulse_la_DEPENDENCIES = linker-script.pulse
 
 libpulseincludedir      = $(includedir)/murphy/pulse
 libpulseinclude_HEADERS = $(libmurphy_pulse_la_HEADERS)
+endif
 
 # linker script generation
-linker-script.pulse: $(libmurphy_pulse_la_HEADERS)
+linker-script.pulse: $(murphy_pulse_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.pulse
-endif
 
 generate-linker-scripts: linker-script.pulse
 
 ###################################
 # murphy ecore glue library
 #
+
+murphy_ecore_headers =			\
+		common/ecore-glue.h
 
 if ECORE_ENABLED
 lib_LTLIBRARIES += libmurphy-ecore.la
@@ -410,8 +419,7 @@ pkgconfig_DATA  += common/murphy-ecore.pc
 libmurphy_ecore_ladir      =		\
 		$(includedir)/murphy/common
 
-libmurphy_ecore_la_HEADERS =		\
-		common/ecore-glue.h
+libmurphy_ecore_la_HEADERS = $(murphy_ecore_headers)
 
 libmurphy_ecore_la_SOURCES =		\
 		common/ecore-glue.c
@@ -430,20 +438,23 @@ libmurphy_ecore_la_DEPENDENCIES = linker-script.ecore
 
 libecoreincludedir      = $(includedir)/murphy/ecore
 libecoreinclude_HEADERS = $(libmurphy_ecore_la_HEADERS)
+endif
 
 # linker script generation
-linker-script.ecore: $(libmurphy_ecore_la_HEADERS)
+linker-script.ecore: $(murphy_ecore_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.ecore
-endif
 
 generate-linker-scripts: linker-script.ecore
 
 ###################################
 # murphy glib glue library
 #
+
+murphy_glib_headers =			\
+		common/glib-glue.h
 
 if GLIB_ENABLED
 lib_LTLIBRARIES += libmurphy-glib.la
@@ -453,8 +464,7 @@ pkgconfig_DATA  += common/murphy-glib.pc
 libmurphy_glib_ladir      =		\
 		$(includedir)/murphy/common
 
-libmurphy_glib_la_HEADERS =		\
-		common/glib-glue.h
+libmurphy_glib_la_HEADERS = $(murphy_glib_headers)
 
 libmurphy_glib_la_SOURCES =		\
 		common/glib-glue.c
@@ -473,20 +483,23 @@ libmurphy_glib_la_DEPENDENCIES = linker-script.glib
 
 libglibincludedir      = $(includedir)/murphy/glib
 libglibinclude_HEADERS = $(libmurphy_glib_la_HEADERS)
+endif
 
 # linker script generation
-linker-script.glib: $(libmurphy_glib_la_HEADERS)
+linker-script.glib: $(murphy_glib_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.glib
-endif
 
 generate-linker-scripts: linker-script.glib
 
 ###################################
 # murphy qt glue library
 #
+
+murphy_qt_headers	=		\
+		common/qt-glue.h
 
 if QT_ENABLED
 lib_LTLIBRARIES += libmurphy-qt.la
@@ -498,8 +511,7 @@ BUILT_SOURCES   += common/qt-glue-priv.moc.h
 libmurphy_qt_ladir      =		\
 		$(includedir)/murphy/common
 
-libmurphy_qt_la_HEADERS =		\
-		common/qt-glue.h
+libmurphy_qt_la_HEADERS = $(murphy_qt_headers)
 
 libmurphy_qt_la_SOURCES =		\
 		common/qt-glue.cpp
@@ -522,14 +534,14 @@ libqtinclude_HEADERS = $(libmurphy_qt_la_HEADERS)
 # run moc to generate Qt meta objects
 common/qt-glue-priv.moc.h: common/qt-glue-priv.h
 	$(QUIET_GEN)$(QT_MOC) -DQT_ENABLED=1 $< -o$@
+endif
 
 # linker script generation
-linker-script.qt: $(libmurphy_qt_la_HEADERS)
+linker-script.qt: $(murphy_qt_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.qt
-endif
 
 generate-linker-scripts: linker-script.qt
 
@@ -635,6 +647,16 @@ resolver/scripting/simple/simple-parser.c:	\
 ###################################
 # murphy resource library
 #
+
+murphy_resource_headers =			\
+		resource/data-types.h           \
+		resource/common-api.h           \
+		resource/client-api.h           \
+		resource/manager-api.h          \
+		resource/config-api.h           \
+		resource/protocol.h		\
+		resource/config-lua.h
+
 if BUILD_RESOURCES
 lib_LTLIBRARIES += libmurphy-resource.la
 EXTRA_DIST      += resource/murphy-resource.pc
@@ -643,14 +665,7 @@ pkgconfig_DATA  += resource/murphy-resource.pc
 libmurphy_resource_ladir =			\
 		$(includedir)/murphy/resource
 
-libmurphy_resource_la_HEADERS =			\
-		resource/data-types.h           \
-		resource/common-api.h           \
-		resource/client-api.h           \
-		resource/manager-api.h          \
-		resource/config-api.h           \
-		resource/protocol.h		\
-		resource/config-lua.h
+libmurphy_resource_la_HEADERS = $(murphy_resource_headers)
 
 libmurphy_resource_la_REGULAR_SOURCES =		\
 		resource/attribute.c		\
@@ -692,14 +707,14 @@ resource-func-info.c: $(libmurphy_resource_la_REGULAR_SOURCES)
 
 clean-func-infos::
 	-rm resource-func-info.c
+endif
 
 # resource linker script generation
-linker-script.resource: $(libmurphy_resource_la_HEADERS)
+linker-script.resource: $(murphy_resource_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.resource
-endif
 
 generate-linker-scripts: linker-script.resource
 
@@ -783,6 +798,9 @@ generate-linker-scripts: linker-script.breedline-murphy
 # breedline glib glue library
 #
 
+breedline_glib_headers =	\
+		breedline/breedline-glib.h
+
 if GLIB_ENABLED
 lib_LTLIBRARIES += libbreedline-glib.la
 EXTRA_DIST      += breedline/breedline-glib.pc
@@ -790,7 +808,7 @@ pkgconfig_DATA  += breedline/breedline-glib.pc
 
 libbreedline_glib_ladir      = $(includedir)/breedline
 
-libbreedline_glib_la_HEADERS = breedline/breedline-glib.h
+libbreedline_glib_la_HEADERS = $(breedline_glib_headers)
 libbreedline_glib_la_SOURCES = breedline/breedline-glib.c
 libbreedline_glib_la_CFLAGS  = $(AM_CFLAGS) $(GLIB_CFLAGS)
 
@@ -804,15 +822,15 @@ libbreedline_glib_la_DEPENDENCIES = linker-script.breedline-glib
 
 libbreedline_glibincludedir      = $(includedir)/breedline
 libbreedline_glibinclude_HEADERS = $(libbreedline_glib_la_HEADERS)
+endif
 
 # linker script generation
-linker-script.breedline-glib: $(libbreedline_glib_la_HEADERS)
+linker-script.breedline-glib: $(breedline_glib_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
 	    -p '^brl_' -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.breedline-glib
-endif
 
 generate-linker-scripts: linker-script.breedline-glib
 
@@ -1032,6 +1050,8 @@ DOMAIN_CONTROL_PLUGIN_SOURCES = plugins/domain-control/plugin-domain-control.c \
 				plugins/domain-control/table.c                 \
 				plugins/domain-control/message.c               \
 				plugins/domain-control/notify.c
+DOMAIN_CONTROL_PLUGIN_LOADER  = linkedin-domain-control-loader.c
+
 
 DOMAIN_CONTROL_PLUGIN_CFLAGS  =
 DOMAIN_CONTROL_PLUGIN_LIBS    =
@@ -1040,7 +1060,6 @@ if !DISABLED_PLUGIN_DOMAIN_CONTROL
 if BUILTIN_PLUGIN_DOMAIN_CONTROL
 LINKEDIN_PLUGINS             += libmurphy-plugin-domain-control.la
 lib_LTLIBRARIES              += libmurphy-plugin-domain-control.la
-DOMAIN_CONTROL_PLUGIN_LOADER  = linkedin-domain-control-loader.c
 DOMAIN_CONTROL_PLUGIN_CFLAGS += $(BUILTIN_CFLAGS)
 
 
@@ -1069,13 +1088,6 @@ libmurphy_plugin_domain_control_la_LIBADD =		\
 libmurphy_plugin_domain_control_la_DEPENDENCIES =	\
 		linker-script.domain-control		\
 	$(filter %.la, $(libmurphy_plugin_domain_control_la_LIBADD))
-
-# linkedin domain control plugin linker script generation
-linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
-
-clean-linker-script::
-	-rm -f linker-script.domain-control
 else
 plugin_domain_control_la_SOURCES = $(DOMAIN_CONTROL_PLUGIN_SOURCES)
 plugin_domain_control_la_CFLAGS  = $(DOMAIN_CONTROL_PLUGIN_CFLAGS) \
@@ -1085,7 +1097,6 @@ plugin_domain_control_la_LIBADD  = $(DOMAIN_CONTROL_PLUGIN_LIBS)
 plugin_LTLIBRARIES              += plugin-domain-control.la
 endif
 
-generate-linker-scripts: linker-script.domain-control
 
 # domain controller client library
 lib_LTLIBRARIES += libmurphy-domain-controller.la
@@ -1117,6 +1128,15 @@ test_domain_controller_LDADD   = libmurphy-domain-controller.la \
 				 libbreedline.la		\
 				 libmurphy-common.la
 endif
+
+# linkedin domain control plugin linker script generation
+linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.domain-control
+
+generate-linker-scripts: linker-script.domain-control
 
 
 # Lua plugin
