@@ -78,6 +78,8 @@ int ecore_mainloop_cleanup(test_config_t *cfg)
 
 mrp_mainloop_t *ecore_mainloop_create(test_config_t *cfg)
 {
+    MRP_UNUSED(cfg);
+
     mrp_log_error("EFL/ecore mainloop support is not available.");
     exit(1);
 }
@@ -85,6 +87,8 @@ mrp_mainloop_t *ecore_mainloop_create(test_config_t *cfg)
 
 int ecore_mainloop_run(test_config_t *cfg)
 {
+    MRP_UNUSED(cfg);
+
     mrp_log_error("EFL/ecore mainloop support is not available.");
     exit(1);
 }
@@ -92,6 +96,8 @@ int ecore_mainloop_run(test_config_t *cfg)
 
 int ecore_mainloop_quit(test_config_t *cfg)
 {
+    MRP_UNUSED(cfg);
+
     mrp_log_error("EFL/ecore mainloop support is not available.");
     exit(1);
 }
@@ -99,6 +105,8 @@ int ecore_mainloop_quit(test_config_t *cfg)
 
 int ecore_mainloop_cleanup(test_config_t *cfg)
 {
+    MRP_UNUSED(cfg);
+
     mrp_log_error("EFL/ecore mainloop support is not available.");
     exit(1);
 }
