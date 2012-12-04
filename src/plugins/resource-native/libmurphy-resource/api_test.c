@@ -1,3 +1,32 @@
+/*
+ * Copyright (c) 2012, Intel Corporation
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of Intel Corporation nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,100 +35,118 @@
 #include <murphy/plugins/resource-native/libmurphy-resource/resource-api.h>
 
 typedef struct my_app_data {
-    murphy_resource_context *cx;
-    murphy_resource_set *rs;
+    mrp_res_context_t *cx;
+    mrp_res_resource_set_t *rs;
 } my_app_data;
 
 
 static bool accept_input;
 
 /* state callback for murphy connection */
-static void state_callback(murphy_resource_context *cx,
-			   murphy_resource_error,
-			   void *ud);
+static void state_callback(mrp_res_context_t *cx,
+               mrp_res_error_t,
+               void *ud);
 
 /* callback for resource set update */
-static void resource_callback(murphy_resource_context *cx,
-			      const murphy_resource_set *rs,
-			      void *userdata);
+static void resource_callback(mrp_res_context_t *cx,
+                  const mrp_res_resource_set_t *rs,
+                  void *userdata);
 
 void acquire_resources(my_app_data *app_data)
 {
-    murphy_resource *resource= NULL;
+    mrp_res_resource_t *resource = NULL;
+    mrp_res_attribute_t *attr;
 
-    /* create resource set and resources */
-    app_data->rs = murphy_resource_set_create(app_data->cx,
-					      "player",
-					      resource_callback,
-					      (void*)app_data);
+    /* if we already have a decent set, just re-acquire it */
+    if (app_data->rs) {
+        mrp_res_acquire_resource_set(app_data->cx, app_data->rs);
+        return;
+    }
+
+    /* otherwise create resource set and resources */
+    app_data->rs = mrp_res_create_resource_set(app_data->cx,
+                          "player",
+                          resource_callback,
+                          (void*)app_data);
 
     if (app_data->rs == NULL) {
-    	printf("Couldn't create resource set\n");
-    	return;
+        printf("Couldn't create resource set\n");
+        return;
     }
 
-    resource = murphy_resource_create(app_data->cx,
-				      app_data->rs,
-				      "audio_playback",
-				      true,
-				      false);
+    resource = mrp_res_create_resource(app_data->cx,
+                      app_data->rs,
+                      "audio_playback",
+                      true,
+                      false);
 
     if (resource == NULL) {
-    	printf("Couldn't create audio resource\n");
-    	murphy_resource_set_delete(app_data->rs);
-    	return;
+        printf("Couldn't create audio resource\n");
+        mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+        return;
     }
 
-    resource = murphy_resource_create(app_data->cx,
-				      app_data->rs,
-				      "video_playback",
-				      true,
-				      false);
+    /* set a resource attribute */
 
+    attr = mrp_res_get_attribute_by_name(app_data->cx, resource, "role");
+
+    if (attr) {
+        mrp_res_set_attribute_string(app_data->cx, attr, "call");
+    }
+
+    resource = mrp_res_create_resource(app_data->cx,
+                      app_data->rs,
+                      "video_playback",
+                      true,
+                      false);
 
     if (resource == NULL) {
-    	printf("Couldn't create video resource\n");
-    	murphy_resource_set_delete(app_data->rs);
-    	return;
+        printf("Couldn't create video resource\n");
+        mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+        return;
     }
+
+    printf("created the resource set, acquiring now!\n");
 
     /* acquire the resources */
-    murphy_resource_set_acquire(app_data->cx, app_data->rs);
+    mrp_res_acquire_resource_set(app_data->cx, app_data->rs);
 }
 
 void giveup_resources(my_app_data *app_data)
 {
-    printf("giving up resources\n");
-
     /* release resources */
-    murphy_resource_set_release(app_data->cx, app_data->rs);
+    if (app_data->rs)
+        mrp_res_release_resource_set(app_data->cx, app_data->rs);
 }
 
-static void state_callback(murphy_resource_context *context,
-			   murphy_resource_error err,
-			   void *userdata)
+static void state_callback(mrp_res_context_t *context,
+               mrp_res_error_t err,
+               void *userdata)
 {
     int i = 0, j = 0;
-    const murphy_string_array *app_classes = NULL;
-    const murphy_resource_set *rs;
-    murphy_string_array *attributes = NULL;
-    murphy_resource_attribute *attr;
+    const mrp_res_string_array_t *app_classes = NULL;
+    const mrp_res_resource_set_t *rs;
+    mrp_res_string_array_t *attributes = NULL;
+    mrp_res_attribute_t *attr;
     bool system_handles_audio = FALSE;
     bool system_handles_video = FALSE;
+    mrp_res_resource_t *resource;
 
-    my_app_data *app_data = userdata;
+    my_app_data *app_data = (my_app_data *) userdata;
 
-    if (err != murphy_resource_error_none) {
+    if (err != MRP_RES_ERROR_NONE) {
         printf("error message received from Murphy\n");
         return;
     }
 
     switch (context->state) {
 
-        case murphy_connected:
+        case MRP_RES_CONNECTED:
+
             printf("connected to murphy\n");
 
-            if ((app_classes = murphy_application_class_list(context)) != NULL) {
+            if ((app_classes =
+                        mrp_res_list_application_classes(context)) != NULL) {
                 printf("listing all application classes in the system\n");
 
                 for (i = 0; i < app_classes->num_strings; i++) {
@@ -107,18 +154,21 @@ static void state_callback(murphy_resource_context *context,
                 }
             }
 
-            if ((rs = murphy_resource_set_list(context)) != NULL) {
-                murphy_string_array *resource_names;
+            if ((rs = mrp_res_list_resources(context)) != NULL) {
+                mrp_res_string_array_t *resource_names;
 
                 printf("listing all resources available in the system\n");
 
-                resource_names = murphy_resource_list_names(context, rs);
+                resource_names = mrp_res_list_resource_names(context, rs);
+
+                if (!resource_names) {
+                    printf("No resources available in the system!\n");
+                    return;
+                }
 
                 for (i = 0; i < resource_names->num_strings; i++) {
 
-                    murphy_resource *resource;
-
-                    resource = murphy_resource_get_by_name(context, rs,
+                    resource = mrp_res_get_resource_by_name(context, rs,
                             resource_names->strings[i]);
 
                     printf("resource %d is %s\n", i, resource->name);
@@ -127,33 +177,38 @@ static void state_callback(murphy_resource_context *context,
                     if (strcmp(resource->name, "video_playback") == 0)
                         system_handles_video = TRUE;
 
-                    attributes = murphy_attribute_list_names(context, resource);
+                    attributes = mrp_res_list_attribute_names(context, resource);
 
                     for (j = 0; j < attributes->num_strings; j++) {
-                        attr = murphy_attribute_get_by_name(context,
+                        attr = mrp_res_get_attribute_by_name(context,
                                 resource,
                                 attributes->strings[i]);
                         printf("attr %s has ", attr->name);
                         switch(attr->type) {
-                            case murphy_string:
-                                printf("type string and value %s\n", attr->string);
+                            case mrp_string:
+                                printf("type string and value %s\n",
+                                        attr->string);
                                 break;
-                            case murphy_int32:
-                                printf("type string and value %d\n", attr->integer);
+                            case mrp_int32:
+                                printf("type string and value %d\n",
+                                        attr->integer);
                                 break;
-                            case murphy_uint32:
-                                printf("type string and value %u\n", attr->unsignd);
+                            case mrp_uint32:
+                                printf("type string and value %u\n",
+                                        attr->unsignd);
                                 break;
-                            case murphy_double:
-                                printf("type string and value %f\n", attr->floating);
+                            case mrp_double:
+                                printf("type string and value %f\n",
+                                        attr->floating);
                                 break;
                             default:
                                 printf("type unknown\n");
                                 break;
                         }
-
                     }
+                    mrp_res_free_string_array(attributes);
                 }
+                mrp_res_free_string_array(resource_names);
             }
 
             if (system_handles_audio && system_handles_video) {
@@ -163,40 +218,43 @@ static void state_callback(murphy_resource_context *context,
 
             break;
 
-        case murphy_disconnected:
+        case MRP_RES_DISCONNECTED:
             printf("disconnected from murphy\n");
-            murphy_resource_set_delete(app_data->rs);
-            murphy_destroy(app_data->cx);
+            mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+            mrp_res_destroy(app_data->cx);
             exit(1);
     }
 }
 
-static void resource_callback(murphy_resource_context *cx,
-			      const murphy_resource_set *rs,
-			      void *userdata)
+static void resource_callback(mrp_res_context_t *cx,
+                  const mrp_res_resource_set_t *rs,
+                  void *userdata)
 {
     my_app_data *my_data = (my_app_data *) userdata;
-    murphy_resource *res;
+    mrp_res_resource_t *res;
+    mrp_res_attribute_t *attr;
 
-    if (!murphy_resource_set_equals(rs, my_data->rs))
+    printf("> resource_callback\n");
+
+    if (!mrp_res_equal_resource_set(rs, my_data->rs))
         return;
 
     /* here compare the resource set difference */
 
-    res = murphy_resource_get_by_name(cx, rs, "audio_playback");
+    res = mrp_res_get_resource_by_name(cx, rs, "audio_playback");
 
     if (!res) {
-        printf("audio_playback not present in resource set");
+        printf("audio_playback not present in resource set\n");
         return;
     }
 
     printf("resource 0 name %s\n", res->name);
     printf("resource 0 state %d\n", res->state);
 
-    res = murphy_resource_get_by_name(cx, rs, "video_playback");
+    res = mrp_res_get_resource_by_name(cx, rs, "video_playback");
 
     if (!res) {
-        printf("video_playback not present in resource set");
+        printf("video_playback not present in resource set\n");
         return;
     }
 
@@ -209,11 +267,17 @@ static void resource_callback(murphy_resource_context *cx,
      * It's up to the user to make sure that there's a working reference
      * to the resource set.
      */
-    murphy_resource_set_delete(my_data->rs);
+    mrp_res_delete_resource_set(cx, my_data->rs);
 
     /* copying must also have no semantic meaning */
-    my_data->rs = murphy_resource_set_copy(rs);
+    my_data->rs = mrp_res_copy_resource_set(cx, rs);
 
+    /* print the current role attribute */
+
+    res = mrp_res_get_resource_by_name(cx, rs, "audio_playback");
+    attr = mrp_res_get_attribute_by_name(cx, res, "role");
+
+    printf("attribute '%s' has role '%s'\n", res->name, attr->string);
 
     /* acquiring a copy of an existing release set means:
      *  - acquired state: update, since otherwise no meaning
@@ -221,7 +285,6 @@ static void resource_callback(murphy_resource_context *cx,
      *  - lost state: update, since otherwise will fail
      *  - available: update or acquire
      */
-
 }
 
 static void handle_input(mrp_mainloop_t *ml, mrp_io_watch_t *watch, int fd,
@@ -249,10 +312,16 @@ static void handle_input(mrp_mainloop_t *ml, mrp_io_watch_t *watch, int fd,
 
     if (accept_input) {
         switch (buf[0]) {
-            case 'C':  acquire_resources(app_data);
+            case 'C':
+                acquire_resources(app_data);
                 break;
-            case 'D':  giveup_resources(app_data);
+            case 'D':
+                giveup_resources(app_data);
                 break;
+            case 'Q':
+                if (app_data->rs)
+                    mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+                mrp_mainloop_quit(ml, 0);
             default:
                 break;
        }
@@ -273,12 +342,23 @@ int main(int argc, char **argv)
     if ((ml = mrp_mainloop_create()) == NULL)
         exit(1);
 
-    app_data.cx = murphy_create(ml, state_callback, &app_data);
+    app_data.rs = NULL;
+    app_data.cx = mrp_res_create(ml, state_callback, &app_data);
 
     mask = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP | MRP_IO_EVENT_ERR;
     watch = mrp_add_io_watch(ml, fileno(stdin), mask, handle_input, &app_data);
 
+    if (!watch)
+        exit(1);
+
+    /* start looping */
     mrp_mainloop_run(ml);
+
+    mrp_res_destroy(app_data.cx);
+    mrp_mainloop_destroy(ml);
+
+    app_data.cx = NULL;
+    app_data.rs = NULL;
 
     return 0;
 }

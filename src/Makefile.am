@@ -6,7 +6,7 @@ SUBDIRS         = murphy-db . \
 BUILT_SOURCES   =
 
 AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
-MURPHY_CFLAGS   = 
+MURPHY_CFLAGS   =
 pkgconfigdir    = ${libdir}/pkgconfig
 
 bin_PROGRAMS    =
@@ -853,7 +853,11 @@ libmurphy_resource_la_HEADERS =         \
         plugins/resource-native/libmurphy-resource/resource-private.h
 
 libmurphy_resource_la_SOURCES =         \
-        plugins/resource-native/libmurphy-resource/resource.c
+        plugins/resource-native/libmurphy-resource/resource.c \
+        plugins/resource-native/libmurphy-resource/attribute.c \
+        plugins/resource-native/libmurphy-resource/rset.c \
+        plugins/resource-native/libmurphy-resource/string_array.c \
+        plugins/resource-native/libmurphy-resource/message.c
 
 libmurphy_resource_la_CFLAGS =          \
         $(AM_CFLAGS)            \
@@ -887,7 +891,7 @@ BUILTIN_LIBS       =
 
 LINKEDIN_PLUGINS   =
 
-plugin_LTLIBRARIES = 
+plugin_LTLIBRARIES =
 plugindir          = $(libdir)/murphy/plugins
 
 

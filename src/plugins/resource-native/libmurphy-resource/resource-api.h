@@ -1,71 +1,101 @@
-#ifndef foomurphyresourceapifoo
-#define foomurphyresourceapifoo
+/*
+ * Copyright (c) 2012, Intel Corporation
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of Intel Corporation nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifndef __MURPHY_RESOURCE_API_H__
+#define __MURPHY_RESOURCE_API_H__
 
 #include <murphy/common.h>
 
-typedef struct murphy_resource_context_private_s murphy_resource_context_private_t;
-typedef struct murphy_resource_private_s         murphy_resource_private_t;
-typedef struct murphy_resource_set_private_s     murphy_resource_set_private_t;
+typedef struct mrp_res_context_private_s mrp_res_context_private_t;
+typedef struct mrp_res_resource_private_s mrp_res_resource_private_t;
+typedef struct mrp_res_resource_set_private_s mrp_res_resource_set_private_t;
 
-typedef enum murphy_connection_state_ {
-    murphy_connected,
-    murphy_disconnected,
-} murphy_connection_state;
+typedef enum {
+    MRP_RES_CONNECTED,
+    MRP_RES_DISCONNECTED,
+} mrp_res_connection_state_t;
 
-typedef enum murphy_resource_state_ {
-    murphy_resource_lost,
-    murphy_resource_pending,
-    murphy_resource_acquired,
-    murphy_resource_available,
-} murphy_resource_state;
+typedef enum {
+    MRP_RES_RESOURCE_LOST,
+    MRP_RES_RESOURCE_PENDING,
+    MRP_RES_RESOURCE_ACQUIRED,
+    MRP_RES_RESOURCE_AVAILABLE,
+} mrp_res_resource_state_t;
 
-typedef enum murphy_resource_error_ {
-    murphy_resource_error_none,
-    murphy_resource_error_connection_lost,
-    murphy_resource_error_internal,
-    murphy_resource_error_malformed,
-} murphy_resource_error;
+typedef enum {
+    MRP_RES_ERROR_NONE,
+    MRP_RES_ERROR_CONNECTION_LOST,
+    MRP_RES_ERROR_INTERNAL,
+    MRP_RES_ERROR_MALFORMED,
+} mrp_res_error_t;
 
-typedef struct murphy_resource_context_ {
-    murphy_connection_state state;
-    murphy_resource_context_private_t *priv;
-} murphy_resource_context;
+typedef struct {
+    mrp_res_connection_state_t state;
+    const char *zone;
+    mrp_res_context_private_t *priv;
+} mrp_res_context_t;
 
-typedef enum murphy_attribute_type_ {
-    murphy_int32   = 'i',
-    murphy_uint32  = 'u',
-    murphy_double  = 'f',
-    murphy_string  = 's',
-    murphy_invalid = '\0'
-} murphy_attribute_type;
+typedef enum {
+    mrp_int32   = 'i',
+    mrp_uint32  = 'u',
+    mrp_double  = 'f',
+    mrp_string  = 's',
+    mrp_invalid = '\0'
+} mrp_res_attribute_type_t;
 
-typedef struct murphy_resource_attribute_ {
-    const char            *name;
-    murphy_attribute_type  type;
+typedef struct {
+    const char *name;
+    mrp_res_attribute_type_t type;
     union {
         const char *string;
-        int32_t     integer;
-        uint32_t    unsignd;
-        double      floating;
+        int32_t integer;
+        uint32_t unsignd;
+        double floating;
     };
-} murphy_resource_attribute;
+} mrp_res_attribute_t;
 
-typedef struct murphy_resource_ {
-    const char                *name;
-    murphy_resource_state      state;
-    murphy_resource_private_t *priv;
-} murphy_resource;
+typedef struct {
+    const char *name;
+    mrp_res_resource_state_t state;
+    mrp_res_resource_private_t *priv;
+} mrp_res_resource_t;
 
-typedef struct murphy_resource_set_ {
-    const char                    *application_class;
-    murphy_resource_state          state;
-    murphy_resource_set_private_t *priv;
-} murphy_resource_set;
+typedef struct {
+    const char *application_class;
+    mrp_res_resource_state_t state;
+    mrp_res_resource_set_private_t *priv;
+} mrp_res_resource_set_t;
 
-typedef struct murphy_string_array_ {
+typedef struct {
     int num_strings;
     const char **strings;
-} murphy_string_array;
+} mrp_res_string_array_t;
 
 /**
  * Prototype for murphy state callback. You have to be in
@@ -76,9 +106,8 @@ typedef struct murphy_string_array_ {
  * @param err error message.
  * @param userdata data you gave when starting to connect.
  */
-typedef void (*murphy_state_callback) (murphy_resource_context *cx,
-                       murphy_resource_error err,
-                       void *userdata);
+typedef void (*mrp_res_state_callback_t) (mrp_res_context_t *cx,
+        mrp_res_error_t err, void *userdata);
 
 /**
  * Prototype for resource update callback. All changes related to
@@ -91,9 +120,8 @@ typedef void (*murphy_state_callback) (murphy_resource_context *cx,
  * @param set updated resource set for you to handle.
  * @param userdata data you gave when starting to acquire resources.
  */
-typedef void (*murphy_resource_callback) (murphy_resource_context *cx,
-                      const murphy_resource_set *set,
-                      void *userdata);
+typedef void (*mrp_res_resource_callback_t) (mrp_res_context_t *cx,
+        const mrp_res_resource_set_t *rs, void *userdata);
 
 /**
  * Connect to murphy. You have to wait for the callback
@@ -106,23 +134,23 @@ typedef void (*murphy_resource_callback) (murphy_resource_context *cx,
  *
  * @return pointer to the newly created resource context.
  */
-murphy_resource_context *murphy_create(mrp_mainloop_t *ml,
-                       murphy_state_callback cb,
-                       void *userdata);
+mrp_res_context_t *mrp_res_create(mrp_mainloop_t *ml,
+        mrp_res_state_callback_t cb, void *userdata);
 
 /**
  * Disconnect from murphy.
  *
  * @param cx Murphy connection context to destroy.
  */
-void murphy_destroy(murphy_resource_context *cx);
+void mrp_res_destroy(mrp_res_context_t *cx);
 
 /**
  * List possible application classes that you can assign yourself
  * when asking for resources. This info is cached to the client
  * library when creating the connection so it will be synchronous.
  */
-const murphy_string_array * murphy_application_class_list(murphy_resource_context *cx);
+const mrp_res_string_array_t * mrp_res_list_application_classes(
+        mrp_res_context_t *cx);
 
 /**
  * List all possible resources that you can try to acquire. This info
@@ -131,7 +159,7 @@ const murphy_string_array * murphy_application_class_list(murphy_resource_contex
  * modify or use as your own resource set. It is only meant for
  * introspecting the possible resources.
  */
-const murphy_resource_set * murphy_resource_set_list(murphy_resource_context *cx);
+const mrp_res_resource_set_t * mrp_res_list_resources(mrp_res_context_t *cx);
 
 /**
  * Create new empty resource set. This is a resource set allocated
@@ -144,18 +172,17 @@ const murphy_resource_set * murphy_resource_set_list(murphy_resource_context *cx
  *
  * @return pointer to a new empty resource set.
  */
-murphy_resource_set * murphy_resource_set_create(murphy_resource_context *cx,
-        const char *app_class,
-        murphy_resource_callback cb,
-        void *userdata);
+mrp_res_resource_set_t * mrp_res_create_resource_set(mrp_res_context_t *cx,
+        const char *app_class, mrp_res_resource_callback_t cb, void *userdata);
 
 /**
- * Delete resource set created with murphy_resource_set_create
- * or murphy_resource_set_copy.
+ * Delete resource set created with mrp_res_create_resource_set
+ * or mrp_res_copy_resource_set.
  *
  * @param set pointer to existing resource set created by the user.
  */
-void murphy_resource_set_delete(murphy_resource_set *set);
+void mrp_res_delete_resource_set(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rs);
 
 /**
  * Make a copy of the resource set. This is a helper function to
@@ -166,7 +193,8 @@ void murphy_resource_set_delete(murphy_resource_set *set);
  *
  * @return pointer to a copy of the resource set.
  */
-murphy_resource_set *murphy_resource_set_copy(const murphy_resource_set *orig);
+mrp_res_resource_set_t *mrp_res_copy_resource_set(mrp_res_context_t *cx,
+        const mrp_res_resource_set_t *orig);
 
 /**
  * You might have assigned the same update callback for
@@ -179,8 +207,8 @@ murphy_resource_set *murphy_resource_set_copy(const murphy_resource_set *orig);
  *
  * @return true when matching, false otherwise.
  */
-bool murphy_resource_set_equals(const murphy_resource_set *a,
-                const murphy_resource_set *b);
+bool mrp_res_equal_resource_set(const mrp_res_resource_set_t *a,
+        const mrp_res_resource_set_t *b);
 
 /**
  * Acquire resources. Errors in the return value will
@@ -194,20 +222,21 @@ bool murphy_resource_set_equals(const murphy_resource_set *a,
  *
  * @return murphy error code.
  */
-int murphy_resource_set_acquire(murphy_resource_context *cx,
-                murphy_resource_set *set);
+int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
+        const mrp_res_resource_set_t *rs);
 
 /**
  * Release the acquired resource set. Resource callbacks
- * for this set will obviously stop.
+ * for this set will not stop, since updates for the resource
+ * set available status are still delivered.
  *
  * @param cx connnection to Murphy resource engine.
  * @param set resource set you want to release.
  *
  * @return murphy error code.
  */
-int murphy_resource_set_release(murphy_resource_context *cx,
-                murphy_resource_set *set);
+int mrp_res_release_resource_set(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rs);
 
 /**
  * Create new resource by name and init all other fields.
@@ -222,24 +251,20 @@ int murphy_resource_set_release(murphy_resource_context *cx,
  *
  * @return pointer to new resource if succesful null otherwise.
  */
-murphy_resource *murphy_resource_create(murphy_resource_context *cx,
-                    murphy_resource_set *set,
-                    const char *name,
-                    bool mandatory,
-                    bool shared);
+mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rs, const char *name, bool mandatory,
+        bool shared);
 
 /**
  * Get the names of all resources in this resource set.
  *
  * @param cx murphy context.
  * @param rs resource set where the resource are.
- * @param names pointer where the name array with content will
- * be allocated.
  *
- * @return murphy error code
+ * @return string array that needs to be freed with mrp_res_free_string_array
  */
-murphy_string_array * murphy_resource_list_names(murphy_resource_context *cx,
-                const murphy_resource_set *rs);
+mrp_res_string_array_t * mrp_res_list_resource_names(mrp_res_context_t *cx,
+        const mrp_res_resource_set_t *rs);
 
 /**
  * Delete resource by name from resource set.
@@ -251,9 +276,8 @@ murphy_string_array * murphy_resource_list_names(murphy_resource_context *cx,
  *
  * @return 0 if resource found.
  */
-murphy_resource * murphy_resource_get_by_name(murphy_resource_context *cx,
-                    const murphy_resource_set *rs,
-                    const char *name);
+mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
+        const mrp_res_resource_set_t *rs, const char *name);
 
 /**
  * Delete a resource from a resource set.
@@ -262,8 +286,8 @@ murphy_resource * murphy_resource_get_by_name(murphy_resource_context *cx,
  * @param res resource to be deleted.
  *
  */
-void murphy_resource_delete(murphy_resource_set *set,
-                murphy_resource *res);
+void mrp_res_delete_resource(mrp_res_resource_set_t *rs,
+        mrp_res_resource_t *res);
 
 /**
  * Delete resource by name from resource set.
@@ -273,8 +297,8 @@ void murphy_resource_delete(murphy_resource_set *set,
  *
  * @return true if resource found and removed.
  */
-bool murphy_resource_delete_by_name(murphy_resource_set *rs,
-                    const char *name);
+bool mrp_res_delete_resource_by_name(mrp_res_resource_set_t *rs,
+        const char *name);
 
 /**
  * Get the names of all attributes in this resource.
@@ -286,8 +310,8 @@ bool murphy_resource_delete_by_name(murphy_resource_set *rs,
  *
  * @return murphy error code
  */
-murphy_string_array * murphy_attribute_list_names(murphy_resource_context *cx,
-                const murphy_resource *res);
+mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
+        const mrp_res_resource_t *res);
 
 /**
  * Get the particular resource attribute by name from the resource.
@@ -299,21 +323,66 @@ murphy_string_array * murphy_attribute_list_names(murphy_resource_context *cx,
  *
  * @return murphy error code.
  */
-murphy_resource_attribute * murphy_attribute_get_by_name(murphy_resource_context *cx,
-                 murphy_resource *res,
-                 const char *name);
+mrp_res_attribute_t * mrp_res_get_attribute_by_name(mrp_res_context_t *cx,
+        mrp_res_resource_t *res, const char *name);
 
 /**
- * Set new attribute value to resource.
+ * Set new string attribute value to resource.
  *
  * @param cx murphy context.
- * @param res resource where the attribute is set.
- * @param attribute value to be set as new attribute replacing the old.
+ * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
+ * @value value to be set, copied by the library.
  *
  * @return murphy error code.
  */
-int murphy_attribute_set(murphy_resource_context *cx,
-             murphy_resource *res,
-             const murphy_resource_attribute *attr);
+int mrp_res_set_attribute_string(mrp_res_context_t *cx,
+        mrp_res_attribute_t *attr, const char *value);
 
-#endif /* foomurphyresourceapifoo */
+
+/**
+ * Set new unsigned integer attribute value to resource.
+ *
+ * @param cx murphy context.
+ * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
+ * @value value to be set.
+ *
+ * @return murphy error code.
+ */
+int mrp_res_set_attribute_uint(mrp_res_context_t *cx,
+        mrp_res_attribute_t *attr, uint32_t value);
+
+
+/**
+ * Set new integer attribute value to resource.
+ *
+ * @param cx murphy context.
+ * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
+ * @value value to be set.
+ *
+ * @return murphy error code.
+ */
+int mrp_res_set_attribute_int(mrp_res_context_t *cx,
+        mrp_res_attribute_t *attr, int32_t value);
+
+
+/**
+ * Set new unsigned integer attribute value to resource.
+ *
+ * @param cx murphy context.
+ * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
+ * @value value to be set.
+ *
+ * @return murphy error code.
+ */
+int mrp_res_set_attribute_double(mrp_res_context_t *cx,
+        mrp_res_attribute_t *attr, double value);
+
+
+/**
+ * Free a string array.
+ *
+ * @param arr string array to be freed.
+ */
+void mrp_res_free_string_array(mrp_res_string_array_t *arr);
+
+#endif /* __MURPHY_RESOURCE_API_H__ */
