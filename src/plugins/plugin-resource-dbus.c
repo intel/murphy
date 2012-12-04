@@ -529,6 +529,10 @@ error:
     if (prop) {
         destroy_property(prop);
     }
+    else {
+        if (free_data)
+            free_data(value);
+    }
 
     return NULL;
 }
@@ -756,8 +760,6 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     map_conf.nbucket = 0;
     map_conf.nentry = 10;
 
-    conf = mrp_htbl_create(&map_conf);
-
     resource->mandatory_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", PROP_MANDATORY, mandatory, free_value);
     resource->mandatory_prop->writable = TRUE;
@@ -799,13 +801,39 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
             attr_buf);
     i = attrs;
 
+    resource->rset = rset;
+    resource->path = mrp_strdup(buf);
+
+    if (!resource->path)
+        goto error;
+
+    conf = mrp_htbl_create(&map_conf);
+
+    if (!conf)
+        goto error;
+
     while (i->name != NULL) {
 
         copy = mrp_allocz(sizeof(mrp_attr_t));
+
+        if (!copy)
+            goto error_delete_conf;
+
         memcpy(copy, i, sizeof(mrp_attr_t));
         copy->name = mrp_strdup(i->name);
+
+        if (!copy->name) {
+            mrp_free(copy);
+            goto error_delete_conf;
+        }
+
         if (i->type == mqi_string) {
             copy->value.string = mrp_strdup(i->value.string);
+            if (!copy->value.string) {
+                mrp_free((void *) copy->name);
+                mrp_free(copy);
+                goto error_delete_conf;
+            }
         }
         mrp_htbl_insert(conf, (void *) copy->name, copy);
         i++;
@@ -814,13 +842,21 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     resource->conf_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "a{sv}", PROP_ATTRIBUTES_CONF, conf, free_map);
 
+    if (!resource->conf_prop) {
+        goto error;
+    }
+
     resource->arguments_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "a{sv}", PROP_ATTRIBUTES, conf, NULL);
 
-    resource->path = mrp_strdup(buf);
-    resource->rset = rset;
+    if (!resource->arguments_prop) {
+        goto error;
+    }
 
     return resource;
+
+error_delete_conf:
+    mrp_htbl_destroy(conf, TRUE);
 
 error:
     if (resource)
@@ -1340,6 +1376,10 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                 dbus_message_iter_recurse(&d_iter, &v_iter);
 
                 new_value = mrp_allocz(sizeof(mrp_attr_t));
+                if (!new_value) {
+                    error_msg = "Internal error";
+                    goto error_reply;
+                }
 
                 value_type = dbus_message_iter_get_arg_type(&v_iter);
 
@@ -1350,6 +1390,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
                         if (prev_value->type != mqi_string) {
                             mrp_htbl_destroy(conf, TRUE);
+                            mrp_free(new_value);
                             error_msg = "Attribute value not string";
                             goto error_reply;
                         }
@@ -1366,6 +1407,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
                         if (prev_value->type != mqi_integer) {
                             mrp_htbl_destroy(conf, TRUE);
+                            mrp_free(new_value);
                             error_msg = "Attribute value not int32";
                             goto error_reply;
                         }
@@ -1382,6 +1424,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
                         if (prev_value->type != mqi_unsignd) {
                             mrp_htbl_destroy(conf, TRUE);
+                            mrp_free(new_value);
                             error_msg = "Attribute value not uint32";
                             goto error_reply;
                         }
@@ -1398,6 +1441,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
                         if (prev_value->type != mqi_floating) {
                             mrp_htbl_destroy(conf, TRUE);
+                            mrp_free(new_value);
                             error_msg = "Attribute value not double";
                             goto error_reply;
                         }
@@ -1410,6 +1454,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                     }
                     default:
                         mrp_htbl_destroy(conf, TRUE);
+                        mrp_free(new_value);
                         error_msg = "Attribute value unknown";
                         goto error_reply;
                 }
@@ -1921,6 +1966,9 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     mrp_plugin_arg_t *args = plugin->args;
     dbus_data_t *ctx = mrp_allocz(sizeof(dbus_data_t));
 
+    if (!ctx)
+        goto error;
+
     ctx->addr = args[ARG_DR_SERVICE].str;
     ctx->tracking = args[ARG_DR_TRACK_CLIENTS].bln;
     ctx->default_zone = args[ARG_DR_DEFAULT_ZONE].str;
@@ -1928,14 +1976,14 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     ctx->bus = args[ARG_DR_BUS].str;
     ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, ctx->bus, NULL);
 
-    if (ctx->dbus == NULL) {
+    if (!ctx->dbus) {
         mrp_log_error("Failed to connect to D-Bus");
         goto error;
     }
 
     ctx->mgr = create_manager(ctx);
 
-    if (ctx->mgr == NULL) {
+    if (!ctx->mgr) {
         mrp_log_error("Failed to create manager");
         goto error;
     }
