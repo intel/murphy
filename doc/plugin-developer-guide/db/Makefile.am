@@ -20,7 +20,7 @@ high_level_api_definition_DOXML = $(high_level_api_definition_SRC:.h=_8h.xml)
 TARGETS = $(FIGURES) plugin-developer-guide.xml
 
 
-xmldir = $(MRP_DOCDIR)
+xmldir = $(datadir)/doc/@PACKAGE@
 nodist_xml_DATA = $(TARGETS)
 
 
