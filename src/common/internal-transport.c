@@ -413,6 +413,9 @@ static int internal_sendto(mrp_transport_t *mu, mrp_msg_t *data,
 
     msg = mrp_allocz(sizeof(internal_message_t));
 
+    if (!msg)
+        return FALSE;
+
     msg->addr = addr;
     msg->addrlen = addrlen;
     msg->data = buf;
@@ -448,6 +451,9 @@ static int internal_sendrawto(mrp_transport_t *mu, void *data, size_t size,
     internal_message_t *msg;
 
     msg = mrp_allocz(sizeof(internal_message_t));
+
+    if (!msg)
+        return FALSE;
 
     msg->addr = addr;
     msg->addrlen = addrlen;
@@ -525,14 +531,18 @@ static int internal_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
     if (type == NULL)
         return FALSE;
 
+    msg = mrp_allocz(sizeof(internal_message_t));
+
+    if (!msg)
+        return FALSE;
+
     size = encode_custom_data(data, &newdata, tag);
 
     if (!newdata) {
         mrp_log_error("custom data encoding failed");
+        mrp_free(msg);
         return FALSE;
     }
-
-    msg = mrp_allocz(sizeof(internal_message_t));
 
     msg->addr = addr;
     msg->addrlen = addrlen;
