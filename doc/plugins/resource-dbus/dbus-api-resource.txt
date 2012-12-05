@@ -1,4 +1,5 @@
 D-Bus API for Murphy resource handling
+======================================
 
 
 Service org.murphy
@@ -74,3 +75,39 @@ properties:
     RW dict conf (string: variant) {
         ... properties specified by resource type ...
     }
+
+
+
+
+Explanation of values
+=====================
+
+
+The "status" variable on resource set objects can have four different values:
+
+    * "pending", meaning that the request() method call hasn't been called or
+          processed yet
+    * "acquired", meaning that the client is allowed to use the requested
+          resource
+    * "lost", meaning that the client has lost the resource set and is not
+          allowed to use it
+    * "available", meaning that the client is not allowed to use the resource
+          set, but based on the current status the client would get the resource
+          set if it did a request() method call
+
+The difference between "lost" and "available" is subtle. One way to
+think of the difference is this: when a media player resource set having
+an audio resource goes to "lost" state, the media player can dim or gray
+out the play button, since the media player is unable to get access to
+the resources under any circumstances. This can be the case for instance
+during a phone call, depending on murphy configuration. However, if the
+media player resource set is in "available" state, the audio playback
+can continue when the user or the application wishes so. This can be the
+case when another media player application is playing audio. The user
+can control which media player will play audio by pushing play button on
+the UI of the application that the user wants to play.
+
+The "status" variable on resource objects can have three values:
+"pending", "acquired" and "lost". The "available" value is not needed,
+since the resources cannot be indiviually requested, only resource sets.
+
