@@ -44,6 +44,7 @@
 
 
 static mrp_funcbridge_t *create_funcbridge(lua_State *, int, int);
+static mrp_funcbridge_t *check_funcbridge(lua_State *, int);
 static int call_from_lua(lua_State *);
 static int get_funcbridge_field(lua_State *);
 static int set_funcbridge_field(lua_State *);
@@ -129,7 +130,7 @@ mrp_funcbridge_t *mrp_funcbridge_create_luafunc(lua_State *L, int f)
     switch (lua_type(L, f)) {
 
     case LUA_TTABLE:
-        fb = mrp_funcbridge_check(L, f);
+        fb = check_funcbridge(L, f);
         break;
 
     case LUA_TFUNCTION:
@@ -226,6 +227,9 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 case MRP_FUNCBRIDGE_FLOATING:
                     lua_pushnumber(L, a->floating);
                     break;
+                case MRP_FUNCBRIDGE_BOOLEAN:
+                    lua_pushboolean(L, a->boolean);
+                    break;
                 case MRP_FUNCBRIDGE_OBJECT:
                     mrp_lua_push_object(L, a->pointer);
                     break;
@@ -249,6 +253,10 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 *ret_type = MRP_FUNCBRIDGE_FLOATING;
                 ret_value->floating = lua_tonumber(L, -1);
                 break;
+            case LUA_TBOOLEAN:
+                *ret_type = MRP_FUNCBRIDGE_BOOLEAN;
+                ret_value->boolean = lua_toboolean(L, -1);
+                break;
             default:
                 *ret_type = MRP_FUNCBRIDGE_NO_DATA;
                 memset(ret_value, 0, sizeof(*ret_value));
@@ -266,24 +274,6 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
     }
 
     return success;
-}
-
-mrp_funcbridge_t *mrp_funcbridge_check(lua_State *L, int t)
-{
-    mrp_funcbridge_t *fb;
-
-    luaL_checktype(L, t, LUA_TTABLE);
-
-    lua_pushvalue(L, t);
-    lua_pushliteral(L, "userdata");
-    lua_rawget(L, -2);
-
-    fb = (mrp_funcbridge_t *)luaL_checkudata(L, -1, USERDATA_METATABLE);
-    luaL_argcheck(L, fb != NULL, 1, "'function bridge' expected");
-
-    lua_pop(L, 2);
-
-    return fb;
 }
 
 
@@ -327,11 +317,29 @@ static mrp_funcbridge_t *create_funcbridge(lua_State *L, int narr, int nrec)
 }
 
 
+static mrp_funcbridge_t *check_funcbridge(lua_State *L, int t)
+{
+    mrp_funcbridge_t *fb;
+
+    luaL_checktype(L, t, LUA_TTABLE);
+
+    lua_pushvalue(L, t);
+    lua_pushliteral(L, "userdata");
+    lua_rawget(L, -2);
+
+    fb = (mrp_funcbridge_t *)luaL_checkudata(L, -1, USERDATA_METATABLE);
+    luaL_argcheck(L, fb != NULL, 1, "'function bridge' expected");
+
+    lua_pop(L, 2);
+
+    return fb;
+}
+
 static int call_from_lua(lua_State *L)
 {
 #define ARG_MAX 256
 
-    mrp_funcbridge_t *fb = mrp_funcbridge_check(L, 1);
+    mrp_funcbridge_t *fb = check_funcbridge(L, 1);
     int ret;
     int i, n, m, b, e;
     const char *s;
