@@ -132,6 +132,8 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *class,
 void  mrp_lua_set_object_name(lua_State  *L, mrp_lua_classdef_t *def,
                               const char *name);
 
+void  mrp_lua_destroy_object(lua_State *L, const char *name, void *data);
+
 int   mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def,
                           const char *name);
 
