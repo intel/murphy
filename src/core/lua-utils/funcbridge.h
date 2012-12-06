@@ -89,6 +89,7 @@ bool              mrp_funcbridge_call_from_c(lua_State *,  mrp_funcbridge_t *,
                                              mrp_funcbridge_value_t *,
                                              char *,
                                              mrp_funcbridge_value_t *);
+mrp_funcbridge_t *mrp_funcbridge_check(lua_State *, int);
 int               mrp_funcbridge_push(lua_State *, mrp_funcbridge_t *);
 
 
