@@ -35,7 +35,7 @@
 
 #include <murphy/common/msg.h>
 
-#define RESPROTO_DEFAULT_ADDRESS      "tcp4:127.0.0.1:3030"
+#define RESPROTO_DEFAULT_ADDRESS      "unxs:@murphy-resource-native"
 
 
 #define RESPROTO_BIT(n)               ((uint32_t)1 << (n))
