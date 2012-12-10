@@ -528,6 +528,7 @@ fi
 AC_CONFIG_FILES([build-aux/shave
 		 build-aux/shave-libtool
 		 Makefile
+                 utils/Makefile
 		 src/Makefile
 		 src/common/tests/Makefile
 		 src/core/tests/Makefile
