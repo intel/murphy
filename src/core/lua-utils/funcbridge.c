@@ -227,6 +227,9 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 case MRP_FUNCBRIDGE_FLOATING:
                     lua_pushnumber(L, a->floating);
                     break;
+                case MRP_FUNCBRIDGE_BOOLEAN:
+                    lua_pushboolean(L, a->boolean);
+                    break;
                 case MRP_FUNCBRIDGE_OBJECT:
                     mrp_lua_push_object(L, a->pointer);
                     break;
@@ -249,6 +252,10 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
             case LUA_TNUMBER:
                 *ret_type = MRP_FUNCBRIDGE_FLOATING;
                 ret_value->floating = lua_tonumber(L, -1);
+                break;
+            case LUA_TBOOLEAN:
+                *ret_type = MRP_FUNCBRIDGE_BOOLEAN;
+                ret_value->boolean = lua_toboolean(L, -1);
                 break;
             default:
                 *ret_type = MRP_FUNCBRIDGE_NO_DATA;
