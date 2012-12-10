@@ -677,12 +677,16 @@ static int cleanup_terminal(brl_t *brl)
 static int terminal_size(int fd, int *nrow, int *ncol)
 {
     struct winsize ws;
+    int    col, row;
 
     if (ioctl(fd, TIOCGWINSZ, &ws) == 0) {
+        row = (ws.ws_row > 0 ? ws.ws_row : 80);
+        col = (ws.ws_col > 0 ? ws.ws_col : 25);
+
         if (nrow != NULL)
-            *nrow = ws.ws_row;
+            *nrow = row;
         if (ncol != NULL)
-            *ncol = ws.ws_col;
+            *ncol = col;
 
         return 0;
     }
