@@ -46,7 +46,7 @@
 #define client_error mrp_log_error
 
 #define DEFAULT_PROMPT  "murphy"
-#define DEFAULT_ADDRESS "tcp4:127.0.0.1:3000"
+#define DEFAULT_ADDRESS "unxs:@murphy-console"
 
 
 /*

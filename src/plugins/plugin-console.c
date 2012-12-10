@@ -397,7 +397,7 @@ static int console_init(mrp_plugin_t *plugin)
 
         if (!strncmp(data->address, "tcp4:", 5) ||
             !strncmp(data->address, "tcp6:", 5) ||
-            !strncmp(data->address, "unxstrm:", 8))
+            !strncmp(data->address, "unxs:", 5))
             ok = strm_setup(data);
         else
             ok = dgrm_setup(data);
@@ -438,7 +438,7 @@ static void console_exit(mrp_plugin_t *plugin)
 
 
 static mrp_plugin_arg_t console_args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "tcp4:127.0.0.1:3000"),
+    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", "unxs:@murphy-console"),
 };
 
 MURPHY_REGISTER_CORE_PLUGIN("console",
