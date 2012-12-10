@@ -172,6 +172,30 @@ void mrp_lua_set_object_name(lua_State          *L,
     }
 }
 
+void mrp_lua_destroy_object(lua_State *L, const char *name, void *data)
+{
+    static int offset = ((userdata_t *)0)->data - (char *)0;
+
+    userdata_t *userdata = (userdata_t *)(data - offset);
+    mrp_lua_classdef_t *def;
+
+    if (data && userdata == userdata->self && userdata->dead) {
+        def = userdata->def;
+
+        luaL_unref(L, LUA_REGISTRYINDEX, userdata->luatbl);
+
+        mrp_lua_get_class_table(L, def);
+        luaL_checktype(L, -1, LUA_TTABLE);
+
+        lua_pushstring(L, name);
+        lua_pushnil(L);
+
+        lua_rawset(L, -3);
+
+        lua_pop(L, 1);
+    }
+}
+
 int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def,const char *name)
 {
     if (!name)
@@ -265,7 +289,6 @@ int mrp_lua_push_object(lua_State *L, void *data)
 
     return 1;
 }
-
 
 
 static bool valid_id(const char *id)
