@@ -276,6 +276,7 @@ mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
     mrp_transport_t *t;
 
     if ((t = mrp_allocz(lt->descr->size)) != NULL) {
+        bool failed  = FALSE;
         t->descr     = lt->descr;
         t->ml        = lt->ml;
         t->evt       = lt->evt;
@@ -287,13 +288,17 @@ mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
 
         MRP_TRANSPORT_BUSY(t, {
                 if (!t->descr->req.accept(t, lt)) {
-                    mrp_free(t);
-                    t = NULL;
+                    failed = TRUE;
                 }
                 else {
                     t->connected = TRUE;
                 }
             });
+
+        if (failed) {
+            mrp_free(t);
+            t = NULL;
+        }
     }
 
     return t;
