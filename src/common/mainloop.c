@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
+#include <sys/socket.h>
 
 #include <murphy/common/macros.h>
 #include <murphy/common/mm.h>
@@ -60,6 +61,7 @@ struct mrp_io_watch_s {
     void              *user_data;                /* opaque user data */
     struct pollfd     *pollfd;                   /* associated pollfd */
     mrp_list_hook_t    slave;                    /* watches with the same fd */
+    int                wrhup;                    /* EPOLLHUPs delivered */
 };
 
 #define is_master(w) !mrp_list_empty(&(w)->hook)
@@ -1477,6 +1479,21 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
 
         if (e->events & EPOLLRDHUP)
             epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
+        else {
+            if ((e->events & EPOLLHUP) && !is_deleted(w)) {
+                /*
+                 * Notes:
+                 *
+                 *    If the user does not react to EPOLLHUPs delivered
+                 *    we stop monitoring the fd to avoid sitting in an
+                 *    infinite busy loop just delivering more EPOLLHUP
+                 *    notifications...
+                 */
+
+                if (w->wrhup++ > 5)
+                    epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
+            }
+        }
 
         if (is_deleted(w))
             delete_io_watch(w);
