@@ -243,7 +243,6 @@ mrp_context_tbl_t *mrp_create_context_table(void)
     mrp_htbl_config_t  hcfg;
 
     tbl = mrp_allocz(sizeof(*tbl));
-    tbl->frame = NULL;
 
     if (tbl != NULL) {
         mrp_clear(&hcfg);
@@ -251,6 +250,7 @@ mrp_context_tbl_t *mrp_create_context_table(void)
         hcfg.hash = mrp_string_hash;
         hcfg.free = NULL;
 
+        tbl->frame = NULL;
         tbl->names = mrp_htbl_create(&hcfg);
 
         if (tbl->names != NULL)

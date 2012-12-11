@@ -452,11 +452,10 @@ static int appclass_create(lua_State *L)
 
     if (!appclass)
         luaL_error(L, "invalid or duplicate name '%s'", name);
-
-    appclass->name = name;
-
-    mrp_log_info("application class '%s' created", name);
-
+    else {
+        appclass->name = name;
+        mrp_log_info("application class '%s' created", name);
+    }
     MRP_LUA_LEAVE(1);
 }
 
@@ -561,14 +560,15 @@ static int zone_create(lua_State *L)
 
     if (!zone)
         luaL_error(L, "invalid or duplicate name '%s'", name);
+    else {
+        zone->id = id;
+        zone->name = name;
+        zone->attr_tbl = attributes_create(L, -1, ZONE,zone, zone_attr_defs,
+                                           fetch_zone_attribute,
+                                           update_zone_attribute);
 
-    zone->id = id;
-    zone->name = name;
-    zone->attr_tbl = attributes_create(L, -1, ZONE,zone, zone_attr_defs,
-                                       fetch_zone_attribute,
-                                       update_zone_attribute);
-
-    mrp_log_info("zone '%s' created", name);
+        mrp_log_info("zone '%s' created", name);
+    }
 
     MRP_LUA_LEAVE(1);
 }
@@ -818,13 +818,13 @@ static int resclass_create_from_lua(lua_State *L)
 
     if (!resclass)
         luaL_error(L, "invalid or duplicate name '%s'", name);
+    else {
+        resclass->id = id;
+        resclass->name = name;
+        resclass->attrs = attrs;
 
-    resclass->id = id;
-    resclass->name = name;
-    resclass->attrs = attrs;
-
-    mrp_log_info("resource class '%s' created", name);
-
+        mrp_log_info("resource class '%s' created", name);
+    }
     MRP_LUA_LEAVE(1);
 }
 

@@ -585,8 +585,10 @@ static mrp_lua_mdb_table_t **element_output_check(lua_State *L,
     len  = luaL_getn(L, idx);
     size = sizeof(mrp_lua_mdb_table_t *) * (len + 1);
 
-    if (!(arr = mrp_alloc(size)))
+    if (!(arr = mrp_alloc(size))) {
         luaL_error(L, "can't allocate %d byte long memory", size);
+        return NULL;
+    }
 
     lua_pushvalue(L, idx);
 

@@ -1237,7 +1237,7 @@ mql_result_t *mql_result_list_create(mqi_data_type_t type,
     char   **strs;
     int     *slen;
     char    *strpool;
-    int      poollen;
+    int      poollen = 0;
     int      i;
 
     MDB_CHECKARG(length > 0 && values, NULL);
@@ -1250,15 +1250,12 @@ mql_result_t *mql_result_list_create(mqi_data_type_t type,
         datalen = sizeof(char *) * length + poollen;
         break;
     case mqi_integer:
-        poollen = 0;
         datalen = sizeof(int32_t) * length;
         break;
     case mqi_unsignd:
-        poollen = 0;
         datalen = sizeof(uint32_t) * length;
         break;
     case mqi_floating:
-        poollen = 0;
         datalen = sizeof(double) * length;
         break;
     default:
