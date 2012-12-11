@@ -558,7 +558,7 @@ static int strm_disconnect(mrp_transport_t *mt)
 {
     strm_t *t = (strm_t *)mt;
 
-    if (t->connected || t->iow != NULL) {
+    if (t->connected/* || t->iow != NULL*/) {
         mrp_del_io_watch(t->iow);
         t->iow = NULL;
 
