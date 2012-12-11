@@ -182,7 +182,7 @@ uint32_t mrp_zone_get_id(mrp_zone_t *zone)
 
 const char *mrp_zone_get_name(mrp_zone_t *zone)
 {
-    if (!zone | !zone->name)
+    if (!zone || !zone->name)
         return "<unknown zone>";
 
     return zone->name;
