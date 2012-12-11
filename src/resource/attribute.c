@@ -113,8 +113,8 @@ mrp_attr_t *mrp_attribute_get_all_values(uint32_t          nvalue,
     mrp_attr_t *vdst, *vend;
     uint32_t i;
 
-    MRP_ASSERT(!nvalue || (nvalue > 0 && values) ||
-               !nattr  || (nattr  > 0 && defs),
+    MRP_ASSERT((!nvalue || (nvalue > 0 && values)) &&
+               (!nattr  || (nattr  > 0 && defs)),
                "invalid argument");
 
     if (nvalue)
