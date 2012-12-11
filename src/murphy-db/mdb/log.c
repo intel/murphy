@@ -438,6 +438,11 @@ static tbl_log_t *get_tbl_log(mdb_dlist_t *vhead,
         }
     }
 
+    if (!log) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
     if (tbl != log->table) {
         errno = EINVAL;
         return NULL;
