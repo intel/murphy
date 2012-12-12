@@ -404,7 +404,8 @@ int mrp_dbus_acquire_name(mrp_dbus_t *dbus, const char *name, DBusError *error)
         return TRUE;
     else {
         if (status == DBUS_REQUEST_NAME_REPLY_EXISTS) {
-            dbus_error_free(error);
+            if (error)
+                dbus_error_free(error);
             dbus_set_error(error, DBUS_ERROR_FAILED, "name already taken");
         }
         return FALSE;
