@@ -51,6 +51,7 @@ void mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
 {
     int lgh;
     void *dst, *src;
+    static char *empty = "";
 
     if (dst_desc && dst_data && src_desc && src_desc->offset >= 0 && src_data){
         dst = dst_data + dst_desc->offset;
@@ -60,6 +61,8 @@ void mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
         switch (dst_desc->type) {
 
         case mqi_varchar:
+            if(__builtin_expect(*((char**)src) == NULL, 0))
+                src = &empty;
             memset(dst, 0, lgh);
             strncpy((char *)dst, *(const char **)src, lgh-1);
             break;
