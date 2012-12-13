@@ -678,12 +678,17 @@ static char *symbol_from_tokens(token_t *tokens, int ntoken)
 
     last = ntoken - 1;
 
-    if (tokens[0].type != TOKEN_WORD)
+    if (tokens[0].type != TOKEN_WORD) {
+        verbose_message(2, "ignoring sequence starting with non-word\n");
         return NULL;
+    }
 
     /* ignore typedefs and everything static */
-    if (MATCHING_TOKEN(0, WORD, "typedef") || MATCHING_TOKEN(0, WORD, "static"))
+    if (MATCHING_TOKEN(0, WORD, "typedef") ||
+        MATCHING_TOKEN(0, WORD, "static")) {
+        verbose_message(2, "ignoring typedef or static sequence\n");
         return NULL;
+    }
 
     /* ignore forward declarations */
     if (ntoken == 3 &&
@@ -691,8 +696,10 @@ static char *symbol_from_tokens(token_t *tokens, int ntoken)
          MATCHING_TOKEN(0, WORD, "union" ) ||
          MATCHING_TOKEN(0, WORD, "enum"  )) &&
         MATCHING_TOKEN(1, WORD, "") &&
-        MATCHING_TOKEN(2, SEMICOLON, ""))
+        MATCHING_TOKEN(2, SEMICOLON, "")) {
+        verbose_message(2, "ignoring forward declaration sequence\n");
         return NULL;
+    }
 
     /* take care of function prototypes */
     if (last > 2) {
@@ -719,6 +726,8 @@ static char *symbol_from_tokens(token_t *tokens, int ntoken)
             MATCHING_TOKEN(last-1, WORD     , ""))
             return tokens[last-1].value;
     }
+
+    verbose_message(2, "ignoring other non-matching token sequence\n");
 
     return NULL;
 }
