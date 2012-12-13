@@ -117,7 +117,7 @@ MRP_CONSOLE_GROUP(resource_group, "resource", NULL, NULL, {
                           "application class. The data sources for the "
                           "printout are the internal data structures of the "
                           "resource library"),
-        MRP_TOKENIZED_CMD("owners" , print_owners_cb , TRUE,
+        MRP_TOKENIZED_CMD("owners" , print_owners_cb , FALSE,
                           "owners", "prints resource owners",
                           "prints for each zone the owner application class "
                           "of each resource. The data sources for the "
