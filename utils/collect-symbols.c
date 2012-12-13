@@ -9,6 +9,7 @@
 #include <regex.h>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #define RD 0
@@ -16,6 +17,7 @@
 
 typedef enum {
     TOKEN_ERROR = -1,
+    TOKEN_LINEMARKER,                    /* a preprocessor line marker */
     TOKEN_BLOCK,                         /* a block enclosed in {}/()/[] */
     TOKEN_WORD,                          /* a word */
     TOKEN_DQUOTED,                       /* a double-quoted sequence */
@@ -318,6 +320,7 @@ static void input_discard_whitespace(input_t *in)
 }
 
 
+#if 0
 static void input_discard_line(input_t *in)
 {
     int ch;
@@ -329,6 +332,7 @@ static void input_discard_line(input_t *in)
     while ((ch = input_read(in)) != '\n' && ch != 0)
         ;
 }
+#endif
 
 
 static int input_discard_quoted(input_t *in, char quote)
@@ -448,7 +452,6 @@ static char *ringbuf_save(ringbuf_t *rb, char *token, int len)
 }
 
 
-
 static char *input_collect_word(input_t *in, ringbuf_t *rb)
 {
 #define WORD_CHAR(c)                            \
@@ -482,10 +485,49 @@ static char *input_collect_word(input_t *in, ringbuf_t *rb)
 }
 
 
+static char *input_parse_linemarker(input_t *in, char *buf, size_t size)
+{
+    char ch;
+    int  i;
+
+    while((ch = input_read(in)) != '"' && ch != '\n' && ch)
+        ;
+
+    if (ch != '"')
+        return NULL;
+
+    for (i = 0; i < (int)size - 1; i++) {
+        buf[i] = ch = input_read(in);
+
+        if (ch == '"') {
+            buf[i] = '\0';
+
+            while ((ch = input_read(in)) != '\n' && ch)
+                ;
+
+            return buf;
+        }
+    }
+
+    return NULL;
+}
+
+
+static int same_file(const char *path1, const char *path2)
+{
+    struct stat st1, st2;
+
+    if (stat(path1, &st1) != 0 || stat(path2, &st2) != 0)
+        return 0;
+    else
+        return st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino;
+}
+
+
 static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
                           int ntoken)
 {
-    char ch, *v;
+    char ch, *v, path[1024];
     int  n, has_paren;
 
     /*
@@ -502,9 +544,17 @@ static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
             tokens[n].value = ringbuf_save(rb, ";", 1);
             return n + 1;
 
-            /* ignore preprocessor directives */
+            /* extract path name from preprocessor line-markers */
         case '#':
-            input_discard_line(in);
+            v = input_parse_linemarker(in, path, sizeof(path));
+            if (v != NULL) {
+                tokens[n].type  = TOKEN_LINEMARKER;
+                tokens[n].value = ringbuf_save(rb, v, -1);
+                if (n == 0)
+                    return n + 1;
+                else
+                    return -1;
+            }
             break;
 
             /* discard whitespace (including trailing newlines) */
@@ -568,6 +618,8 @@ static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
             v = input_collect_word(in, rb);
 
             if (v != NULL) {
+                if (!strcmp(v, "__extension__"))
+                    break;
                 tokens[n].type  = TOKEN_WORD;
                 tokens[n].value = v;
                 n++;
@@ -631,6 +683,15 @@ static char *symbol_from_tokens(token_t *tokens, int ntoken)
 
     /* ignore typedefs and everything static */
     if (MATCHING_TOKEN(0, WORD, "typedef") || MATCHING_TOKEN(0, WORD, "static"))
+        return NULL;
+
+    /* ignore forward declarations */
+    if (ntoken == 3 &&
+        (MATCHING_TOKEN(0, WORD, "struct") ||
+         MATCHING_TOKEN(0, WORD, "union" ) ||
+         MATCHING_TOKEN(0, WORD, "enum"  )) &&
+        MATCHING_TOKEN(1, WORD, "") &&
+        MATCHING_TOKEN(2, SEMICOLON, ""))
         return NULL;
 
     /* take care of function prototypes */
@@ -742,7 +803,7 @@ static void extract_symbols(const char *path, const char *cflags,
     token_t   tokens[MAX_TOKENS];
     int       ntoken;
     char     *sym;
-    int       pp_status;
+    int       pp_status, foreign;
 
     fd = preprocess_file(path, cflags, &pp_pid);
 
@@ -750,6 +811,20 @@ static void extract_symbols(const char *path, const char *cflags,
     ringbuf_init(&rb);
 
     while ((ntoken = collect_tokens(&in, &rb, tokens, MAX_TOKENS)) > 0) {
+        if (tokens[0].type == TOKEN_LINEMARKER) {
+            foreign = !same_file(path, tokens[0].value);
+
+            verbose_message(1, "input switched to %s file '%s'...",
+                            foreign ? "foreign" : "input", tokens[0].value);
+
+            continue;
+        }
+
+        if (foreign) {
+            verbose_message(2, "ignoring token stream from foreign file...\n");
+            continue;
+        }
+
         sym = symbol_from_tokens(tokens, ntoken);
 
         if (sym != NULL) {
@@ -762,6 +837,9 @@ static void extract_symbols(const char *path, const char *cflags,
 
     close(fd);
     waitpid(pp_pid, &pp_status, 0);
+
+    if (WIFEXITED(pp_status) && WEXITSTATUS(pp_status) != 0)
+        fatal_error("preprocessing of '%s' failed\n", path);
 }
 
 
