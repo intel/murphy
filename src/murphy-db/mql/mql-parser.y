@@ -973,7 +973,7 @@ select_statement: select columns TKN_FROM table_name where_clause {
         MQL_ERROR(errno, errbuf);
 
 
-    if (mode != mql_mode_precompile && !tsiz) {
+    if (mode != mql_mode_precompile && mode != mql_mode_exec && !tsiz) {
         if (mode == mql_mode_parser)
             fprintf(mqlout, "no rows\n");
     }
@@ -983,8 +983,13 @@ select_statement: select columns TKN_FROM table_name where_clause {
         where = (cond == conds) ? NULL : conds;
 
         if (mode != mql_mode_precompile) {
-            if ((n = mqi_select(table, where,coldescs, rows,rowsize,tsiz)) < 0)
-                MQL_ERROR(errno, "select failed: %s", strerror(errno));
+            if (tsiz != 0) {
+                if ((n = mqi_select(table, where,
+                                    coldescs, rows, rowsize, tsiz)) < 0)
+                    MQL_ERROR(errno, "select failed: %s", strerror(errno));
+            }
+            else
+                n = 0;
         }
 
         switch (mode) {
