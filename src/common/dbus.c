@@ -236,6 +236,8 @@ static mrp_dbus_t *dbus_get(mrp_mainloop_t *ml, const char *address)
     bus_spec_t        spec;
 
     if (buses == NULL) {
+        mrp_clear(&hcfg);
+
         hcfg.comp = bus_cmp;
         hcfg.hash = bus_hash;
         hcfg.free = NULL;
