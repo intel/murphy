@@ -179,8 +179,15 @@ void mrp_lua_destroy_object(lua_State *L, const char *name, void *data)
     userdata_t *userdata = (userdata_t *)(data - offset);
     mrp_lua_classdef_t *def;
 
-    if (data && userdata == userdata->self && userdata->dead) {
+    if (data && userdata == userdata->self && !userdata->dead) {
+        userdata->dead = true;
         def = userdata->def;
+
+        lua_rawgeti(L, LUA_REGISTRYINDEX, userdata->luatbl);
+        lua_pushstring(L, "userdata");
+        lua_pushnil(L);
+        lua_rawset(L, -3);
+        lua_pop(L, -1);
 
         luaL_unref(L, LUA_REGISTRYINDEX, userdata->luatbl);
 
