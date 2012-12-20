@@ -45,8 +45,10 @@
         mrp_log_msgv;
         mrp_log_parse_levels;
         mrp_log_parse_target;
+        mrp_log_register_target;
         mrp_log_set_mask;
         mrp_log_set_target;
+        mrp_log_unregister_target;
         mrp_mainloop_create;
         mrp_mainloop_destroy;
         mrp_mainloop_dispatch;
