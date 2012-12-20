@@ -33,11 +33,26 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <murphy/common/mm.h>
+#include <murphy/common/list.h>
 #include <murphy/common/log.h>
 
-static int log_mask = MRP_LOG_MASK_ERROR;
-static const char *log_target = MRP_LOG_TO_STDERR;
-static FILE *log_fp;
+typedef struct {
+    mrp_list_hook_t  hook;
+    char            *name;
+    mrp_logger_t     logger;
+    void            *data;
+    int              builtin;
+} log_target_t;
+
+static log_target_t stderr_target;
+static log_target_t stdout_target;
+static log_target_t syslog_target;
+static log_target_t file_target;
+
+static MRP_LIST_HOOK(log_targets);
+static int           log_mask   = MRP_LOG_MASK_ERROR;
+static log_target_t *log_target = NULL;
 
 
 mrp_log_mask_t mrp_log_parse_levels(const char *levels)
@@ -83,14 +98,7 @@ mrp_log_mask_t mrp_log_parse_levels(const char *levels)
 
 const char *mrp_log_parse_target(const char *target)
 {
-    if (!strcmp(target, "stderr"))
-        return MRP_LOG_TO_STDERR;
-    if (!strcmp(target, "stdout"))
-        return MRP_LOG_TO_STDOUT;
-    if (!strcmp(target, "syslog"))
-        return MRP_LOG_TO_SYSLOG;
-    else
-        return target;
+    return target;
 }
 
 
@@ -124,60 +132,123 @@ mrp_log_mask_t mrp_log_set_mask(mrp_log_mask_t enabled)
 }
 
 
-int mrp_log_set_target(const char *target)
+static log_target_t *find_target(const char *name)
 {
-    const char *old_target = log_target;
-    FILE       *old_fp     = log_fp;
+    log_target_t    *t;
+    mrp_list_hook_t *p, *n;
 
-    if (!target || log_target == target)
+    mrp_list_foreach(&log_targets, p, n) {
+        t = mrp_list_entry(p, typeof(*t), hook);
+
+        if (t->name == name || !strcmp(t->name, name))
+            return t;
+    }
+
+    return NULL;
+}
+
+
+int mrp_log_set_target(const char *name)
+{
+    log_target_t *target;
+    const char   *path;
+
+    if (!strncmp(name, "file:", 5)) {
+        path = name + 5;
+        name = "file";
+    }
+
+    target = find_target(name);
+
+    if (target == NULL)
         return FALSE;
 
-    if (target == MRP_LOG_TO_SYSLOG) {
-        log_target = target;
-        log_fp     = NULL;
-        openlog(NULL, 0, LOG_DAEMON);
+    /* close files opened by us, if any */
+    if (log_target == &file_target) {
+        if (file_target.data != NULL) {
+            fclose(file_target.data);
+            file_target.data = NULL;
+        }
     }
-    else if (target == MRP_LOG_TO_STDERR) {
-        log_target = target;
-        log_fp     = stdout;
-    }
-    else if (target == MRP_LOG_TO_STDOUT) {
-        log_target = target;
-        log_fp     = stdout;
-    }
-    else {
-        log_target = target;
-        log_fp     = fopen(log_target, "a");
 
-        if (log_fp == NULL) {
-            log_target = old_target;
-            log_fp     = old_fp;
+    log_target = target;
+
+    /* open any new files if we have to */
+    if (target == &file_target) {
+        target->data = fopen(path, "a");
+
+        if (target->data == NULL) {
+            log_target = &syslog_target;
 
             return FALSE;
         }
     }
 
-    if (old_target == MRP_LOG_TO_SYSLOG)
-        closelog();
-    else if (old_target != MRP_LOG_TO_STDOUT && old_target != MRP_LOG_TO_STDERR)
-        fclose(old_fp);
+    return TRUE;
+}
+
+
+int mrp_log_register_target(const char *name, mrp_logger_t logger, void *data)
+{
+    log_target_t *target;
+
+    if (find_target(name) != NULL)
+        return FALSE;
+
+    target = mrp_allocz(sizeof(*target));
+
+    mrp_list_init(&target->hook);
+    target->name   = mrp_strdup(name);
+    target->logger = logger;
+    target->data   = data;
+
+    if (target->name != NULL) {
+        mrp_list_append(&log_targets, &target->hook);
+
+        return TRUE;
+    }
+    else {
+        mrp_free(target);
+
+        return FALSE;
+    }
+}
+
+
+int mrp_log_unregister_target(const char *name)
+{
+    log_target_t *target;
+
+    target = find_target(name);
+
+    if (target == NULL || target->builtin)
+        return FALSE;
+
+    if (log_target == target)
+        log_target = &stderr_target;
+
+    mrp_list_delete(&target->hook);
+    mrp_free(target->name);
+    mrp_free(target);
 
     return TRUE;
 }
 
 
-void mrp_log_msgv(mrp_log_level_t level, const char *file,
-                  int line, const char *func, const char *format, va_list ap)
+static void log_msgv(void *data, mrp_log_level_t level, const char *file,
+                     int line, const char *func, const char *format,
+                     va_list ap)
 {
+    FILE       *fp = data;
     int         lvl;
     const char *prefix;
     char        prfx[2*1024];
 
-    (void)file;
-    (void)line;
-
     if (!(log_mask & (1 << level)))
         return;
+
+    MRP_UNUSED(file);
+    MRP_UNUSED(line);
 
     switch (level) {
     case MRP_LOG_ERROR:   lvl = LOG_ERR;     prefix = "E: "; break;
@@ -192,23 +263,34 @@ void mrp_log_msgv(mrp_log_level_t level, const char *file,
         return;
     }
 
-    if (log_fp == NULL)
+    if (fp == NULL)
         vsyslog(lvl, format, ap);
     else {
-        fputs(prefix, log_fp);
-        vfprintf(log_fp, format, ap); fputs("\n", log_fp);
-        fflush(log_fp);
+        fputs(prefix, fp);
+        vfprintf(fp, format, ap); fputs("\n", fp);
+        fflush(fp);
     }
+}
+
+
+void mrp_log_msgv(mrp_log_level_t level, const char *file,
+                  int line, const char *func, const char *format,
+                  va_list ap)
+{
+    mrp_logger_t  logger = log_target->logger;
+    void         *data   = log_target->data;
+
+    if (!(log_mask & (1 << level)))
+        return;
+
+    logger(data, level, file, line, func, format, ap);
 }
 
 
 void mrp_log_msg(mrp_log_level_t level, const char *file,
                  int line, const char *func, const char *format, ...)
 {
-    va_list     ap;
-
-    (void)file;
-    (void)line;
+    va_list ap;
 
     if (!(log_mask & (1 << level)))
         return;
@@ -225,6 +307,34 @@ void mrp_log_msg(mrp_log_level_t level, const char *file,
 
 static __attribute__((constructor)) void set_default_logging(void)
 {
-    log_target = MRP_LOG_TO_STDERR;
-    log_fp     = stderr;
+    mrp_list_init(&stderr_target.hook);
+    stderr_target.name    = "stderr";
+    stderr_target.logger  = log_msgv;
+    stderr_target.data    = stderr;
+    stderr_target.builtin = TRUE;
+
+    mrp_list_init(&stdout_target.hook);
+    stdout_target.name    = "stdout";
+    stdout_target.logger  = log_msgv;
+    stderr_target.data    = stdout;
+    stderr_target.builtin = TRUE;
+
+    mrp_list_init(&syslog_target.hook);
+    syslog_target.name    = "syslog";
+    syslog_target.logger  = log_msgv;
+    syslog_target.data    = NULL;
+    syslog_target.builtin = TRUE;
+
+    mrp_list_init(&file_target.hook);
+    file_target.name    = "file";
+    file_target.logger  = log_msgv;
+    file_target.data    = NULL;
+    file_target.builtin = TRUE;
+
+    mrp_list_prepend(&log_targets, &file_target.hook);
+    mrp_list_prepend(&log_targets, &syslog_target.hook);
+    mrp_list_prepend(&log_targets, &stderr_target.hook);
+    mrp_list_prepend(&log_targets, &stdout_target.hook);
+
+    log_target = &stderr_target;
 }
