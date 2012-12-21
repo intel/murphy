@@ -34,10 +34,6 @@
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
 
-#include <murphy/plugins/signalling/signalling.h>
-#include <murphy/plugins/signalling/signalling-protocol.h>
-
-
 
 typedef struct {
     mrp_event_watch_t *w;
@@ -62,12 +58,6 @@ void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_cb_1(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_info_register_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_info_unregister_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-void signalling_create_ep_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
@@ -80,31 +70,7 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("four" , four_cb , TRUE,
                           "four [args]", "command 4", "description 4"),
         MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
-                          "update <target>", "update target", "update target"),
-        MRP_TOKENIZED_CMD("signalling_1" , signalling_cb_1 , TRUE,
-                          "signalling_1 [args]", "signalling command",
-                          "Signalling test case 1"),
-        MRP_TOKENIZED_CMD("signalling_2" , signalling_cb_2 , TRUE,
-                          "signalling_2 [args]", "signalling command",
-                          "Signalling test case 2"),
-        MRP_TOKENIZED_CMD("signalling_3" , signalling_cb_3 , TRUE,
-                          "signalling_3 [args]", "signalling command",
-                          "Signalling test case 3"),
-        MRP_TOKENIZED_CMD("signalling_info_register",
-                          signalling_info_register_cb , TRUE,
-                          "signalling_info_register [args]",
-                          "signalling back channel registration command",
-                          "Signalling back channel registration"),
-        MRP_TOKENIZED_CMD("signalling_info_unregister",
-                          signalling_info_unregister_cb , TRUE,
-                          "signalling_info_unregister [args]",
-                          "signalling back channel unregistration command",
-                          "Signalling back channel unregistration"),
-        MRP_TOKENIZED_CMD("signalling_create_ep_cb",
-                          signalling_create_ep_cb, TRUE,
-                          "signalling_create_ep_cb [args]",
-                          "signalling internal EP creation command",
-                          "Create internal enforcement point for signalling")
+                          "update <target>", "update target", "update target")
 });
 
 
@@ -233,17 +199,6 @@ static int boilerplate2(mrp_plugin_t *plugin,
 
 MRP_IMPORTABLE(char *, method1ptr, (int arg1, char *arg2, double arg3));
 MRP_IMPORTABLE(int, method2ptr, (char *arg1, double arg2, int arg3));
-
-MRP_IMPORTABLE(uint32_t, mrp_tx_open_signal, ());
-MRP_IMPORTABLE(int, mrp_tx_add_domain, (uint32_t id, const char *domain));
-MRP_IMPORTABLE(int, mrp_tx_add_data, (uint32_t id, const char *row));
-MRP_IMPORTABLE(void, mrp_tx_add_success_cb, (uint32_t id, mrp_tx_success_cb cb, void *data));
-MRP_IMPORTABLE(void, mrp_tx_add_error_cb, (uint32_t id, mrp_tx_error_cb cb, void *data));
-MRP_IMPORTABLE(int, mrp_tx_close_signal, (uint32_t id));
-MRP_IMPORTABLE(void, mrp_tx_cancel_signal, (uint32_t id));
-
-MRP_IMPORTABLE(int, mrp_info_register, (const char *client_id, mrp_info_cb cb, void *data));
-MRP_IMPORTABLE(int, mrp_info_unregister, (const char *client_id));
 
 #if 0
 static int export_methods(mrp_plugin_t *plugin)
@@ -437,270 +392,6 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 }
 
 
-static void success_cb(uint32_t tx, void *data)
-{
-    mrp_console_t *c = data;
-
-    MRP_UNUSED(c);
-
-    printf("%s(): transaction %u\n", __FUNCTION__, tx);
-}
-
-
-static void error_cb(uint32_t tx, mrp_tx_error_t err, void *data)
-{
-    mrp_console_t *c = data;
-
-    MRP_UNUSED(c);
-
-    printf("%s(): transaction %u error: %s\n", __FUNCTION__,
-           tx, (err == MRP_TX_ERROR_NACKED) ? "NACK" : "no reply");
-}
-
-
-void signalling_cb_1(mrp_console_t *c, void *user_data, int argc, char **argv)
-{
-    uint32_t tx;
-
-    MRP_UNUSED(user_data);
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argv);
-
-    tx = mrp_tx_open_signal();
-
-    mrp_tx_add_domain(tx, "domain1");
-
-    mrp_tx_add_data(tx, "this is a data row");
-    mrp_tx_add_data(tx, "this is another data row");
-
-    mrp_tx_add_success_cb(tx, success_cb, c);
-    mrp_tx_add_error_cb(tx, error_cb, c);
-
-    mrp_tx_close_signal(tx);
-}
-
-
-void signalling_cb_2(mrp_console_t *c, void *user_data, int argc, char **argv)
-{
-    uint32_t tx;
-
-    MRP_UNUSED(user_data);
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argv);
-
-    tx = mrp_tx_open_signal();
-
-    mrp_tx_add_domain(tx, "domain_nonexistent");
-
-    mrp_tx_add_data(tx, "this is a data row");
-    mrp_tx_add_data(tx, "this is another data row");
-
-    mrp_tx_add_success_cb(tx, success_cb, c);
-    mrp_tx_add_error_cb(tx, error_cb, c);
-
-    mrp_tx_close_signal(tx);
-}
-
-void signalling_cb_3(mrp_console_t *c, void *user_data, int argc, char **argv)
-{
-    uint32_t tx;
-    int ret;
-
-    MRP_UNUSED(user_data);
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argv);
-
-    tx = mrp_tx_open_signal();
-
-    mrp_tx_add_domain(tx, "domain1");
-
-    mrp_tx_add_data(tx, "this is a data row");
-    mrp_tx_add_data(tx, "this is another data row");
-
-    mrp_tx_add_success_cb(tx, success_cb, c);
-    mrp_tx_add_error_cb(tx, error_cb, c);
-
-    /* try cancelling the signal first */
-    mrp_tx_cancel_signal(tx);
-
-    ret = mrp_tx_close_signal(tx);
-
-    printf("%s(): tried to send a cancelled transction %u -- success %i\n",
-           __FUNCTION__, tx, ret);
-}
-
-static void info_cb(char *msg, void *data)
-{
-    mrp_console_t *c = data;
-
-    MRP_UNUSED(c);
-
-    printf("received msg '%s'\n", msg);
-}
-
-void signalling_info_register_cb(mrp_console_t *c, void *user_data,
-            int argc, char **argv)
-{
-    /* create the back channel to the test ep */
-
-    char *ep = "foobar";
-    int ret;
-
-    MRP_UNUSED(user_data);
-
-    if (argc == 1)
-        ep = argv[0];
-
-
-    ret = mrp_info_register(ep, info_cb, c);
-
-    if (ret < 0)
-        printf("Failed to register back channel to EP '%s'\n", ep);
-    else
-        printf("Registered back channel to EP '%s'\n", ep);
-}
-
-
-void signalling_info_unregister_cb(mrp_console_t *c, void *user_data,
-            int argc, char **argv)
-{
-    /* create the back channel to the test ep */
-
-    char *ep = "foobar";
-
-    MRP_UNUSED(c);
-    MRP_UNUSED(user_data);
-
-    if (argc == 1)
-        ep = argv[0];
-
-    mrp_info_unregister(ep);
-
-    printf("Unregistered back channel to EP '%s'\n", ep);
-}
-
-
-static void dump_decision(mrp_console_t *c, ep_decision_t *msg)
-{
-    uint i;
-
-    MRP_UNUSED(c);
-
-    printf("Message contents:\n");
-    for (i = 0; i < msg->n_rows; i++) {
-        printf("row %d: '%s'\n", i+1, msg->rows[i]);
-    }
-    printf("%s required.\n\n",
-                msg->reply_required ? "Reply" : "No reply");
-}
-
-
-static void recvfrom_evt(mrp_transport_t *t, void *data, uint16_t tag,
-             mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
-{
-    mrp_console_t *c = user_data;
-
-    MRP_UNUSED(addr);
-    MRP_UNUSED(addrlen);
-
-    printf("Received message (0x%02x)\n", tag);
-
-    switch (tag) {
-        case TAG_POLICY_DECISION:
-        {
-            ep_decision_t *msg = data;
-            dump_decision(c, msg);
-
-
-            if (msg->reply_required) {
-                ep_ack_t reply;
-
-                reply.id = msg->id;
-                reply.success = EP_ACK;
-                mrp_transport_senddata(t, &reply, TAG_ACK);
-            }
-            break;
-        }
-        case TAG_ERROR:
-            printf("Server sends an error message!\n");
-            break;
-        default:
-            /* no other messages supported ATM */
-            break;
-    }
-
-    mrp_data_free(data, tag);
-}
-
-
-static void recv_evt(mrp_transport_t *t, void *data, uint16_t tag, void *user_data)
-{
-    recvfrom_evt(t, data, tag, NULL, 0, user_data);
-}
-
-
-static void closed_evt(mrp_transport_t *t, int error, void *user_data)
-{
-    MRP_UNUSED(t);
-    MRP_UNUSED(error);
-    MRP_UNUSED(user_data);
-
-    printf("Received closed event\n");
-}
-
-
-void signalling_create_ep_cb(mrp_console_t *c, void *user_data,
-            int argc, char **argv)
-{
-    mrp_transport_t *t;
-    static mrp_transport_evt_t evt;
-    int ret, flags;
-    char *domains[] = { "domain1" };
-
-    MRP_UNUSED(user_data);
-
-    ep_register_t msg;
-
-    socklen_t alen;
-    mrp_sockaddr_t addr;
-
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argv);
-
-    evt.closed = closed_evt;
-    evt.recvdata = recv_evt;
-    evt.recvdatafrom = recvfrom_evt;
-
-    flags = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_MODE_CUSTOM;
-
-    t = mrp_transport_create(c->ctx->ml, "internal", &evt, c, flags);
-
-    alen = mrp_transport_resolve(NULL, "internal:signalling", &addr, sizeof(addr), NULL);
-
-    if (alen <= 0) {
-        printf("Error: resolving address failed!\n");
-        return;
-    }
-
-    ret = mrp_transport_connect(t, &addr, alen);
-    if (ret == 0) {
-        printf("Error: connect failed!\n");
-        return;
-    }
-
-    msg.ep_name = "ep_name";
-    msg.domains = domains;
-    msg.n_domains = 1;
-
-    ret = mrp_transport_senddata(t, &msg, TAG_REGISTER);
-
-    if (!ret) {
-        printf("Failed to send register message\n");
-        return;
-    }
-}
-
-
 static int test_init(mrp_plugin_t *plugin)
 {
     mrp_plugin_arg_t *args;
@@ -787,13 +478,6 @@ static mrp_method_descr_t exports[] = {
 static mrp_method_descr_t imports[] = {
     MRP_IMPORT_METHOD("method1", method1ptr),
     MRP_IMPORT_METHOD("method2", method2ptr),
-    MRP_IMPORT_METHOD("mrp_tx_open_signal", mrp_tx_open_signal),
-    MRP_IMPORT_METHOD("mrp_tx_add_domain", mrp_tx_add_domain),
-    MRP_IMPORT_METHOD("mrp_tx_add_data", mrp_tx_add_data),
-    MRP_IMPORT_METHOD("mrp_tx_add_success_cb", mrp_tx_add_success_cb),
-    MRP_IMPORT_METHOD("mrp_tx_add_error_cb", mrp_tx_add_error_cb),
-    MRP_IMPORT_METHOD("mrp_tx_close_signal", mrp_tx_close_signal),
-    MRP_IMPORT_METHOD("mrp_tx_cancel_signal", mrp_tx_cancel_signal),
 };
 
 
