@@ -22,9 +22,6 @@ end
 -- load glib plugin, ignoring any errors
 m:try_load_plugin('glib')
 
--- try loading the signalling plugin
-m:try_load_plugin('signalling', { address = 'internal:signalling' })
-
 -- load the native resource plugin
 if m:plugin_exists('resource-native') then
     m:load_plugin('resource-native')
