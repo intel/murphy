@@ -119,6 +119,7 @@ static void logger(void *data, mrp_log_level_t level, const char *file,
     case MRP_LOG_WARNING: prefix = "[log] W: "; break;
     case MRP_LOG_INFO:    prefix = "[log] I: "; break;
     case MRP_LOG_DEBUG:   prefix = "[log] D: "; break;
+    default:              prefix = "[log] ?: ";
     }
 
     va_copy(cp, ap);
