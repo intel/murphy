@@ -194,6 +194,8 @@ int mrp_log_set_target(const char *name)
         path = name + 5;
         name = "file";
     }
+    else
+        path = NULL;
 
     target = find_target(name);
 
