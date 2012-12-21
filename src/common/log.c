@@ -102,6 +102,43 @@ const char *mrp_log_parse_target(const char *target)
 }
 
 
+const char *mrp_log_dump_mask(mrp_log_mask_t mask, char *buf, size_t size)
+{
+    char *p, *t;
+    int   n, l;
+
+    if (!mask)
+        return "none";
+
+    p = buf;
+    l = size;
+
+    t  = "";
+    *p = '\0';
+
+    if (mask & MRP_LOG_MASK_INFO) {
+        n  = snprintf(p, l, "info");
+        p += n;
+        l -= n;
+        t = ",";
+    }
+    if (mask & MRP_LOG_MASK_WARNING) {
+        n  = snprintf(p, l, "%swarning", t);
+        p += n;
+        l -= n;
+        t = ",";
+    }
+    if (mask & MRP_LOG_MASK_ERROR) {
+        n  = snprintf(p, l, "%serror", t);
+        p += n;
+        l -= n;
+        t = ",";
+    }
+
+    return buf;
+}
+
+
 mrp_log_mask_t mrp_log_enable(mrp_log_mask_t enabled)
 {
     mrp_log_mask_t old_mask = log_mask;
@@ -185,6 +222,31 @@ int mrp_log_set_target(const char *name)
     }
 
     return TRUE;
+}
+
+
+const char *mrp_log_get_target(void)
+{
+    return log_target->name;
+}
+
+
+int mrp_log_get_targets(const char **targets, size_t size)
+{
+    mrp_list_hook_t *p, *n;
+    log_target_t    *t;
+    int cnt;
+
+    cnt = 0;
+    mrp_list_foreach(&log_targets, p, n) {
+        if (cnt == (int)size)
+            break;
+
+        t = mrp_list_entry(p, typeof(*t), hook);
+        targets[cnt++] = t->name;
+    }
+
+    return cnt;
 }
 
 
@@ -316,8 +378,8 @@ static __attribute__((constructor)) void set_default_logging(void)
     mrp_list_init(&stdout_target.hook);
     stdout_target.name    = "stdout";
     stdout_target.logger  = log_msgv;
-    stderr_target.data    = stdout;
-    stderr_target.builtin = TRUE;
+    stdout_target.data    = stdout;
+    stdout_target.builtin = TRUE;
 
     mrp_list_init(&syslog_target.hook);
     syslog_target.name    = "syslog";

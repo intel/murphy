@@ -76,6 +76,9 @@ typedef enum {
 /** Parse a string of comma-separated log level names to a log mask. */
 mrp_log_mask_t mrp_log_parse_levels(const char *levels);
 
+/** Write the given log mask as a string to the given buffer. */
+const char *mrp_log_dump_mask(mrp_log_mask_t mask, char *buf, size_t size);
+
 /** Clear current logging level and enable levels in mask. */
 mrp_log_mask_t mrp_log_set_mask(mrp_log_mask_t mask);
 
@@ -84,6 +87,9 @@ mrp_log_mask_t mrp_log_enable(mrp_log_mask_t mask);
 
 /** Disable logging for levels in mask. */
 mrp_log_mask_t mrp_log_disable(mrp_log_mask_t mask);
+
+/** Get the current logging level mask. */
+#define mrp_log_get_mask() mrp_log_disable(0)
 
 /**
  * Logging target names.
@@ -106,6 +112,12 @@ const char *mrp_log_parse_target(const char *target);
 
 /** Set logging target. */
 int mrp_log_set_target(const char *target);
+
+/** Get the current log target. */
+const char *mrp_log_get_target(void);
+
+/** Get all available logging targets. */
+int mrp_log_get_targets(const char **targets, size_t size);
 
 /** Log an error. */
 #define mrp_log_error(fmt, args...) \
