@@ -47,7 +47,6 @@ struct userdata_s {
     int  luatbl;
     int  refcnt;
     bool dead;
-    char data[];
 };
 
 static bool valid_id(const char *);
@@ -153,7 +152,7 @@ void *mrp_lua_create_object(lua_State          *L,
         lua_rawset(L, class);
     }
 
-    return (void *)userdata->data;
+    return (void *)(userdata + 1);
 }
 
 void mrp_lua_set_object_name(lua_State          *L,
@@ -174,9 +173,7 @@ void mrp_lua_set_object_name(lua_State          *L,
 
 void mrp_lua_destroy_object(lua_State *L, const char *name, void *data)
 {
-    static int offset = ((userdata_t *)0)->data - (char *)0;
-
-    userdata_t *userdata = (userdata_t *)(data - offset);
+    userdata_t *userdata = (userdata_t *)data - 1;
     mrp_lua_classdef_t *def;
 
     if (data && userdata == userdata->self && !userdata->dead) {
@@ -251,7 +248,7 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 
     lua_pop(L, 2);
 
-    return userdata ? (void *)userdata->data : NULL;
+    return userdata ? (void *)(userdata + 1) : NULL;
 }
 
 void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
@@ -278,16 +275,14 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 
     lua_pop(L, 3);
 
-    return userdata ? (void *)userdata->data : NULL;
+    return userdata ? (void *)(userdata + 1) : NULL;
 }
 
 
 
 int mrp_lua_push_object(lua_State *L, void *data)
 {
-    static int offset = ((userdata_t *)0)->data - (char *)0;
-
-    userdata_t *userdata = (userdata_t *)(data - offset);
+    userdata_t *userdata = (userdata_t *)data - 1;
 
     if (!data || userdata != userdata->self || userdata->dead)
         lua_pushnil(L);
@@ -327,7 +322,7 @@ static int userdata_destructor(lua_State *L)
         if (!lua_rawequal(L, -1, -2))
             luaL_typerror(L, -2, def->userdata_id);
         else
-            def->destructor((void *)userdata->data);
+            def->destructor((void *)(userdata + 1));
     }
 
     return 0;
