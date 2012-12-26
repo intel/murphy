@@ -74,9 +74,11 @@ struct console_s {
     mrp_transport_t *t;                  /* associated transport */
     mrp_sockaddr_t   addr;
     socklen_t        addrlen;
+    int              id;
 };
 
 
+static int next_id = 1;
 
 static ssize_t write_req(mrp_console_t *mc, void *buf, size_t size)
 {
@@ -101,6 +103,57 @@ static ssize_t write_req(mrp_console_t *mc, void *buf, size_t size)
 }
 
 
+static void logger(void *data, mrp_log_level_t level, const char *file,
+                   int line, const char *func, const char *format, va_list ap)
+{
+    console_t  *c = (console_t *)data;
+    va_list     cp;
+    const char *prefix;
+
+    MRP_UNUSED(file);
+    MRP_UNUSED(line);
+    MRP_UNUSED(func);
+
+    switch (level) {
+    case MRP_LOG_ERROR:   prefix = "[log] E: "; break;
+    case MRP_LOG_WARNING: prefix = "[log] W: "; break;
+    case MRP_LOG_INFO:    prefix = "[log] I: "; break;
+    case MRP_LOG_DEBUG:   prefix = "[log] D: "; break;
+    default:              prefix = "[log] ?: ";
+    }
+
+    va_copy(cp, ap);
+    mrp_console_printf(c->mc, "%s", prefix);
+    mrp_console_vprintf(c->mc, format, cp);
+    mrp_console_printf(c->mc, "\n");
+    va_end(cp);
+}
+
+
+static void register_logger(console_t *c)
+{
+    char name[32];
+
+    if (!c->id)
+        return;
+
+    snprintf(name, sizeof(name), "console/%d", c->id);
+    mrp_log_register_target(name, logger, c);
+}
+
+
+static void unregister_logger(console_t *c)
+{
+    char name[32];
+
+    if (!c->id)
+        return;
+
+    snprintf(name, sizeof(name), "console/%d", c->id);
+    mrp_log_unregister_target(name);
+}
+
+
 static void tcp_close_req(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc->backend_data;
@@ -108,6 +161,7 @@ static void tcp_close_req(mrp_console_t *mc)
     if (c->t != NULL) {
         mrp_transport_disconnect(c->t);
         mrp_transport_destroy(c->t);
+        unregister_logger(c);
         c->t = NULL;
     }
 }
@@ -242,7 +296,9 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
 
         mrp_transport_disconnect(t);
         mrp_transport_destroy(t);
+        unregister_logger(c);
         c->t = NULL;
+        unregister_logger(c);
     }
 }
 
@@ -267,8 +323,11 @@ static void connection_evt(mrp_transport_t *lt, void *user_data)
 
             c->mc = mrp_create_console(data->ctx, &req, c);
 
-            if (c->mc != NULL)
+            if (c->mc != NULL) {
+                c->id = next_id++;
+                register_logger(c);
                 return;
+            }
         }
 
         mrp_transport_destroy(c->t);

@@ -234,11 +234,7 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
             break;
 
         case 't':
-            ctx->log_target = mrp_log_parse_target(optarg);
-            if (!ctx->log_target)
-                print_usage(argv[0], EINVAL, "invalid log target '%s'", optarg);
-            else
-                mrp_log_set_target(ctx->log_target);
+            ctx->log_target = optarg;
             break;
 
         case 'd':

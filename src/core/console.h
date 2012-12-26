@@ -176,6 +176,9 @@ void mrp_destroy_console(mrp_console_t *mc);
 /** Send (printf-compatible) formatted output to a console. */
 void mrp_console_printf(mrp_console_t *mc, const char *fmt, ...);
 
+/** Send (vprintf-compatible) formatted output to a console. */
+void mrp_console_vprintf(mrp_console_t *mc, const char *fmt, va_list ap);
+
 /** Set the prompt of a console. */
 void mrp_set_console_prompt(mrp_console_t *mc);
 

@@ -175,6 +175,18 @@ static void start_plugins(mrp_context_t *ctx)
 }
 
 
+static void setup_logging(mrp_context_t *ctx)
+{
+    const char *target;
+
+    target = mrp_log_parse_target(ctx->log_target);
+
+    if (!target)
+        mrp_log_error("invalid log target '%s'", ctx->log_target);
+    else
+        mrp_log_set_target(target);
+}
+
 static void daemonize(mrp_context_t *ctx)
 {
     if (!ctx->foreground) {
@@ -242,6 +254,7 @@ int main(int argc, char *argv[])
     start_plugins(ctx);
     load_ruleset(ctx);
     prepare_ruleset(ctx);
+    setup_logging(ctx);
     daemonize(ctx);
     run_mainloop(ctx);
     stop_plugins(ctx);

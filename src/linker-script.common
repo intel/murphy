@@ -40,13 +40,18 @@
         mrp_htbl_remove;
         mrp_htbl_reset;
         mrp_log_disable;
+        mrp_log_dump_mask;
         mrp_log_enable;
+        mrp_log_get_target;
+        mrp_log_get_targets;
         mrp_log_msg;
         mrp_log_msgv;
         mrp_log_parse_levels;
         mrp_log_parse_target;
+        mrp_log_register_target;
         mrp_log_set_mask;
         mrp_log_set_target;
+        mrp_log_unregister_target;
         mrp_mainloop_create;
         mrp_mainloop_destroy;
         mrp_mainloop_dispatch;

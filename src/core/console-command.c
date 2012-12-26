@@ -30,4 +30,4 @@
 #include "console-builtin.c"
 #include "console-debug.c"
 #include "console-db.c"
-
+#include "console-log.c"

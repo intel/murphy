@@ -967,41 +967,6 @@ clean-func-infos::
 	-rm plugin-console-func-info.c
 endif
 
-# signalling plugin
-SIGNALLING_PLUGIN_SOURCES = plugins/plugin-signalling.c \
-                            plugins/signalling/transaction.c \
-                            plugins/signalling/util.c \
-                            plugins/signalling/client.c \
-                            plugins/signalling/info.c \
-                            plugins/signalling/endpoint.c \
-                            plugins/signalling/plugin.h \
-                            plugins/signalling/transaction.h \
-                            plugins/signalling/util.h \
-                            plugins/signalling/client.h \
-                            plugins/signalling/info.h \
-                            plugins/signalling/endpoint.h
-SIGNALLING_PLUGIN_HEADERS = plugins/signalling/signalling.h
-SIGNALLING_PLUGIN_CFLAGS  =
-SIGNALLING_PLUGIN_LIBS    =
-SIGNALLING_PLUGINdir      = $(includedir)/murphy/plugins/signalling
-
-
-if BUILTIN_PLUGIN_SIGNALLING
-BUILTIN_PLUGINS += $(SIGNALLING_PLUGIN_SOURCES)
-BUILTIN_CFLAGS  += $(SIGNALLING_PLUGIN_CFLAGS)
-BUILTIN_LIBS    += $(SIGNALLING_PLUGIN_LIBS)
-else
-plugin_signalling_la_SOURCES = $(SIGNALLING_PLUGIN_SOURCES)
-plugin_signalling_la_HEADERS = $(SIGNALLING_PLUGIN_HEADERS)
-plugin_signalling_la_CFLAGS  = $(SIGNALLING_PLUGIN_CFLAGS) \
-                $(MURPHY_CFLAGS) $(AM_CFLAGS)
-plugin_signalling_la_LDFLAGS = -module -avoid-version
-plugin_signalling_la_LIBADD  = $(SIGNALLING_PLUGIN_LIBS)
-plugin_signalling_ladir      = $(SIGNALLING_PLUGINdir)
-
-plugin_LTLIBRARIES    += plugin-signalling.la
-endif
-
 # native resource plugin
 if BUILD_RESOURCES
 PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES = 				\

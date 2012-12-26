@@ -260,6 +260,19 @@ void mrp_console_printf(mrp_console_t *mc, const char *fmt, ...)
 }
 
 
+void mrp_console_vprintf(mrp_console_t *mc, const char *fmt, va_list ap)
+{
+    console_t *c = (console_t *)mc;
+    va_list    cp;
+
+    va_copy(cp, ap);
+    vfprintf(c->stdout, fmt, cp);
+    va_end(cp);
+
+    fflush(c->stdout);
+}
+
+
 void mrp_set_console_prompt(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc;
