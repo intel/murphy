@@ -158,14 +158,6 @@ struct mrp_subloop_s {
  * main loop
  */
 
-typedef enum {
-    MRP_SUPER_EVENT_NONE  = 0x0,
-    MRP_SUPER_EVENT_IO    = 0x1,
-    MRP_SUPER_EVENT_TIMER = 0x2,
-    MRP_SUPER_EVENT_DEFER = 0x4,
-} super_event_t;
-
-
 struct mrp_mainloop_s {
     int                  epollfd;                /* our epoll descriptor */
     struct epoll_event  *events;                 /* epoll event buffer */
@@ -196,7 +188,6 @@ struct mrp_mainloop_s {
 
     mrp_superloop_ops_t *super_ops;              /* superloop options */
     void                *super_data;             /* superloop glue data */
-    super_event_t        super_events;           /* pending superloop events  */
     void                *iow;                    /* superloop epollfd watch */
     void                *timer;                  /* superloop timer */
     void                *work;                   /* superloop deferred work */
@@ -835,7 +826,6 @@ static void super_io_cb(void *super_data, void *id, int fd,
     MRP_UNUSED(fd);
     MRP_UNUSED(events);
 
-    ml->super_events |= MRP_SUPER_EVENT_IO;
     ops->mod_defer(ml->super_data, ml->work, TRUE);
 }
 
@@ -848,7 +838,6 @@ static void super_timer_cb(void *super_data, void *id, void *user_data)
     MRP_UNUSED(super_data);
     MRP_UNUSED(id);
 
-    ml->super_events |= MRP_SUPER_EVENT_TIMER;
     ops->mod_defer(ml->super_data, ml->work, TRUE);
 }
 
