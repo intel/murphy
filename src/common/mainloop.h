@@ -30,6 +30,7 @@
 #ifndef __MURPHY_MAINLOOP_H__
 #define __MURPHY_MAINLOOP_H__
 
+#include <signal.h>
 #include <sys/poll.h>
 #include <sys/epoll.h>
 
