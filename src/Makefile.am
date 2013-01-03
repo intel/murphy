@@ -689,7 +689,7 @@ libmurphy_resource_backend_la_CFLAGS =                 \
 		$(INCLUDES)
 
 libmurphy_resource_backend_la_LDFLAGS =                        \
-		-Wl,-version-script=linker-script.resource \
+		-Wl,-version-script=linker-script.resource_backend \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resource_backend_la_LIBADD =     \
@@ -700,7 +700,7 @@ libmurphy_resource_backend_la_LIBADD =     \
 		murphy-db/mdb/libmdb.la \
 		$(LUA_LIBS)
 
-libmurphy_resource_backend_la_DEPENDENCIES = linker-script.resource \
+libmurphy_resource_backend_la_DEPENDENCIES = linker-script.resource_backend \
 	$(filter %.la, $(libmurphy_resource_backend_la_LIBADD))
 
 # debug file:line-function mapping generation
@@ -712,13 +712,13 @@ clean-func-infos::
 endif
 
 # resource linker script generation
-linker-script.resource: $(libmurphy_resource_backend_la_HEADERS)
+linker-script.resource_backend: $(libmurphy_resource_backend_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.resource
+	-rm -f linker-script.resource_backend
 
-generate-linker-scripts: linker-script.resource
+generate-linker-scripts: linker-script.resource_backend
 
 ##########################
 # readline replacement
@@ -863,12 +863,27 @@ libmurphy_resource_la_CFLAGS =          \
         $(AM_CFLAGS)            \
         $(INCLUDES)
 
+libmurphy_resource_la_LDFLAGS =	\
+		-Wl,-version-script=linker-script.resource	\
+		-version-info @MURPHY_VERSION_INFO@
+
 libmurphy_resource_la_LIBADD =      \
         libmurphy-core.la   \
         libmurphy-common.la
 
 libmurphy_resource_la_DEPENDENCIES = libmurphy-core.la      \
-                     libmurphy-common.la
+                     libmurphy-common.la \
+                     linker-script.resource
+
+# linker script generation
+linker-script.resource: $(libmurphy_resource_la_HEADERS)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.resource
+
+generate-linker-scripts: linker-script.resource
+
 
 # resource-api-test
 bin_PROGRAMS += resource-api-test
