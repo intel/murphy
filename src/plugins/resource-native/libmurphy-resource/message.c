@@ -632,8 +632,7 @@ error:
 }
 
 
-
-int get_application_classes(mrp_res_context_t *cx)
+int get_application_classes_request(mrp_res_context_t *cx)
 {
     mrp_msg_t *msg = NULL;
 
@@ -659,7 +658,7 @@ error:
 }
 
 
-int get_available_resources(mrp_res_context_t *cx)
+int get_available_resources_request(mrp_res_context_t *cx)
 {
     mrp_msg_t *msg = NULL;
 

@@ -27,10 +27,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __MURPHY_RESOURCE_API_MESSAGE_H__
+#define __MURPHY_RESOURCE_API_MESSAGE_H__
+
 #include <murphy/resource/protocol.h>
+
 #include "resource-private.h"
 #include "string_array.h"
 
+/* parsing of the message */
 
 bool fetch_resource_set_state(mrp_msg_t *msg, void **pcursor,
                                      mrp_resproto_state_t *pstate);
@@ -55,6 +60,7 @@ int fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
 bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
                                 const char **pname);
 
+/* handling of the message responses */
 
 mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
         void **pcursor);
@@ -67,6 +73,8 @@ bool create_resource_set_response(mrp_msg_t *msg,
 mrp_res_resource_set_t *acquire_resource_set_response(mrp_msg_t *msg,
             mrp_res_context_t *cx, void **pcursor);
 
+/* requests to the server */
+
 int acquire_resource_set_request(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rset);
 
@@ -76,8 +84,8 @@ int release_resource_set_request(mrp_res_context_t *cx,
 int create_resource_set_request(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rset);
 
+int get_application_classes_request(mrp_res_context_t *cx);
 
-int get_application_classes(mrp_res_context_t *cx);
+int get_available_resources_request(mrp_res_context_t *cx);
 
-
-int get_available_resources(mrp_res_context_t *cx);
+#endif

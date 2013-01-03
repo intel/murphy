@@ -27,6 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __MURPHY_RESOURCE_API_RSET_H__
+#define __MURPHY_RESOURCE_API_RSET_H__
+
 #include <errno.h>
 
 #include <murphy/resource/protocol.h>
@@ -57,3 +60,5 @@ mrp_res_resource_set_t *resource_set_copy(
 
 mrp_res_resource_t *get_resource_by_name(mrp_res_resource_set_t *rset,
         const char *name);
+
+#endif

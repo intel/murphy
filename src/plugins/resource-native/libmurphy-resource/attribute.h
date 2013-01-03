@@ -27,6 +27,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __MURPHY_RESOURCE_API_ATTRIBUTE_H__
+#define __MURPHY_RESOURCE_API_ATTRIBUTE_H__
+
 #include <errno.h>
 
 #include "resource-private.h"
@@ -44,3 +47,5 @@ mrp_res_attribute_t *mrp_attribute_array_dup(uint32_t dim,
         mrp_res_attribute_t *arr);
 
 attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr);
+
+#endif

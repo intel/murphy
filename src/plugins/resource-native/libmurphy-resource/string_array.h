@@ -27,9 +27,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __MURPHY_RESOURCE_API_STRING_ARRAY_H__
+#define __MURPHY_RESOURCE_API_STRING_ARRAY_H__
+
 #include "resource-api.h"
 #include "resource-private.h"
 
 #define ARRAY_MAX      1024
 
 mrp_res_string_array_t *mrp_str_array_dup(uint32_t dim, const char **arr);
+
+#endif

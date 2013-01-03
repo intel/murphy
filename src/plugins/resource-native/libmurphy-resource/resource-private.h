@@ -33,39 +33,39 @@
 #include "resource-api.h"
 
 typedef struct {
-    const char     *name;
+    const char *name;
     mrp_res_attribute_type_t type;       /* s:char *, i:int32_t, u:uint32_t, f:double */
     union {
         const char *string;
-        int32_t     integer;
-        uint32_t    unsignd;
-        double      floating;
+        int32_t integer;
+        uint32_t unsignd;
+        double floating;
     };
 } attribute_t;
 
 typedef struct {
-    uint32_t       dim;
-    attribute_t    elems[0];
+    uint32_t dim;
+    attribute_t elems[0];
 } attribute_array_t;
 
 typedef struct {
-    const char        *name;
+    const char *name;
     attribute_array_t *attrs;
 } resource_def_t;
 
 typedef struct {
-    uint32_t          dim;
-    resource_def_t    defs[0];
+    uint32_t dim;
+    resource_def_t defs[0];
 } resource_def_array_t;
 
 struct mrp_res_resource_private_s {
     mrp_res_resource_t *pub; /* composition */
     mrp_res_resource_set_t *set; /* owning set */
 
-    bool                       mandatory;
-    bool                       shared;
-    int                        num_attributes;
-    mrp_res_attribute_t  *attrs;
+    bool mandatory;
+    bool shared;
+    int num_attributes;
+    mrp_res_attribute_t *attrs;
 };
 
 struct mrp_res_resource_set_private_s {

@@ -478,7 +478,7 @@ mrp_res_context_t *mrp_res_create(mrp_mainloop_t *ml,
     cx->priv->connected = TRUE;
     cx->state = MRP_RES_DISCONNECTED;
 
-    if (get_application_classes(cx) < 0 || get_available_resources(cx) < 0) {
+    if (get_application_classes_request(cx) < 0 || get_available_resources_request(cx) < 0) {
         goto error;
     }
 
