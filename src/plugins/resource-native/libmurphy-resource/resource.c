@@ -97,8 +97,8 @@ static void resource_event(mrp_msg_t *msg,
     size_t size;
     uint32_t resid;
     const char *resnam;
-    attribute_t attrs[ATTRIBUTE_MAX + 1];
-    attribute_array_t *list;
+    mrp_res_attribute_t attrs[ATTRIBUTE_MAX + 1];
+    int n_attrs;
     uint32_t mask;
 
     mrp_res_resource_set_t *rset;
@@ -166,18 +166,14 @@ static void resource_event(mrp_msg_t *msg,
             res->state = MRP_RES_RESOURCE_LOST;
         }
 
-        if (fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs) < 0) {
+        n_attrs = fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs);
+
+        if (n_attrs < 0) {
             printf("malformed 3\n");
             goto malformed;
         }
 
-        if (!(list = attribute_array_dup(0, attrs))) {
-            mrp_log_error("failed to duplicate attribute list");
-        }
-
-        /* TODO attributes */
-
-        attribute_array_free(list);
+        /* TODO: attributes */
     }
 
     /* Check the resource set state. If the set is under construction
@@ -503,4 +499,3 @@ void mrp_res_destroy(mrp_res_context_t *cx)
     printf("> mrp_res_destroy\n");
     destroy_context(cx);
 }
-

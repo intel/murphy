@@ -753,4 +753,3 @@ error:
     mrp_msg_unref(msg);
     return -1;
 }
-

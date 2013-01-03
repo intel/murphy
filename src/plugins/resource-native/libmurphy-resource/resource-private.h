@@ -34,7 +34,7 @@
 
 typedef struct {
     const char *name;
-    mrp_res_attribute_type_t type;       /* s:char *, i:int32_t, u:uint32_t, f:double */
+    mrp_res_attribute_type_t type; /* s:char *, i:int32_t, u:uint32_t, f:double */
     union {
         const char *string;
         int32_t integer;
@@ -45,12 +45,13 @@ typedef struct {
 
 typedef struct {
     uint32_t dim;
-    attribute_t elems[0];
+    mrp_res_attribute_t elems[0];
 } attribute_array_t;
 
 typedef struct {
     const char *name;
-    attribute_array_t *attrs;
+    int num_attrs;
+    mrp_res_attribute_t *attrs;
 } resource_def_t;
 
 typedef struct {

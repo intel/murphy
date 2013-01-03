@@ -55,7 +55,7 @@ int fetch_request(mrp_msg_t *msg, void **pcursor, uint16_t *preqtype);
 bool fetch_status(mrp_msg_t *msg, void **pcursor, int *pstatus);
 
 int fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
-                                 size_t dim, attribute_t *arr);
+                                 size_t dim, mrp_res_attribute_t *arr);
 
 bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
                                 const char **pname);

@@ -54,89 +54,6 @@ void mrp_attribute_array_free(mrp_res_attribute_t *arr,
 }
 
 
-void attribute_array_free(attribute_array_t *arr)
-{
-    uint32_t i;
-    attribute_t *attr;
-
-    if (arr) {
-        for (i = 0; i < arr->dim; i++) {
-            attr = arr->elems + i;
-
-            mrp_free((void *)attr->name);
-
-            if (attr->type == 's')
-                mrp_free((void *)attr->string);
-        }
-        mrp_free(arr);
-    }
-}
-
-
-attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr)
-{
-    size_t size;
-    uint32_t i;
-    attribute_t *sattr, *dattr;
-    attribute_array_t *dup;
-    int err;
-
-    MRP_ASSERT(dim < ARRAY_MAX && arr, "invalid argument");
-
-    if (!dim && arr) {
-        for (dim = 0;  arr[dim].name;  dim++)
-            ;
-    }
-
-    size = sizeof(attribute_array_t) + (sizeof(attribute_t) * (dim + 1));
-
-    if (!(dup = mrp_allocz(size))) {
-        err = ENOMEM;
-        goto failed;
-    }
-
-    dup->dim = dim;
-
-    for (i = 0;    i < dim;    i++) {
-        sattr = arr + i;
-        dattr = dup->elems + i;
-
-        if (!(dattr->name = mrp_strdup(sattr->name))) {
-            err = ENOMEM;
-            goto failed;
-        }
-
-        switch ((dattr->type = sattr->type)) {
-        case 's':
-            if (!(dattr->string = mrp_strdup(sattr->string))) {
-                err = ENOMEM;
-                goto failed;
-            }
-            break;
-        case 'i':
-            dattr->integer = sattr->integer;
-            break;
-        case 'u':
-            dattr->unsignd = sattr->unsignd;
-            break;
-        case 'f':
-            dattr->floating = sattr->floating;
-            break;
-        default:
-            err = EINVAL;
-            goto failed;
-        }
-    }
-
-    return dup;
-
- failed:
-    attribute_array_free(dup);
-    errno = err;
-    return NULL;
-}
-
-
 mrp_res_attribute_t *mrp_attribute_array_dup(uint32_t dim,
                                  mrp_res_attribute_t *arr)
 {
@@ -229,7 +146,6 @@ mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
 
     return ret;
 }
-
 
 
 mrp_res_attribute_t * mrp_res_get_attribute_by_name(

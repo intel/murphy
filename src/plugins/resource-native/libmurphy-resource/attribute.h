@@ -36,16 +36,10 @@
 
 #define ATTRIBUTE_MAX  32
 
-/* TODO: refactor so that there is only one dup/free set left */
-
 void mrp_attribute_array_free(mrp_res_attribute_t *arr,
         uint32_t dim);
 
-void attribute_array_free(attribute_array_t *arr);
-
 mrp_res_attribute_t *mrp_attribute_array_dup(uint32_t dim,
         mrp_res_attribute_t *arr);
-
-attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr);
 
 #endif

@@ -181,9 +181,9 @@ bool fetch_status(mrp_msg_t *msg, void **pcursor, int *pstatus)
 
 
 int fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
-                                 size_t dim, attribute_t *arr)
+                                 size_t dim, mrp_res_attribute_t *arr)
 {
-    attribute_t *attr;
+    mrp_res_attribute_t *attr;
     uint16_t tag;
     uint16_t type;
     mrp_msg_value_t value;
@@ -232,9 +232,9 @@ int fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
         }
     }
 
-    memset(arr + i, 0, sizeof(attribute_t));
+    memset(arr + i, 0, sizeof(mrp_res_attribute_t));
 
-    return 0;
+    return i;
 }
 
 
@@ -258,58 +258,17 @@ bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
 }
 
 
-
-static void priv_attr_to_mrp_attr(attribute_t *attr,
-        mrp_res_attribute_t *attribute) {
-
-    if (attr == NULL || attribute == NULL)
-        return;
-
-    attribute->name = mrp_strdup(attr->name);
-
-    switch (attr->type) {
-        case 's':
-            attribute->type = mrp_string;
-            attribute->string = mrp_strdup(attr->string);
-            break;
-        case 'i':
-            attribute->type = mrp_int32;
-            attribute->integer = attr->integer;
-            break;
-        case 'u':
-            attribute->type = mrp_uint32;
-            attribute->unsignd = attr->unsignd;
-            break;
-        case 'f':
-            attribute->type = mrp_double;
-            attribute->floating = attr->floating;
-            break;
-        default:
-            attribute->type = mrp_invalid;
-    }
-}
-
-
-static int priv_res_to_mrp_res(resource_def_t *src, mrp_res_resource_t *dst) {
-
-    uint32_t i = 0;
-
+static int priv_res_to_mrp_res(resource_def_t *src, mrp_res_resource_t *dst)
+{
     dst->name  = mrp_strdup(src->name);
     dst->state = MRP_RES_RESOURCE_LOST;
     dst->priv->mandatory = false;
     dst->priv->shared = false;
-    dst->priv->num_attributes = src->attrs->dim;
+    dst->priv->num_attributes = src->num_attrs;
 
-    dst->priv->attrs = mrp_allocz(
-            sizeof(mrp_res_attribute_t) * src->attrs->dim);
-
-    for (i = 0; i < src->attrs->dim; i++) {
-        priv_attr_to_mrp_attr(&src->attrs->elems[i], &dst->priv->attrs[i]);
-    }
+    dst->priv->attrs = src->attrs;
     return 0;
 }
-
-
 
 
 mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
@@ -318,7 +277,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
     int             status;
     uint32_t        dim, i;
     resource_def_t  rdef[RESOURCE_MAX];
-    attribute_t     attrs[ATTRIBUTE_MAX + 1];
+    mrp_res_attribute_t attrs[ATTRIBUTE_MAX + 1];
     resource_def_t *src;
     mrp_res_resource_set_t *arr = NULL;
 
@@ -331,13 +290,18 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
         dim = 0;
 
         while (fetch_resource_name(msg, pcursor, &rdef[dim].name)) {
-            if (fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX+1, attrs) < 0)
+            int n_attrs = fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX+1,
+                    attrs);
+
+            if (n_attrs < 0)
                 goto failed;
 
-            if (!(rdef[dim].attrs = attribute_array_dup(0, attrs))) {
+            if (!(rdef[dim].attrs = mrp_attribute_array_dup(n_attrs, attrs))) {
                 mrp_log_error("failed to duplicate attributes");
-                return NULL;
+                goto failed;
             }
+
+            rdef[dim].num_attrs = n_attrs;
 
             dim++;
         }
@@ -376,7 +340,6 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
                 goto failed;
             }
             priv_res_to_mrp_res(src, arr->priv->resources[i]);
-            attribute_array_free(rdef[i].attrs);
         }
     }
 
