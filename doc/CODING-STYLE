@@ -26,23 +26,23 @@ Some examples:
 
     if (!condition) {
         foo();
-	foobar();
+        foobar();
     }
     else {
         bar();
-	barfoo();
+        barfoo();
     }
 
     while (check) {
         do_something();
-	and_something_else();
+        and_something_else();
     }
 
 Exceptions:
 
     do {
         process();
-	and_more();
+        and_more();
     } while (need_to);
 
     if (foo < bar) {
@@ -55,7 +55,7 @@ Exceptions:
         frobnicate();
         xyzzy();
     }
-    
+
 In a function you put both the opening and the closing braces on lines
 of their own:
 
@@ -190,7 +190,7 @@ existing code obey the existing style.
 
 2.4 Code Layout
 
-Put licensing information to the beginning of every file. 
+Put licensing information to the beginning of every file.
 Within a module put includes and macro definitions in the beginning
 (of course). Then put type definitions, any necessary static function
 prototypes and finally module-local variables before the actual
