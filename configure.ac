@@ -188,8 +188,10 @@ AC_ARG_ENABLE(ecore,
               [  --enable-ecore          enable EFL/ecore mainloop support],
 	      [enable_ecore=$enableval], [enable_ecore=auto])
 
+
 if test "$enable_ecore" != "no"; then
-    PKG_CHECK_MODULES(ECORE, ecore,
+    # We are using features which are present only at ecore 1.2 onwards.
+    PKG_CHECK_MODULES(ECORE, ecore >= 1.2,
                       [have_ecore=yes], [have_ecore=no])
     if test "$have_ecore" = "no" -a "$enable_ecore" = "yes"; then
         AC_MSG_ERROR([EFL/ecore development libraries not found.])
@@ -493,12 +495,12 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/murphy-db/tests/Makefile
 		 src/resolver/murphy-resolver.pc
 		 src/resolver/tests/Makefile
-		 src/resource/murphy-resource.pc
 		 src/plugins/domain-control/murphy-domain-controller.pc
 		 doc/Makefile
 		 doc/plugin-developer-guide/Makefile
 		 doc/plugin-developer-guide/db/Makefile
 		 doc/plugin-developer-guide/doxml/Makefile
+		 src/plugins/resource-native/libmurphy-resource/murphy-resource.pc
 		 ])
 AC_OUTPUT
 
