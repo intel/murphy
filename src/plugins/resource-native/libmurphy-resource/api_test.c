@@ -358,6 +358,9 @@ int main(int argc, char **argv)
 
     my_app_data app_data;
 
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+
     if ((ml = mrp_mainloop_create()) == NULL)
         exit(1);
 

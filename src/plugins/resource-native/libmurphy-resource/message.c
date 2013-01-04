@@ -508,7 +508,7 @@ int create_resource_set_request(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rset)
 {
     mrp_msg_t *msg = NULL;
-    int i;
+    uint32_t i;
 
     if (!cx || !rset)
         return -1;
