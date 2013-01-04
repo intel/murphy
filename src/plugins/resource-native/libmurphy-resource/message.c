@@ -258,14 +258,16 @@ bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
 }
 
 
-static int priv_res_to_mrp_res(resource_def_t *src, mrp_res_resource_t *dst)
+static int priv_res_to_mrp_res(uint32_t id, resource_def_t *src, mrp_res_resource_t *dst)
 {
     dst->name  = mrp_strdup(src->name);
     dst->state = MRP_RES_RESOURCE_LOST;
     dst->priv->mandatory = false;
     dst->priv->shared = false;
-    dst->priv->num_attributes = src->num_attrs;
 
+    dst->priv->server_id = id;
+
+    dst->priv->num_attributes = src->num_attrs;
     dst->priv->attrs = src->attrs;
     return 0;
 }
@@ -339,7 +341,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
                 arr->priv->num_resources = i;
                 goto failed;
             }
-            priv_res_to_mrp_res(src, arr->priv->resources[i]);
+            priv_res_to_mrp_res(i, src, arr->priv->resources[i]);
         }
     }
 

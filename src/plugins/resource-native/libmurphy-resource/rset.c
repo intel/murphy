@@ -33,23 +33,48 @@
 #include "attribute.h"
 #include "message.h"
 
+
+static char *state_to_str(mrp_res_resource_state_t st)
+{
+    char *state = "unknown";
+    switch (st) {
+        case MRP_RES_RESOURCE_ACQUIRED:
+            state = "acquired";
+            break;
+        case MRP_RES_RESOURCE_LOST:
+            state = "lost";
+            break;
+        case MRP_RES_RESOURCE_AVAILABLE:
+            state = "available";
+            break;
+        case MRP_RES_RESOURCE_PENDING:
+            state = "pending";
+            break;
+    }
+    return state;
+}
+
+
 void print_resource(mrp_res_resource_t *res)
 {
-    mrp_log_info("   resource '%s' : %smandatory, %sshared",
-            res->name, res->priv->mandatory ? " " : "not ",
+    mrp_log_info("   resource '%s' -> '%s' : %smandatory, %sshared",
+            res->name, state_to_str(res->state),
+            res->priv->mandatory ? " " : "not ",
             res->priv->shared ? "" : "not ");
 }
 
 
 void print_resource_set(mrp_res_resource_set_t *rset)
 {
-    int i;
+    uint32_t i;
     mrp_res_resource_t *res;
 
-    mrp_log_info("Resource set %i (%s):", rset->priv->id, rset->application_class);
+    mrp_log_info("Resource set %i/%i (%s) -> '%s':",
+            rset->priv->id, rset->priv->internal_id,
+            rset->application_class, state_to_str(rset->state));
 
     for (i = 0; i < rset->priv->num_resources; i++) {
-    res = rset->priv->resources[i];
+        res = rset->priv->resources[i];
         print_resource(res);
     }
 }
@@ -121,7 +146,7 @@ void decrease_ref(mrp_res_context_t *cx,
 mrp_res_resource_t *get_resource_by_name(mrp_res_resource_set_t *rset,
         const char *name)
 {
-    int i;
+    uint32_t i;
 
     if (!rset || !name)
         return NULL;
@@ -156,7 +181,7 @@ static void free_resource(mrp_res_resource_t *res)
 
 void free_resource_set(mrp_res_resource_set_t *rset)
 {
-    int i;
+    uint32_t i;
 
     if (!rset)
         return;
@@ -256,7 +281,7 @@ mrp_res_resource_set_t *resource_set_copy(
         const mrp_res_resource_set_t *original)
 {
     mrp_res_resource_set_t *copy = NULL;
-    int i;
+    uint32_t i;
 
     copy = mrp_allocz(sizeof(mrp_res_resource_set_t));
 
@@ -356,7 +381,7 @@ static int update_library_resource_set(mrp_res_context_t *cx,
 {
     char *application_class = NULL;
     mrp_res_resource_t **resources = NULL;
-    int i, num_resources = 0;
+    uint32_t i, num_resources = 0;
 
     if (!cx || !original)
         return -1;
@@ -424,8 +449,9 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
                     bool shared)
 {
     mrp_res_resource_t *res = NULL, *proto = NULL;
-    int i = 0;
+    uint32_t i = 0;
     bool found = false;
+    uint32_t server_id = 0;
 
     if (cx == NULL || set == NULL || name == NULL)
         return NULL;
@@ -434,6 +460,7 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
         proto = cx->priv->master_resource_set->priv->resources[i];
         if (strcmp(proto->name, name) == 0) {
             found = true;
+            server_id = proto->priv->server_id;
             break;
         }
     }
@@ -455,6 +482,7 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
     if (!res->priv)
         goto error;
 
+    res->priv->server_id = server_id;
     res->priv->mandatory = mandatory;
     res->priv->shared = shared;
     res->priv->pub = res;
@@ -591,7 +619,7 @@ void mrp_res_delete_resource(mrp_res_resource_set_t *set, mrp_res_resource_t *re
 
 bool mrp_res_delete_resource_by_name(mrp_res_resource_set_t *rs, const char *name)
 {
-    int i;
+    uint32_t i;
     mrp_res_resource_t *res = NULL;
 
     /* assumption: only one resource of given name in the resource set */
@@ -623,7 +651,7 @@ bool mrp_res_delete_resource_by_name(mrp_res_resource_set_t *rs, const char *nam
 mrp_res_string_array_t * mrp_res_list_resource_names(mrp_res_context_t *cx,
                 const mrp_res_resource_set_t *rs)
 {
-    int i;
+    uint32_t i;
     mrp_res_string_array_t *ret;
 
     if (!cx || !rs)
@@ -659,7 +687,7 @@ mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
                  const mrp_res_resource_set_t *rs,
                  const char *name)
 {
-    int i;
+    uint32_t i;
 
     if (!cx || !rs)
         return NULL;
@@ -680,14 +708,18 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     mrp_msg_t *msg = NULL;
     mrp_res_resource_set_t *rset;
 
-    if (!cx->priv->connected)
+    if (!cx->priv->connected) {
+        mrp_log_error("not connected to server");
         goto error;
+    }
 
     rset = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
             u_to_p(original->priv->internal_id));
 
-    if (!rset)
+    if (!rset) {
+        mrp_log_error("trying to acquire non-existent resource set");
         goto error;
+    }
 
     update_library_resource_set(cx, original, rset);
 
@@ -699,6 +731,7 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
 
         if (rset->state == MRP_RES_RESOURCE_ACQUIRED) {
             /* already requested, updating is not supported yet */
+            mrp_log_error("trying to re-acquire already acquired set");
 
             /* TODO: when supported by backend
              * type = RESPROTO_UPDATE_RESOURCE_SET
@@ -714,8 +747,10 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     /* Create the resource set. The acquisition is continued
      * when the set is created. */
 
-    if (create_resource_set_request(cx, rset) < 0)
+    if (create_resource_set_request(cx, rset) < 0) {
+        mrp_log_error("creating resource set failed");
         goto error;
+    }
 
     mrp_list_append(&cx->priv->pending_sets, &rset->priv->hook);
 
@@ -723,8 +758,6 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     return 0;
 
 error:
-    mrp_log_error("mrp_res_acquire_resource_set error");
-
     mrp_msg_unref(msg);
     return -1;
 }

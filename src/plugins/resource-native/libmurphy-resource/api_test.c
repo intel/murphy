@@ -226,6 +226,27 @@ static void state_callback(mrp_res_context_t *context,
     }
 }
 
+
+static char *state_to_str(mrp_res_resource_state_t st)
+{
+    char *state = "unknown";
+    switch (st) {
+        case MRP_RES_RESOURCE_ACQUIRED:
+            state = "acquired";
+            break;
+        case MRP_RES_RESOURCE_LOST:
+            state = "lost";
+            break;
+        case MRP_RES_RESOURCE_AVAILABLE:
+            state = "available";
+            break;
+        case MRP_RES_RESOURCE_PENDING:
+            state = "pending";
+            break;
+    }
+    return state;
+}
+
 static void resource_callback(mrp_res_context_t *cx,
                   const mrp_res_resource_set_t *rs,
                   void *userdata)
@@ -248,8 +269,7 @@ static void resource_callback(mrp_res_context_t *cx,
         return;
     }
 
-    printf("resource 0 name %s\n", res->name);
-    printf("resource 0 state %d\n", res->state);
+    printf("resource 0 name '%s' -> '%s'\n", res->name, state_to_str(res->state));
 
     res = mrp_res_get_resource_by_name(cx, rs, "video_playback");
 
@@ -258,8 +278,7 @@ static void resource_callback(mrp_res_context_t *cx,
         return;
     }
 
-    printf("resource 1 name %s\n", res->name);
-    printf("resource 1 state %d\n", res->state);
+    printf("resource 1 name '%s' -> '%s'\n", res->name, state_to_str(res->state));
 
     /* let's copy the changed set for ourselves */
 

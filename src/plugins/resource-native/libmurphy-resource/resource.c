@@ -99,8 +99,8 @@ static void resource_event(mrp_msg_t *msg,
     const char *resnam;
     mrp_res_attribute_t attrs[ATTRIBUTE_MAX + 1];
     int n_attrs;
-    uint32_t mask;
-
+    uint32_t mask, all = 0x0, mandatory = 0x0;
+    uint32_t i;
     mrp_res_resource_set_t *rset;
 
     mrp_log_info("Resource event (request no %u):", seqno);
@@ -122,6 +122,7 @@ static void resource_event(mrp_msg_t *msg,
         goto malformed;
     }
 
+#if 0
     switch (state) {
         case RESPROTO_RELEASE:
             rset->state = MRP_RES_RESOURCE_LOST;
@@ -130,6 +131,7 @@ static void resource_event(mrp_msg_t *msg,
             rset->state = MRP_RES_RESOURCE_ACQUIRED;
             break;
     }
+#endif
 
     while (mrp_msg_iterate(msg, pcursor, &tag, &type, &value, &size)) {
 
@@ -149,17 +151,8 @@ static void resource_event(mrp_msg_t *msg,
         }
 
         resid = value.u32;
-        mask  = (1UL <<  resid);
 
-        if (grant & mask) {
-            res->state = MRP_RES_RESOURCE_ACQUIRED;
-        }
-        else if (advice & mask) {
-            res->state = MRP_RES_RESOURCE_AVAILABLE;
-        }
-        else {
-            res->state = MRP_RES_RESOURCE_LOST;
-        }
+        mrp_log_info("data for '%s': %d", res->name, resid);
 
         n_attrs = fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs);
 
@@ -171,10 +164,54 @@ static void resource_event(mrp_msg_t *msg,
         /* TODO: attributes */
     }
 
+    /* go through all resources and see if they have been modified */
+
+    for (i = 0; i < rset->priv->num_resources; i++)
+    {
+        mrp_res_resource_t *res = rset->priv->resources[i];
+
+        mask  = (1UL <<  res->priv->server_id);
+        all  |= mask;
+
+        if (res->priv->mandatory)
+            mandatory |= mask;
+
+        if (grant & mask) {
+            res->state = MRP_RES_RESOURCE_ACQUIRED;
+        }
+#if 1
+        else {
+            res->state = MRP_RES_RESOURCE_LOST;
+        }
+#else
+        else if (advice & mask) {
+            res->state = MRP_RES_RESOURCE_AVAILABLE;
+        }
+        else {
+            res->state = MRP_RES_RESOURCE_LOST;
+        }
+#endif
+    }
+
+    mrp_log_error("advice = 0x%08x, grant = 0x%08x, mandatory = 0x%08x, all = 0x%08x",
+            advice, grant, mandatory, all);
+
+    if (grant) {
+        rset->state = MRP_RES_RESOURCE_ACQUIRED;
+    }
+    else if (advice == mandatory) {
+        rset->state = MRP_RES_RESOURCE_AVAILABLE;
+    }
+    else {
+        rset->state = MRP_RES_RESOURCE_LOST;
+    }
+
     /* Check the resource set state. If the set is under construction
      * (we are waiting for "acquire" message), do not do the callback
      * before that. Otherwise, if this is a real event, call the
      * callback right away. */
+
+     print_resource_set(rset);
 
     if (!rset->priv->seqno) {
         if (rset->priv->cb) {

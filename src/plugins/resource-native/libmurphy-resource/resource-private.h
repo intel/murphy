@@ -67,6 +67,7 @@ struct mrp_res_resource_private_s {
     bool shared;
     int num_attributes;
     mrp_res_attribute_t *attrs;
+    uint32_t server_id;
 };
 
 struct mrp_res_resource_set_private_s {
@@ -79,7 +80,7 @@ struct mrp_res_resource_set_private_s {
     mrp_res_resource_callback_t cb;
     void *user_data;
 
-    int num_resources;
+    uint32_t num_resources;
     mrp_res_resource_t **resources;
 
     mrp_list_hook_t hook;
