@@ -33,27 +33,26 @@
 #include "attribute.h"
 #include "message.h"
 
-#ifndef NO_DEBUG
 void print_resource(mrp_res_resource_t *res)
 {
-    printf("   resource '%s' : %smandatory, %sshared\n",
+    mrp_log_info("   resource '%s' : %smandatory, %sshared",
             res->name, res->priv->mandatory ? " " : "not ",
             res->priv->shared ? "" : "not ");
 }
+
 
 void print_resource_set(mrp_res_resource_set_t *rset)
 {
     int i;
     mrp_res_resource_t *res;
 
-    printf("Resource set %i (%s):\n", rset->priv->id, rset->application_class);
+    mrp_log_info("Resource set %i (%s):", rset->priv->id, rset->application_class);
 
     for (i = 0; i < rset->priv->num_resources; i++) {
     res = rset->priv->resources[i];
         print_resource(res);
     }
 }
-#endif
 
 
 void increase_ref(mrp_res_context_t *cx,
@@ -65,13 +64,10 @@ void increase_ref(mrp_res_context_t *cx,
         return;
 
     rset->priv->internal_ref_count++;
-
-    printf("rset %p ref count increased to %d\n",
-            rset, rset->priv->internal_ref_count);
 }
 
 
-static int destroy_resource_set(mrp_res_context_t *cx,
+static int destroy_resource_set_request(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rset)
 {
     mrp_msg_t *msg = NULL;
@@ -103,8 +99,6 @@ error:
 }
 
 
-
-
 void decrease_ref(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rset)
 {
@@ -113,12 +107,9 @@ void decrease_ref(mrp_res_context_t *cx,
 
     rset->priv->internal_ref_count--;
 
-    printf("rset %p ref count decreased to %d\n",
-            rset, rset->priv->internal_ref_count);
-
     if (rset->priv->internal_ref_count == 0) {
-        printf("delete the server resource set now\n");
-        destroy_resource_set(cx, rset);
+        mrp_log_info("delete the server resource set now");
+        destroy_resource_set_request(cx, rset);
         mrp_htbl_remove(cx->priv->rset_mapping,
                 u_to_p(rset->priv->id), FALSE);
         mrp_htbl_remove(cx->priv->internal_rset_mapping,
@@ -137,8 +128,6 @@ mrp_res_resource_t *get_resource_by_name(mrp_res_resource_set_t *rset,
 
     for (i = 0; i < rset->priv->num_resources; i++) {
         mrp_res_resource_t *res = rset->priv->resources[i];
-        printf("    comparing '%s' with '%s'\n",
-                name, res->name ? res->name : "NULL");
         if (strcmp(res->name, name) == 0) {
             return res;
         }
@@ -169,8 +158,6 @@ void free_resource_set(mrp_res_resource_set_t *rset)
 {
     int i;
 
-    printf("> free resource set %p\n", rset);
-
     if (!rset)
         return;
 
@@ -197,8 +184,6 @@ void delete_resource_set(mrp_res_context_t *cx,
     if (!rs)
         return;
 
-    printf("> delete_resource_set (%p)\n", rs);
-
     if (cx && rs->priv) {
         /* check if the resource set being deleted is a library resource set */
         mrp_res_resource_set_t *internal_rset = mrp_htbl_lookup(
@@ -218,8 +203,6 @@ static mrp_res_resource_t *resource_copy(const mrp_res_resource_t *original,
         mrp_res_resource_set_t *new_rset)
 {
     mrp_res_resource_t *copy;
-
-    printf("> resource_copy\n");
 
     copy = mrp_allocz(sizeof(mrp_res_resource_t));
 
@@ -252,7 +235,7 @@ static mrp_res_resource_t *resource_copy(const mrp_res_resource_t *original,
     return copy;
 
 error:
-    printf("resource_copy error\n");
+    mrp_log_error("failed to copy resource");
 
     if (copy) {
         mrp_free((void *) copy->name);
@@ -276,8 +259,6 @@ mrp_res_resource_set_t *resource_set_copy(
     int i;
 
     copy = mrp_allocz(sizeof(mrp_res_resource_set_t));
-
-    printf("> resource_set_copy (%p -> %p)\n", original, copy);
 
     if (!copy)
         goto error;
@@ -360,8 +341,6 @@ static mrp_res_resource_set_t *create_resource_set(
 
     mrp_htbl_insert(cx->priv->internal_rset_mapping,
             u_to_p(internal->priv->internal_id), internal);
-
-    printf("< create_resource_set (%p, internal %p)\n", rs, internal);
 
     return rs;
 
@@ -492,7 +471,7 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
     return res;
 
 error:
-    printf("mrp_res_create_resource error\n");
+    mrp_log_error("mrp_res_create_resource error");
     free_resource(res);
 
     return NULL;
@@ -541,11 +520,6 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
 {
     mrp_res_resource_set_t *internal_set = NULL;
 
-    printf("> mrp_release_resources (rset %d at %p)\n",
-            rset->priv->id, rset);
-
-    print_resource_set(rset);
-
     if (!cx->priv->connected)
         goto error;
 
@@ -562,6 +536,8 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
     return release_resource_set_request(cx, internal_set);
 
 error:
+    mrp_log_error("mrp_release_resources error");
+
     return -1;
 }
 
@@ -710,9 +686,6 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     rset = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
             u_to_p(original->priv->internal_id));
 
-    printf("> mrp_acquire_resources (client %p, internal %p)\n",
-            original, rset);
-
     if (!rset)
         goto error;
 
@@ -750,6 +723,8 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     return 0;
 
 error:
+    mrp_log_error("mrp_res_acquire_resource_set error");
+
     mrp_msg_unref(msg);
     return -1;
 }

@@ -285,7 +285,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
         goto failed;
 
     if (status != 0)
-        printf("Resource query failed (%u): %s\n", status, strerror(status));
+        mrp_log_error("Resource query failed (%u): %s", status, strerror(status));
     else {
         dim = 0;
 
@@ -426,7 +426,7 @@ mrp_res_resource_set_t *acquire_resource_set_response(mrp_msg_t *msg,
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
     if (!rset) {
-        printf("no rset found!\n");
+        mrp_log_error("no rset found!");
         goto error;
     }
 
@@ -537,8 +537,6 @@ int create_resource_set_request(mrp_res_context_t *cx,
 
         if (!res)
             goto error;
-
-        printf("    adding %s\n", res->name);
 
         if (res->priv->shared)
             flags |= RESPROTO_RESFLAG_SHARED;

@@ -103,27 +103,24 @@ static void resource_event(mrp_msg_t *msg,
 
     mrp_res_resource_set_t *rset;
 
-    printf("\nResource event (request no %u):\n", seqno);
+    mrp_log_info("Resource event (request no %u):", seqno);
 
     if (!fetch_resource_set_id(msg, pcursor, &rset_id) ||
         !fetch_resource_set_state(msg, pcursor, &state) ||
         !fetch_resource_set_mask(msg, pcursor, 0, &grant) ||
         !fetch_resource_set_mask(msg, pcursor, 1, &advice)) {
-        printf("malformed 0.2\n");
+        mrp_log_error("failed to fetch data from message");
         goto malformed;
     }
 
     /* Update our "master copy" of the resource set. */
 
-    printf("going to get rset of id %d\n", rset_id);
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
     if (!rset) {
-        printf("resource event before creating the resource set!\n");
+        mrp_log_error("resource event outside the resource set lifecycle");
         goto malformed;
     }
-
-    printf("resource set %p id: %u\n", rset, rset->priv->id);
 
     switch (state) {
         case RESPROTO_RELEASE:
@@ -138,18 +135,16 @@ static void resource_event(mrp_msg_t *msg,
 
         mrp_res_resource_t *res = NULL;
 
-        printf("iterating through the resources...\n");
-
         if ((tag != RESPROTO_RESOURCE_ID || type != MRP_MSG_FIELD_UINT32) ||
-            !fetch_resource_name(msg, pcursor, &resnam)) {
-            printf("malformed 1\n");
+                !fetch_resource_name(msg, pcursor, &resnam)) {
+            mrp_log_error("failed to read resource from message");
             goto malformed;
         }
 
         res = get_resource_by_name(rset, resnam);
 
         if (!res) {
-            printf("malformed 2\n");
+            mrp_log_error("resource doesn't exist in resource set");
             goto malformed;
         }
 
@@ -169,7 +164,7 @@ static void resource_event(mrp_msg_t *msg,
         n_attrs = fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs);
 
         if (n_attrs < 0) {
-            printf("malformed 3\n");
+            mrp_log_error("failed to read attributes from message");
             goto malformed;
         }
 
@@ -213,12 +208,12 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
                 fetch_request(msg, &cursor, &req) < 0)
         goto error;
 
-    printf("received message %d for %p\n", req, cx);
+    mrp_log_info("received message %d for %p", req, cx);
 
     switch (req) {
         case RESPROTO_QUERY_RESOURCES:
 
-            printf("received QUERY_RESOURCES response\n");
+            mrp_log_info("received QUERY_RESOURCES response");
 
             cx->priv->master_resource_set =
                     resource_query_response(msg, &cursor);
@@ -227,7 +222,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             break;
         case RESPROTO_QUERY_CLASSES:
 
-            printf("received QUERY_CLASSES response\n");
+            mrp_log_info("received QUERY_CLASSES response");
 
             cx->priv->master_classes = class_query_response(msg, &cursor);
             if (!cx->priv->master_classes)
@@ -239,7 +234,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             mrp_res_resource_set_t *rset = NULL;
             mrp_list_hook_t *p, *n;
 
-            printf("received CREATE_RESOURCE_SET response\n");
+            mrp_log_info("received CREATE_RESOURCE_SET response");
 
             /* get the correct resource set from the pending_sets list */
 
@@ -262,7 +257,6 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             if (!create_resource_set_response(msg, rset, &cursor))
                 goto error;
 
-            printf("inserting rset %p of id %d\n", rset, rset->priv->id);
             mrp_htbl_insert(cx->priv->rset_mapping,
                     u_to_p(rset->priv->id), rset);
 
@@ -275,7 +269,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
         {
             mrp_res_resource_set_t *rset;
 
-            printf("received ACQUIRE_RESOURCE_SET response\n");
+            mrp_log_info("received ACQUIRE_RESOURCE_SET response");
 
             rset = acquire_resource_set_response(msg, cx, &cursor);
 
@@ -298,7 +292,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
         case RESPROTO_RELEASE_RESOURCE_SET:
         {
             mrp_res_resource_set_t *rset;
-            printf("received RELEASE_RESOURCE_SET response\n");
+            mrp_log_info("received RELEASE_RESOURCE_SET response");
 
             rset = acquire_resource_set_response(msg, cx, &cursor);
 
@@ -319,12 +313,13 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             break;
         }
         case RESPROTO_RESOURCES_EVENT:
-            printf("received RESOURCES_EVENT response\n");
+            mrp_log_info("received RESOURCES_EVENT response");
 
             resource_event(msg, cx, seqno, &cursor);
             break;
         case RESPROTO_DESTROY_RESOURCE_SET:
-            /* TODO */
+            mrp_log_info("received DESTROY_RESOURCE_SET response");
+            /* TODO? */
             break;
         default:
             break;
@@ -340,7 +335,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
     return;
 
 error:
-    printf("error processing a message from Murphy\n");
+    mrp_log_error("error processing a message from the server");
     cx->priv->cb(cx, MRP_RES_ERROR_INTERNAL, cx->priv->user_data);
 }
 
@@ -357,7 +352,7 @@ void closed_evt(mrp_transport_t *transp, int error, void *user_data)
     MRP_UNUSED(transp);
     MRP_UNUSED(error);
 
-    printf("connection closed for %p\n", cx);
+    mrp_log_error("connection closed for %p", cx);
     cx->priv->connected = FALSE;
 }
 
@@ -393,7 +388,7 @@ static void destroy_context(mrp_res_context_t *cx)
 static void htbl_free_rset_mapping(void *key, void *object)
 {
 #if 0
-    printf("> htbl_free_rset_mapping(%d, %p)\n", p_to_u(key), object);
+    mrp_log_info("> htbl_free_rset_mapping(%d, %p)", p_to_u(key), object);
 #else
     MRP_UNUSED(key);
 #endif
@@ -487,7 +482,7 @@ mrp_res_context_t *mrp_res_create(mrp_mainloop_t *ml,
 
 error:
 
-    printf("Error connecting to Murphy!\n");
+    mrp_log_error("error connecting to server");
     destroy_context(cx);
 
     return NULL;
@@ -496,6 +491,5 @@ error:
 
 void mrp_res_destroy(mrp_res_context_t *cx)
 {
-    printf("> mrp_res_destroy\n");
     destroy_context(cx);
 }
