@@ -258,7 +258,8 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 
     idx = (idx < 0) ? lua_gettop(L) + idx + 1 : idx;
 
-    luaL_checktype(L, idx, LUA_TTABLE);
+    if (!lua_istable(L, idx))
+        return NULL;
 
     lua_pushliteral(L, "userdata");
     lua_rawget(L, idx);
