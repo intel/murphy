@@ -254,17 +254,19 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
     userdata_t *userdata;
+    int top = lua_gettop(L);
+
+    idx = (idx < 0) ? lua_gettop(L) + idx + 1 : idx;
 
     luaL_checktype(L, idx, LUA_TTABLE);
 
-    lua_pushvalue(L, idx);
     lua_pushliteral(L, "userdata");
-    lua_rawget(L, -2);
+    lua_rawget(L, idx);
 
     userdata = (userdata_t *)lua_touserdata(L, -1);
 
     if (!userdata || !lua_getmetatable(L, -1)) {
-        lua_pop(L, 1);
+        lua_settop(L, top);
         return NULL;
     }
 
@@ -273,7 +275,7 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     if (!lua_rawequal(L, -1, -2) || userdata != userdata->self)
         userdata = NULL;
 
-    lua_pop(L, 3);
+    lua_settop(L, top);
 
     return userdata ? (void *)(userdata + 1) : NULL;
 }
