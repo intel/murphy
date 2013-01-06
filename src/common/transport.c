@@ -42,6 +42,7 @@ static inline int purge_destroyed(mrp_transport_t *t);
 
 
 static MRP_LIST_HOOK(transports);
+static mrp_sighandler_t *pipe_handler;
 
 
 static int check_request_callbacks(mrp_transport_req_t *req)
@@ -130,12 +131,26 @@ static int check_event_callbacks(mrp_transport_evt_t *evt)
 }
 
 
+static void sigpipe_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int sig,
+                            void *user_data)
+{
+    MRP_UNUSED(ml);
+    MRP_UNUSED(h);
+    MRP_UNUSED(user_data);
+
+    mrp_debug("caught signal %d (%s)...", sig, strsignal(sig));
+}
+
+
 mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
                                       mrp_transport_evt_t *evt, void *user_data,
                                       int flags)
 {
     mrp_transport_descr_t *d;
     mrp_transport_t       *t;
+
+    if (!pipe_handler)
+        pipe_handler = mrp_add_sighandler(ml, SIGPIPE, sigpipe_handler, NULL);
 
     if (!check_event_callbacks(evt)) {
         errno = EINVAL;
@@ -173,6 +188,9 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
 {
     mrp_transport_descr_t *d;
     mrp_transport_t       *t;
+
+    if (!pipe_handler)
+        pipe_handler = mrp_add_sighandler(ml, SIGPIPE, sigpipe_handler, NULL);
 
     if (!check_event_callbacks(evt)) {
         errno = EINVAL;
