@@ -602,6 +602,10 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
         valp->_member = f->_member;                       \
         break
 
+#define ANY_TYPE(_type, _member)                \
+    case MRP_MSG_FIELD_##_type:                 \
+        valp->_member = f->_member;             \
+        break
 
     mrp_msg_field_t *f;
     mrp_msg_value_t *valp;
@@ -654,7 +658,23 @@ int mrp_msg_iterate_get(mrp_msg_t *msg, void **it, ...)
 
             if (type == MRP_MSG_FIELD_ANY) {
                 *typep = f->type;
-                *valp  = *((mrp_msg_value_t *)&f->str);
+                switch (f->type) {
+                ANY_TYPE(STRING, str);
+                ANY_TYPE(BOOL  , bln);
+                ANY_TYPE(UINT8 , u8 );
+                ANY_TYPE(SINT8 , s8 );
+                ANY_TYPE(UINT16, u16);
+                ANY_TYPE(SINT16, s16);
+                ANY_TYPE(UINT32, u32);
+                ANY_TYPE(SINT32, s32);
+                ANY_TYPE(UINT64, u64);
+                ANY_TYPE(SINT64, s64);
+                ANY_TYPE(DOUBLE, dbl);
+                default:
+                    mrp_log_error("XXX TODO: currently cannot fetch array "
+                                  "message fields with iterators.");
+                }
+
                 goto next;
             }
 
