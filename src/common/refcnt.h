@@ -35,6 +35,10 @@
  * if/when necessary.
  */
 
+#include <murphy/common/macros.h>
+
+MRP_CDECL_BEGIN
+
 typedef int mrp_refcnt_t;
 
 static inline void *_mrp_ref_obj(void *obj, off_t offs)
@@ -42,7 +46,7 @@ static inline void *_mrp_ref_obj(void *obj, off_t offs)
     mrp_refcnt_t *refcnt;
 
     if (obj != NULL) {
-        refcnt = obj + offs;
+        refcnt = (mrp_refcnt_t *) (obj + offs);
         (*refcnt)++;
     }
 
@@ -55,7 +59,7 @@ static inline int _mrp_unref_obj(void *obj, off_t offs)
     mrp_refcnt_t *refcnt;
 
     if (obj != NULL) {
-        refcnt = obj + offs;
+        refcnt = (mrp_refcnt_t *) (obj + offs);
         --(*refcnt);
 
         if (*refcnt <= 0)
@@ -76,5 +80,7 @@ static inline void mrp_refcnt_init(mrp_refcnt_t *refcnt)
 
 #define mrp_unref_obj(obj, member)                                        \
     _mrp_unref_obj(obj, MRP_OFFSET(typeof(*(obj)), member))
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_REFCNT_H__ */
