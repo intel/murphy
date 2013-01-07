@@ -848,14 +848,18 @@ static void check_glib_io(void)
     int        i;
 
     for (i = 0, t = gios; i < cfg.ngio; i++, t++) {
-        if (t->target != 0 && t->sent != t->received)
-            warning("GLIB I/O #%d: FAIL (only %d/%d)", t->id, t->received,
-                    t->sent);
+        if (t->target != 0 && t->sent != t->received) {
+            warning("GLIB I/O #%d (fd %d): FAIL (only %d/%d)",
+                    t->id, t->pipe[0], t->received, t->sent);
+        }
+
         else
-            info("GLIB I/O #%d: OK (%d/%d)", t->id, t->received, t->sent);
+            info("GLIB I/O #%d (fd %d): OK (%d/%d)", t->id, t->pipe[0],
+                 t->received, t->sent);
     }
 }
 
+static void glib_pump_cleanup(void);
 #endif
 
 
@@ -882,10 +886,6 @@ typedef struct {
     int             nsignal;
 } dbus_test_t;
 
-
-#ifdef GLIB_ENABLED
-static void glib_pump_cleanup(void);
-#endif
 
 static dbus_test_t dbus_test = { pipe: { -1, -1 } };
 
@@ -1033,25 +1033,30 @@ static DBusConnection *connect_to_dbus(char *name)
 }
 
 
-static void client_send_msg(mrp_mainloop_t *ml, mrp_timer_t *t,
-                            void *user_data)
+static void client_send_msg(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 {
     char buf[1024];
 
     MRP_UNUSED(ml);
     MRP_UNUSED(user_data);
 
+    if (dbus_test.nmethod < cfg.ndbus_method) {
+        snprintf(buf, sizeof(buf), "DBUS message #%d", dbus_test.nmethod);
+        send_dbus_message(dbus_test.conn, dbus_test.address, buf);
 
-    snprintf(buf, sizeof(buf), "DBUS message #%d", dbus_test.nmethod);
-    send_dbus_message(dbus_test.conn, dbus_test.address, buf);
+        info("DBUS client: sent #%d message", dbus_test.nmethod);
 
-    info("DBUS client: sent #%d message", dbus_test.nmethod);
+        dbus_test.nmethod++;
+    }
 
-    dbus_test.nmethod++;
-
-    if (dbus_test.nmethod >= cfg.ndbus_method)
+    if (dbus_test.nmethod >= cfg.ndbus_method) {
         mrp_del_timer(t);
-    /* cfg.nrunning updated only once we've received the last reply */
+        if (cfg.ndbus_method == 0)
+            cfg.nrunning--;
+        else {
+            /* cfg.nrunning updated only once we've received the last reply */
+        }
+    }
 }
 
 
@@ -1218,7 +1223,7 @@ static void setup_dbus_tests(mrp_mainloop_t *ml)
 {
     mrp_sighandler_t *h;
 
-    if (cfg.ndbus_method == 0 || cfg.ndbus_signal == 0)
+    if (cfg.ndbus_method == 0 && cfg.ndbus_signal == 0)
         return;
 
     if ((h = mrp_add_sighandler(ml, SIGCHLD, sigchild_handler, NULL)) != NULL) {
@@ -1232,7 +1237,7 @@ static void setup_dbus_tests(mrp_mainloop_t *ml)
 
 static void check_dbus(void)
 {
-    if (cfg.ndbus_method == 0 || cfg.ndbus_signal == 0)
+    if (cfg.ndbus_method == 0 && cfg.ndbus_signal == 0)
         return;
 
     if (dbus_test.client != 0) {
@@ -1647,6 +1652,10 @@ int main(int argc, char *argv[])
     if (ml == NULL)
         fatal("failed to create main loop.");
 
+    dbus_test.ml = ml;
+    setup_dbus_tests(ml);
+    ml = dbus_test.ml;
+
     setup_timers(ml);
     setup_io(ml);
     setup_signals(ml);
@@ -1661,10 +1670,6 @@ int main(int argc, char *argv[])
     setup_glib_io();
     setup_glib_timers();
 #endif
-
-    dbus_test.ml = ml;
-    setup_dbus_tests(ml);
-    ml = dbus_test.ml;
 
     if (mrp_add_timer(ml, 1000, check_quit, NULL) == NULL)
         fatal("failed to create quit-check timer");

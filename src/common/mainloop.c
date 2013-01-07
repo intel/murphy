@@ -53,6 +53,7 @@
 
 struct mrp_io_watch_s {
     mrp_list_hook_t    hook;                     /* to list of watches */
+    mrp_list_hook_t    deleted;                  /* to list of pending delete */
     int              (*free)(void *ptr);         /* cb to free memory */
     mrp_mainloop_t    *ml;                       /* mainloop */
     int                fd;                       /* file descriptor to watch */
@@ -74,6 +75,7 @@ struct mrp_io_watch_s {
 
 struct mrp_timer_s {
     mrp_list_hook_t  hook;                       /* to list of timers */
+    mrp_list_hook_t  deleted;                    /* to list of pending delete */
     int            (*free)(void *ptr);           /* cb to free memory */
     mrp_mainloop_t  *ml;                         /* mainloop */
     unsigned int     msecs;                      /* timer interval */
@@ -89,6 +91,7 @@ struct mrp_timer_s {
 
 struct mrp_deferred_s {
     mrp_list_hook_t    hook;                     /* to list of cbs */
+    mrp_list_hook_t    deleted;                  /* to list of pending delete */
     int              (*free)(void *ptr);         /* cb to free memory */
     mrp_mainloop_t    *ml;                       /* mainloop */
     mrp_deferred_cb_t  cb;                       /* user callback */
@@ -103,6 +106,7 @@ struct mrp_deferred_s {
 
 struct mrp_sighandler_s {
     mrp_list_hook_t      hook;                   /* to list of handlers */
+    mrp_list_hook_t      deleted;                /* to list of pending delete */
     int                (*free)(void *ptr);       /* cb to free memory */
     mrp_mainloop_t      *ml;                     /* mainloop */
     int                  signum;                 /* signal number */
@@ -111,8 +115,12 @@ struct mrp_sighandler_s {
 };
 
 
-#define mark_deleted(o) ((o)->cb = NULL)
-#define is_deleted(o)   ((o)->cb == NULL)
+#define mark_deleted(o) do {                                    \
+        (o)->cb = NULL;                                         \
+        mrp_list_append(&(o)->ml->deleted, &(o)->deleted);      \
+    } while (0)
+
+#define is_deleted(o) ((o)->cb == NULL)
 
 
 /*
@@ -129,6 +137,7 @@ struct mrp_sighandler_s {
 
 typedef struct {
     mrp_list_hook_t  hook;                       /* unfreed deleted items */
+    mrp_list_hook_t  deleted;                    /* to list of pending delete */
     int            (*free)(void *ptr);           /* cb to free memory */
 } deleted_t;
 
@@ -161,7 +170,9 @@ typedef struct {
 
 struct mrp_subloop_s {
     mrp_list_hook_t      hook;                   /* to list of subloops */
+    mrp_list_hook_t      deleted;                /* to list of pending delete */
     int                (*free)(void *ptr);       /* cb to free memory */
+    mrp_mainloop_t      *ml;                     /* main loop */
     mrp_subloop_ops_t   *cb;                     /* subloop glue callbacks */
     void                *user_data;              /* opaque subloop data */
     int                  epollfd;                /* epollfd for this subloop */
@@ -328,75 +339,141 @@ static void fdtbl_remove(fdtbl_t *ft, int fd)
  * I/O watches
  */
 
-
-static int add_slave_io_watch(mrp_io_watch_t *w)
+static uint32_t epoll_event_mask(mrp_io_watch_t *master, mrp_io_watch_t *ignore)
 {
-    mrp_mainloop_t     *ml = w->ml;
-    struct epoll_event  evt;
-    mrp_io_watch_t     *master, *slave;
-    mrp_list_hook_t    *p, *n, *sp, *sn;
+    mrp_io_watch_t  *w;
+    mrp_list_hook_t *p, *n;
+    uint32_t         mask;
 
-    mrp_list_foreach(&ml->iowatches, p, n) {
-        master = mrp_list_entry(p, typeof(*master), hook);
-        if (master->fd != w->fd)
-            continue;
+    mask = (master != ignore ? master->events : 0);
 
-        evt.events   = master->events;
-        evt.data.fd  = master->fd;
+    mrp_list_foreach(&master->slave, p, n) {
+        w = mrp_list_entry(p, typeof(*w), slave);
 
-        mrp_list_foreach(&master->slave, sp, sn) {
-            slave = mrp_list_entry(sp, typeof(*slave), slave);
-            evt.events |= slave->events;
-        }
-
-        slave = w;
-        evt.events |= slave->events;
-        if (epoll_ctl(ml->epollfd, EPOLL_CTL_MOD, master->fd, &evt) == 0) {
-            mrp_list_append(&master->slave, &slave->slave);
-            return TRUE;
-        }
-        else
-            break;
+        if (w != ignore)
+            mask |= w->events;
     }
 
-    return FALSE;
+    return mask;
 }
 
 
-static uint32_t slave_io_events(mrp_io_watch_t *watch, mrp_io_watch_t **master)
+static int epoll_add_slave(mrp_io_watch_t *master, mrp_io_watch_t *slave)
 {
-    mrp_list_hook_t *p, *n;
-    mrp_io_watch_t  *w;
-    uint32_t         events;
+    mrp_mainloop_t     *ml = master->ml;
+    struct epoll_event  evt;
 
-    events = watch->events;
-    mrp_list_foreach(&watch->slave, p, n) {
-        w       = mrp_list_entry(p, typeof(*w), slave);
-        events |= w->events;
+    evt.events   = epoll_event_mask(master, NULL) | slave->events;
+    evt.data.u64 = 0;
+    evt.data.fd  = master->fd;
 
-        if (master != NULL && !mrp_list_empty(&w->hook))
-            *master = w;
+    if (epoll_ctl(ml->epollfd, EPOLL_CTL_MOD, master->fd, &evt) == 0) {
+        mrp_list_append(&master->slave, &slave->slave);
+
+        return 0;
     }
 
-    return events;
+    return -1;
+}
+
+
+static int epoll_add(mrp_io_watch_t *w)
+{
+    mrp_mainloop_t     *ml = w->ml;
+    mrp_io_watch_t     *master;
+    struct epoll_event  evt;
+
+    if (fdtbl_insert(ml->fdtbl, w->fd, w) == 0) {
+        evt.events   = w->events;
+        evt.data.u64 = 0;                /* init full union for valgrind... */
+        evt.data.fd  = w->fd;
+
+        if (epoll_ctl(ml->epollfd, EPOLL_CTL_ADD, w->fd, &evt) == 0) {
+            mrp_list_append(&ml->iowatches, &w->hook);
+            ml->niowatch++;
+
+            return 0;
+        }
+        else
+            fdtbl_remove(ml->fdtbl, w->fd);
+    }
+    else {
+        if (errno == EEXIST) {
+            master = fdtbl_lookup(ml->fdtbl, w->fd);
+
+            if (master != NULL)
+                return epoll_add_slave(master, w);
+        }
+    }
+
+    return -1;
+}
+
+
+static int epoll_del(mrp_io_watch_t *w)
+{
+    mrp_mainloop_t     *ml = w->ml;
+    mrp_io_watch_t     *master;
+    struct epoll_event  evt;
+    int                 status;
+
+    if (is_master(w))
+        master = w;
+    else
+        master = fdtbl_lookup(ml->fdtbl, w->fd);
+
+    if (master != NULL) {
+        evt.events   = epoll_event_mask(master, w);
+        evt.data.u64 = 0;                /* init full union for valgrind... */
+        evt.data.fd  = w->fd;
+
+        if (evt.events == 0) {
+            fdtbl_remove(ml->fdtbl, w->fd);
+            status = epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, &evt);
+
+            if (status == 0 || (errno == EBADF || errno == ENOENT))
+                ml->niowatch--;
+        }
+        else
+            status = epoll_ctl(ml->epollfd, EPOLL_CTL_MOD, w->fd, &evt);
+
+        if (status == 0 || (errno == EBADF || errno == ENOENT))
+            return 0;
+        else
+            mrp_log_error("Failed to update epoll for deleted I/O watch %p "
+                          "(fd %d, %d: %s).", w, w->fd, errno, strerror(errno));
+    }
+    else {
+        mrp_log_error("Failed to find master for deleted I/O watch %p "
+                      "(fd %d).", w, w->fd);
+        errno = EINVAL;
+    }
+
+    return -1;
 }
 
 
 static int free_io_watch(void *ptr)
 {
-    mrp_io_watch_t     *w = (typeof(w))ptr;
-    struct epoll_event  evt;
+    mrp_io_watch_t *w  = (mrp_io_watch_t *)ptr;
+    mrp_mainloop_t *ml = w->ml;
+    mrp_io_watch_t *master;
 
-    /*
-     * try removing from epoll if we failed to do so
-     */
+    master = fdtbl_lookup(ml->fdtbl, w->fd);
 
-    if (w->fd != -1) {
-        if (epoll_ctl(w->ml->epollfd, EPOLL_CTL_DEL, w->fd, &evt) != 0)
-            if (errno != EBADF)
-                return FALSE;
+    if (master == w) {
+        fdtbl_remove(ml->fdtbl, w->fd);
+
+        if (!mrp_list_empty(&w->slave)) {
+            /* relink first slave as new master to mainloop */
+            master = mrp_list_entry(w->slave.next, typeof(*master), slave);
+            mrp_list_append(&ml->iowatches, &master->hook);
+
+            fdtbl_insert(ml->fdtbl, master->fd, master);
+        }
     }
 
+    mrp_list_delete(&w->slave);
     mrp_free(w);
 
     return TRUE;
@@ -407,14 +484,14 @@ mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
                                  mrp_io_event_t events,
                                  mrp_io_watch_cb_t cb, void *user_data)
 {
-    struct epoll_event  evt;
-    mrp_io_watch_t     *w;
+    mrp_io_watch_t *w;
 
     if (fd < 0 || cb == NULL)
         return NULL;
 
     if ((w = mrp_allocz(sizeof(*w))) != NULL) {
         mrp_list_init(&w->hook);
+        mrp_list_init(&w->deleted);
         mrp_list_init(&w->slave);
         w->ml        = ml;
         w->fd        = fd;
@@ -423,25 +500,9 @@ mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
         w->user_data = user_data;
         w->free      = free_io_watch;
 
-        evt.events   = w->events;
-        evt.data.fd  = fd;
-
-        if (fdtbl_insert(ml->fdtbl, fd, w) == 0) {
-            if (epoll_ctl(ml->epollfd, EPOLL_CTL_ADD, w->fd, &evt) == 0) {
-                mrp_list_append(&ml->iowatches, &w->hook);
-                ml->niowatch++;
-            }
-            else {
-                fdtbl_remove(ml->fdtbl, fd);
-                mrp_free(w);
-                w = NULL;
-            }
-        }
-        else {
-            if (errno != EEXIST || !add_slave_io_watch(w)) {
-                mrp_free(w);
-                w = NULL;
-            }
+        if (epoll_add(w) != 0) {
+            mrp_free(w);
+            w = NULL;
         }
     }
 
@@ -458,60 +519,14 @@ void mrp_del_io_watch(mrp_io_watch_t *w)
      *        the actual deletion in the dispatching loop.
      */
 
-    if (w != NULL)
+    if (w != NULL) {
+        mrp_debug("marking I/O watch %p deleted", w);
+
         mark_deleted(w);
-}
+        w->events = 0;
 
-
-static void delete_io_watch(mrp_io_watch_t *w)
-{
-    mrp_mainloop_t     *ml = w->ml;
-    mrp_io_watch_t     *master;
-    struct epoll_event  evt;
-    int                 op, was_master;
-
-    was_master = is_master(w);
-    mrp_list_delete(&w->hook);
-
-    if (was_master) {
-        if (mrp_list_empty(&w->slave)) {
-            op = EPOLL_CTL_DEL;
-            mrp_list_append(&ml->deleted, &w->hook);
-            fdtbl_remove(ml->fdtbl, w->fd);
-        }
-        else {
-            /* relink first slave as new master to mainloop */
-            master = mrp_list_entry(w->slave.next, typeof(*master), slave);
-            mrp_list_delete(&w->slave);
-            mrp_list_append(&ml->iowatches, &master->hook);
-            /* relink old master to deleted list */
-            mrp_list_init(&w->slave);
-            mrp_list_append(&ml->deleted, &w->hook);
-
-            op          = EPOLL_CTL_MOD;
-            evt.events  = master->events | slave_io_events(master, NULL);
-            evt.data.fd = w->fd;
-        }
+        epoll_del(w);
     }
-    else {
-        master      = NULL;
-        w->events   = 0;
-        op          = EPOLL_CTL_MOD;
-        evt.events  = slave_io_events(w, &master);
-        evt.data.fd = w->fd;
-
-        mrp_list_delete(&w->slave);
-        mrp_list_init(&w->slave);
-        mrp_list_append(&ml->deleted, &w->hook);
-    }
-
-    if (epoll_ctl(ml->epollfd, op, w->fd, &evt) == 0 ||
-        errno == EBADF || errno == ENOENT)
-        w->fd = -1;
-    else
-        mrp_log_error("Failed to update epoll for deleted I/O watch %p.", w);
-
-    ml->niowatch--;
 }
 
 
@@ -602,6 +617,17 @@ static mrp_timer_t *find_next_timer(mrp_mainloop_t *ml)
 }
 
 
+static int free_timer(void *ptr)
+{
+    mrp_timer_t *t = (mrp_timer_t *)ptr;
+
+    mrp_free(t);
+
+    return TRUE;
+}
+
+
+
 mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
                            mrp_timer_cb_t cb, void *user_data)
 {
@@ -612,11 +638,13 @@ mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
 
     if ((t = mrp_allocz(sizeof(*t))) != NULL) {
         mrp_list_init(&t->hook);
+        mrp_list_init(&t->deleted);
         t->ml        = ml;
         t->expire    = time_now() + msecs * USECS_PER_MSEC;
         t->msecs     = msecs;
         t->cb        = cb;
         t->user_data = user_data;
+        t->free      = free_timer;
 
         insert_timer(t);
     }
@@ -638,18 +666,13 @@ void mrp_del_timer(mrp_timer_t *t)
      */
 
     if (t != NULL) {
+        mrp_debug("marking timer %p deleted", t);
+
         mark_deleted(t);
 
         if (t->ml->next_timer == t)
             find_next_timer(t->ml);
     }
-}
-
-
-static inline void delete_timer(mrp_timer_t *t)
-{
-    mrp_list_delete(&t->hook);
-    mrp_list_append(&t->ml->deleted, &t->hook);
 }
 
 
@@ -667,6 +690,7 @@ mrp_deferred_t *mrp_add_deferred(mrp_mainloop_t *ml, mrp_deferred_cb_t cb,
 
     if ((d = mrp_allocz(sizeof(*d))) != NULL) {
         mrp_list_init(&d->hook);
+        mrp_list_init(&d->deleted);
         d->ml        = ml;
         d->cb        = cb;
         d->user_data = user_data;
@@ -687,15 +711,10 @@ void mrp_del_deferred(mrp_deferred_t *d)
      *        in the dispatching loop.
      */
 
-    if (d != NULL)
+    if (d != NULL) {
+        mrp_debug("marking deferred %p deleted", d);
         mark_deleted(d);
-}
-
-
-static inline void delete_deferred(mrp_deferred_t *d)
-{
-    mrp_list_delete(&d->hook);
-    mrp_list_append(&d->ml->deleted, &d->hook);
+    }
 }
 
 
@@ -732,13 +751,6 @@ void mrp_enable_deferred(mrp_deferred_t *d)
  * signal notifications
  */
 
-static inline void delete_sighandler(mrp_sighandler_t *h)
-{
-    mrp_list_delete(&h->hook);
-    mrp_list_append(&h->ml->deleted, &h->hook);
-}
-
-
 static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
                              mrp_io_event_t events, void *user_data)
 {
@@ -761,9 +773,6 @@ static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
                 if (h->signum == signum)
                     h->cb(ml, h, signum, h->user_data);
             }
-
-            if (is_deleted(h))
-                delete_sighandler(h);
         }
     }
 }
@@ -802,6 +811,7 @@ mrp_sighandler_t *mrp_add_sighandler(mrp_mainloop_t *ml, int signum,
 
     if ((s = mrp_allocz(sizeof(*s))) != NULL) {
         mrp_list_init(&s->hook);
+        mrp_list_init(&s->deleted);
         s->ml        = ml;
         s->signum    = signum;
         s->cb        = cb;
@@ -839,6 +849,8 @@ void mrp_del_sighandler(mrp_sighandler_t *h)
 {
     if (h != NULL) {
         if (!is_deleted(h)) {
+            mrp_debug("marking sighandler %p deleted", h);
+
             mark_deleted(h);
             recalc_sigmask(h->ml);
         }
@@ -853,6 +865,8 @@ void mrp_del_sighandler(mrp_sighandler_t *h)
 static int free_subloop(void *ptr)
 {
     mrp_subloop_t *sl = (mrp_subloop_t *)ptr;
+
+    mrp_debug("freeing subloop %p", sl);
 
     mrp_free(sl->pollfds);
     mrp_free(sl->events);
@@ -872,6 +886,8 @@ static void subloop_event_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     MRP_UNUSED(fd);
     MRP_UNUSED(events);
 
+    mrp_debug("subloop %p has events, setting poll to TRUE", sl);
+
     sl->poll = TRUE;
 }
 
@@ -886,7 +902,9 @@ mrp_subloop_t *mrp_add_subloop(mrp_mainloop_t *ml, mrp_subloop_ops_t *ops,
 
     if ((sl = mrp_allocz(sizeof(*sl))) != NULL) {
         mrp_list_init(&sl->hook);
+        mrp_list_init(&sl->deleted);
         sl->free      = free_subloop;
+        sl->ml        = ml;
         sl->cb        = ops;
         sl->user_data = user_data;
         sl->epollfd   = epoll_create1(EPOLL_CLOEXEC);
@@ -916,9 +934,8 @@ mrp_subloop_t *mrp_add_subloop(mrp_mainloop_t *ml, mrp_subloop_ops_t *ops,
 
 void mrp_del_subloop(mrp_subloop_t *sl)
 {
-    mrp_mainloop_t     *ml;
-    struct epoll_event  dummy;
-    int                 i;
+    struct epoll_event dummy;
+    int                i;
 
     /*
      * Notes: It is not safe to free the loop here as there might be
@@ -931,9 +948,11 @@ void mrp_del_subloop(mrp_subloop_t *sl)
      */
 
     if (sl != NULL && !is_deleted(sl)) {
-        ml = sl->w->ml;
+        mrp_debug("deactivating and marking subloop %p deleted", sl);
+
         mrp_del_io_watch(sl->w);
 
+        /* XXX TODO: Why ? close(sl->epollfd) should be enough... */
         for (i = 0; i < sl->npollfd; i++)
             epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, sl->pollfds[i].fd, &dummy);
 
@@ -943,8 +962,6 @@ void mrp_del_subloop(mrp_subloop_t *sl)
         sl->fdtbl = NULL;
 
         mark_deleted(sl);
-        mrp_list_delete(&sl->hook);
-        mrp_list_append(&ml->deleted, &sl->hook);
     }
 }
 
@@ -1121,6 +1138,7 @@ static void purge_io_watches(mrp_mainloop_t *ml)
     mrp_list_foreach(&ml->iowatches, p, n) {
         w = mrp_list_entry(p, typeof(*w), hook);
         mrp_list_delete(&w->hook);
+        mrp_list_delete(&w->deleted);
 
         mrp_list_foreach(&w->slave, sp, sn) {
             s = mrp_list_entry(sp, typeof(*s), slave);
@@ -1141,6 +1159,7 @@ static void purge_timers(mrp_mainloop_t *ml)
     mrp_list_foreach(&ml->timers, p, n) {
         t = mrp_list_entry(p, typeof(*t), hook);
         mrp_list_delete(&t->hook);
+        mrp_list_delete(&t->deleted);
         mrp_free(t);
     }
 }
@@ -1154,12 +1173,14 @@ static void purge_deferred(mrp_mainloop_t *ml)
     mrp_list_foreach(&ml->deferred, p, n) {
         d = mrp_list_entry(p, typeof(*d), hook);
         mrp_list_delete(&d->hook);
+        mrp_list_delete(&d->deleted);
         mrp_free(d);
     }
 
     mrp_list_foreach(&ml->inactive_deferred, p, n) {
         d = mrp_list_entry(p, typeof(*d), hook);
         mrp_list_delete(&d->hook);
+        mrp_list_delete(&d->deleted);
         mrp_free(d);
     }
 }
@@ -1173,6 +1194,7 @@ static void purge_sighandlers(mrp_mainloop_t *ml)
     mrp_list_foreach(&ml->sighandlers, p, n) {
         s = mrp_list_entry(p, typeof(*s), hook);
         mrp_list_delete(&s->hook);
+        mrp_list_delete(&s->deleted);
         mrp_free(s);
     }
 }
@@ -1184,14 +1206,18 @@ static void purge_deleted(mrp_mainloop_t *ml)
     deleted_t       *d;
 
     mrp_list_foreach(&ml->deleted, p, n) {
-        d = mrp_list_entry(p, typeof(*d), hook);
+        d = mrp_list_entry(p, typeof(*d), deleted);
+        mrp_list_delete(&d->deleted);
         mrp_list_delete(&d->hook);
-        if (d->free == NULL)
+        if (d->free == NULL) {
+            mrp_debug("purging deleted object %p", d);
             mrp_free(d);
+        }
         else {
+            mrp_debug("purging deleted object %p (free cb: %p)", d, d->free);
             if (!d->free(d)) {
                 mrp_log_error("Failed to free purged item %p.", d);
-                mrp_list_prepend(p, &d->hook);
+                mrp_list_prepend(p, &d->deleted);
             }
         }
     }
@@ -1206,6 +1232,7 @@ static void purge_subloops(mrp_mainloop_t *ml)
     mrp_list_foreach(&ml->subloops, p, n) {
         sl = mrp_list_entry(p, typeof(*sl), hook);
         mrp_list_delete(&sl->hook);
+        mrp_list_delete(&sl->deleted);
         free_subloop(sl);
     }
 }
@@ -1299,11 +1326,15 @@ static int prepare_subloop(mrp_subloop_t *sl)
 
     MRP_UNUSED(dump_pollfds);
 
+    mrp_debug("preparing subloop %p", sl);
+
     pollfds = sl->pollfds;
     npollfd = sl->npollfd;
 
-    if (sl->cb->prepare(sl->user_data))
+    if (sl->cb->prepare(sl->user_data)) {
+        mrp_debug("subloop %p prepare reported ready, dispatching it", sl);
         sl->cb->dispatch(sl->user_data);
+    }
     sl->poll = FALSE;
 
     nfd = npollfd;
@@ -1353,19 +1384,24 @@ static int prepare_subloop(mrp_subloop_t *sl)
     for (i = 0; i < npollfd; i++) {
         fd = pollfds[i].fd;
         fdtbl_remove(sl->fdtbl, fd);
-        epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, fd, &evt);
+        if (epoll_ctl(sl->epollfd, EPOLL_CTL_DEL, fd, &evt) < 0) {
+            if (errno != EBADF && errno != ENOENT)
+                mrp_log_error("Failed to delete subloop fd %d from epoll "
+                              "(%d: %s)", fd, errno, strerror(errno));
+        }
     }
 
     for (i = 0; i < nfd; i++) {
         fd  = fds[i].fd;
         idx = i + 1;
 
-        evt.events  = fds[i].events;
-        evt.data.fd = fd;
+        evt.events   = fds[i].events;
+        evt.data.u64 = 0;                /* init full union for valgrind... */
+        evt.data.fd  = fd;
 
         if (fdtbl_insert(sl->fdtbl, fd, (void *)(ptrdiff_t)idx) == 0) {
             if (epoll_ctl(sl->epollfd, EPOLL_CTL_ADD, fd, &evt) != 0) {
-                mrp_log_error("Failed to add subloop fd %d for epoll "
+                mrp_log_error("Failed to add subloop fd %d to epoll "
                               "(%d: %s)", fd, errno, strerror(errno));
             }
         }
@@ -1395,6 +1431,9 @@ static int prepare_subloop(mrp_subloop_t *sl)
     }
 
  out:
+    mrp_debug("subloop %p: fds: %d, timeout: %d, poll: %s",
+              sl, sl->npollfd, timeout, sl->poll ? "TRUE" : "FALSE");
+
     return timeout;
 }
 
@@ -1414,6 +1453,8 @@ static int prepare_subloops(mrp_mainloop_t *ml)
             ext_timeout = prepare_subloop(sl);
             min_timeout = MRP_MIN(min_timeout, ext_timeout);
         }
+        else
+            mrp_debug("skipping deleted subloop %p", sl);
     }
 
     return min_timeout;
@@ -1457,6 +1498,9 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
         MRP_ASSERT(ml->events != NULL, "can't allocate epoll event buffer");
     }
 
+    mrp_debug("mainloop %p prepared: %d I/O watches, timeout %d", ml,
+              ml->niowatch, ml->poll_timeout);
+
     return TRUE;
 }
 
@@ -1472,6 +1516,9 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
 
         if (n < 0 && errno == EINTR)
             n = 0;
+
+        mrp_debug("mainloop %p has %d/%d I/O events waiting", ml, n,
+                  ml->nevent);
 
         ml->poll_result = n;
     }
@@ -1512,10 +1559,15 @@ static int poll_subloop(mrp_subloop_t *sl)
             }
         }
 
+        mrp_debug("subloop %p has %d fds ready", sl, sl->npollfd);
+
         return n;
     }
-    else
+    else {
+        mrp_debug("subloop %p has poll flag off", sl);
+
         return 0;
+    }
 }
 
 
@@ -1527,12 +1579,15 @@ static void dispatch_deferred(mrp_mainloop_t *ml)
     mrp_list_foreach(&ml->deferred, p, n) {
         d = mrp_list_entry(p, typeof(*d), hook);
 
-        if (!is_deleted(d) && !d->inactive)
+        if (!is_deleted(d) && !d->inactive) {
+            mrp_debug("dispatching active deferred cb %p", d);
             d->cb(ml, d, d->user_data);
+        }
+        else
+            mrp_debug("skipping %s deferred cb %p",
+                      is_deleted(d) ? "deleted" : "inactive", d);
 
-        if (is_deleted(d))
-            delete_deferred(d);
-        else if (d->inactive)
+        if (!is_deleted(d) && d->inactive)
             disable_deferred(d);
 
         if (ml->quit)
@@ -1554,6 +1609,8 @@ static void dispatch_timers(mrp_mainloop_t *ml)
 
         if (!is_deleted(t)) {
             if (t->expire <= now) {
+                mrp_debug("dispatching expired timer %p", t);
+
                 t->cb(ml, t, t->user_data);
 
                 if (!is_deleted(t))
@@ -1562,9 +1619,8 @@ static void dispatch_timers(mrp_mainloop_t *ml)
             else
                 break;
         }
-
-        if (is_deleted(t))
-            delete_timer(t);
+        else
+            mrp_debug("skipping deleted timer %p", t);
 
         if (ml->quit)
             break;
@@ -1584,8 +1640,12 @@ static void dispatch_subloops(mrp_mainloop_t *ml)
             poll_subloop(sl);
 
             if (sl->cb->check(sl->user_data, sl->pollfds,
-                              sl->npollfd))
+                              sl->npollfd)) {
+                mrp_debug("dispatching subloop %p", sl);
                 sl->cb->dispatch(sl->user_data);
+            }
+            else
+                mrp_debug("skipping subloop %p, check said no", sl);
         }
     }
 }
@@ -1606,13 +1666,14 @@ static void dispatch_slaves(mrp_io_watch_t *w, struct epoll_event *e)
 
         s = mrp_list_entry(p, typeof(*s), slave);
 
-        if (!is_deleted(s))
+        if (!is_deleted(s)) {
+            mrp_debug("dispatching slave I/O watch %p (fd %d)", s, s->fd);
             s->cb(ml, s, s->fd, events, s->user_data);
+        }
+        else
+            mrp_debug("skipping slave I/O watch %p (fd %d)", s, s->fd);
 
         events &= ~(MRP_IO_EVENT_INOUT & s->events);
-
-        if (is_deleted(s))
-            delete_io_watch(s);
     }
 }
 
@@ -1627,17 +1688,26 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
         fd = e->data.fd;
         w  = fdtbl_lookup(ml->fdtbl, fd);
 
-        if (w == NULL)
+        if (w == NULL) {
+            mrp_debug("ignoring event for deleted fd %d", fd);
             continue;
+        }
 
-        if (!is_deleted(w))
+        if (!is_deleted(w)) {
+            mrp_debug("dispatching I/O watch %p (fd %d)", w, fd);
             w->cb(ml, w, w->fd, e->events, w->user_data);
+        }
+        else
+            mrp_debug("skipping delete I/O watch %p (fd %d)", w, fd);
 
         if (!mrp_list_empty(&w->slave))
             dispatch_slaves(w, e);
 
         if (e->events & EPOLLRDHUP) {
-            epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
+            if (epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e) < 0 &&
+                (errno != EBADF && errno != ENOENT))
+                mrp_log_error("Failed to delete fd %d from epoll "
+                              "(%d: %s).", w->fd, errno, strerror(errno));
             fdtbl_remove(ml->fdtbl, w->fd);
         }
         else {
@@ -1652,14 +1722,14 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
                  */
 
                 if (w->wrhup++ > 5) {
-                    epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e);
+                    if (epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e) < 0 &&
+                        (errno != EBADF && errno != ENOENT))
+                        mrp_log_error("Failed to EPOLL_CTL_DEL fd %d (%d: %s).",
+                                      w->fd, errno,strerror(errno));
                     fdtbl_remove(ml->fdtbl, w->fd);
                 }
             }
         }
-
-        if (is_deleted(w))
-            delete_io_watch(w);
 
         if (ml->quit)
             break;
