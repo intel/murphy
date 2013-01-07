@@ -221,6 +221,7 @@ pkgconfig_DATA  += core/murphy-core.pc
 
 LUA_BINDINGS_SOURCES = 				\
 		core/lua-bindings/lua-murphy.c	\
+		core/lua-bindings/lua-lua.c	\
 		core/lua-bindings/lua-plugin.c	\
 		core/lua-bindings/lua-log.c	\
 		core/lua-bindings/lua-console.c
