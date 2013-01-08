@@ -183,7 +183,7 @@ static void config_set_defaults(mrp_context_t *ctx)
 
 void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
 {
-    #define OPTIONS "c:C:l:t:fP:a:vd:Dhq"
+#   define OPTIONS "c:C:l:t:fP:a:vd:DhHq"
     struct option options[] = {
         { "config-file"  , required_argument, NULL, 'c' },
         { "config-dir"   , required_argument, NULL, 'C' },
@@ -195,15 +195,18 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
         { "list-debug"   , no_argument      , NULL, 'D' },
         { "foreground"   , no_argument      , NULL, 'f' },
         { "help"         , no_argument      , NULL, 'h' },
+        { "more-help"    , no_argument      , NULL, 'H' },
         { "query-plugins", no_argument      , NULL, 'q' },
         { NULL, 0, NULL, 0 }
     };
 
-    int  opt;
+    int opt, help;
 
     config_set_defaults(ctx);
     mrp_log_set_mask(ctx->log_mask);
     mrp_log_set_target(ctx->log_target);
+
+    help = FALSE;
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
         switch (opt) {
@@ -254,9 +257,11 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
             break;
 
         case 'h':
-            print_usage(argv[0], -1, "");
-            print_plugin_help(ctx, FALSE);
-            exit(0);
+            help++;
+            break;
+
+        case 'H':
+            help += 2;
             break;
 
         case 'q':
@@ -267,6 +272,14 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
             print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
+
+    if (help) {
+        print_usage(argv[0], -1, "");
+        if (help > 1)
+            print_plugin_help(ctx, FALSE);
+        exit(0);
+    }
+
 }
 
 
