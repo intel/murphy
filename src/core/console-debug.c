@@ -157,7 +157,7 @@ static void debug_reset(mrp_console_t *c, void *user_data,
     "\n"                                                                  \
     "    func[=on|off]:       all messages from <func>\n"                 \
     "    @file[=on|off]:      all messages in <file>\n"                   \
-    "    @file:line=[on|off]: messages at <file>:<line>\n"                \
+    "    @file:line[=on|off]: messages at <file>:<line>\n"                \
     "    *[=on|off]:          all messages\n"                             \
 
 #define RESET_SYNTAX        "reset"
