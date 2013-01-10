@@ -110,7 +110,6 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
     mrp_resource_state_t state;
     mrp_list_hook_t *entry, *n;
     mrp_resource_t *res;
-    mqi_handle_t trh;
 
     if (rset) {
         state = rset->state;
