@@ -30,6 +30,8 @@
 #ifndef __MURPHY_LUA_ELEMENT_H__
 #define __MURPHY_LUA_ELEMENT_H__
 
+#include <murphy-db/mqi-types.h>
+
 #define MRP_LUA_ELEMENT_FIELDS                  \
     const char              *name;              \
     mrp_lua_element_mask_t   inpmask;           \
@@ -45,6 +47,27 @@ typedef struct mrp_lua_element_input_s   mrp_lua_element_input_t;
 typedef uint32_t                         mrp_lua_element_mask_t;
 
 void mrp_lua_create_element_class(lua_State *L);
+
+int mrp_lua_element_get_input_count(mrp_lua_element_t *el);
+const char *mrp_lua_element_get_input_name(mrp_lua_element_t *el, int inpidx);
+int mrp_lua_element_get_input_index(mrp_lua_element_t *el, const char *inpnam);
+int mrp_lua_element_get_column_index(mrp_lua_element_t *el, int inpidx,
+                                     const char *colnam);
+int mrp_lua_element_get_column_count(mrp_lua_element_t *el, int inpidx);
+
+mqi_data_type_t mrp_lua_element_get_column_type(mrp_lua_element_t *el,
+                                                int inpidx, int colidx);
+int mrp_lua_element_get_row_count(mrp_lua_element_t *el, int inpidx);
+const char *mrp_lua_element_get_string(mrp_lua_element_t *el, int inpidx,
+                                      int colidx, int rowidx,
+                                      char * buf, int len);
+int32_t mrp_lua_element_get_integer(mrp_lua_element_t *el, int inpidx,
+                                   int colidx, int rowidx);
+
+uint32_t mrp_lua_element_get_unsigned(mrp_lua_element_t *el, int inpidx,
+                                     int colidx, int rowidx);
+double mrp_lua_element_get_floating(mrp_lua_element_t *el, int inpidx,
+                                   int colidx, int rowidx);
 
 
 #endif  /* __MURPHY_LUA_ELEMENT_H__ */

@@ -152,6 +152,214 @@ void mrp_lua_create_element_class(lua_State *L)
     element_input_class_create(L);
 }
 
+int mrp_lua_element_get_input_count(mrp_lua_element_t *el)
+{
+    return el ? (int)el->ninput : -1;
+}
+
+const char *mrp_lua_element_get_input_name(mrp_lua_element_t *el, int inpidx)
+{
+    mrp_lua_element_input_t *inp;
+
+    if (!el || inpidx < 0 || inpidx >= (int)el->ninput || !(inp = el->inputs))
+        return NULL;
+
+    return inp->name;
+}
+
+int mrp_lua_element_get_input_index(mrp_lua_element_t *el, const char *inpnam)
+{
+    mrp_lua_element_input_t *inp;
+    size_t inpidx;
+
+    if (el && inpnam && (inp = el->inputs)) {
+        for (inpidx = 0;   inpidx < el->ninput;   inpidx++) {
+            if (!strcmp(inpnam, el->inputs[inpidx].name))
+                return inpidx;
+        }
+    }
+
+    return -1;
+}
+
+
+int mrp_lua_element_get_column_index(mrp_lua_element_t *el,
+                                     int inpidx,
+                                     const char *colnam)
+{
+    mrp_lua_element_input_t *inp;
+
+    if (el && inpidx >= 0 && inpidx < (int)el->ninput &&
+        (inp = el->inputs + inpidx) && colnam)
+    {
+        if (inp->type != SELECT)
+            return (!colnam || strcmp(colnam, "single_value")) ? -1 : 0;
+        else
+            return mrp_lua_select_get_column_index(inp->select, colnam);
+    }
+
+    return -1;
+}
+
+int mrp_lua_element_get_column_count(mrp_lua_element_t *el, int inpidx)
+{
+    mrp_lua_element_input_t *inp;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type != SELECT)
+            return 1;
+        else
+            return mrp_lua_select_get_column_count(inp->select);
+    }
+
+    return -1;
+}
+
+mqi_data_type_t mrp_lua_element_get_column_type(mrp_lua_element_t *el,
+                                                int inpidx,
+                                                int colidx)
+{
+    mrp_lua_element_input_t *inp;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type == SELECT)
+            return mrp_lua_select_get_column_type(inp->select, colidx);
+        else {
+            switch (inp->type) {
+            case NUMBER:   return mqi_floating;
+            case STRING:   return mqi_string;
+            default:       return -1;
+            }
+        }
+    }
+
+    return -1;
+}
+
+int mrp_lua_element_get_row_count(mrp_lua_element_t *el, int inpidx)
+{
+    mrp_lua_element_input_t *inp;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type != SELECT)
+            return 1;
+        else
+            return mrp_lua_select_get_row_count(inp->select);
+    }
+
+    return -1;
+}
+
+const char *mrp_lua_element_get_string(mrp_lua_element_t *el, int inpidx,
+                                       int colidx, int rowidx,
+                                       char *buf, int len)
+{
+    mrp_lua_element_input_t *inp;
+    const char *s = NULL;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type == SELECT)
+            s = mrp_lua_select_get_string(inp->select, colidx,rowidx, buf,len);
+        else {
+            if (!buf || len < 1)
+                s = (inp->type == STRING) ? inp->constant.string : "";
+            else {
+                s = buf;
+                switch (inp->type) {
+                case NUMBER:
+                    snprintf(buf, len, "%lf", inp->constant.floating);
+                    break;
+                case STRING:
+                    snprintf(buf, len, "%s", inp->constant.string);
+                    break;
+                default:
+                    *buf = '\0';
+                    break;
+                }
+            }
+        }
+    }
+
+    return s;
+}
+
+int32_t mrp_lua_element_get_integer(mrp_lua_element_t *el, int inpidx,
+                                    int colidx, int rowidx)
+{
+    mrp_lua_element_input_t *inp;
+    int32_t i = 0;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type == SELECT)
+            i = mrp_lua_select_get_integer(inp->select, colidx,rowidx);
+        else {
+            switch (inp->type) {
+            case NUMBER:  i = inp->constant.floating;                  break;
+            case STRING:  i = strtol(inp->constant.string, NULL, 10);  break;
+            default:      i = 0;                                       break;
+            }
+        }
+    }
+
+    return i;
+}
+
+uint32_t mrp_lua_element_get_unsigned(mrp_lua_element_t *el, int inpidx,
+                                     int colidx, int rowidx)
+{
+    mrp_lua_element_input_t *inp;
+    uint32_t u = 0;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type == SELECT)
+            u = mrp_lua_select_get_unsigned(inp->select, colidx,rowidx);
+        else {
+            switch (inp->type) {
+            case NUMBER:  u = inp->constant.floating;                   break;
+            case STRING:  u = strtoul(inp->constant.string, NULL, 10);  break;
+            default:      u = 0;                                        break;
+            }
+        }
+    }
+
+    return u;
+}
+
+double mrp_lua_element_get_floating(mrp_lua_element_t *el, int inpidx,
+                                   int colidx, int rowidx)
+{
+    mrp_lua_element_input_t *inp;
+    double f = 0;
+
+    if (el && inpidx >= 0 && inpidx <= (int)el->ninput &&
+        (inp = el->inputs + inpidx))
+    {
+        if (inp->type == SELECT)
+            f = mrp_lua_select_get_floating(inp->select, colidx,rowidx);
+        else {
+            switch (inp->type) {
+            case NUMBER:  f = inp->constant.floating;              break;
+            case STRING:  f = strtod(inp->constant.string, NULL);  break;
+            default:      f = 0;                                   break;
+            }
+        }
+    }
+
+    return f;
+}
+
 
 static int element_create_from_lua(lua_State *L)
 {
