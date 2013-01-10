@@ -48,6 +48,22 @@ mrp_lua_mdb_select_t *mrp_lua_select_check(lua_State *L, int idx);
 mrp_lua_mdb_select_t *mrp_lua_to_select(lua_State *L, int idx);
 int mrp_lua_push_select(lua_State *L,mrp_lua_mdb_select_t *sel,bool singleval);
 const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel);
+int mrp_lua_select_get_column_index(mrp_lua_mdb_select_t *sel,
+                                    const char *colnam);
+int mrp_lua_select_get_column_count(mrp_lua_mdb_select_t *sel);
+mqi_data_type_t mrp_lua_select_get_column_type(mrp_lua_mdb_select_t *sel,
+                                               int colidx);
+int mrp_lua_select_get_row_count(mrp_lua_mdb_select_t *sel);
+const char *mrp_lua_select_get_string(mrp_lua_mdb_select_t *sel,
+                                      int colidx, int rowidx,
+                                      char * buf, int len);
+int32_t mrp_lua_select_get_integer(mrp_lua_mdb_select_t *sel,
+                                   int colidx, int rowidx);
+
+uint32_t mrp_lua_select_get_unsigned(mrp_lua_mdb_select_t *sel,
+                                     int colidx, int rowidx);
+double mrp_lua_select_get_floating(mrp_lua_mdb_select_t *sel,
+                                   int colidx, int rowidx);
 
 int mrp_lua_dependency_add(lua_State *L, const char *name);
 
