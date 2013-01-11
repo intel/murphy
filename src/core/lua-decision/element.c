@@ -32,9 +32,6 @@
 #include <string.h>
 #include <alloca.h>
 
-#include <lualib.h>
-#include <lauxlib.h>
-
 #include <murphy/common.h>
 #include <murphy/common/debug.h>
 
@@ -49,6 +46,7 @@
 
 
 #define ELEMENT_CLASS           MRP_LUA_CLASS(element, lua)
+#define SINK_CLASS              MRP_LUA_CLASS(sink, lua)
 
 #define ELEMENT_INPUT_CLASSID   MRP_LUA_CLASSID_ROOT "element_input"
 #define ELEMENT_OUTPUT_CLASSID  MRP_LUA_CLASSID_ROOT "element_output"
@@ -70,6 +68,11 @@ enum field_e {
     INPUTS,
     OUTPUTS,
     UPDATE,
+    OBJECT,
+    INTERFACE,
+    PROPERTY,
+    TYPE,
+    INITIATE,
 };
 
 enum input_type_e {
@@ -92,6 +95,15 @@ struct mrp_lua_element_s {
     MRP_LUA_ELEMENT_FIELDS;
 };
 
+struct mrp_lua_sink_s {
+    MRP_LUA_ELEMENT_FIELDS;
+    const char *object;
+    const char *interface;
+    const char *property;
+    const char *type;
+    mrp_funcbridge_t *initiate;
+};
+
 
 static int  element_create_from_lua(lua_State *);
 static int  element_getfield(lua_State *);
@@ -99,7 +111,15 @@ static int  element_setfield(lua_State *);
 static int  element_tostring(lua_State *);
 static void element_destroy_from_lua(void *);
 static mrp_lua_element_t *element_check(lua_State *, int);
-static void element_install(lua_State *, mrp_lua_element_t *);
+static void element_install(lua_State *, void *);
+
+static int  sink_create_from_lua(lua_State *);
+static int  sink_getfield(lua_State *);
+static int  sink_setfield(lua_State *);
+static int  sink_tostring(lua_State *);
+static void sink_destroy_from_lua(void *);
+static mrp_lua_sink_t *sink_check(lua_State *, int);
+static void sink_install(lua_State *, void *);
 
 static void element_input_class_create(lua_State *);
 static int  element_input_create_luatbl(lua_State *, int);
@@ -121,11 +141,24 @@ MRP_LUA_METHOD_LIST_TABLE (
 );
 
 MRP_LUA_METHOD_LIST_TABLE (
+    sink_methods,             /* methodlist name */
+    MRP_LUA_METHOD_CONSTRUCTOR  (sink_create_from_lua)
+);
+
+MRP_LUA_METHOD_LIST_TABLE (
     element_overrides,       /* methodlist name */
     MRP_LUA_OVERRIDE_CALL       (element_create_from_lua)
     MRP_LUA_OVERRIDE_GETFIELD   (element_getfield)
     MRP_LUA_OVERRIDE_SETFIELD   (element_setfield)
     MRP_LUA_OVERRIDE_STRINGIFY  (element_tostring)
+);
+
+MRP_LUA_METHOD_LIST_TABLE (
+    sink_overrides,           /* methodlist name */
+    MRP_LUA_OVERRIDE_CALL       (sink_create_from_lua)
+    MRP_LUA_OVERRIDE_GETFIELD   (sink_getfield)
+    MRP_LUA_OVERRIDE_SETFIELD   (sink_setfield)
+    MRP_LUA_OVERRIDE_STRINGIFY  (sink_tostring)
 );
 
 MRP_LUA_METHOD_LIST_TABLE (
@@ -144,10 +177,20 @@ MRP_LUA_CLASS_DEF (
     element_overrides            /* override methods */
 );
 
+MRP_LUA_CLASS_DEF (
+    sink,                        /* class name */
+    lua,                         /* constructor name */
+    mrp_lua_sink_t,              /* userdata type */
+    sink_destroy_from_lua,       /* userdata destructor */
+    sink_methods,                /* class methods */
+    sink_overrides               /* override methods */
+);
+
 
 void mrp_lua_create_element_class(lua_State *L)
 {
     mrp_lua_create_object_class(L, ELEMENT_CLASS);
+    mrp_lua_create_object_class(L, SINK_CLASS);
 
     element_input_class_create(L);
 }
@@ -371,6 +414,8 @@ static int element_create_from_lua(lua_State *L)
     MRP_LUA_ENTER;
 
     el = (mrp_lua_element_t *)mrp_lua_create_object(L, ELEMENT_CLASS, NULL);
+    el->install = element_install;
+
     table = lua_gettop(L);
 
     lua_pushinteger(L, INPUT_IDX);
@@ -506,7 +551,7 @@ static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
 
     if (el->update) {
         if (!mrp_funcbridge_call_from_c(L, el->update, "o", args, &t, &ret)) {
-            mrp_log_error("failed to call %s:update method (%s)",
+            mrp_log_error("failed to call element.lua.%s:update method (%s)",
                           el->name, ret.string);
             mrp_free((void *)ret.string);
             return FALSE;
@@ -517,7 +562,7 @@ static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
 }
 
 
-static void element_install(lua_State *L, mrp_lua_element_t *el)
+static void element_install(lua_State *L, void *void_el)
 {
     static mrp_interpreter_t element_updater = {
         { NULL, NULL },
@@ -529,6 +574,7 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
         NULL
     };
 
+    mrp_lua_element_t *el = (mrp_lua_element_t *)void_el;
     mrp_lua_element_input_t *inp;
     mrp_context_t *ctx;
     size_t i;
@@ -578,6 +624,273 @@ static void element_install(lua_State *L, mrp_lua_element_t *el)
             printf("Failed to install resolver target for element '%s'.\n",
                    el->name);
         }
+    }
+
+    MRP_LUA_LEAVE_NOARG;
+}
+
+
+static int sink_create_from_lua(lua_State *L)
+{
+    mrp_lua_sink_t *sink;
+    int table;
+    size_t fldnamlen;
+    const char *fldnam;
+
+    MRP_LUA_ENTER;
+
+    sink = (mrp_lua_sink_t *)mrp_lua_create_object(L, SINK_CLASS, NULL);
+    sink->install = sink_install;
+
+    table = lua_gettop(L);
+
+    lua_pushinteger(L, INPUT_IDX);
+    element_input_create_luatbl(L, table);
+    lua_rawset(L, table);
+
+    MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
+
+        switch (field_name_to_type(fldnam, fldnamlen)) {
+
+        case NAME:
+            sink->name = mrp_strdup(luaL_checkstring(L, -1));
+            break;
+
+        case INPUTS:
+            sink->inputs = element_input_create_userdata(L, -1, &sink->ninput,
+                                                         &sink->inpmask);
+            break;
+
+        case OUTPUTS:
+            luaL_error(L, "sinks can't have outputs");
+            break;
+
+        case OBJECT:
+            sink->object = mrp_strdup(luaL_checkstring(L, -1));
+            break;
+
+        case INTERFACE:
+            sink->interface = mrp_strdup(luaL_checkstring(L, -1));
+            break;
+
+        case PROPERTY:
+            sink->property = mrp_strdup(luaL_checkstring(L, -1));
+            break;
+
+        case TYPE:
+            sink->type = mrp_strdup(luaL_checkstring(L, -1));
+            break;
+
+        case INITIATE:
+            sink->initiate = mrp_funcbridge_create_luafunc(L, -1);
+            break;
+
+        case UPDATE:
+            sink->update = mrp_funcbridge_create_luafunc(L, -1);
+            break;
+
+        default:
+            lua_pushvalue(L, -2);
+            lua_pushvalue(L, -2);
+            lua_rawset(L, table);
+            break;
+        }
+
+    } /* MRP_LUA_FOREACH_FIELD */
+
+    if (!sink->name)
+        luaL_error(L, "missing mandatory 'name' field");
+    if (!sink->inputs || !sink->ninput)
+        luaL_error(L, "missing or empty manadatory 'input' field");
+    if (!sink->update)
+        luaL_error(L, "missing or invalid mandatory 'update' field");
+
+    mrp_lua_set_object_name(L, SINK_CLASS, sink->name);
+
+    mrp_debug("sink '%s' created", sink->name);
+
+    if (sink->inpmask == INPUT_MASK(sink->ninput))
+        sink_install(L, sink);
+
+    MRP_LUA_LEAVE(1);
+}
+
+static int sink_getfield(lua_State *L)
+{
+    mrp_lua_sink_t *sink;
+    field_t fld;
+
+    MRP_LUA_ENTER;
+
+    sink = sink_check(L, 1);
+    fld = field_check(L, 2, NULL);
+    lua_pop(L, 1);
+
+    switch (fld) {
+    case NAME:      lua_pushstring(L, sink->name);          break;
+    case INPUTS:    lua_rawgeti(L, 1, INPUT_IDX);           break;
+    case OBJECT:    lua_pushstring(L, sink->object);        break;
+    case INTERFACE: lua_pushstring(L, sink->interface);     break;
+    case PROPERTY:  lua_pushstring(L, sink->property);      break;
+    case TYPE:      lua_pushstring(L, sink->type);          break;
+    case UPDATE:    mrp_funcbridge_push(L, sink->update);   break;
+    default:        lua_pushnil(L);                         break;
+    }
+
+    MRP_LUA_LEAVE(1);
+}
+
+static int sink_setfield(lua_State *L)
+{
+    mrp_lua_sink_t *sink;
+
+    MRP_LUA_ENTER;
+
+    sink = sink_check(L, 1);
+    luaL_error(L, "'%s' is read-only", sink->name);
+
+    MRP_LUA_LEAVE(0);
+}
+
+static int sink_tostring(lua_State *L)
+{
+    mrp_lua_sink_t *sink;
+
+    MRP_LUA_ENTER;
+
+    if ((sink = sink_check(L, 1)) && sink->name)
+        lua_pushstring(L, sink->name);
+    else
+        lua_pushstring(L, "<error>");
+
+    MRP_LUA_LEAVE(1);
+}
+
+static void sink_destroy_from_lua(void *data)
+{
+    mrp_lua_sink_t *sink = (mrp_lua_sink_t *)data;
+
+    MRP_LUA_ENTER;
+
+    if (sink) {
+        mrp_free((void *)sink->name);
+        mrp_free((void *)sink->object);
+        mrp_free((void *)sink->interface);
+        mrp_free((void *)sink->property);
+        mrp_free((void *)sink->type);
+    }
+
+    MRP_LUA_LEAVE_NOARG;
+}
+
+static mrp_lua_sink_t *sink_check(lua_State *L, int idx)
+{
+    return (mrp_lua_sink_t *)mrp_lua_check_object(L, SINK_CLASS, idx);
+}
+
+static int sink_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
+{
+    lua_State *L = mrp_lua_get_lua_state();
+    mrp_lua_sink_t *sink = (mrp_lua_sink_t *)script->data;
+    mrp_funcbridge_value_t args[1] = { { .pointer = sink } };
+    mrp_funcbridge_value_t ret;
+    char t;
+
+    MRP_UNUSED(ctbl);
+
+    mrp_debug("'%s'", sink->name);
+
+    if (sink->update) {
+        if (!mrp_funcbridge_call_from_c(L, sink->update, "o",args, &t,&ret)) {
+            mrp_log_error("failed to call sink.lua.%s:update method (%s)",
+                          sink->name, ret.string);
+            mrp_free((void *)ret.string);
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static void sink_install(lua_State *L, void *void_sink)
+{
+    static mrp_interpreter_t sink_updater = {
+        { NULL, NULL },
+        "sink_updater",
+        NULL,
+        NULL,
+        NULL,
+        sink_update_cb,
+        NULL
+    };
+
+    mrp_lua_sink_t *sink = (mrp_lua_sink_t *)void_sink;
+    mrp_context_t *ctx;
+    mrp_funcbridge_value_t args[1] = { { .pointer = sink } };
+    mrp_funcbridge_value_t ret;
+    char t;
+    mrp_lua_element_input_t *inp;
+    size_t i;
+    char buf[1024], target[1024];
+    const char **depends, *d;
+    char *dep;
+    int ndepend;
+    char *p, *e;
+    size_t len;
+
+    MRP_LUA_ENTER;
+
+    ctx = mrp_lua_get_murphy_context();
+
+    if (ctx == NULL || ctx->r == NULL) {
+        mrp_log_error("Invalid or incomplete murphy context");
+        return;
+    }
+
+    if (sink->initiate) {
+        if (!mrp_funcbridge_call_from_c(L, sink->initiate, "o",args, &t,&ret)){
+            mrp_log_error("failed to call sink.lua.%s:initiate method (%s)",
+                          sink->name, ret.string);
+            mrp_free((void *)ret.string);
+            return;
+        }
+        if (t != MRP_FUNCBRIDGE_BOOLEAN) {
+            mrp_log_error("sink.lua.%s:initiate returned '%c' type instead of "
+                          "'b' (boolean)", sink->name, t);
+            return;
+        }
+        if (!ret.boolean) {
+            mrp_log_error("sink.lua.%s:initiate failed", sink->name);
+            return;
+        }
+    }
+
+    depends = alloca(sink->ninput * sizeof(depends[0]));
+    ndepend = 0;
+
+    for (i = 0, e = (p = buf) + sizeof(buf);  i < sink->ninput && p < e;  i++){
+        inp = sink->inputs + i;
+
+        if (inp->type == SELECT) {
+            d  = mrp_lua_select_name(inp->select);
+            p += snprintf(p, e-p, " _select_%s", d);
+
+            len = strlen(d) + 7 + 1;
+            depends[ndepend++] = dep = alloca(len);
+            sprintf(dep, "_select_%s", d);
+        }
+    }
+
+    snprintf(target, sizeof(target), "_sink_%s", sink->name);
+
+    printf("\%s:%s\n\tupdate(%s)\n\n", target, buf, sink->name);
+
+
+    if (!mrp_resolver_add_prepared_target(ctx->r, target, depends, ndepend,
+                                          &sink_updater, NULL, sink))
+    {
+        printf("Failed to install resolver target for element '%s'.\n",
+               sink->name);
     }
 
     MRP_LUA_LEAVE_NOARG;
@@ -693,7 +1006,7 @@ static int element_input_setfield(lua_State *L)
             } /* switch type */
 
             if ((el->inpmask |= INPUT_BIT(i)) == INPUT_MASK(el->ninput))
-                element_install(L, el);
+                el->install(L, el);
 
             break;
         }
@@ -843,6 +1156,8 @@ static field_t field_name_to_type(const char *name, size_t len)
     case 4:
         if (!strcmp(name, "name"))
             return NAME;
+        if (!strcmp(name, "type"))
+            return TYPE;
         break;
 
     case 6:
@@ -850,11 +1165,25 @@ static field_t field_name_to_type(const char *name, size_t len)
             return INPUTS;
         if (!strcmp(name, "update"))
             return UPDATE;
+        if (!strcmp(name, "object"))
+            return OBJECT;
         break;
 
     case 7:
         if (!strcmp(name, "outputs"))
             return OUTPUTS;
+        break;
+
+    case 8:
+        if (!strcmp(name, "property"))
+            return PROPERTY;
+        if (!strcmp(name, "initiate"))
+            return INITIATE;
+        break;
+
+    case 9:
+        if (!strcmp(name, "interface"))
+            return INTERFACE;
         break;
 
     default:
@@ -863,6 +1192,7 @@ static field_t field_name_to_type(const char *name, size_t len)
 
     return 0;
 }
+
 
 
 /*

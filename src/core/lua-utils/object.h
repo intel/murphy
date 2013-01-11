@@ -141,6 +141,8 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int argnum);
 void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx);
 int   mrp_lua_push_object(lua_State *L, void *object);
 
+mrp_lua_classdef_t *mrp_lua_get_object_classdef(void *);
+
 
 #endif  /* __MURPHY_LUA_OBJECT_H__ */
 

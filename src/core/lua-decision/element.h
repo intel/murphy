@@ -30,19 +30,22 @@
 #ifndef __MURPHY_LUA_ELEMENT_H__
 #define __MURPHY_LUA_ELEMENT_H__
 
+#include <lua.h>
 #include <murphy-db/mqi-types.h>
 
-#define MRP_LUA_ELEMENT_FIELDS                  \
-    const char              *name;              \
-    mrp_lua_element_mask_t   inpmask;           \
-    size_t                   ninput;            \
-    mrp_lua_element_input_t *inputs;            \
-    size_t                   noutput;           \
-    mrp_lua_mdb_table_t    **outputs;           \
+#define MRP_LUA_ELEMENT_FIELDS                                  \
+    const char              *name;                              \
+    mrp_lua_element_mask_t   inpmask;                           \
+    size_t                   ninput;                            \
+    mrp_lua_element_input_t *inputs;                            \
+    size_t                   noutput;                           \
+    mrp_lua_mdb_table_t    **outputs;                           \
+    void                   (*install)(lua_State *, void *);     \
     mrp_funcbridge_t        *update
 
 
 typedef struct mrp_lua_element_s         mrp_lua_element_t;
+typedef struct mrp_lua_sink_s            mrp_lua_sink_t;
 typedef struct mrp_lua_element_input_s   mrp_lua_element_input_t;
 typedef uint32_t                         mrp_lua_element_mask_t;
 
