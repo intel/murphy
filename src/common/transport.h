@@ -30,6 +30,8 @@
 #ifndef __MURPHY_TRANSPORT_H__
 #define __MURPHY_TRANSPORT_H__
 
+MRP_CDECL_BEGIN
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
@@ -442,5 +444,7 @@ int mrp_transport_senddata(mrp_transport_t *t, void *data, uint16_t tag);
 /** Send custom data through the given transport to the remote address. */
 int mrp_transport_senddatato(mrp_transport_t *t, void *data, uint16_t tag,
                              mrp_sockaddr_t *addr, socklen_t addrlen);
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_TRANSPORT_H__ */
