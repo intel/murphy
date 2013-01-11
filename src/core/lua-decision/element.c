@@ -195,6 +195,11 @@ void mrp_lua_create_element_class(lua_State *L)
     element_input_class_create(L);
 }
 
+const char *mrp_lua_get_element_name(mrp_lua_element_t *el)
+{
+    return el ? el->name : "";
+}
+
 int mrp_lua_element_get_input_count(mrp_lua_element_t *el)
 {
     return el ? (int)el->ninput : -1;
