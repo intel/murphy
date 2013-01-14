@@ -32,6 +32,8 @@
 
 #include <glib.h>
 
+MRP_CDECL_BEGIN
+
 /** Register the given murphy mainloop with the glib mainloop. */
 int mrp_mainloop_register_with_glib(mrp_mainloop_t *ml, GMainLoop *gml);
 
@@ -40,5 +42,7 @@ int mrp_mainloop_unregister_from_glib(mrp_mainloop_t *ml);
 
 /** Create a murphy mainloop and set it up with the glib mainloop. */
 mrp_mainloop_t *mrp_mainloop_glib_get(GMainLoop *gml);
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_GLIB_H__ */

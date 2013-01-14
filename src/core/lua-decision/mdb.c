@@ -357,10 +357,69 @@ int mrp_lua_push_select(lua_State *L,mrp_lua_mdb_select_t *sel,bool singleval)
     return 1;
 }
 
-const char * mrp_lua_select_name(mrp_lua_mdb_select_t *sel)
+const char *mrp_lua_select_name(mrp_lua_mdb_select_t *sel)
 {
     return (sel && sel->name) ? sel->name : "<unknown>";
 }
+
+int mrp_lua_select_get_column_index(mrp_lua_mdb_select_t *sel,
+                                    const char *colnam)
+{
+    mrp_lua_strarray_t *cols;
+    size_t colidx;
+
+    if (sel && colnam && (cols = sel->columns)) {
+        for (colidx = 0;   colidx < cols->nstring;   colidx++) {
+            if (!strcmp(colnam, cols->strings[colidx]))
+                return (int)colidx;
+        }
+    }
+
+    return -1;
+}
+
+int mrp_lua_select_get_column_count(mrp_lua_mdb_select_t *sel)
+{
+    return sel ? mql_result_rows_get_row_column_count(sel->result) : -1;
+}
+
+mqi_data_type_t mrp_lua_select_get_column_type(mrp_lua_mdb_select_t *sel,
+                                               int colidx)
+{
+    return sel ? mql_result_rows_get_row_column_type(sel->result, colidx) : -1;
+}
+
+int mrp_lua_select_get_row_count(mrp_lua_mdb_select_t *sel)
+{
+    return sel ? mql_result_rows_get_row_count(sel->result) : -1;
+}
+
+const char *mrp_lua_select_get_string(mrp_lua_mdb_select_t *sel,
+                                      int colidx, int rowidx,
+                                      char * buf, int len)
+{
+    return sel ? mql_result_rows_get_string(sel->result, colidx,rowidx,
+                                            buf,len) : NULL;
+}
+
+int32_t mrp_lua_select_get_integer(mrp_lua_mdb_select_t *sel,
+                                   int colidx, int rowidx)
+{
+    return sel ? mql_result_rows_get_integer(sel->result, colidx,rowidx) : 0;
+}
+
+uint32_t mrp_lua_select_get_unsigned(mrp_lua_mdb_select_t *sel,
+                                     int colidx, int rowidx)
+{
+    return sel ? mql_result_rows_get_unsigned(sel->result, colidx,rowidx) : 0;
+}
+
+double mrp_lua_select_get_floating(mrp_lua_mdb_select_t *sel,
+                                   int colidx, int rowidx)
+{
+    return sel ? mql_result_rows_get_floating(sel->result,colidx,rowidx) : 0.0;
+}
+
 
 int mrp_lua_dependency_add(lua_State *L, const char *name)
 {

@@ -38,7 +38,7 @@
 #include <murphy/common/list.h>
 #include <murphy/common/refcnt.h>
 
-
+MRP_CDECL_BEGIN
 
 /*
  * message field types
@@ -451,5 +451,7 @@ void *mrp_msgbuf_pull(mrp_msgbuf_t *mb, size_t size, size_t align);
                                                                           \
             _ptr;                                                         \
         })
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_MSG_H__ */

@@ -295,6 +295,19 @@ int mrp_lua_push_object(lua_State *L, void *data)
     return 1;
 }
 
+mrp_lua_classdef_t *mrp_lua_get_object_classdef(void *data)
+{
+    userdata_t *userdata = (userdata_t *)data - 1;
+    mrp_lua_classdef_t *def;
+
+    if (!data || userdata != userdata->self || userdata->dead)
+        def = NULL;
+    else
+        def = userdata->def;
+
+    return def;
+}
+
 
 static bool valid_id(const char *id)
 {
