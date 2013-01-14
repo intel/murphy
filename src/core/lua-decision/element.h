@@ -100,6 +100,11 @@ uint32_t mrp_lua_element_get_unsigned(mrp_lua_element_t *el, int inpidx,
 double mrp_lua_element_get_floating(mrp_lua_element_t *el, int inpidx,
                                    int colidx, int rowidx);
 
+const char *mrp_lua_sink_get_interface(mrp_lua_sink_t *s);
+const char *mrp_lua_sink_get_object(mrp_lua_sink_t *s);
+const char *mrp_lua_sink_get_type(mrp_lua_sink_t *s);
+const char *mrp_lua_sink_get_property(mrp_lua_sink_t *s);
+
 
 #endif  /* __MURPHY_LUA_ELEMENT_H__ */
 

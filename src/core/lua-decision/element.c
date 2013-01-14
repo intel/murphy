@@ -1198,7 +1198,25 @@ static field_t field_name_to_type(const char *name, size_t len)
     return 0;
 }
 
+const char *mrp_lua_sink_get_interface(mrp_lua_sink_t *s)
+{
+    return s ? s->interface : "";
+}
 
+const char *mrp_lua_sink_get_object(mrp_lua_sink_t *s)
+{
+    return s ? s->object : "";
+}
+
+const char *mrp_lua_sink_get_type(mrp_lua_sink_t *s)
+{
+    return s ? s->type : "";
+}
+
+const char *mrp_lua_sink_get_property(mrp_lua_sink_t *s)
+{
+    return s ? s->property : "";
+}
 
 /*
  * Local Variables:
