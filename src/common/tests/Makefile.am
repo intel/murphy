@@ -1,6 +1,7 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
-noinst_PROGRAMS  = mm-test hash-test msg-test transport-test internal-transport-test
+noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
+            internal-transport-test process-watch-test
 if DBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
@@ -59,6 +60,11 @@ transport_test_LDADD   = ../../libmurphy-common.la
 internal_transport_test_SOURCES = internal-transport-test.c
 internal_transport_test_CFLAGS  = $(AM_CFLAGS)
 internal_transport_test_LDADD   = ../../libmurphy-common.la
+
+# process watch test
+process_watch_test_SOURCES = process-test.c
+process_watch_test_CFLAGS  = $(AM_CFLAGS)
+process_watch_test_LDADD   = ../../libmurphy-common.la
 
 if DBUS_ENABLED
 transport_test_LDADD  += ../../libmurphy-dbus.la
