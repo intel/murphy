@@ -281,6 +281,31 @@ AC_SUBST(CONSOLE_ENABLED)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_LIBS)
 
+# Check if websockets support was enabled.
+AC_ARG_ENABLE(websockets,
+              [--enable-websockets    enable websockets support],
+              [enable_websockets=$enableval], [enable_websockets=auto])
+
+if test "$enable_websockets" != "no"; then
+    PKG_CHECK_MODULES(WEBSOCKETS, libwebsockets,
+                      [have_websockets=yes], [have_websockets=no])
+    if test "$have_websockets" = "no" -a "$enable_websockets" = "yes"; then
+        AC_MSG_ERROR([libwebsockets development libraries not found.])
+    fi
+
+    enable_websockets="$have_websockets"
+else
+    AC_MSG_NOTICE([libwebsockets support is disabled.])
+fi
+
+if test "$enable_websockets" = "yes"; then
+    AC_DEFINE([WEBSOCKETS_ENABLED], 1, [Enable websockets support ?])
+fi
+AM_CONDITIONAL(WEBSOCKETS_ENABLED, [test "$enable_websockets" = "yes"])
+AC_SUBST(WEBSOCKETS_ENABLED)
+AC_SUBST(WEBSOCKETS_CFLAGS)
+AC_SUBST(WEBSOCKETS_LIBS)
+
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
 MURPHY_LIBS=""

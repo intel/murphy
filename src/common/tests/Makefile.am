@@ -5,6 +5,8 @@ if DBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
 
+noinst_PROGRAMS += fragbuf-test
+
 # memory management test
 mm_test_SOURCES = mm-test.c
 mm_test_CFLAGS  = $(AM_CFLAGS)
@@ -66,3 +68,13 @@ dbus_test_SOURCES = dbus-test.c
 dbus_test_CFLAGS  = $(AM_CFLAGS) $(DBUS_CFLAGS)
 dbus_test_LDADD   = ../../libmurphy-dbus.la ../../libmurphy-common.la
 endif
+
+## databuf test
+#databuf_test_SOURCES = databuf-test.c
+#databuf_test_CFLAGS  = $(AM_CFLAGS)
+#databuf_test_LDADD   = ../../libmurphy-common.la
+
+# fragbuf test
+fragbuf_test_SOURCES = fragbuf-test.c
+fragbuf_test_CFLAGS  = $(AM_CFLAGS)
+fragbuf_test_LDADD   = ../../libmurphy-common.la
