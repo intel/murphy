@@ -50,6 +50,7 @@ libmurphy_common_la_HEADERS =		\
 		common/debug-info.h	\
 		common/mm.h		\
 		common/hashtbl.h	\
+		common/process.h	\
 		common/mainloop.h	\
 		common/utils.h		\
 		common/file-utils.h	\
@@ -67,6 +68,7 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/mainloop.c		\
 		common/utils.c			\
 		common/file-utils.c		\
+		common/process.c 		\
 		common/msg.c			\
 		common/fragbuf.c		\
 		common/json.c			\
