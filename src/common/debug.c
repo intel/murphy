@@ -106,6 +106,7 @@ int mrp_debug_enable(int enabled)
 
     debug_enabled = !!enabled;
     mrp_log_enable(MRP_LOG_MASK_DEBUG);
+    mrp_debug_stamp++;
 
     return prev;
 }
