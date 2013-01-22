@@ -7,8 +7,8 @@ static mrp_debug_info_t info_0[] = {
     { .line = 106, .func = "logger" },
     { .line = 133, .func = "register_logger" },
     { .line = 145, .func = "unregister_logger" },
-    { .line = 157, .func = "tcp_close_req" },
-    { .line = 170, .func = "udp_close_req" },
+    { .line = 157, .func = "strm_close_req" },
+    { .line = 170, .func = "dgrm_close_req" },
     { .line = 189, .func = "set_prompt_req" },
     { .line = 206, .func = "free_req" },
     { .line = 212, .func = "recv_evt" },
@@ -18,7 +18,7 @@ static mrp_debug_info_t info_0[] = {
     { .line = 344, .func = "strm_setup" },
     { .line = 391, .func = "dgrm_setup" },
     { .line = 446, .func = "console_init" },
-    { .line = 481, .func = "console_exit" },
+    { .line = 482, .func = "console_exit" },
     { .line = 0, .func = NULL }
 };
 static mrp_debug_file_t file_0 = {
