@@ -31,6 +31,13 @@
         mrp_del_timer;
         mrp_disable_deferred;
         mrp_enable_deferred;
+        mrp_fragbuf_alloc;
+        mrp_fragbuf_create;
+        mrp_fragbuf_destroy;
+        mrp_fragbuf_init;
+        mrp_fragbuf_pull;
+        mrp_fragbuf_push;
+        mrp_fragbuf_reset;
         mrp_htbl_create;
         mrp_htbl_destroy;
         mrp_htbl_find;
