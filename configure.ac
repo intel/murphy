@@ -287,10 +287,10 @@ AC_ARG_ENABLE(websockets,
               [enable_websockets=$enableval], [enable_websockets=auto])
 
 if test "$enable_websockets" != "no"; then
-    PKG_CHECK_MODULES(WEBSOCKETS, libwebsockets,
+    PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets json] ,
                       [have_websockets=yes], [have_websockets=no])
     if test "$have_websockets" = "no" -a "$enable_websockets" = "yes"; then
-        AC_MSG_ERROR([libwebsockets development libraries not found.])
+        AC_MSG_ERROR([libwebsockets or json-c development libraries not found.])
     fi
 
     enable_websockets="$have_websockets"

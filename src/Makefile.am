@@ -93,13 +93,15 @@ if WEBSOCKETS_ENABLED
 libmurphy_common_la_HEADERS +=			\
 		common/fragbuf.h		\
 		common/websocklib.h		\
-		common/websocket.c
+		common/websocket.h		\
+		common/json.h
 
 libmurphy_common_la_REGULAR_SOURCES +=		\
 		common/fragbuf.c		\
 		common/websocklib.c		\
 		common/websocket.c		\
-		common/wsck-transport.c
+		common/wsck-transport.c 	\
+		common/json.c
 
 libmurphy_common_la_CFLAGS +=			\
 		$(WEBSOCKETS_CFLAGS)
