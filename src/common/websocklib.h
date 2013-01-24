@@ -67,6 +67,7 @@ typedef struct {
 typedef struct {
     const char      *name;               /* protocol name */
     wsl_callbacks_t  cbs;                /* event/request callbacks */
+    int              framed;             /* wheter a framed protocol */
     void            *proto_data;         /* protocol-specific user data */
 } wsl_proto_t;
 

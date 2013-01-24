@@ -520,7 +520,7 @@ wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
 
         sck->ctx   = wsl_ref_context(ctx);
         sck->proto = up;
-        sck->buf   = mrp_fragbuf_create(TRUE, 0);
+        sck->buf   = mrp_fragbuf_create(up->framed, 0);
 
         if (sck->buf != NULL) {
             sck->user_data = user_data;
@@ -553,7 +553,7 @@ wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data)
 {
     wsl_sck_t  *sck, **ptr;
 
-    if (ctx->pending == NULL)
+    if (ctx->pending == NULL || ctx->pending_proto == NULL)
         return NULL;
 
     mrp_debug("accepting pending websocket connection %p/%p", ctx->pending,
@@ -568,7 +568,7 @@ wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data)
          *     wsl_connect above...
          */
         sck->ctx = wsl_ref_context(ctx);
-        sck->buf = mrp_fragbuf_create(TRUE, 0);
+        sck->buf = mrp_fragbuf_create(ctx->pending_proto->framed, 0);
 
         if (sck->buf != NULL) {
             sck->proto     = ctx->pending_proto;
@@ -851,12 +851,26 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
          * want to know about the internals of the upper layer, neither
          * want the upper layer to know about our internals, the only
          * way to pass information about the connection around in the
-         * context at this point. To keep things simple we only prepare
-         * and handle once outstanding connection attemp at a time. This
-         * is equivalent to listening on a stream-socket with backlog 1.
-         * Since we run single-threaded it shouldn't ever be possible to
-         * have more than one pending connection if the upper layer does
-         * things right but we do check for this just in case...
+         * context at this point.
+         *
+         * To keep things simple we only prepare and handle once
+         * outstanding connection attemp at a time. This is equivalent
+         * to listening on a stream-socket with a backlog of 1. Since we
+         * run single-threaded it shouldn't ever be possible to have more
+         * than one pending connection if the upper layer does things
+         * right but we do check for this and reject multiple pending
+         * connections here...
+         *
+         * We store the pending websocket instance and its associated
+         * user data in the context then call the connection notifier
+         * callback. If the upper layer wants to accept the connection
+         * it calls wsl_accept_pending. That in turn digs these out from
+         * the context to set up and hook together things properly. If all
+         * goes fine wsl_accept_pending clears pending and pending_user
+         * from the context. If something fails or the upper layer decides
+         * not to accept the connection, pending and pending_user stay
+         * intact in which case we'll reject the client here once the
+         * callback returns.
          */
 
         if (ctx->pending != NULL) {
@@ -864,17 +878,6 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
             return LWS_EVENT_DENY;
         }
 
-        /*
-         * Store the pending websocket instance and it's associated
-         * user data in the context then call the connection notifier
-         * callback. If the upper layer wants to accept the connection
-         * it calls wsl_accept_pending. That in turn digs these out
-         * from the context to set up and hook together things properly.
-         * If everything goes fine wsl_accept_pending clears pending and
-         * pending_user from the context. If not or if the upper layer
-         * decides not to accept the connection, pending and pending_user
-         * stay intact in which case we'll reject the client below.
-         */
 
         proto = (lws_proto_t *)libwebsockets_get_protocol(ws);
         up    = find_context_protocol(ctx, proto->name);
@@ -892,7 +895,7 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
         ctx->pending_proto = up;
 
         wsl_ref_context(ctx);
-        up->cbs.connection(ctx, "XXX TODO peer address", up->name,
+        up->cbs.connection(ctx, "XXX TODO dig out peer address", up->name,
                            ctx->user_data, up->proto_data);
 
         /* XXX TODO

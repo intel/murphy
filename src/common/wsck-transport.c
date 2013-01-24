@@ -134,12 +134,13 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                      socklen_t addrlen)
 {
     static wsl_proto_t proto = {
-        "murphy",
-        { .connection = connection_cb,
-          .closed     = closed_cb,
-          .recv       = recv_cb,
-          .check      = check_cb,      },
-        NULL
+        .name       = "murphy",
+        .cbs        = { .connection = connection_cb,
+                        .closed     = closed_cb,
+                        .recv       = recv_cb,
+                        .check      = check_cb,      },
+        .framed     = TRUE,
+        .proto_data = NULL
     };
 
     wsck_t          *t  = (wsck_t *)mt;
@@ -218,12 +219,13 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                         socklen_t addrlen)
 {
     static wsl_proto_t proto = {
-        "murphy",
-        { .connection = connection_cb,
-          .closed     = closed_cb,
-          .recv       = recv_cb,
-          .check      = check_cb,      },
-        NULL
+        .name       = "murphy",
+        .cbs        = { .connection = connection_cb,
+                        .closed     = closed_cb,
+                        .recv       = recv_cb,
+                        .check      = check_cb,      },
+        .framed     = TRUE,
+        .proto_data = NULL
     };
 
     wsck_t          *t = (wsck_t *)mt;
