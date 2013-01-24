@@ -114,16 +114,18 @@ static inline mrp_sockaddr_t *mrp_sockaddr_cpy(mrp_sockaddr_t *d,
  */
 
 typedef enum {
-    MRP_TRANSPORT_REUSEADDR = 0x1,
-    MRP_TRANSPORT_NONBLOCK  = 0x2,
-    MRP_TRANSPORT_CLOEXEC   = 0x4,
+    MRP_TRANSPORT_MODE_MSG    = 0x00,    /* generic message encoding */
+    MRP_TRANSPORT_MODE_RAW    = 0x01,    /* uses bitpipe mode */
+    MRP_TRANSPORT_MODE_CUSTOM = 0x02,    /* uses custom data types */
+} mrp_transport_mode_t;
 
-    MRP_TRANSPORT_MODE_MSG    = 0x00000000, /* in generic mode */
-    MRP_TRANSPORT_MODE_RAW    = 0x10000000, /* in bitpipe mode */
-    MRP_TRANSPORT_MODE_CUSTOM = 0x20000000, /* in custom type mode */
-    MRP_TRANSPORT_MODE_MASK   = 0x30000000, /* mask for  transport mode */
+typedef enum {
+    MRP_TRANSPORT_MODE_MASK   = 0x03,    /* mask of mode bits */
+    MRP_TRANSPORT_INHERIT     = 0x03,    /* mask of all inherited flags */
 
-    MRP_TRANSPORT_INHERIT     = 0x30000000, /* mask of inherited flags */
+    MRP_TRANSPORT_REUSEADDR   = 0x10,
+    MRP_TRANSPORT_NONBLOCK    = 0x20,
+    MRP_TRANSPORT_CLOEXEC     = 0x40,
 } mrp_transport_flag_t;
 
 #define MRP_TRANSPORT_MODE(t) ((t)->flags & MRP_TRANSPORT_MODE_MASK)
@@ -249,6 +251,7 @@ typedef struct {
                                         socklen_t addrlen);               \
     void                    *user_data;                                   \
     int                      flags;                                       \
+    int                      mode;                                        \
     int                      busy;                                        \
     int                      connected : 1;                               \
     int                      listened : 1;                                \

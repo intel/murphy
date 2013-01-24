@@ -374,17 +374,22 @@ static int dbus_bind(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
 
     copy_address(&t->local, addr);
 
-    if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
+    switch (t->mode) {
+    case MRP_TRANSPORT_MODE_CUSTOM:
         method = TRANSPORT_CUSTOM;
         cb     = dbus_data_cb;
-    }
-    else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
+        break;
+    case MRP_TRANSPORT_MODE_RAW:
         method = TRANSPORT_RAW;
         cb     = dbus_raw_cb;
-    }
-    else {
+        break;
+    case MRP_TRANSPORT_MODE_MSG:
         method = TRANSPORT_MESSAGE;
         cb     = dbus_msg_cb;
+        break;
+    default:
+        errno = EPROTOTYPE;
+        goto fail;
     }
 
     if (!mrp_dbus_export_method(t->dbus, addr->db_path, TRANSPORT_INTERFACE,
@@ -433,15 +438,16 @@ static void dbus_close(mrp_transport_t *mt)
     int           (*cb)(mrp_dbus_t *, DBusMessage *, void *);
 
     if (t->bound) {
-        if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
+        switch (t->mode) {
+        case MRP_TRANSPORT_MODE_CUSTOM:
             method = TRANSPORT_CUSTOM;
             cb     = dbus_data_cb;
-        }
-        else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
+            break;
+        case MRP_TRANSPORT_MODE_RAW:
             method = TRANSPORT_RAW;
             cb     = dbus_raw_cb;
-        }
-        else {
+            break;
+        case MRP_TRANSPORT_MODE_MSG:
             method = TRANSPORT_MESSAGE;
             cb     = dbus_msg_cb;
         }
