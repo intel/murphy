@@ -153,7 +153,7 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
 
     /*
-     * Unfortunately instead of binding to a address/port pair, the
+     * Unfortunately instead of binding to an address/port pair, the
      * underlying libwebsockets library API allows one to bind to a
      * device/port pair, with NULL being a wildcard device.
      *
@@ -557,7 +557,7 @@ static void connection_cb(wsl_ctx_t *ctx, char *addr, const char *protocol,
 
     mrp_debug("incoming connection (%s) for context %p", protocol, ctx);
 
-    if (t->listened) {
+    if (t->listened && strncmp(protocol, "http", 4)) {
         MRP_TRANSPORT_BUSY(t, {
                 t->evt.connection((mrp_transport_t *)t, t->user_data);
             });
