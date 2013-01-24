@@ -46,6 +46,9 @@ void mrp_fragbuf_destroy(mrp_fragbuf_t *buf);
 /** Allocate a buffer of the given size from the buffer. */
 void *mrp_fragbuf_alloc(mrp_fragbuf_t *buf, size_t size);
 
+/** Trim the last allocation to nsize bytes. */
+int mrp_fragbuf_trim(mrp_fragbuf_t *buf, void *ptr, size_t osize, size_t nsize);
+
 /** Append the given data to the buffer. */
 int mrp_fragbuf_push(mrp_fragbuf_t *buf, void *data, size_t size);
 

@@ -115,6 +115,23 @@ void *mrp_fragbuf_alloc(mrp_fragbuf_t *buf, size_t size)
 }
 
 
+int mrp_fragbuf_trim(mrp_fragbuf_t *buf, void *ptr, size_t osize, size_t nsize)
+{
+    size_t diff;
+
+    if (ptr + osize == buf->data + buf->used) { /* looks like the last alloc */
+        if (nsize <= osize) {
+            diff = osize - nsize;
+            buf->used -= diff;
+
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+
 int mrp_fragbuf_push(mrp_fragbuf_t *buf, void *data, size_t size)
 {
     void *ptr;
@@ -139,6 +156,12 @@ int mrp_fragbuf_pull(mrp_fragbuf_t *buf, void **datap, size_t *sizep)
 
     if (buf == NULL || buf->used <= 0)
         return FALSE;
+
+    if (MRP_UNLIKELY(*datap &&
+                     (*datap < buf->data || *datap > buf->data + buf->used))) {
+        mrp_log_warning("%s(): *** looks like we're called with an unreset "
+                        "datap pointer... ***", __FUNCTION__);
+    }
 
     /* start of iteration */
     if (*datap == NULL) {
