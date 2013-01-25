@@ -139,7 +139,7 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                         .closed     = closed_cb,
                         .recv       = recv_cb,
                         .check      = check_cb,      },
-        .framed     = TRUE,
+        .framed     = FALSE,
         .proto_data = NULL
     };
 
@@ -224,7 +224,7 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                         .closed     = closed_cb,
                         .recv       = recv_cb,
                         .check      = check_cb,      },
-        .framed     = TRUE,
+        .framed     = FALSE,
         .proto_data = NULL
     };
 

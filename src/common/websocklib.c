@@ -520,7 +520,7 @@ wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
 
         sck->ctx   = wsl_ref_context(ctx);
         sck->proto = up;
-        sck->buf   = mrp_fragbuf_create(up->framed, 0);
+        sck->buf   = mrp_fragbuf_create(/*up->framed*/TRUE, 0);
 
         if (sck->buf != NULL) {
             sck->user_data = user_data;
@@ -568,7 +568,7 @@ wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data)
          *     wsl_connect above...
          */
         sck->ctx = wsl_ref_context(ctx);
-        sck->buf = mrp_fragbuf_create(ctx->pending_proto->framed, 0);
+        sck->buf = mrp_fragbuf_create(/*ctx->pending_proto->framed*/TRUE, 0);
 
         if (sck->buf != NULL) {
             sck->proto     = ctx->pending_proto;
@@ -662,19 +662,30 @@ static int check_closed(wsl_sck_t *sck)
 int wsl_send(wsl_sck_t *sck, void *payload, size_t size)
 {
     unsigned char *buf;
-    size_t         pre, post;
+    size_t         pre, post, total;
     uint32_t      *len;
 
     if (sck != NULL && sck->sck != NULL) {
-        pre  = LWS_SEND_BUFFER_PRE_PADDING;
-        post = LWS_SEND_BUFFER_POST_PADDING;
-        buf  = alloca(pre + sizeof(*len) + size + post);
+        if (sck->proto->framed) {
+            pre  = LWS_SEND_BUFFER_PRE_PADDING;
+            post = LWS_SEND_BUFFER_POST_PADDING;
+            buf  = alloca(pre + sizeof(*len) + size + post);
+            len  = (uint32_t *)(buf + pre);
+            *len = htobe32(size);
 
-        len  = (uint32_t *)(buf + pre);
-        *len = htobe32(size);
-        memcpy(buf + pre + sizeof(*len), payload, size);
+            memcpy(buf + pre + sizeof(*len), payload, size);
+            total = sizeof(*len) + size;
+        }
+        else {
+            pre  = LWS_SEND_BUFFER_PRE_PADDING;
+            post = LWS_SEND_BUFFER_POST_PADDING;
+            buf  = alloca(pre + size + post);
 
-        if (libwebsocket_write(sck->sck, buf + pre, sizeof(*len) + size,
+            memcpy(buf + pre, payload, size);
+            total = size;
+        }
+
+        if (libwebsocket_write(sck->sck, buf + pre, total,
                                LWS_WRITE_BINARY) >= 0)
             return TRUE;
     }
@@ -832,6 +843,7 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
     wsl_proto_t *up;
     void        *data;
     size_t       size;
+    uint32_t     total;
     const char  *ext;
     lws_proto_t *proto;
     int          status;
@@ -942,11 +954,22 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
     case LWS_CALLBACK_RECEIVE:
     case LWS_CALLBACK_CLIENT_RECEIVE:
         mrp_debug("%d bytes received on websocket %p/%p", len, ws, user);
+        mrp_debug("%zd remaining from this message",
+                  libwebsockets_remaining_packet_payload(ws));
 
         sck = *(wsl_sck_t **)user;
         up  = sck ? sck->proto : NULL;
 
         if (up != NULL) {
+            if (!up->framed && !mrp_fragbuf_missing(sck->buf)) {
+                /* new packet of an unframed protocol, push message size */
+                total = len + libwebsockets_remaining_packet_payload(ws);
+                mrp_debug("unframed protocol, total message size %u", total);
+
+                total = htobe32(total);
+                mrp_fragbuf_push(sck->buf, &total, sizeof(total));
+            }
+
             if (mrp_fragbuf_push(sck->buf, in, len)) {
                 data = NULL;
                 size = 0;
