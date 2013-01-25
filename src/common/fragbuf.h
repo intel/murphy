@@ -43,6 +43,12 @@ void mrp_fragbuf_reset(mrp_fragbuf_t *buf);
 /** Destroy the given data collector buffer, freeing all associated memory. */
 void mrp_fragbuf_destroy(mrp_fragbuf_t *buf);
 
+/** Return the amount of buffer space currently in used in th buffer. */
+size_t mrp_fragbuf_used(mrp_fragbuf_t *buf);
+
+/** Return the amount of bytes missing from the last message. */
+size_t mrp_fragbuf_missing(mrp_fragbuf_t *buf);
+
 /** Allocate a buffer of the given size from the buffer. */
 void *mrp_fragbuf_alloc(mrp_fragbuf_t *buf, size_t size);
 

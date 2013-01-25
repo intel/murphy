@@ -30,14 +30,20 @@ static void *fragbuf_ensure(mrp_fragbuf_t *buf, size_t size)
 }
 
 
-static size_t fragbuf_missing(mrp_fragbuf_t *buf)
+size_t mrp_fragbuf_used(mrp_fragbuf_t *buf)
+{
+    return buf->used;
+}
+
+
+size_t mrp_fragbuf_missing(mrp_fragbuf_t *buf)
 {
     void     *ptr;
     int       offs;
     uint32_t  size;
 
     if (!buf->framed || !buf->used)
-        return -1;
+        return 0;
 
     /* find the last frame */
     ptr  = buf->data;
