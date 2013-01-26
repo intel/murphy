@@ -667,7 +667,8 @@ MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
                        strm_connect, strm_disconnect,
                        strm_send, NULL,
                        strm_sendraw, NULL,
-                       strm_senddata, NULL);
+                       strm_senddata, NULL,
+                       NULL, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
@@ -675,7 +676,8 @@ MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_connect, strm_disconnect,
                        strm_send, NULL,
                        strm_sendraw, NULL,
-                       strm_senddata, NULL);
+                       strm_senddata, NULL,
+                       NULL, NULL);
 
 MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
@@ -683,4 +685,5 @@ MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
                        strm_connect, strm_disconnect,
                        strm_send, NULL,
                        strm_sendraw, NULL,
-                       strm_senddata, NULL);
+                       strm_senddata, NULL,
+                       NULL, NULL);

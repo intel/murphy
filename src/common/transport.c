@@ -540,6 +540,43 @@ int mrp_transport_senddatato(mrp_transport_t *t, void *data, uint16_t tag,
 }
 
 
+int mrp_transport_sendcustom(mrp_transport_t *t, void *data)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_CUSTOM && t->descr->req.sendcustom) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendcustom(t, data);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
+int mrp_transport_sendcustomto(mrp_transport_t *t, void *data,
+                               mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_CUSTOM && t->descr->req.sendcustomto) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendcustomto(t, data, addr, addrlen);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
 static int recv_data(mrp_transport_t *t, void *data, size_t size,
                      mrp_sockaddr_t *addr, socklen_t addrlen)
 {
@@ -629,6 +666,28 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
             return 0;
         }
         break;
+
+    case MRP_TRANSPORT_MODE_CUSTOM:
+        if (t->connected) {
+            if (t->evt.recvcustom) {
+                MRP_TRANSPORT_BUSY(t, {
+                        t->evt.recvcustom(t, data, t->user_data);
+                    });
+
+                return 0;
+            }
+        }
+        else {
+            if (t->evt.recvcustomfrom) {
+                MRP_TRANSPORT_BUSY(t, {
+                        t->evt.recvcustomfrom(t, data, addr, addrlen,
+                                              t->user_data);
+                    });
+
+                return 0;
+            }
+        }
+        return -EPROTOTYPE;
 
     default:
         return -EPROTOTYPE;

@@ -702,7 +702,8 @@ MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
                        dgrm_connect, dgrm_disconnect,
                        dgrm_send, dgrm_sendto,
                        dgrm_sendraw, dgrm_sendrawto,
-                       dgrm_senddata, dgrm_senddatato);
+                       dgrm_senddata, dgrm_senddatato,
+                       NULL, NULL);
 
 MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
@@ -710,7 +711,8 @@ MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_connect, dgrm_disconnect,
                        dgrm_send, dgrm_sendto,
                        dgrm_sendraw, dgrm_sendrawto,
-                       dgrm_senddata, dgrm_senddatato);
+                       dgrm_senddata, dgrm_senddatato,
+                       NULL, NULL);
 
 MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
@@ -718,4 +720,5 @@ MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
                        dgrm_connect, dgrm_disconnect,
                        dgrm_send, dgrm_sendto,
                        dgrm_sendraw, dgrm_sendrawto,
-                       dgrm_senddata, dgrm_senddatato);
+                       dgrm_senddata, dgrm_senddatato,
+                       NULL, NULL);
