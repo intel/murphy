@@ -61,6 +61,7 @@ typedef struct {
     MRP_TRANSPORT_PUBLIC_FIELDS;         /* common transport fields */
     wsl_ctx_t *ctx;                      /* websocket context */
     wsl_sck_t *sck;                      /* websocket instance */
+    int        send_mode;                /* websocket send mode */
 } wsck_t;
 
 
@@ -127,6 +128,28 @@ static void wsck_close(mrp_transport_t *mt)
 
     if (user_data == t)                  /* was our associated context */
         wsl_unref_context(ctx);
+}
+
+
+static int wsck_setopt(mrp_transport_t *mt, const char *opt, const void *val)
+{
+    wsck_t *t = (wsck_t *)mt;
+
+    if (!strcmp(opt, MRP_WSCK_OPT_SENDMODE) && val != NULL) {
+        if (!strcmp(val, "binary"))
+            t->send_mode = WSL_SEND_BINARY;
+        else if (!strcmp(val, "text"))
+            t->send_mode = WSL_SEND_TEXT;
+        else
+            return FALSE;
+
+        if (t->sck != NULL)
+            return wsl_set_sendmode(t->sck, t->send_mode);
+        else
+            return TRUE;
+    }
+
+    return FALSE;
 }
 
 
@@ -204,6 +227,10 @@ static int wsck_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 
     if (t->sck != NULL) {
         mrp_debug("accepted websocket connection %p", mlt);
+
+        /* default to mode inherited from listening transport */
+        t->send_mode = lt->send_mode;
+        wsl_set_sendmode(t->sck, t->send_mode);
 
         return TRUE;
     }
@@ -624,7 +651,7 @@ static int check_cb(wsl_sck_t *sck, void *user_data, void *proto_data)
 
 
 MRP_REGISTER_TRANSPORT(wsck, WSCKP, wsck_t, wsck_resolve,
-                       wsck_open, wsck_createfrom, wsck_close,
+                       wsck_open, wsck_createfrom, wsck_close, wsck_setopt,
                        wsck_bind, wsck_listen, wsck_accept,
                        wsck_connect, wsck_disconnect,
                        wsck_send, NULL,

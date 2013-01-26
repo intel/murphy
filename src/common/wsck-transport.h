@@ -23,6 +23,14 @@ typedef struct {
 #define MRP_WSCK_DEFPROTO "murphy"
 #define MRP_WSCK_PROTOLEN (MRP_SOCKADDR_SIZE - sizeof(_mrp_wsckaddr_base_t))
 
+/*
+ * websocket transport options and value
+ */
+
+#define MRP_WSCK_OPT_SENDMODE     "send-mode" /* sendmode option name */
+#define MRP_WSCK_SENDMODE_TEXT    "text"      /* sendmode text option */
+#define MRP_WSCK_SENDMODE_BINARY  "binary"    /* sendmode blob option */
+
 
 /*
  * websocket transport address
