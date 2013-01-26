@@ -1,10 +1,16 @@
 #include <stdarg.h>
+#include <string.h>
 #include <json/json.h>
 
 #include <murphy/common/macros.h>
 #include <murphy/common/log.h>
+#include <murphy/common/debug.h>
 #include <murphy/common/json.h>
 
+/** Type for a JSON parser. */
+typedef struct json_tokener mrp_json_parser_t;
+
+static mrp_json_parser_t *parser;
 
 mrp_json_t *mrp_json_create(mrp_json_type_t type, ...)
 {
@@ -48,9 +54,21 @@ mrp_json_t *mrp_json_create(mrp_json_type_t type, ...)
 }
 
 
-mrp_json_t *mrp_json_string_to_object(const char *s)
+mrp_json_t *mrp_json_string_to_object(const char *s, int len)
 {
-    return json_object_new_string(s);
+    if (parser == NULL) {
+        parser = json_tokener_new();
+
+        if (parser == NULL)
+            return NULL;
+    }
+    else
+        json_tokener_reset(parser);
+
+    if (len < 0)
+        len = strlen(s);
+
+    return json_tokener_parse_ex(parser, s, len);
 }
 
 
@@ -136,9 +154,81 @@ mrp_json_t *mrp_json_add_member(mrp_json_t *o, const char *key,
 }
 
 
+mrp_json_t *mrp_json_add_array(mrp_json_t *o, const char *key,
+                               mrp_json_type_t type, ...)
+{
+    va_list      ap;
+    void        *arr;
+    size_t       cnt, i;
+    mrp_json_t  *a;
+
+    va_start(ap, type);
+    arr = va_arg(ap, void *);
+    cnt = va_arg(ap, size_t);
+    a   = mrp_json_create(MRP_JSON_ARRAY);
+
+    if (a == NULL)
+        return NULL;
+
+    switch (type) {
+    case MRP_JSON_STRING:
+        for (i = 0; i < cnt; i++) {
+            if (!mrp_json_array_append_item(a, type, ((char **)arr)[i]))
+                goto fail;
+        }
+        break;
+
+    case MRP_JSON_INTEGER:
+        for (i = 0; i < cnt; i++) {
+            if (!mrp_json_array_append_item(a, type, ((int *)arr)[i]))
+                goto fail;
+        }
+        break;
+
+    case MRP_JSON_DOUBLE:
+        for (i = 0; i < cnt; i++) {
+            if (!mrp_json_array_append_item(a, type, ((double *)arr)[i]))
+                goto fail;
+        }
+        break;
+
+    case MRP_JSON_BOOLEAN:
+        for (i = 0; i < cnt; i++) {
+            if (!mrp_json_array_append_item(a, type, ((bool *)arr)[i]))
+                goto fail;
+        }
+        break;
+
+    default:
+        goto fail;
+
+    }
+
+    va_end(ap);
+
+    mrp_json_add(o, key, a);
+    return a;
+
+ fail:
+    va_end(ap);
+    mrp_json_unref(a);
+
+    return NULL;
+}
+
+
 mrp_json_t *mrp_json_get(mrp_json_t *o, const char *key)
 {
-    return json_object_object_get(o, key);
+    mrp_json_iter_t  it;
+    const char      *k;
+    mrp_json_t      *v;
+
+    mrp_json_foreach_member(o, k, v, it) {
+        if (!strcmp(k, key))
+            return v;
+    }
+
+    return NULL;
 }
 
 
@@ -155,7 +245,7 @@ int mrp_json_get_member(mrp_json_t *o, const char *key,
 
     va_start(ap, type);
 
-    m = json_object_object_get(o, key);
+    m = mrp_json_get(o, key);
 
     if (m != NULL && json_object_is_type(m, type)) {
         success = TRUE;

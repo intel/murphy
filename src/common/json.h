@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <json/json.h>
+#include <json/linkhash.h>
 
 #include <murphy/common/macros.h>
 
@@ -30,13 +31,13 @@ typedef enum {
 } mrp_json_type_t;
 
 /** Type for a JSON member iterator. */
-typedef struct json_object_iter mrp_json_iter_t;
+typedef json_object_iter mrp_json_iter_t;
 
 /** Create a new JSON object of the given type. */
 mrp_json_t *mrp_json_create(mrp_json_type_t type, ...);
 
 /** Deserialize a string to a JSON object. */
-mrp_json_t *mrp_json_string_to_object(const char *str);
+mrp_json_t *mrp_json_string_to_object(const char *str, int len);
 
 /** Serialize a JSON object to a string. */
 const char *mrp_json_object_to_string(mrp_json_t *o);
@@ -59,6 +60,36 @@ void mrp_json_add(mrp_json_t *o, const char *key, mrp_json_t *m);
 /** Create a new JSON object and set it as a member of another object. */
 mrp_json_t *mrp_json_add_member(mrp_json_t *o, const char *key,
                                 mrp_json_type_t type, ...);
+
+/** Convenience macros to add members of various basic types. */
+#define mrp_json_add_string(o, key, s) \
+    mrp_json_add_string(o, key, MRP_JSON_STRING, s)
+
+#define mrp_json_add_integer(o, key, i) \
+    mrp_json_add_member(o, key, MRP_JSON_INTEGER, i)
+
+#define mrp_json_add_double(o, key, d) \
+    mrp_json_add_string(o, key, MRP_JSON_DOUBLE, d)
+
+#define mrp_json_add_boolean(o, key, b) \
+    mrp_json_add_string(o, key, MRP_JSON_BOOLEAN, (int)b)
+
+/** Add an array member from a native C array of the given type. */
+mrp_json_t *mrp_json_add_array(mrp_json_t *o, const char *key,
+                               mrp_json_type_t type, ...);
+
+/** Convenience macros for adding arrays of various basic types. */
+#define mrp_json_add_string_array(o, key, arr, size) \
+    mrp_json_add_array(o, key, MRP_JSON_STRING, arr, size)
+
+#define mrp_json_add_int_array(o, key, arr, size) \
+    mrp_json_add_array(o, key, MRP_JSON_INTEGER, arr, size)
+
+#define mrp_json_add_double_array(o, key, arr, size) \
+    mrp_json_add_array(o, key, MRP_JSON_DOUBLE, arr, size)
+
+#define mrp_json_add_boolean_array(o, key, arr, size) \
+    mrp_json_add_array(o, key, MRP_JSON_BOOLEAN, arr, size)
 
 /** Get the member of a JSON object as a json object. */
 mrp_json_t *mrp_json_get(mrp_json_t *o, const char *key);
@@ -94,7 +125,7 @@ int mrp_json_array_get_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...);
 
 /** Iterate through the members of an object. */
 #define mrp_json_foreach_member(o, k, v, it)                    \
-    for (it.entry = json_object_get_object((o)->head);          \
+    for (it.entry = json_object_get_object((o))->head;          \
     (it.entry ?                                                 \
      (k = it.key = it.entry->k,                                 \
       v = it.val = (mrp_json_t *)it.entry->v,                   \
