@@ -82,6 +82,9 @@ typedef enum {
 #if 0
     WSL_SEND_HTTP   = LWS_WRITE_HTTP     /* HTTP mode */
 #endif
+
+#define WSL_SEND_TEXT WSL_SEND_TEXT
+
 } wsl_sendmode_t;
 
 

@@ -703,6 +703,11 @@ int wsl_send(wsl_sck_t *sck, void *payload, size_t size)
             total = size;
         }
 
+#if (WSL_SEND_TEXT != 0)
+        if (!sck->send_mode)
+            sck->send_mode = WSL_SEND_TEXT;
+#endif
+
         if (libwebsocket_write(sck->sck, buf + pre, total, sck->send_mode) >= 0)
             return TRUE;
     }
