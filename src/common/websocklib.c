@@ -58,20 +58,20 @@ typedef struct {
  */
 
 struct wsl_ctx_s {
-    lws_ctx_t       *ctx;                /* libwebsocket context */
-    wsl_proto_t     *protos;             /* protocols */
-    int              nproto;             /* number of protocols */
-    lws_proto_t     *lws_protos;         /* libwebsocket protocols */
-    mrp_refcnt_t     refcnt;             /* reference count */
-    int              epollfd;            /* epoll descriptor */
-    mrp_io_watch_t  *w;                  /* I/O watch for epollfd */
-    mrp_mainloop_t  *ml;                 /* pumping mainloop */
-    pollfd_t        *fds;                /* polled descriptors */
-    int              nfd;                /* number descriptors */
-    void            *user_data;          /* opaque user data */
-    lws_t           *pending;            /* pending connection */
-    void            *pending_user;       /* user_data of pending */
-    wsl_proto_t     *pending_proto;      /* protocol of pending */
+    lws_ctx_t      *ctx;                 /* libwebsocket context */
+    wsl_proto_t    *protos;              /* protocols */
+    int             nproto;              /* number of protocols */
+    lws_proto_t    *lws_protos;          /* libwebsocket protocols */
+    mrp_refcnt_t    refcnt;              /* reference count */
+    int             epollfd;             /* epoll descriptor */
+    mrp_io_watch_t *w;                   /* I/O watch for epollfd */
+    mrp_mainloop_t *ml;                  /* pumping mainloop */
+    pollfd_t       *fds;                 /* polled descriptors */
+    int             nfd;                 /* number descriptors */
+    void           *user_data;           /* opaque user data */
+    lws_t          *pending;             /* pending connection */
+    void           *pending_user;        /* user_data of pending */
+    wsl_proto_t    *pending_proto;       /* protocol of pending */
 };
 
 /*
@@ -79,14 +79,15 @@ struct wsl_ctx_s {
  */
 
 struct wsl_sck_s {
-    wsl_ctx_t     *ctx;                  /* associated context */
-    lws_t         *sck;                  /* libwebsocket instance */
-    wsl_proto_t   *proto;                /* protocol data */
-    mrp_fragbuf_t *buf;                  /* fragment collection buffer */
-    void          *user_data;            /* opaque user data */
-    wsl_sck_t    **sckptr;               /* back pointer from sck to us */
-    int            closing : 1;          /* close in progress */
-    int            busy;                 /* upper-layer callback(s) active */
+    wsl_ctx_t       *ctx;                /* associated context */
+    lws_t           *sck;                /* libwebsocket instance */
+    wsl_proto_t     *proto;              /* protocol data */
+    wsl_sendmode_t   send_mode;          /* libwebsocket write mode */
+    mrp_fragbuf_t   *buf;                /* fragment collection buffer */
+    void            *user_data;          /* opaque user data */
+    wsl_sck_t      **sckptr;             /* back pointer from sck to us */
+    int              closing : 1;        /* close in progress */
+    int              busy;               /* upper-layer callback(s) active */
 };
 
 
@@ -659,6 +660,23 @@ static int check_closed(wsl_sck_t *sck)
 }
 
 
+int wsl_set_sendmode(wsl_sck_t *sck, wsl_sendmode_t mode)
+{
+    const char *name;
+
+    switch (mode) {
+    case WSL_SEND_TEXT:   name = "text";   break;
+    case WSL_SEND_BINARY: name = "binary"; break;
+    default:                               return FALSE;
+    }
+
+    mrp_debug("websocket %p/%p mode changed to %s", sck->sck, sck, name);
+    sck->send_mode = mode;
+
+    return TRUE;
+}
+
+
 int wsl_send(wsl_sck_t *sck, void *payload, size_t size)
 {
     unsigned char *buf;
@@ -685,8 +703,7 @@ int wsl_send(wsl_sck_t *sck, void *payload, size_t size)
             total = size;
         }
 
-        if (libwebsocket_write(sck->sck, buf + pre, total,
-                               LWS_WRITE_BINARY) >= 0)
+        if (libwebsocket_write(sck->sck, buf + pre, total, sck->send_mode) >= 0)
             return TRUE;
     }
 

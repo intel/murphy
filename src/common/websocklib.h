@@ -73,6 +73,19 @@ typedef struct {
 
 
 /*
+ * websocket write modes
+ */
+
+typedef enum {
+    WSL_SEND_TEXT   = LWS_WRITE_TEXT,    /* text mode */
+    WSL_SEND_BINARY = LWS_WRITE_BINARY,  /* binary/blob mode */
+#if 0
+    WSL_SEND_HTTP   = LWS_WRITE_HTTP     /* HTTP mode */
+#endif
+} wsl_sendmode_t;
+
+
+/*
  * logging levels
  */
 
@@ -116,6 +129,9 @@ void wsl_reject_pending(wsl_ctx_t *ctx);
 
 /** Close a websocket connection. Return user_data of the associated context. */
 void *wsl_close(wsl_sck_t *sck);
+
+/** Set websocket write mode (binary or text). */
+int wsl_set_sendmode(wsl_sck_t *sck, wsl_sendmode_t mode);
 
 /** Send data over a wbesocket. */
 int wsl_send(wsl_sck_t *sck, void *payload, size_t size);
