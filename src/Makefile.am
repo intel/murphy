@@ -1023,6 +1023,30 @@ endif
 endif
 endif
 
+# resource-wrt plugin
+if BUILD_RESOURCES
+if WEBSOCKETS_ENABLED
+RESOURCE_WRT_PLUGIN_SOURCES = plugins/resource-wrt/plugin-resource-wrt.c
+RESOURCE_WRT_PLUGIN_CFLAGS  = $(WEBSOCKETS_CFLAGS)
+RESOURCE_WRT_PLUGIN_LIBS    =
+
+if !DISABLED_PLUGIN_RESOURCE_WRT
+if BUILTIN_PLUGIN_RESOURCE_WRT
+BUILTIN_PLUGINS += $(RESOURCE_WRT_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(RESOURCE_WRT_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(RESOURCE_WRT_PLUGIN_LIBS)
+else
+plugin_resource_wrt_la_SOURCES = $(RESOURCE_WRT_PLUGIN_SOURCES)
+plugin_resource_wrt_la_CFLAGS  = $(RESOURCE_WRT_PLUGIN_CFLAGS) \
+				 $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_resource_wrt_la_LDFLAGS = -module -avoid-version
+plugin_resource_wrt_la_LIBADD  = $(RESOURCE_WRT_PLUGIN_LIBS)
+plugin_LTLIBRARIES    += plugin-resource-wrt.la
+endif
+endif
+endif
+endif
+
 # console plugin
 CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/plugin-console.c
 CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES) \
