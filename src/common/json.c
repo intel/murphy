@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdarg.h>
 #include <string.h>
 #include <json/json.h>
@@ -144,6 +145,7 @@ mrp_json_t *mrp_json_add_member(mrp_json_t *o, const char *key,
         break;
     default:
         m = NULL;
+        errno = EINVAL;
     }
     va_end(ap);
 
@@ -243,43 +245,50 @@ int mrp_json_get_member(mrp_json_t *o, const char *key,
     int          success;
     va_list      ap;
 
+    success = FALSE;
     va_start(ap, type);
 
     m = mrp_json_get(o, key);
 
-    if (m != NULL && json_object_is_type(m, type)) {
-        success = TRUE;
-        switch (type) {
-        case MRP_JSON_STRING:
-            s  = va_arg(ap, const char **);
-            *s = json_object_get_string(m);
-            break;
-        case MRP_JSON_BOOLEAN:
-            b  = va_arg(ap, bool *);
-            *b = json_object_get_boolean(m);
-            break;
-        case MRP_JSON_INTEGER:
-            i  = va_arg(ap, int *);
-            *i = json_object_get_int(m);
-            break;
-        case MRP_JSON_DOUBLE:
-            d  = va_arg(ap, double *);
-            *d = json_object_get_double(m);
-            break;
-        case MRP_JSON_OBJECT:
-            mp  = va_arg(ap, mrp_json_t **);
-            *mp = m;
-            break;
-        case MRP_JSON_ARRAY:
-            mp  = va_arg(ap, mrp_json_t **);
-            *mp = m;
-            break;
-        default:
-            success = FALSE;
+    if (m != NULL) {
+        if (json_object_is_type(m, type)) {
+            success = TRUE;
+            switch (type) {
+            case MRP_JSON_STRING:
+                s  = va_arg(ap, const char **);
+                *s = json_object_get_string(m);
+                break;
+            case MRP_JSON_BOOLEAN:
+                b  = va_arg(ap, bool *);
+                *b = json_object_get_boolean(m);
+                break;
+            case MRP_JSON_INTEGER:
+                i  = va_arg(ap, int *);
+                *i = json_object_get_int(m);
+                break;
+            case MRP_JSON_DOUBLE:
+                d  = va_arg(ap, double *);
+                *d = json_object_get_double(m);
+                break;
+            case MRP_JSON_OBJECT:
+                mp  = va_arg(ap, mrp_json_t **);
+                *mp = m;
+                break;
+            case MRP_JSON_ARRAY:
+                mp  = va_arg(ap, mrp_json_t **);
+                *mp = m;
+                break;
+            default:
+                success = FALSE;
+            }
         }
+        else
+            errno = EINVAL;
     }
-    else
+    else {
+        errno = ENOENT;
         success = FALSE;
+    }
 
     va_end(ap);
 
@@ -301,7 +310,7 @@ int mrp_json_array_length(mrp_json_t *a)
 
 int mrp_json_array_append(mrp_json_t *a, mrp_json_t *v)
 {
-    return json_object_array_add(a, v);
+    return json_object_array_add(a, v) == 0;
 }
 
 
@@ -340,13 +349,20 @@ mrp_json_t *mrp_json_array_append_item(mrp_json_t *a, mrp_json_type_t type, ...)
         break;
     default:
         v = NULL;
+        errno = EINVAL;
     }
     va_end(ap);
 
-    if (v != NULL)
-        json_object_array_add(a, v);
+    if (v != NULL) {
+        if (json_object_array_add(a, v) == 0)
+            return v;
+        else {
+            mrp_json_unref(v);
+            errno = ENOMEM;
+        }
+    }
 
-    return v;
+    return NULL;
 }
 
 
@@ -391,13 +407,16 @@ int mrp_json_array_set_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...)
         break;
     default:
         v = NULL;
+        errno = EINVAL;
     }
     va_end(ap);
 
     if (v != NULL)
         return json_object_array_put_idx(a, idx, v);
-    else
+    else {
+        errno = ENOMEM;
         return FALSE;
+    }
 }
 
 
@@ -417,43 +436,49 @@ int mrp_json_array_get_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...)
     int          success;
     va_list      ap;
 
+    success = FALSE;
     va_start(ap, type);
 
     v = json_object_array_get_idx(a, idx);
 
-    if (v != NULL && json_object_is_type(v, type)) {
-        success = TRUE;
-        switch (type) {
-        case MRP_JSON_STRING:
-            s  = va_arg(ap, const char **);
-            *s = json_object_get_string(v);
-            break;
-        case MRP_JSON_BOOLEAN:
-            b  = va_arg(ap, bool *);
-            *b = json_object_get_boolean(v);
-            break;
-        case MRP_JSON_INTEGER:
-            i  = va_arg(ap, int *);
-            *i = json_object_get_int(v);
-            break;
-        case MRP_JSON_DOUBLE:
-            d  = va_arg(ap, double *);
-            *d = json_object_get_double(v);
-            break;
-        case MRP_JSON_OBJECT:
-            vp  = va_arg(ap, mrp_json_t **);
-            *vp = v;
-            break;
-        case MRP_JSON_ARRAY:
-            vp  = va_arg(ap, mrp_json_t **);
-            *vp = v;
-            break;
-        default:
-            success = FALSE;
+    if (v != NULL) {
+        if (json_object_is_type(v, type)) {
+            success = TRUE;
+            switch (type) {
+            case MRP_JSON_STRING:
+                s  = va_arg(ap, const char **);
+                *s = json_object_get_string(v);
+                break;
+            case MRP_JSON_BOOLEAN:
+                b  = va_arg(ap, bool *);
+                *b = json_object_get_boolean(v);
+                break;
+            case MRP_JSON_INTEGER:
+                i  = va_arg(ap, int *);
+                *i = json_object_get_int(v);
+                break;
+            case MRP_JSON_DOUBLE:
+                d  = va_arg(ap, double *);
+                *d = json_object_get_double(v);
+                break;
+            case MRP_JSON_OBJECT:
+                vp  = va_arg(ap, mrp_json_t **);
+                *vp = v;
+                break;
+            case MRP_JSON_ARRAY:
+                vp  = va_arg(ap, mrp_json_t **);
+                *vp = v;
+                break;
+            default:
+                success = FALSE;
+                errno = EINVAL;
+            }
         }
+        else
+            errno = EINVAL;
     }
     else
-        success = FALSE;
+        errno = ENOENT;
 
     va_end(ap);
 
