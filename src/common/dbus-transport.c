@@ -1707,7 +1707,7 @@ static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id)
 
 
 MRP_REGISTER_TRANSPORT(dbus, DBUS, dbus_t, dbus_resolve,
-                       dbus_open, dbus_createfrom, dbus_close,
+                       dbus_open, dbus_createfrom, dbus_close, NULL,
                        dbus_bind, NULL, NULL,
                        dbus_connect, dbus_disconnect,
                        dbus_sendmsg, dbus_sendmsgto,

@@ -223,6 +223,17 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
 }
 
 
+int mrp_transport_setopt(mrp_transport_t *t, const char *opt, const void *val)
+{
+    if (t != NULL) {
+        if (t->descr->req.setopt != NULL)
+            return t->descr->req.setopt(t, opt, val);
+    }
+
+    return FALSE;
+}
+
+
 static inline int type_matches(const char *type, const char *addr)
 {
     while (*type == *addr)

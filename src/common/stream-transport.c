@@ -662,7 +662,7 @@ static int strm_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
 
 
 MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
-                       strm_open, strm_createfrom, strm_close,
+                       strm_open, strm_createfrom, strm_close, NULL,
                        strm_bind, strm_listen, strm_accept,
                        strm_connect, strm_disconnect,
                        strm_send, NULL,
@@ -670,7 +670,7 @@ MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
                        strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
-                       strm_open, strm_createfrom, strm_close,
+                       strm_open, strm_createfrom, strm_close, NULL,
                        strm_bind, strm_listen, strm_accept,
                        strm_connect, strm_disconnect,
                        strm_send, NULL,
@@ -678,7 +678,7 @@ MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_senddata, NULL);
 
 MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
-                       strm_open, strm_createfrom, strm_close,
+                       strm_open, strm_createfrom, strm_close, NULL,
                        strm_bind, strm_listen, strm_accept,
                        strm_connect, strm_disconnect,
                        strm_send, NULL,

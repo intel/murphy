@@ -697,7 +697,7 @@ static int dgrm_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
 
 
 MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
-                       dgrm_open, dgrm_createfrom, dgrm_close,
+                       dgrm_open, dgrm_createfrom, dgrm_close, NULL,
                        dgrm_bind, dgrm_listen, NULL,
                        dgrm_connect, dgrm_disconnect,
                        dgrm_send, dgrm_sendto,
@@ -705,7 +705,7 @@ MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
                        dgrm_senddata, dgrm_senddatato);
 
 MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
-                       dgrm_open, dgrm_createfrom, dgrm_close,
+                       dgrm_open, dgrm_createfrom, dgrm_close, NULL,
                        dgrm_bind, dgrm_listen, NULL,
                        dgrm_connect, dgrm_disconnect,
                        dgrm_send, dgrm_sendto,
@@ -713,7 +713,7 @@ MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_senddata, dgrm_senddatato);
 
 MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
-                       dgrm_open, dgrm_createfrom, dgrm_close,
+                       dgrm_open, dgrm_createfrom, dgrm_close, NULL,
                        dgrm_bind, dgrm_listen, NULL,
                        dgrm_connect, dgrm_disconnect,
                        dgrm_send, dgrm_sendto,

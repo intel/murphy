@@ -43,48 +43,6 @@ MRP_CDECL_BEGIN
 typedef struct mrp_transport_s mrp_transport_t;
 
 
-/*
- * Notes:
- *
- *    Transports can get destructed in two slightly different ways.
- *
- *    1)
- *      Someone calls mrp_transport_destroy while the transport is
- *      idle, ie. with no callbacks or operations being active. This
- *      is simple and straightforward:
- *         - mrp_transport_destroy calls req.disconnect
- *         - mrp_transport_destroy calls req.close
- *         - mrp_transport_destroy check and sees the transport is idle
- *           so it frees the transport
- *
- *    2)
- *      Someone calls mrp_tansport_destroy while the transport is
- *      busy, ie. it has an unfinished callback or operation running.
- *      This typically happens when an operation or callback function,
- *      or a user function called from either of those calls
- *      mrp_transport_destroy as a result of a received message, or a
- *      (communication) error. In this case destroying the transport
- *      is less straightforward and needs to get delayed to avoid
- *      shooting out the transport underneath the active operation or
- *      callback.
- *
- *    To handle the latter case, the generic (ie. top-level) transport
- *    layer has a member function check_destroy. This function checks
- *    for pending destroy requests and destroys the transport if it
- *    is not busy. All transport backends MUST CALL this function and
- *    CHECK ITS RETURN VALUE, whenever a user callback or a transport
- *    callback (ie. bottom-up event propagation) function invoked by
- *    the backend returns.
- *
- *    If the transport has been left intact, check_destroy returns
- *    FALSE and processing can continue normally, taking into account
- *    that any transport state stored locally in the stack frame of the
- *    backend function might have changed during the callback. However,
- *    if check_destroy returns TRUE, it has nuked the transport and the
- *    backend MUST NOT touch or try to dereference the transport any more
- *    as its resources have already been released.
- */
-
 
 /*
  * transport socket address
@@ -158,6 +116,8 @@ typedef struct {
     int  (*disconnect)(mrp_transport_t *t);
     /** Close a transport, free all resources from open/accept/connect. */
     void (*close)(mrp_transport_t *t);
+    /** Set a (possibly type specific) transport option. */
+    int  (*setopt)(mrp_transport_t *t, const char *opt, const void *value);
     /** Send a message over a (connected) transport. */
     int (*sendmsg)(mrp_transport_t *t, mrp_msg_t *msg);
     /** Send raw data over a (connected) transport. */
@@ -263,6 +223,48 @@ struct mrp_transport_s {
 };
 
 
+/*
+ * Notes:
+ *
+ *    Transports can get destructed in two slightly different ways.
+ *
+ *    1)
+ *      Someone calls mrp_transport_destroy while the transport is
+ *      idle, ie. with no callbacks or operations being active. This
+ *      is simple and straightforward:
+ *         - mrp_transport_destroy calls req.disconnect
+ *         - mrp_transport_destroy calls req.close
+ *         - mrp_transport_destroy check and sees the transport is idle
+ *           so it frees the transport
+ *
+ *    2)
+ *      Someone calls mrp_tansport_destroy while the transport is
+ *      busy, ie. it has an unfinished callback or operation running.
+ *      This typically happens when an operation or callback function,
+ *      or a user function called from either of those calls
+ *      mrp_transport_destroy as a result of a received message, or a
+ *      (communication) error. In this case destroying the transport
+ *      is less straightforward and needs to get delayed to avoid
+ *      shooting out the transport underneath the active operation or
+ *      callback.
+ *
+ *    To handle the latter case, the generic (ie. top-level) transport
+ *    layer has a member function check_destroy. This function checks
+ *    for pending destroy requests and destroys the transport if it
+ *    is not busy. All transport backends MUST CALL this function and
+ *    CHECK ITS RETURN VALUE, whenever a user callback or a transport
+ *    callback (ie. bottom-up event propagation) function invoked by
+ *    the backend returns.
+ *
+ *    If the transport has been left intact, check_destroy returns
+ *    FALSE and processing can continue normally, taking into account
+ *    that any transport state stored locally in the stack frame of the
+ *    backend function might have changed during the callback. However,
+ *    if check_destroy returns TRUE, it has nuked the transport and the
+ *    backend MUST NOT touch or try to dereference the transport any more
+ *    as its resources have already been released.
+ */
+
 
 /*
  * convenience macros
@@ -342,7 +344,7 @@ struct mrp_transport_s {
 
 /** Automatically register a transport on startup. */
 #define MRP_REGISTER_TRANSPORT(_prfx, _typename, _structtype, _resolve,   \
-                               _open, _createfrom, _close,                \
+                               _open, _createfrom, _close, _setopt,       \
                                _bind, _listen, _accept,                   \
                                _connect, _disconnect,                     \
                                _sendmsg, _sendmsgto,                      \
@@ -363,6 +365,7 @@ struct mrp_transport_s {
                 .listen     = _listen,                                    \
                 .accept     = _accept,                                    \
                 .close      = _close,                                     \
+                .setopt     = _setopt,                                    \
                 .connect    = _connect,                                   \
                 .disconnect = _disconnect,                                \
                 .sendmsg    = _sendmsg,                                   \
@@ -400,6 +403,9 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
                                            void *conn, mrp_transport_evt_t *evt,
                                            void *user_data, int flags,
                                            int connected);
+
+/** Set a (possibly type-specific) transport option. */
+int mrp_transport_setopt(mrp_transport_t *t, const char *opt, const void *val);
 
 /** Resolve an address string to a transport-specific address. */
 socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
