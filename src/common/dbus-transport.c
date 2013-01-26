@@ -46,7 +46,7 @@
 #define TRANSPORT_PATH       "/murphy/transport"
 #define TRANSPORT_INTERFACE  "Murphy.Transport"
 #define TRANSPORT_MESSAGE    "DeliverMessage"
-#define TRANSPORT_CUSTOM     "DeliverCustom"
+#define TRANSPORT_DATA       "DeliverData"
 #define TRANSPORT_RAW        "DeliverRaw"
 #define TRANSPORT_METHOD     "DeliverMessage"
 
@@ -375,8 +375,8 @@ static int dbus_bind(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
     copy_address(&t->local, addr);
 
     switch (t->mode) {
-    case MRP_TRANSPORT_MODE_CUSTOM:
-        method = TRANSPORT_CUSTOM;
+    case MRP_TRANSPORT_MODE_DATA:
+        method = TRANSPORT_DATA;
         cb     = dbus_data_cb;
         break;
     case MRP_TRANSPORT_MODE_RAW:
@@ -439,8 +439,8 @@ static void dbus_close(mrp_transport_t *mt)
 
     if (t->bound) {
         switch (t->mode) {
-        case MRP_TRANSPORT_MODE_CUSTOM:
-            method = TRANSPORT_CUSTOM;
+        case MRP_TRANSPORT_MODE_DATA:
+            method = TRANSPORT_DATA;
             cb     = dbus_data_cb;
             break;
         case MRP_TRANSPORT_MODE_RAW:
@@ -798,7 +798,7 @@ static int dbus_senddatato(mrp_transport_t *mt, void *data, uint16_t tag,
 
         if (m != NULL) {
             if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
-                              TRANSPORT_INTERFACE, TRANSPORT_CUSTOM,
+                              TRANSPORT_INTERFACE, TRANSPORT_DATA,
                               0, NULL, NULL, m))
                 success = TRUE;
             else {

@@ -72,18 +72,18 @@ static inline mrp_sockaddr_t *mrp_sockaddr_cpy(mrp_sockaddr_t *d,
  */
 
 typedef enum {
-    MRP_TRANSPORT_MODE_MSG    = 0x00,    /* generic message encoding */
-    MRP_TRANSPORT_MODE_RAW    = 0x01,    /* uses bitpipe mode */
-    MRP_TRANSPORT_MODE_CUSTOM = 0x02,    /* uses custom data types */
+    MRP_TRANSPORT_MODE_MSG  = 0x00,      /* generic message encoding */
+    MRP_TRANSPORT_MODE_RAW  = 0x01,      /* uses bitpipe mode */
+    MRP_TRANSPORT_MODE_DATA = 0x02,      /* uses registered data types */
 } mrp_transport_mode_t;
 
 typedef enum {
-    MRP_TRANSPORT_MODE_MASK   = 0x03,    /* mask of mode bits */
-    MRP_TRANSPORT_INHERIT     = 0x03,    /* mask of all inherited flags */
+    MRP_TRANSPORT_MODE_MASK = 0x03,      /* mask of mode bits */
+    MRP_TRANSPORT_INHERIT   = 0x03,      /* mask of all inherited flags */
 
-    MRP_TRANSPORT_REUSEADDR   = 0x10,
-    MRP_TRANSPORT_NONBLOCK    = 0x20,
-    MRP_TRANSPORT_CLOEXEC     = 0x40,
+    MRP_TRANSPORT_REUSEADDR = 0x10,
+    MRP_TRANSPORT_NONBLOCK  = 0x20,
+    MRP_TRANSPORT_CLOEXEC   = 0x40,
 } mrp_transport_flag_t;
 
 #define MRP_TRANSPORT_MODE(t) ((t)->flags & MRP_TRANSPORT_MODE_MASK)

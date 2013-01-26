@@ -123,7 +123,7 @@ mrp_data_descr_t *data_descr;
 typedef enum {
     MODE_DEFAULT = 0,
     MODE_MESSAGE = 1,
-    MODE_CUSTOM  = 2,
+    MODE_DATA    = 2,
     MODE_RAW     = 3,
 } msg_mode_t;
 
@@ -153,9 +153,9 @@ void recv_msg(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
 void recvfrom_msg(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
                   socklen_t addrlen, void *user_data);
 
-void recv_custom(mrp_transport_t *t, void *data, uint16_t tag, void *user_data);
-void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
-                     mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data);
+void recv_data(mrp_transport_t *t, void *data, uint16_t tag, void *user_data);
+void recvfrom_data(mrp_transport_t *t, void *data, uint16_t tag,
+                   mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data);
 
 void recvraw(mrp_transport_t *t, void *data, size_t size, void *user_data);
 void recvrawfrom(mrp_transport_t *t, void *data, size_t size,
@@ -247,8 +247,8 @@ void free_custom(custom_t *msg)
 }
 
 
-void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
-                     mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
+void recvfrom_data(mrp_transport_t *t, void *data, uint16_t tag,
+                   mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
 {
     context_t *c   = (context_t *)user_data;
     custom_t  *msg = (custom_t *)data;
@@ -287,9 +287,9 @@ void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
 }
 
 
-void recv_custom(mrp_transport_t *t, void *data, uint16_t tag, void *user_data)
+void recv_data(mrp_transport_t *t, void *data, uint16_t tag, void *user_data)
 {
-    recvfrom_custom(t, data, tag, NULL, 0, user_data);
+    recvfrom_data(t, data, tag, NULL, 0, user_data);
 }
 
 
@@ -400,9 +400,9 @@ void server_init(context_t *c)
     type_init(c);
 
     switch (c->mode) {
-    case MODE_CUSTOM:
-        evt.recvdata     = recv_custom;
-        evt.recvdatafrom = recvfrom_custom;
+    case MODE_DATA:
+        evt.recvdata     = recv_data;
+        evt.recvdatafrom = recvfrom_data;
         break;
     case MODE_RAW:
         evt.recvraw      = recv_raw;
@@ -422,8 +422,8 @@ void server_init(context_t *c)
     flags = MRP_TRANSPORT_REUSEADDR;
 
     switch (c->mode) {
-    case MODE_CUSTOM:  flags |= MRP_TRANSPORT_MODE_CUSTOM; break;
-    case MODE_RAW:     flags |= MRP_TRANSPORT_MODE_RAW;    break;
+    case MODE_DATA:    flags |= MRP_TRANSPORT_MODE_DATA; break;
+    case MODE_RAW:     flags |= MRP_TRANSPORT_MODE_RAW;  break;
     default:
     case MODE_MESSAGE: flags |= MRP_TRANSPORT_MODE_MSG;
     }
@@ -498,7 +498,7 @@ void send_msg(context_t *c)
 }
 
 
-void send_custom(context_t *c)
+void send_data(context_t *c)
 {
     uint32_t  seq = c->seqno++;
     custom_t  msg;
@@ -569,8 +569,8 @@ void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
     MRP_UNUSED(t);
 
     switch (c->mode) {
-    case MODE_CUSTOM:  send_custom(c); break;
-    case MODE_RAW:     send_raw(c);    break;
+    case MODE_DATA:    send_data(c); break;
+    case MODE_RAW:     send_raw(c);  break;
     default:
     case MODE_MESSAGE: send_msg(c);
     }
@@ -591,10 +591,10 @@ void client_init(context_t *c)
     type_init(c);
 
     switch (c->mode) {
-    case MODE_CUSTOM:
-        evt.recvdata     = recv_custom;
-        evt.recvdatafrom = recvfrom_custom;
-        flags            = MRP_TRANSPORT_MODE_CUSTOM;
+    case MODE_DATA:
+        evt.recvdata     = recv_data;
+        evt.recvdatafrom = recvfrom_data;
+        flags            = MRP_TRANSPORT_MODE_DATA;
         break;
     case MODE_RAW:
         evt.recvraw      = recv_raw;
@@ -727,7 +727,7 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
 
         case 'c':
             if (ctx->mode == MODE_DEFAULT)
-                ctx->mode = MODE_CUSTOM;
+                ctx->mode = MODE_DATA;
             else {
                 mrp_log_error("Multiple modes requested.");
                 exit(1);
@@ -817,8 +817,8 @@ int main(int argc, char *argv[])
         mrp_log_info("Running as client, using address '%s'...", c.addrstr);
 
     switch (c.mode) {
-    case MODE_CUSTOM:  mrp_log_info("Using custom messages...");  break;
-    case MODE_RAW:     mrp_log_info("Using raw messages...");     break;
+    case MODE_DATA:    mrp_log_info("Using custom data messages..."); break;
+    case MODE_RAW:     mrp_log_info("Using raw messages...");         break;
     default:
     case MODE_MESSAGE: mrp_log_info("Using generic messages...");
     }

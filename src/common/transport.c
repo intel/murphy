@@ -507,7 +507,7 @@ int mrp_transport_senddata(mrp_transport_t *t, void *data, uint16_t tag)
     int result;
 
     if (t->connected &&
-        t->mode == MRP_TRANSPORT_MODE_CUSTOM && t->descr->req.senddata) {
+        t->mode == MRP_TRANSPORT_MODE_DATA && t->descr->req.senddata) {
         MRP_TRANSPORT_BUSY(t, {
                 result = t->descr->req.senddata(t, data, tag);
             });
@@ -526,7 +526,7 @@ int mrp_transport_senddatato(mrp_transport_t *t, void *data, uint16_t tag,
 {
     int result;
 
-    if (t->mode == MRP_TRANSPORT_MODE_CUSTOM && t->descr->req.senddatato) {
+    if (t->mode == MRP_TRANSPORT_MODE_DATA && t->descr->req.senddatato) {
         MRP_TRANSPORT_BUSY(t, {
                 result = t->descr->req.senddatato(t, data, tag, addr, addrlen);
             });
@@ -549,7 +549,7 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
     void             *decoded;
 
     switch (t->mode) {
-    case MRP_TRANSPORT_MODE_CUSTOM:
+    case MRP_TRANSPORT_MODE_DATA:
         tag   = be16toh(*(uint16_t *)data);
         data += sizeof(tag);
         size -= sizeof(tag);
