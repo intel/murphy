@@ -43,8 +43,8 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/list.h>
 #include <murphy/common/log.h>
-#include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
+#include <murphy/common/json.h>
 
 #include "websocklib.h"
 #include "wsck-transport.h"
@@ -373,6 +373,31 @@ static int wsck_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
 }
 
 
+static int wsck_sendcustom(mrp_transport_t *mt, void *data)
+{
+    wsck_t     *t    = (wsck_t *)mt;
+    mrp_json_t *json = (mrp_json_t *)data;
+    const char *s;
+    int         status;
+
+    s = mrp_json_object_to_string(json);
+
+    /*
+     * Notes:
+     *     Although json-c internally counts the length of the serialized
+     *     object, it does not provide an API to get it out together with
+     *     the string. Great...
+     */
+
+    if (s != NULL)
+        status = wsl_send(t->sck, (void *)s, strlen(s));
+    else
+        status = FALSE;
+
+    return status;
+}
+
+
 static inline int looks_ipv4(const char *p)
 {
 #define DEC_DIGIT(c) ('0' <= (c) && (c) <= '9')
@@ -624,7 +649,16 @@ static void recv_cb(wsl_sck_t *sck, void *data, size_t size, void *user_data,
     mrp_debug("%d bytes on websocket %p", size, sck);
 
     MRP_TRANSPORT_BUSY(t, {
-            t->recv_data((mrp_transport_t *)t, data, size, NULL, 0);
+            if (t->mode != MRP_TRANSPORT_MODE_CUSTOM)
+                t->recv_data((mrp_transport_t *)t, data, size, NULL, 0);
+            else {
+                mrp_json_t *json = mrp_json_string_to_object(data, size);
+
+                if (json != NULL) {
+                    t->recv_data((mrp_transport_t *)t, json, 0, NULL, 0);
+                    mrp_json_unref(json);
+                }
+            }
         });
 }
 
@@ -656,4 +690,5 @@ MRP_REGISTER_TRANSPORT(wsck, WSCKP, wsck_t, wsck_resolve,
                        wsck_connect, wsck_disconnect,
                        wsck_send, NULL,
                        wsck_sendraw, NULL,
-                       wsck_senddata, NULL);
+                       wsck_senddata, NULL,
+                       wsck_sendcustom, NULL);
