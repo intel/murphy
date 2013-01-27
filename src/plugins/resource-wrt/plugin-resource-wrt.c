@@ -424,6 +424,52 @@ static int parse_attributes(mrp_json_t *ja, mrp_attr_t *attrs, size_t max,
 }
 
 
+static int append_attributes(mrp_json_t *o, mrp_attr_t *attrs, errbuf_t *e)
+{
+    mrp_json_t *a;
+    mrp_attr_t *attr;
+
+    if (attrs->name == NULL)
+        return 0;
+
+    a = mrp_json_create(MRP_JSON_OBJECT);
+
+    if (a == NULL)
+        return error(e, ENOMEM, "failed to create attributes object");
+
+    for (attr = attrs; attr->name != NULL; attr++) {
+        switch (attr->type) {
+        case mqi_string:
+            if (!mrp_json_add_string(a, attr->name, attr->value.string))
+                goto fail;
+            break;
+        case mqi_integer:
+            if (!mrp_json_add_string(a, attr->name, attr->value.integer))
+                goto fail;
+            break;
+        case mqi_unsignd:
+            if (!mrp_json_add_string(a, attr->name, attr->value.integer))
+                goto fail;
+            break;
+        case mqi_floating:
+            if (!mrp_json_add_double(a, attr->name, attr->value.floating))
+                goto fail;
+            break;
+        default:
+            goto fail;
+        }
+    }
+
+    mrp_json_add(o, "attributes", a);
+    return 0;
+
+ fail:
+    mrp_json_unref(a);
+
+    return error(e, EINVAL, "failed to append attribtues");
+}
+
+
 static int parse_flags(mrp_json_t *arr, flagdef_t *defs, uint32_t *flagsp,
                        errbuf_t *e)
 {
@@ -511,10 +557,15 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
     wrt_client_t   *c    = (wrt_client_t *)user_data;
     const char     *type = RESWRT_EVENT;
     int             seq  = (int)reqid;
-    mrp_json_t     *msg;
+    mrp_json_t     *msg, *rarr, *r;
     int             rsid;
     const char     *state;
-    int             grant, advice;
+    int             grant, advice, all, mask;
+    errbuf_t        e;
+    mrp_resource_t *res;
+    void           *it;
+    const char     *name;
+    mrp_attr_t      attrs[ATTRIBUTE_MAX + 1];
 
     mrp_debug("event for resource set %p of client %p", rset, c);
 
@@ -540,10 +591,59 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
     if (mrp_json_add_integer(msg, "id"    , rsid ) &&
         mrp_json_add_string (msg, "state" , state) &&
         mrp_json_add_integer(msg, "grant" , grant) &&
-        mrp_json_add_integer(msg, "advice", advice))
-        mrp_transport_sendcustom(c->t, msg);
+        mrp_json_add_integer(msg, "advice", advice)) {
 
+        all  = grant | advice;
+        it   = NULL;
+        rarr = r = NULL;
+
+        while ((res = mrp_resource_set_iterate_resources(rset, &it)) != NULL) {
+            mask = mrp_resource_get_mask(res);
+
+            if (!(mask & all))
+                continue;
+
+            name = mrp_resource_get_name(res);
+
+            if (!mrp_resource_read_all_attributes(res, ATTRIBUTE_MAX+1, attrs))
+                goto fail;
+
+            if (rarr == NULL) {
+                rarr = mrp_json_create(MRP_JSON_ARRAY);
+                if (rarr == NULL)
+                    goto fail;
+            }
+
+            r = mrp_json_create(MRP_JSON_OBJECT);
+
+            if (r == NULL)
+                goto fail;
+
+            if (!mrp_json_add_string(r, "name", name))
+                goto fail;
+
+            if (append_attributes(r, attrs, &e) != 0)
+                goto fail;
+
+            if (!mrp_json_array_append(rarr, r))
+                goto fail;
+            else
+                r = NULL;
+        }
+
+        if (rarr != NULL)
+            mrp_json_add(msg, "resources", rarr);
+
+        mrp_transport_sendcustom(c->t, msg);
+        mrp_json_unref(msg);
+
+        return;
+    }
+
+ fail:
     mrp_json_unref(msg);
+    mrp_json_unref(rarr);
+    mrp_json_unref(r);
 }
 
 
