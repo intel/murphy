@@ -49,7 +49,7 @@
 #include "resource-wrt.h"
 
 #define DEFAULT_ADDRESS "wsck:127.0.0.1:4000/murphy"
-#define ATTRIBUTE_MAX   (sizeof(mrp_attribute_mask_t) * 8)
+#define ATTRIBUTE_MAX   MRP_ATTRIBUTE_MAX
 
 /*
  * plugin argument indices
@@ -84,12 +84,12 @@ typedef struct {
      * Notes:
      *    The resource infra sends the first event for a resource set
      *    out-of-order, before it has acknowledged the creation of the
-     *    set and let the client know the resource set id. We use these
-     *    fields below to cache the content of the first event to delay
-     *    its emission only after the creation has been acknowledged.
+     *    set and let the client know the resource set id. We use the
+     *    field below to suppress this event and force emitting an event
+     *    for the resource set right after we have acked the creation request.
      */
-    int                 acked;
-    mrp_resource_set_t *rset;
+    mrp_resource_set_t *rset;            /* resource set being created */
+    int                 force_all;       /* flag for */
 } wrt_client_t;
 
 
@@ -113,6 +113,8 @@ typedef struct {
     char msg[256];
 } errbuf_t;
 
+
+static int send_message(wrt_client_t *c, mrp_json_t *msg);
 
 static void ignore_invalid_request(wrt_client_t *c, mrp_json_t *req, ...)
 {
@@ -186,7 +188,7 @@ static void error_reply(wrt_client_t *c, const char *type, int seq, int code,
             mrp_json_add_integer(reply, "seq"   , seq ) &&
             mrp_json_add_integer(reply, "status", code) &&
             mrp_json_add_string (reply, "errmsg", errmsg))
-            mrp_transport_sendcustom(c->t, reply);
+            send_message(c, reply);
 
         mrp_json_unref(reply);
     }
@@ -232,7 +234,7 @@ static void query_resources(wrt_client_t *c, mrp_json_t *req)
         if (r == NULL)
             goto fail;
 
-        if (!mrp_json_add_string(r, "name", resources[id]))
+        if (!mrp_json_add_string (r, "name", resources[id]))
             goto fail;
 
         attrs = mrp_resource_definition_read_all_attributes(id,
@@ -282,7 +284,7 @@ static void query_resources(wrt_client_t *c, mrp_json_t *req)
 
     if (mrp_json_add_integer(reply, "status"   , 0)) {
         mrp_json_add        (reply, "resources", rarr);
-        mrp_transport_sendcustom(c->t, reply);
+        send_message(c, reply);
     }
 
     mrp_json_unref(reply);
@@ -329,7 +331,7 @@ static void query_classes(wrt_client_t *c, mrp_json_t *req)
 
     if (mrp_json_add_integer     (reply, "status" , 0) &&
         mrp_json_add_string_array(reply, "classes", classes, nclass))
-        mrp_transport_sendcustom(c->t, reply);
+        send_message(c, reply);
 
     mrp_json_unref(reply);
     mrp_free(classes);
@@ -367,7 +369,7 @@ static void query_zones(wrt_client_t *c, mrp_json_t *req)
 
     if (mrp_json_add_integer     (reply, "status", 0) &&
         mrp_json_add_string_array(reply, "zones" , zones, nzone))
-        mrp_transport_sendcustom(c->t, reply);
+        send_message(c, reply);
 
     mrp_json_unref(reply);
     mrp_free(zones);
@@ -551,10 +553,37 @@ static int parse_resource_definition(mrp_json_t *jr, resdef_t *d, errbuf_t *e)
 }
 
 
-static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
-                     void *user_data)
+static int block_resource_set_events(wrt_client_t *c, mrp_resource_set_t *rset)
 {
-    wrt_client_t   *c    = (wrt_client_t *)user_data;
+    if (c->rset == NULL) {
+        c->rset = rset;
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
+
+static int allow_resource_set_events(wrt_client_t *c, mrp_resource_set_t *rset)
+{
+    if (c->rset == rset) {
+        c->rset = NULL;
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
+
+static int resource_set_events_blocked(wrt_client_t *c, mrp_resource_set_t *rs)
+{
+    return c->rset == rs;
+}
+
+
+static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
+                                    mrp_resource_set_t *rset, int force_all)
+{
     const char     *type = RESWRT_EVENT;
     int             seq  = (int)reqid;
     mrp_json_t     *msg, *rarr, *r;
@@ -569,6 +598,11 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
 
     mrp_debug("event for resource set %p of client %p", rset, c);
 
+    if (resource_set_events_blocked(c, rset)) {
+        mrp_debug("suppressing event for unacknowledged resource set");
+        return;
+    }
+
     if (mrp_get_resource_set_state(rset) == mrp_resource_acquire)
         state = RESWRT_STATE_GRANTED;
     else
@@ -577,11 +611,6 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
     rsid   = (int)mrp_get_resource_set_id(rset);
     grant  = (int)mrp_get_resource_set_grant(rset);
     advice = (int)mrp_get_resource_set_advice(rset);
-
-    if (!c->acked) {
-        c->rset = rset;
-        return;
-    }
 
     msg = alloc_reply(type, seq);
 
@@ -600,7 +629,7 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
         while ((res = mrp_resource_set_iterate_resources(rset, &it)) != NULL) {
             mask = mrp_resource_get_mask(res);
 
-            if (!(mask & all))
+            if (!(mask & all) && !force_all)
                 continue;
 
             name = mrp_resource_get_name(res);
@@ -619,7 +648,8 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
             if (r == NULL)
                 goto fail;
 
-            if (!mrp_json_add_string(r, "name", name))
+            if (!mrp_json_add_string (r, "name", name) ||
+                (force_all && !mrp_json_add_integer(r, "mask", mask)))
                 goto fail;
 
             if (append_attributes(r, attrs, &e) != 0)
@@ -634,7 +664,7 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
         if (rarr != NULL)
             mrp_json_add(msg, "resources", rarr);
 
-        mrp_transport_sendcustom(c->t, msg);
+        send_message(c, msg);
         mrp_json_unref(msg);
 
         return;
@@ -644,6 +674,12 @@ static void event_cb(uint32_t reqid, mrp_resource_set_t *rset,
     mrp_json_unref(msg);
     mrp_json_unref(rarr);
     mrp_json_unref(r);
+}
+
+
+static void event_cb(uint32_t reqid, mrp_resource_set_t *rset, void *user_data)
+{
+    emit_resource_set_event((wrt_client_t *)user_data, reqid, rset, FALSE);
 }
 
 
@@ -772,6 +808,10 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
             }
         }
 
+        block_resource_set_events(c, rset);
+        /* suppress events for this resource set (client does not know id) */
+        c->rset = rset;
+
         /* add resource set to class/zone */
         if (mrp_application_class_add_resource_set(appclass, zone, rset, seq)) {
             error_reply(c, type, seq, EINVAL, "failed to add set to class");
@@ -783,13 +823,10 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
             if (reply != NULL) {
                 if (mrp_json_add_integer(reply, "status",0) &&
                     mrp_json_add_integer(reply, "id", rsid)) {
-                    mrp_transport_sendcustom(c->t, reply);
-                    c->acked = TRUE;
+                    send_message(c, reply);
 
-                    if (c->rset != NULL) {
-                        event_cb(0, c->rset, c);
-                        c->rset = NULL;
-                    }
+                    allow_resource_set_events(c, rset);
+                    emit_resource_set_event(c, 0, rset, TRUE);
                 }
             }
 
@@ -830,7 +867,7 @@ static void destroy_set(wrt_client_t *c, mrp_json_t *req)
 
         if (reply != NULL) {
             if (mrp_json_add_integer(reply, "status", 0))
-                mrp_transport_sendcustom(c->t, reply);
+                send_message(c, reply);
         }
 
         mrp_resource_set_destroy(rset);
@@ -866,7 +903,7 @@ static void acquire_set(wrt_client_t *c, mrp_json_t *req)
 
         if (reply != NULL) {
             if (mrp_json_add_integer(reply, "status", 0))
-                mrp_transport_sendcustom(c->t, reply);
+                send_message(c, reply);
         }
 
         mrp_resource_set_acquire(rset, (uint32_t)seq);
@@ -902,7 +939,7 @@ static void release_set(wrt_client_t *c, mrp_json_t *req)
 
         if (reply != NULL) {
             if (mrp_json_add_integer(reply, "status", 0))
-                mrp_transport_sendcustom(c->t, reply);
+                send_message(c, reply);
         }
 
         mrp_resource_set_release(rset, (uint32_t)seq);
@@ -985,6 +1022,19 @@ static void closed_evt(mrp_transport_t *t, int error, void *user_data)
         mrp_log_info("WRT resource connection closed.");
 
     destroy_client(c);
+}
+
+
+static int send_message(wrt_client_t *c, mrp_json_t *msg)
+{
+    const char *s;
+
+    s = mrp_json_object_to_string(msg);
+
+    mrp_log_info("sending WRT resource message:");
+    mrp_log_info("  %s", s);
+
+    return mrp_transport_sendcustom(c->t, msg);
 }
 
 
@@ -1128,7 +1178,7 @@ static void plugin_exit(mrp_plugin_t *plugin)
 
 
 #define PLUGIN_DESCRIPTION "Murphy resource Web runtime bridge plugin."
-#define PLUGIN_HELP        "Expose the Murphy resource protocol to WRTs."
+#define PLUGIN_HELP        "Murphy resource protocol for web-runtimes."
 #define PLUGIN_AUTHORS     "Krisztian Litkey <kli@iki.fi>"
 #define PLUGIN_VERSION     MRP_VERSION_INT(0, 0, 1)
 
