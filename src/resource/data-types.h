@@ -46,7 +46,7 @@
 #define MRP_RESOURCE_ID_INVALID    (~(uint32_t)0)
 #define MRP_RESOURCE_REQNO_INVALID (~(uint32_t)0)
 
-
+#define MRP_ATTRIBUTE_MAX (sizeof(mrp_attribute_mask_t) * 8)
 
 typedef enum   mrp_resource_state_e     mrp_resource_state_t;
 typedef enum   mrp_resource_access_e    mrp_resource_access_t;

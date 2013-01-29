@@ -54,7 +54,7 @@
 #include <murphy/resource/protocol.h>
 #include <murphy/resource/config-lua.h>
 
-#define ATTRIBUTE_MAX   (sizeof(mrp_attribute_mask_t) * 8)
+#define ATTRIBUTE_MAX MRP_ATTRIBUTE_MAX
 
 
 
