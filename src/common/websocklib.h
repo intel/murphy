@@ -67,7 +67,7 @@ typedef struct {
 typedef struct {
     const char      *name;               /* protocol name */
     wsl_callbacks_t  cbs;                /* event/request callbacks */
-    int              framed;             /* wheter a framed protocol */
+    int              framed;             /* whether a framed protocol */
     void            *proto_data;         /* protocol-specific user data */
 } wsl_proto_t;
 
@@ -138,6 +138,9 @@ int wsl_set_sendmode(wsl_sck_t *sck, wsl_sendmode_t mode);
 
 /** Send data over a wbesocket. */
 int wsl_send(wsl_sck_t *sck, void *payload, size_t size);
+
+/** Serve the given file over the given socket. */
+int wsl_serve_http_file(wsl_sck_t *sck, const char *path, const char *mime);
 
 MRP_CDECL_END
 

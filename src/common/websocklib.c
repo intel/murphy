@@ -58,20 +58,22 @@ typedef struct {
  */
 
 struct wsl_ctx_s {
-    lws_ctx_t      *ctx;                 /* libwebsocket context */
-    wsl_proto_t    *protos;              /* protocols */
-    int             nproto;              /* number of protocols */
-    lws_proto_t    *lws_protos;          /* libwebsocket protocols */
-    mrp_refcnt_t    refcnt;              /* reference count */
-    int             epollfd;             /* epoll descriptor */
-    mrp_io_watch_t *w;                   /* I/O watch for epollfd */
-    mrp_mainloop_t *ml;                  /* pumping mainloop */
-    pollfd_t       *fds;                 /* polled descriptors */
-    int             nfd;                 /* number descriptors */
-    void           *user_data;           /* opaque user data */
-    lws_t          *pending;             /* pending connection */
-    void           *pending_user;        /* user_data of pending */
-    wsl_proto_t    *pending_proto;       /* protocol of pending */
+    lws_ctx_t       *ctx;                 /* libwebsocket context */
+    wsl_proto_t     *protos;              /* protocols */
+    int              nproto;              /* number of protocols */
+    lws_proto_t     *lws_protos;          /* libwebsocket protocols */
+    mrp_refcnt_t     refcnt;              /* reference count */
+    int              epollfd;             /* epoll descriptor */
+    mrp_io_watch_t  *w;                   /* I/O watch for epollfd */
+    mrp_mainloop_t  *ml;                  /* pumping mainloop */
+    pollfd_t        *fds;                 /* polled descriptors */
+    int              nfd;                 /* number descriptors */
+    void            *user_data;           /* opaque user data */
+    lws_t           *pending;             /* pending connection */
+    void            *pending_user;        /* user_data of pending */
+    wsl_proto_t     *pending_proto;       /* protocol of pending */
+    int              has_http;            /* has HTTP as upper layer protocol */
+    mrp_list_hook_t  pure_http;           /* pure HTTP sockets */
 };
 
 /*
@@ -87,7 +89,9 @@ struct wsl_sck_s {
     void            *user_data;          /* opaque user data */
     wsl_sck_t      **sckptr;             /* back pointer from sck to us */
     int              closing : 1;        /* close in progress */
+    int              pure_http : 1;      /* pure HTTP socket */
     int              busy;               /* upper-layer callback(s) active */
+    mrp_list_hook_t  hook;               /* to pure HTTP list, if such */
 };
 
 
@@ -328,11 +332,12 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
         goto fail;
 
     mrp_refcnt_init(&ctx->refcnt);
+    mrp_list_init(&ctx->pure_http);
 
     ctx->protos = protos;
     ctx->nproto = nproto;
 
-    has_http   = !strncmp(protos[0].name, "http", 4);
+    has_http   = !strncmp(protos[0].name, "http", 4) ? 1 : 0;
     lws_nproto = (has_http ? nproto : nproto + 1) + 1;
     lws_protos = mrp_allocz_array(lws_proto_t, lws_nproto);
 
@@ -344,12 +349,12 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
     if (!has_http)
         lws_protos[0].per_session_data_size = sizeof(void *);
     else
-        lws_protos[0].per_session_data_size = 0;
+        lws_protos[0].per_session_data_size = sizeof(void *);
 
     lp = lws_protos + 1;
     up = protos + (has_http ? 1 : 0);
 
-    for (i = 0; i < nproto; i++) {
+    for (i = has_http; i < nproto; i++) {
         lp->name                  = up->name;
         lp->callback              = wsl_event;
         lp->per_session_data_size = sizeof(void *);
@@ -359,6 +364,7 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
     }
 
     ctx->lws_protos = lws_protos;
+    ctx->has_http   = has_http;
 
     ctx->epollfd = epoll_create1(EPOLL_CLOEXEC);
 
@@ -449,6 +455,30 @@ static wsl_proto_t *find_context_protocol(wsl_ctx_t *ctx, const char *protocol)
 }
 
 
+static wsl_sck_t *find_pure_http(wsl_ctx_t *ctx, lws_t *ws)
+{
+    mrp_list_hook_t *p, *n;
+    wsl_sck_t       *sck;
+
+    /*
+     * Notes:
+     *     We expect an extremely low number of concurrent pure
+     *     HTTP connections so we do asimple linear search here.
+     *     We can change this if this turns out to be a false
+     *     assumption.
+     */
+
+    mrp_list_foreach(&ctx->pure_http, p, n) {
+        sck = mrp_list_entry(p, typeof(*sck), hook);
+
+        if (sck->sck == ws)
+            return sck;
+    }
+
+    return NULL;
+}
+
+
 wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
                        const char *protocol, void *user_data)
 {
@@ -519,14 +549,20 @@ wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
          * The exact same notes apply to wsl_accept_pending below...
          */
 
+        mrp_list_init(&sck->hook);
         sck->ctx   = wsl_ref_context(ctx);
         sck->proto = up;
         sck->buf   = mrp_fragbuf_create(/*up->framed*/TRUE, 0);
 
         if (sck->buf != NULL) {
             sck->user_data = user_data;
-            *ptr           = sck;
-            sck->sckptr    = ptr;
+
+            if (strncmp(protocol, "http", 4)) { /* Think harder, Homer ! */
+                *ptr           = sck;
+                sck->sckptr    = ptr;
+            }
+            else
+                mrp_list_append(&ctx->pure_http, &sck->hook);
 
             sck->sck = libwebsocket_client_connect_extended(ctx->ctx,
                                                             astr, port,
@@ -539,6 +575,7 @@ wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
                 return sck;
 
             mrp_fragbuf_destroy(sck->buf);
+            mrp_list_delete(&sck->hook);
         }
 
         wsl_unref_context(ctx);
@@ -563,6 +600,8 @@ wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data)
     sck = mrp_allocz(sizeof(*sck));
 
     if (sck != NULL) {
+        mrp_list_init(&sck->hook);
+
         /*
          * Notes:
          *     The same notes apply here for context creation as for
@@ -576,12 +615,17 @@ wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data)
             sck->user_data = user_data;
             sck->sck       = ctx->pending;
             ptr            = (wsl_sck_t **)ctx->pending_user;
-            *ptr           = sck;
             sck->sckptr    = ptr;
+
+            if (ptr != NULL)             /* genuine websocket */
+                *ptr = sck;
+            else                         /* pure http socket */
+                mrp_list_append(&ctx->pure_http, &sck->hook);
 
             /* let the event handler know we accepted the client */
             ctx->pending       = NULL;
-            ctx->pending_user  = NULL;
+            /* for pure http communicate sck back in pending_user */
+            ctx->pending_user  = (ptr == NULL ? sck : NULL);
             ctx->pending_proto = NULL;
 
             return sck;
@@ -625,7 +669,11 @@ void *wsl_close(wsl_sck_t *sck)
             sck->closing = TRUE;
             libwebsocket_close_and_free_session(ctx->ctx, sck->sck, status);
             sck->sck     = NULL;
-            *sck->sckptr = NULL;
+
+            if (sck->sckptr != NULL)     /* genuine websocket */
+                *sck->sckptr = NULL;
+            else                         /* pure http socket */
+                mrp_list_delete(&sck->hook);
 
             if (ctx != NULL) {
                 user_data = ctx->user_data;
@@ -716,12 +764,24 @@ int wsl_send(wsl_sck_t *sck, void *payload, size_t size)
 }
 
 
+int wsl_serve_http_file(wsl_sck_t *sck, const char *path, const char *type)
+{
+    mrp_debug("serving file '%s' (%s) over websocket %p", path, type, sck->sck);
+
+    if (libwebsockets_serve_http_file(sck->ctx->ctx, sck->sck, path, type) == 0)
+        return TRUE;
+    else
+        return FALSE;
+}
+
 static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                       void *user, void *in, size_t len)
 {
-    wsl_ctx_t  *ctx = libwebsocket_context_user(ws_ctx);
-    const char *ext, *uri;
-    int         fd, mask;
+    wsl_ctx_t   *ctx = libwebsocket_context_user(ws_ctx);
+    wsl_sck_t   *sck;
+    wsl_proto_t *up;
+    const char  *ext, *uri;
+    int          fd, mask, status, accepted;
 
     switch (event) {
     case LWS_CALLBACK_ESTABLISHED:
@@ -804,12 +864,99 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 
         /*
          * clients wanting to stay pure HTTP clients
+         *
+         * Notes:
+         *     Clients that stay pure HTTP clients (ie. do not negotiate a
+         *     websocket connection) never get an LWS_CALLBACK_ESTABLISHED
+         *     event emitted for. This is a bit unfortunate, since that is
+         *     the event we map to the incoming connection event of our
+         *     transport layer.
+         *
+         *     However, we'd really like to keep pure HTTP and websocket
+         *     connections as much equal as possible. First and foremost
+         *     this means that we'd like to associate our own websocklib
+         *     wsl_sck_t socket context to lws_t and vice versa. Also
+         *     similarly to websocket connections we want to give the upper
+         *     layer a chance to accept or reject the connection.
+         *
+         *     Since there is no ESTABLISHED event for pure HTTP clients,
+         *     we have to emulate one such here. We need to check if test
+         *     ws belongs to a known connection by checking if it has an
+         *     associated wsl_sck_t. If not we need to call the upper layer
+         *     to let it accept or reject the connection. If it has already
+         *     we need to call the reception handler of the upper layer.
+         *
+         *     However, unfortunately libwebsockets never allocates user
+         *     data for the HTTP websockets even we specify a non-zero size
+         *     for protocol 0. Hence, we cannot use our normal mechanism of
+         *     associating the upper layer wsl_sck_t context using the ws
+         *     user data. Instead we need to separately keep track of HTTP
+         *     websockets and look up the associated wsl_sck_t using this
+         *     secondary bookkeeping.
          */
+
     case LWS_CALLBACK_HTTP:
         uri = (const char *)in;
-        /* we don't serve HTTP requests */
-        mrp_debug("denying HTTP request for '%s'", uri);
-        return LWS_EVENT_DENY;
+
+        if (!ctx->has_http) {
+            mrp_debug("denying HTTP request of '%s' for httpless context", uri);
+            return LWS_EVENT_DENY;
+        }
+
+        sck = find_pure_http(ctx, ws);
+
+        if (sck != NULL) {               /* known socket, deliver event */
+        deliver_event:
+            up = sck->proto;
+
+            if (up != NULL) {
+                SOCKET_BUSY_REGION(sck, {
+                        up->cbs.recv(sck, in, strlen(uri), sck->user_data,
+                                     up->proto_data);
+                        up->cbs.check(sck, sck->user_data, up->proto_data);
+                    });
+
+                if (check_closed(sck))
+                    return 0;
+            }
+
+            status = LWS_EVENT_OK;
+        }
+        else {                           /* unknown socket, needs to accept */
+            if (ctx->pending != NULL) {
+                mrp_log_error("Multiple pending connections, rejecting.");
+                return LWS_EVENT_DENY;
+            }
+
+            up = &ctx->protos[0];
+
+
+            ctx->pending       = ws;
+            ctx->pending_user  = NULL;
+            ctx->pending_proto = up;
+
+            wsl_ref_context(ctx);
+            up->cbs.connection(ctx, "XXX TODO dig out peer address", up->name,
+                               ctx->user_data, up->proto_data);
+            sck = ctx->pending_user;
+            ctx->pending_user = NULL;
+
+            /* XXX TODO
+             * check if sockets gets properly closed and freed if
+             * cb->connection calls close on the 'listening' websocket in
+             * the transport layer...
+             */
+
+            accepted = (ctx->pending == NULL);
+            wsl_unref_context(ctx);
+
+            if (accepted)
+                goto deliver_event;
+            else
+                status = LWS_EVENT_DENY;
+        }
+
+        return status;
 
     case LWS_CALLBACK_HTTP_FILE_COMPLETION:
         uri = (const char *)in;
@@ -1057,6 +1204,10 @@ static void libwebsockets(const char *line)
     const char *ts, *ll;
     const char *b, *e, *lvl;
     int         l, ls;
+    uint32_t    mask;
+
+    if ((mask = mrp_log_get_mask()) == 0)
+        return;
 
     /*
      * Notes:
@@ -1082,7 +1233,7 @@ static void libwebsockets(const char *line)
      *     classes we want to keep the extra information carried by the
      *     log class as part of the message.
      *
-     *     Becuase the libwebsockets log messages are terminated by '\n',
+     *     Because the libwebsockets log messages are terminated by '\n',
      *     we also prepare here to properly bridge multiline messages to
      *     the murphy infra (although I'm not sure the library ever issues
      *     such messages).
@@ -1115,14 +1266,31 @@ static void libwebsockets(const char *line)
 
             /* map log level: debug, info, err, warn, or other */
             switch (*ll) {
-            case 'D': lvl = "d"; break;
-            case 'I': lvl = "i"; break;
-            case 'W': lvl = "w"; break;
+            case 'D':
+                if (!(mask & MRP_LOG_MASK_DEBUG))
+                    return;
+                lvl = "d";
+                break;
+            case 'I':
+                if (!(mask & MRP_LOG_MASK_INFO))
+                    return;
+                lvl = "i";
+                break;
+            case 'W':
+                if (!(mask & MRP_LOG_MASK_WARNING))
+                    return;
+                lvl = "w";
+                break;
             case 'E':
-                if (ll[1] == 'R')
+                if (ll[1] == 'R') {
+                    if (!(mask & MRP_LOG_MASK_ERROR))
+                        return;
                     lvl = "e";
+                }
                 else {
                 other:
+                    if (!(mask & MRP_LOG_MASK_DEBUG))
+                        return;
                     lvl = ll;
                     e  = strchr(lvl, ':');
 
