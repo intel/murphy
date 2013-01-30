@@ -302,6 +302,9 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
     for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
         rset = ev->rset;
+
+        mrp_resource_set_updated(rset);
+
         rset->event(ev->replyid, rset, rset->user_data);
     }
 

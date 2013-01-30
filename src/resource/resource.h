@@ -50,6 +50,7 @@ struct mrp_resource_def_s {
 
 struct mrp_resource_s {
     mrp_list_hook_t     list;
+    uint32_t            rsetid;
     mrp_resource_def_t *def;
     bool                shared;
     mrp_attr_value_t    attrs[0];
@@ -63,13 +64,15 @@ mrp_resource_def_t *mrp_resource_definition_find_by_id(uint32_t);
 mrp_resource_def_t *mrp_resource_definition_iterate_manager(void **);
 
 
-mrp_resource_t     *mrp_resource_create(const char *, bool, mrp_attr_t *);
+mrp_resource_t     *mrp_resource_create(const char *, uint32_t, bool,
+                                        bool, mrp_attr_t *);
 void                mrp_resource_destroy(mrp_resource_t *);
 
 int                 mrp_resource_print(mrp_resource_t*, uint32_t,
                                        size_t, char *, int);
 int                 mrp_resource_attribute_print(mrp_resource_t *, char *,int);
 
+void                mrp_resource_user_update(mrp_resource_t *, int, bool);
 
 #endif  /* __MURPHY_RESOURCE_H__ */
 

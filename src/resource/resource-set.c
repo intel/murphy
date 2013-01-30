@@ -200,10 +200,15 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
 {
     uint32_t mask;
     mrp_resource_t *res;
+    uint32_t rsetid;
+    bool autorel;
 
     MRP_ASSERT(rset && name, "invalid argument");
 
-    if (!(res = mrp_resource_create(name, shared, attrs))) {
+    rsetid  = rset->id;
+    autorel = rset->auto_release;
+
+    if (!(res = mrp_resource_create(name, rsetid, autorel, shared, attrs))) {
         mrp_log_error("Can't add resource '%s' name to resource set %u",
                       name, rset->id);
         return -1;
@@ -318,6 +323,26 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
     }
 }
 
+void mrp_resource_set_updated(mrp_resource_set_t *rset)
+{
+    mrp_resource_t *res;
+    mrp_resource_def_t *def;
+    mrp_list_hook_t *resen, *n;
+    mrp_resource_mask_t mask;
+    bool grant;
+
+    MRP_ASSERT(rset, "invalid argument");
+
+    mrp_list_foreach(&rset->resource.list, resen, n) {
+        res = mrp_list_entry(resen, mrp_resource_t, list);
+        def = res->def;
+
+        mask = ((mrp_resource_mask_t)1) << def->id;
+        grant =  (mask & rset->resource.mask.grant) ? true : false;
+
+        mrp_resource_user_update(res, rset->state, grant);
+    }
+}
 
 int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
                            char *buf, int len)
