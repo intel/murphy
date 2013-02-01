@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head> <meta charset=utf-8 /> <title>Resource-Webruntime Test</title>
+  <script src="resource-api.js"></script>
+  <script>
+
+var ctx;
+
+
+function appClassQueryReplied (classes) {
+    console.log("Application classes: " + classes);
+}
+
+function appClassQueryFailed (error) {
+    console.log("Application class query failed: " +
+                error.error, + " (" + error.message + ")");
+}
+
+
+function zoneNameQueryReplied (zones) {
+    console.log("Zones: " + zones);
+}
+
+function zoneNameQueryFailed (error) {
+    console.log("Zone query failed: " +
+                error.error, + " (" + error.message + ")");
+}
+
+
+function resourceDefinitionQueryReplied (resources) {
+    var name, r, attributes, a;
+
+    console.log("Received resource definitions:: ");
+
+    for (name in resources) {
+        console.log("    resource " + name);
+
+        attributes = resources[name];
+
+        for (a in attributes) {
+            console.log("        attribute " + a + " = " + attributes[a]);
+        }
+    }
+}
+
+function resourceDefinitionQueryFailed (error) {
+    console.log("Resource definition query failed: " +
+                error.error, + " (" + error.message + ")");
+}
+
+
+function resourceSetCreated () {
+    ctx.rset = this;
+
+    console.log("Resource set created");
+    setStatus("resource set created");
+}
+
+function resourceSetFailed (error) {
+    console.log("Resource set creation failed: " +
+                error.error + " (" + error.message + ")");
+    setStatus("resource set failed");
+}
+
+function resourceSetEvent (mask) {
+    var names, mask, attributes, grant, advice, gnames, anames;
+
+    console.log("Resource set event: granted resource mask = " + mask);
+
+    names  = this.getResourceNames();
+    anames = this.getAllocableResourceNames();
+    gnames = this.getGrantedResourceNames();
+
+    console.log("All resources: " + names);
+    console.log("Granted resources: " + gnames);
+    console.log("Allocable resources: " + anames);
+
+    for (var i in names) {
+        console.log("mask of " + names[i] + ": " +
+                    this.getMaskByResourceName(names[i]));
+
+        if ((attributes = this.getAttributesByResourceName(names[i])))
+            console.log("attributes of " + names[i] + ": " + attributes);
+
+        console.log("isGranted: " + this.isGranted(names[i]));
+        console.log("isAllocable: " + this.isAllocable(names[i]));
+    }
+
+    if (mask == 0) {
+        setStatus(this.isPreempted ? "lost" : "released");
+    }
+    else
+        setStatus("acquired");
+
+    names = this.getResourceNames();
+    grant = this.getGrantedMask();
+    advice = this.getAllocableMask();
+
+    setContent('grant', grant);
+    setContent('advice', advice);
+    setContent('granted', gnames);
+    setContent('allocable', anames);
+}
+
+
+function managerConnected () {
+    var ctx = this.user_data;
+    var mgr = ctx.mgr;
+    var aqry, zqry, rqry, rset;
+
+    console.log("Manager connection up...");
+
+    setStatus("connected")
+
+    disableButton("connect");
+    enableButton("disconnect")
+    enableButton("acquire")
+    enableButton("release")
+
+
+    try {
+        aqry = mgr.queryApplicationClassNames();
+        aqry.onsuccess = appClassQueryReplied;
+        aqry.onerror   = appClassQueryFailed;
+
+        zqry = mgr.queryZoneNames();
+        zqry.onsuccess = zoneNameQueryReplied;
+        zqry.onerror   = zoneNameQueryFailed;
+
+        rqry = mgr.queryResourceDefinitions();
+        rqry.onsuccess = resourceDefinitionQueryReplied;
+        rqry.onerror   = resourceDefinitionQueryFailed;
+
+        var resources = [
+            {
+                name: 'audio_playback', attributes: { role: 'media' }
+            },
+            {
+                name: 'video_playback', flags: ['optional']
+            }
+        ];
+        var options = { priority: 0, 'class': 'player' };
+
+        setStatus("creating resource set");
+        rset = mgr.createResourceSet(resources, options);
+        rset.onsuccess      = resourceSetCreated;
+        rset.onerror        = resourceSetFailed;
+        rset.onstatechanged = resourceSetEvent;
+    }
+    catch (e) {
+        console.log("Query failed: " +
+                    e.error + "(" + e.message + ")");
+    }
+}
+
+
+function managerDisconnected () {
+    console.log("Manager connection down...");
+    setStatus("disconnected");
+
+    enableButton("connect");
+    disableButton("disconnect")
+    disableButton("acquire")
+    disableButton("release")
+
+    setContent('grant', "");
+    setContent('advice', "");
+    setContent('granted', "");
+    setContent('allocable', "");
+}
+
+
+function managerFailed () {
+    console.log("Manager failed to connect...");
+    setStatus("failed to connect");
+}
+
+
+function runtest () {
+    var mgr;
+
+    wrt_debug_enable([WRT_MGR, WRT_MSG]);
+
+    ctx = {};
+    mgr = new WrtResourceManager();
+
+    mgr.onconnect    = managerConnected;
+    mgr.ondisconnect = managerDisconnected;
+    mgr.onfailed     = managerFailed;
+    mgr.user_data    = ctx;
+
+    ctx.mgr = mgr;
+
+    mgr.connect("ws://127.0.0.1:4000");
+}
+
+
+function setContent(id, text) {
+    var elem = document.getElementById(id);
+
+    if (elem)
+        elem.textContent = text;
+}
+
+
+function setStatus(status) {
+    setContent('status', status);
+}
+
+
+function enableButton(name) {
+    var btn = document.getElementById(name);
+
+    if (btn)
+        btn.disabled = false;
+}
+
+
+function disableButton(name) {
+    var btn = document.getElementById(name);
+
+    if (btn)
+        btn.disabled = true;
+}
+
+
+function initialize() {
+    disableButton("disconnect");
+    disableButton("acquire");
+    disableButton("release");
+    enableButton("connect");
+}
+
+
+function connect() {
+    var mgr;
+
+    setStatus("connecting...");
+
+    wrt_debug_enable([WRT_MGR, WRT_MSG]);
+
+    ctx = {};
+    mgr = new WrtResourceManager();
+
+    mgr.onconnect    = managerConnected;
+    mgr.ondisconnect = managerDisconnected;
+    mgr.onfailed     = managerFailed;
+    mgr.user_data    = ctx;
+
+    ctx.mgr = mgr;
+
+    mgr.connect("ws://127.0.0.1:4000");
+}
+
+
+function disconnect() {
+    var mgr = ctx.mgr;
+
+    setStatus("disconnecting...");
+
+    mgr.disconnect();
+}
+
+
+function acquire() {
+    setStatus("acquiring...");
+
+    ctx.rset.acquire();
+}
+
+
+function release() {
+    setStatus("releasing...");
+
+    ctx.rset.release();
+}
+
+</script>
+
+</head>
+
+<body onload="/*runtest();*/ initialize();">
+
+
+<table>
+    <tr>
+        <th align=left>Actions:</th>
+        <td align=left>
+          <input type=button id=connect value="Connect"
+               onclick="connect();">
+          <input type=button id=disconnect value="Disconnect"
+               onclick="disconnect();" disabled>
+          <input type=button id=acquire value="Acquire"
+               onclick="acquire();" disabled>
+          <input type=button id=release value="Release"
+               onclick="release();" disabled>
+        </td>
+    </tr>
+    <tr>
+        <th align=left>Status:</th>
+	<td id=statush align=left><div id=status>disconnected</div></td>
+    </tr>
+    <tr>
+        <th align=left>grant mask:</th>
+        <td id=granth align=left><div id=grant></div></td>
+    </tr>
+    <tr>
+        <th align=left>advice mask:</th>
+        <td id=adviceh align=left><div id=advice></div></td>
+    </tr>
+    <tr>
+        <th align=left>granted:</th>
+        <td id=grantedh align=left><div id=granted></div></td>
+    </tr>
+    <tr>
+        <th align=left>allocable:</th>
+        <td id=allocableh align=left><div id=allocable></div></td>
+    </tr>
+
+    <tr>
+        <td colspan=2 width=500 align=center style="background-color: #e0e0e0;"><div id=wslm_drawing> </div></td>
+    </tr>
+    <tr>
+      <td>
+        <audio>
+           <source src="http://127.0.0.1/the_ritual_10.ogg"
+                   type='audio/ogg;codecs="vorbis"'>
+        </audio>
+      <td>
+    </tr>
+</table>
+
+
+</body>
+</html>
