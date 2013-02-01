@@ -279,39 +279,9 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 
     MRP_ASSERT(rset, "invalid argument");
 
-    if (!rset->class.ptr) {
-        /* TODO: proper error handling */
-        return;
-    }
-
     rset->state = mrp_resource_acquire;
-    rset->request.id = reqid;
-    rset->request.stamp = get_request_stamp();
 
-    mrp_application_class_move_resource_set(rset);
-
-    trh = mqi_begin_transaction();
-    mrp_resource_owner_update_zone(rset->zone, rset, reqid);
-    mqi_commit_transaction(trh);
-}
-
-void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
-{
-    mqi_handle_t trh;
-
-    MRP_ASSERT(rset, "invalid argument");
-
-    if (!rset->class.ptr) {
-        /* TODO: proper error handling */
-        return;
-    }
-
-    if (rset->state == mrp_resource_release) {
-        if (rset->event)
-            rset->event(reqid, rset, rset->user_data);
-    }
-    else {
-        rset->state = mrp_resource_release;
+    if (rset->class.ptr) {
         rset->request.id = reqid;
         rset->request.stamp = get_request_stamp();
 
@@ -320,6 +290,33 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
         trh = mqi_begin_transaction();
         mrp_resource_owner_update_zone(rset->zone, rset, reqid);
         mqi_commit_transaction(trh);
+    }
+}
+
+void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
+{
+    mqi_handle_t trh;
+
+    MRP_ASSERT(rset, "invalid argument");
+
+    if (!rset->class.ptr)
+        rset->state = mrp_resource_release;
+    else {
+        if (rset->state == mrp_resource_release) {
+            if (rset->event)
+                rset->event(reqid, rset, rset->user_data);
+        }
+        else {
+            rset->state = mrp_resource_release;
+            rset->request.id = reqid;
+            rset->request.stamp = get_request_stamp();
+
+            mrp_application_class_move_resource_set(rset);
+
+            trh = mqi_begin_transaction();
+            mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+            mqi_commit_transaction(trh);
+        }
     }
 }
 

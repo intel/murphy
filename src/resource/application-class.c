@@ -261,13 +261,18 @@ int mrp_application_class_add_resource_set(const char *class_name,
 
     rset->class.ptr = class;
     rset->zone = mrp_zone_get_id(zone);
-    rset->request.id = reqid;
 
-    if (rset->state == mrp_resource_no_request)
-        rset->state = mrp_resource_release;
+    if (rset->state == mrp_resource_acquire)
+        mrp_resource_set_acquire(rset, reqid);
+    else {
+        rset->request.id = reqid;
 
-    mrp_application_class_move_resource_set(rset);
-    mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+        if (rset->state == mrp_resource_no_request)
+            rset->state = mrp_resource_release;
+
+        mrp_application_class_move_resource_set(rset);
+        mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+    }
     
     return 0;
 }

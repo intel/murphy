@@ -612,6 +612,7 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
     int                     arst;
     int32_t                 status;
     bool                    auto_release;
+    bool                    auto_acquire;
     mrp_resource_event_cb_t event_cb;
 
     MRP_ASSERT(client, "invalid argument");
@@ -649,6 +650,7 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
                  flags, priority, class, zone);
 
     auto_release = (flags & RESPROTO_RSETFLAG_AUTORELEASE);
+    auto_acquire = (flags & RESPROTO_RSETFLAG_AUTOACQUIRE);
 
     if (flags & RESPROTO_RSETFLAG_NOEVENTS)
         event_cb = NULL;
@@ -666,6 +668,8 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
         ;
 
     if (arst > 0) {
+        if (auto_acquire)
+            mrp_resource_set_acquire(rset,seqno);
         if (mrp_application_class_add_resource_set(class,zone,rset,seqno) == 0)
             status = 0;
     }
