@@ -447,6 +447,7 @@ static void dbus_close(mrp_transport_t *mt)
             method = TRANSPORT_RAW;
             cb     = dbus_raw_cb;
             break;
+        default:
         case MRP_TRANSPORT_MODE_MSG:
             method = TRANSPORT_MESSAGE;
             cb     = dbus_msg_cb;
