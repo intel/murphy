@@ -596,22 +596,23 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
 {
     static uint16_t reqtyp = RESPROTO_CREATE_RESOURCE_SET;
 
-    resource_data_t    *data   = client->data;
-    mrp_plugin_t       *plugin = data->plugin;
-    mrp_resource_set_t *rset   = 0;
-    mrp_msg_t          *rpl;
-    uint32_t            flags;
-    uint32_t            priority;
-    const char         *class;
-    const char         *zone;
-    uint16_t            tag;
-    uint16_t            type;
-    size_t              size;
-    mrp_msg_value_t     value;
-    uint32_t            rsid;
-    int                 arst;
-    int32_t             status;
-    bool                auto_release;
+    resource_data_t        *data   = client->data;
+    mrp_plugin_t           *plugin = data->plugin;
+    mrp_resource_set_t     *rset   = 0;
+    mrp_msg_t              *rpl;
+    uint32_t                flags;
+    uint32_t                priority;
+    const char             *class;
+    const char             *zone;
+    uint16_t                tag;
+    uint16_t                type;
+    size_t                  size;
+    mrp_msg_value_t         value;
+    uint32_t                rsid;
+    int                     arst;
+    int32_t                 status;
+    bool                    auto_release;
+    mrp_resource_event_cb_t event_cb;
 
     MRP_ASSERT(client, "invalid argument");
     MRP_ASSERT(client->rscli, "confused with data structures");
@@ -649,8 +650,13 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
 
     auto_release = (flags & RESPROTO_RSETFLAG_AUTORELEASE);
 
+    if (flags & RESPROTO_RSETFLAG_NOEVENTS)
+        event_cb = NULL;
+    else
+        event_cb = resource_event_handler;
+
     rset = mrp_resource_set_create(client->rscli, auto_release, priority,
-                                   resource_event_handler, client);
+                                   event_cb, client);
     if (!rset)
         goto reply;
 
