@@ -166,7 +166,8 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 
             t->check_destroy = check_destroy;
             t->recv_data     = recv_data;
-            t->flags         = flags;
+            t->flags         = flags & ~MRP_TRANSPORT_MODE_MASK;
+            t->mode          = flags &  MRP_TRANSPORT_MODE_MASK;
 
             if (!t->descr->req.open(t)) {
                 mrp_free(t);
@@ -206,7 +207,8 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
 
             t->check_destroy = check_destroy;
             t->recv_data     = recv_data;
-            t->flags         = flags;
+            t->flags         = flags & ~MRP_TRANSPORT_MODE_MASK;
+            t->mode          = flags &  MRP_TRANSPORT_MODE_MASK;
 
             if (!t->descr->req.createfrom(t, conn)) {
                 mrp_free(t);
@@ -218,6 +220,17 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
         t = NULL;
 
     return t;
+}
+
+
+int mrp_transport_setopt(mrp_transport_t *t, const char *opt, const void *val)
+{
+    if (t != NULL) {
+        if (t->descr->req.setopt != NULL)
+            return t->descr->req.setopt(t, opt, val);
+    }
+
+    return FALSE;
 }
 
 
@@ -303,6 +316,8 @@ mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
         t->check_destroy = check_destroy;
         t->recv_data     = recv_data;
         t->flags         = (lt->flags & MRP_TRANSPORT_INHERIT) | flags;
+        t->flags         = t->flags & ~MRP_TRANSPORT_MODE_MASK;
+        t->mode          = lt->mode;
 
         MRP_TRANSPORT_BUSY(t, {
                 if (!t->descr->req.accept(t, lt)) {
@@ -454,7 +469,7 @@ int mrp_transport_sendraw(mrp_transport_t *t, void *data, size_t size)
     int result;
 
     if (t->connected &&
-        (t->flags & MRP_TRANSPORT_MODE_RAW) && t->descr->req.sendraw) {
+        t->mode == MRP_TRANSPORT_MODE_RAW && t->descr->req.sendraw) {
         MRP_TRANSPORT_BUSY(t, {
                 result = t->descr->req.sendraw(t, data, size);
             });
@@ -473,7 +488,7 @@ int mrp_transport_sendrawto(mrp_transport_t *t, void *data, size_t size,
 {
     int result;
 
-    if ((t->flags & MRP_TRANSPORT_MODE_RAW) && t->descr->req.sendrawto) {
+    if (t->mode == MRP_TRANSPORT_MODE_RAW && t->descr->req.sendrawto) {
         MRP_TRANSPORT_BUSY(t, {
                 result = t->descr->req.sendrawto(t, data, size, addr, addrlen);
             });
@@ -492,7 +507,7 @@ int mrp_transport_senddata(mrp_transport_t *t, void *data, uint16_t tag)
     int result;
 
     if (t->connected &&
-        (t->flags & MRP_TRANSPORT_MODE_CUSTOM) && t->descr->req.senddata) {
+        t->mode == MRP_TRANSPORT_MODE_DATA && t->descr->req.senddata) {
         MRP_TRANSPORT_BUSY(t, {
                 result = t->descr->req.senddata(t, data, tag);
             });
@@ -511,9 +526,46 @@ int mrp_transport_senddatato(mrp_transport_t *t, void *data, uint16_t tag,
 {
     int result;
 
-    if ((t->flags & MRP_TRANSPORT_MODE_CUSTOM) && t->descr->req.senddatato) {
+    if (t->mode == MRP_TRANSPORT_MODE_DATA && t->descr->req.senddatato) {
         MRP_TRANSPORT_BUSY(t, {
                 result = t->descr->req.senddatato(t, data, tag, addr, addrlen);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
+int mrp_transport_sendcustom(mrp_transport_t *t, void *data)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_CUSTOM && t->descr->req.sendcustom) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendcustom(t, data);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
+int mrp_transport_sendcustomto(mrp_transport_t *t, void *data,
+                               mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_CUSTOM && t->descr->req.sendcustomto) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendcustomto(t, data, addr, addrlen);
             });
 
         purge_destroyed(t);
@@ -533,7 +585,8 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
     mrp_msg_t        *msg;
     void             *decoded;
 
-    if (MRP_TRANSPORT_MODE(t) == MRP_TRANSPORT_MODE_CUSTOM) {
+    switch (t->mode) {
+    case MRP_TRANSPORT_MODE_DATA:
         tag   = be16toh(*(uint16_t *)data);
         data += sizeof(tag);
         size -= sizeof(tag);
@@ -570,50 +623,74 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
         }
         else
             return -ENOPROTOOPT;
-    }
-    else {
-        if (MRP_TRANSPORT_MODE(t) == MRP_TRANSPORT_MODE_RAW) {
+        break;
+
+    case MRP_TRANSPORT_MODE_RAW:
+        if (t->connected) {
+            MRP_TRANSPORT_BUSY(t, {
+                    t->evt.recvraw(t, data, size, t->user_data);
+                });
+        }
+        else {
+            MRP_TRANSPORT_BUSY(t, {
+                    t->evt.recvrawfrom(t, data, size, addr, addrlen,
+                                       t->user_data);
+                });
+        }
+        return 0;
+
+    case MRP_TRANSPORT_MODE_MSG:
+        tag   = be16toh(*(uint16_t *)data);
+        data += sizeof(tag);
+        size -= sizeof(tag);
+
+        if (tag != MRP_MSG_TAG_DEFAULT ||
+            (msg = mrp_msg_default_decode(data, size)) == NULL) {
+            return -EPROTO;
+        }
+        else {
             if (t->connected) {
                 MRP_TRANSPORT_BUSY(t, {
-                        t->evt.recvraw(t, data, size, t->user_data);
+                        t->evt.recvmsg(t, msg, t->user_data);
                     });
             }
             else {
                 MRP_TRANSPORT_BUSY(t, {
-                        t->evt.recvrawfrom(t, data, size, addr, addrlen,
+                        t->evt.recvmsgfrom(t, msg, addr, addrlen,
                                            t->user_data);
                     });
             }
 
+            mrp_msg_unref(msg);
+
             return 0;
         }
-        else {
-            tag   = be16toh(*(uint16_t *)data);
-            data += sizeof(tag);
-            size -= sizeof(tag);
+        break;
 
-            if (tag != MRP_MSG_TAG_DEFAULT ||
-                (msg = mrp_msg_default_decode(data, size)) == NULL) {
-                return -EPROTO;
-            }
-            else {
-                if (t->connected) {
-                    MRP_TRANSPORT_BUSY(t, {
-                            t->evt.recvmsg(t, msg, t->user_data);
-                        });
-                }
-                else {
-                    MRP_TRANSPORT_BUSY(t, {
-                            t->evt.recvmsgfrom(t, msg, addr, addrlen,
-                                               t->user_data);
-                        });
-                }
-
-                mrp_msg_unref(msg);
+    case MRP_TRANSPORT_MODE_CUSTOM:
+        if (t->connected) {
+            if (t->evt.recvcustom) {
+                MRP_TRANSPORT_BUSY(t, {
+                        t->evt.recvcustom(t, data, t->user_data);
+                    });
 
                 return 0;
             }
         }
+        else {
+            if (t->evt.recvcustomfrom) {
+                MRP_TRANSPORT_BUSY(t, {
+                        t->evt.recvcustomfrom(t, data, addr, addrlen,
+                                              t->user_data);
+                    });
+
+                return 0;
+            }
+        }
+        return -EPROTOTYPE;
+
+    default:
+        return -EPROTOTYPE;
     }
 }
 

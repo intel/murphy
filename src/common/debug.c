@@ -86,10 +86,14 @@ static int init_rules(void)
 
 static void reset_rules(void)
 {
-    if (rules_on != NULL)
+    if (rules_on != NULL) {
         mrp_htbl_destroy(rules_on , TRUE);
-    if (rules_off != NULL)
+        rules_on = NULL;
+    }
+    if (rules_off != NULL) {
         mrp_htbl_destroy(rules_off, TRUE);
+        rules_off = NULL;
+    }
 }
 
 
@@ -106,6 +110,7 @@ int mrp_debug_enable(int enabled)
 
     debug_enabled = !!enabled;
     mrp_log_enable(MRP_LOG_MASK_DEBUG);
+    mrp_debug_stamp++;
 
     return prev;
 }

@@ -120,6 +120,14 @@ MRP_DATA_DESCRIPTOR(buggy_descr, TAG_CUSTOM, custom_t,
 mrp_data_descr_t *data_descr;
 
 
+typedef enum {
+    MODE_DEFAULT = 0,
+    MODE_MESSAGE = 1,
+    MODE_DATA    = 2,
+    MODE_RAW     = 3,
+} msg_mode_t;
+
+
 typedef struct {
     mrp_mainloop_t  *ml;
     mrp_transport_t *lt, *t;
@@ -131,7 +139,7 @@ typedef struct {
     int              sock;
     mrp_io_watch_t  *iow;
     mrp_timer_t     *timer;
-    int              custom;
+    int              mode;
     int              buggy;
     int              connect;
     int              stream;
@@ -145,10 +153,13 @@ void recv_msg(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
 void recvfrom_msg(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
                   socklen_t addrlen, void *user_data);
 
-void recv_custom(mrp_transport_t *t, void *data, uint16_t tag, void *user_data);
-void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
-                     mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data);
+void recv_data(mrp_transport_t *t, void *data, uint16_t tag, void *user_data);
+void recvfrom_data(mrp_transport_t *t, void *data, uint16_t tag,
+                   mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data);
 
+void recvraw(mrp_transport_t *t, void *data, size_t size, void *user_data);
+void recvrawfrom(mrp_transport_t *t, void *data, size_t size,
+                 mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data);
 
 
 void dump_msg(mrp_msg_t *msg, FILE *fp)
@@ -236,8 +247,8 @@ void free_custom(custom_t *msg)
 }
 
 
-void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
-                     mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
+void recvfrom_data(mrp_transport_t *t, void *data, uint16_t tag,
+                   mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
 {
     context_t *c   = (context_t *)user_data;
     custom_t  *msg = (custom_t *)data;
@@ -276,10 +287,53 @@ void recvfrom_custom(mrp_transport_t *t, void *data, uint16_t tag,
 }
 
 
-void recv_custom(mrp_transport_t *t, void *data, uint16_t tag, void *user_data)
+void recv_data(mrp_transport_t *t, void *data, uint16_t tag, void *user_data)
 {
-    recvfrom_custom(t, data, tag, NULL, 0, user_data);
+    recvfrom_data(t, data, tag, NULL, 0, user_data);
 }
+
+
+void dump_raw(void *data, size_t size, FILE *fp)
+{
+    int len = (int)size;
+
+    fprintf(fp, "[%*.*s]\n", len, len, (char *)data);
+}
+
+
+void recvfrom_raw(mrp_transport_t *t, void *data, size_t size,
+                  mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
+{
+    context_t *c   = (context_t *)user_data;
+    char       rpl[256];
+    size_t     rpl_size;
+    int        status;
+
+    rpl_size = snprintf(rpl, sizeof(rpl), "reply to message [%*.*s]",
+                        (int)size, (int)size, (char *)data);
+
+    mrp_log_info("received raw message");
+    dump_raw(data, size, stdout);
+
+    if (strncmp((char *)data, "reply to ", 9) != 0) {
+        if (c->connect)
+            status = mrp_transport_sendraw(t, rpl, rpl_size);
+        else
+            status = mrp_transport_sendrawto(t, rpl, rpl_size, addr, addrlen);
+
+        if (status)
+            mrp_log_info("reply successfully sent");
+        else
+            mrp_log_error("failed to send reply");
+    }
+}
+
+
+void recv_raw(mrp_transport_t *t, void *data, size_t size, void *user_data)
+{
+    recvfrom_raw(t, data, size, NULL, 0, user_data);
+}
+
 
 
 void closed_evt(mrp_transport_t *t, int error, void *user_data)
@@ -345,31 +399,35 @@ void server_init(context_t *c)
 
     type_init(c);
 
-    if (!c->stream) {
-        if (c->custom) {
-            evt.recvdata     = recv_custom;
-            evt.recvdatafrom = recvfrom_custom;
-        }
-        else {
-            evt.recvmsg     = recv_msg;
-            evt.recvmsgfrom = recvfrom_msg;
-        }
-    }
-    else {
-        evt.connection = connection_evt;
-        evt.closed     = closed_evt;
-        if (c->custom) {
-            evt.recvdata     = recv_custom;
-            evt.recvdatafrom = recvfrom_custom;
-        }
-        else {
-            evt.recvmsg     = recv_msg;
-            evt.recvmsgfrom = recvfrom_msg;
-        }
+    switch (c->mode) {
+    case MODE_DATA:
+        evt.recvdata     = recv_data;
+        evt.recvdatafrom = recvfrom_data;
+        break;
+    case MODE_RAW:
+        evt.recvraw      = recv_raw;
+        evt.recvrawfrom  = recvfrom_raw;
+        break;
+    case MODE_MESSAGE:
+    default:
+        evt.recvmsg      = recv_msg;
+        evt.recvmsgfrom  = recvfrom_msg;
     }
 
-    flags = MRP_TRANSPORT_REUSEADDR |
-        (c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0);
+    if (c->stream) {
+        evt.connection = connection_evt;
+        evt.closed     = closed_evt;
+    }
+
+    flags = MRP_TRANSPORT_REUSEADDR;
+
+    switch (c->mode) {
+    case MODE_DATA:    flags |= MRP_TRANSPORT_MODE_DATA; break;
+    case MODE_RAW:     flags |= MRP_TRANSPORT_MODE_RAW;  break;
+    default:
+    case MODE_MESSAGE: flags |= MRP_TRANSPORT_MODE_MSG;
+    }
+
     c->lt = mrp_transport_create(c->ml, c->atype, &evt, c, flags);
 
     if (c->lt == NULL) {
@@ -440,7 +498,7 @@ void send_msg(context_t *c)
 }
 
 
-void send_custom(context_t *c)
+void send_data(context_t *c)
 {
     uint32_t  seq = c->seqno++;
     custom_t  msg;
@@ -479,6 +537,29 @@ void send_custom(context_t *c)
 }
 
 
+void send_raw(context_t *c)
+{
+    uint32_t  seq = c->seqno++;
+    char      msg[256];
+    size_t    size;
+    int       status;
+
+    size = snprintf(msg, sizeof(msg), "this is message #%u", seq);
+
+    if (c->connect)
+        status = mrp_transport_sendraw(c->t, msg, size);
+    else
+        status = mrp_transport_sendrawto(c->t, msg, size, &c->addr, c->alen);
+
+    if (!status) {
+        mrp_log_error("Failed to send raw message #%d.", seq);
+        exit(1);
+    }
+    else
+        mrp_log_info("Message #%u succesfully sent.", seq);
+}
+
+
 
 void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 {
@@ -487,10 +568,12 @@ void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
     MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
-    if (c->custom)
-        send_custom(c);
-    else
-        send_msg(c);
+    switch (c->mode) {
+    case MODE_DATA:    send_data(c); break;
+    case MODE_RAW:     send_raw(c);  break;
+    default:
+    case MODE_MESSAGE: send_msg(c);
+    }
 }
 
 
@@ -507,17 +590,25 @@ void client_init(context_t *c)
 
     type_init(c);
 
-    if (c->custom) {
-        evt.recvdata     = recv_custom;
-        evt.recvdatafrom = recvfrom_custom;
-    }
-    else {
-        evt.recvmsg     = recv_msg;
-        evt.recvmsgfrom = recvfrom_msg;
+    switch (c->mode) {
+    case MODE_DATA:
+        evt.recvdata     = recv_data;
+        evt.recvdatafrom = recvfrom_data;
+        flags            = MRP_TRANSPORT_MODE_DATA;
+        break;
+    case MODE_RAW:
+        evt.recvraw      = recv_raw;
+        evt.recvrawfrom  = recvfrom_raw;
+        flags            = MRP_TRANSPORT_MODE_RAW;
+        break;
+    default:
+    case MODE_MESSAGE:
+        evt.recvmsg      = recv_msg;
+        evt.recvmsgfrom  = recvfrom_msg;
+        flags            = MRP_TRANSPORT_MODE_MSG;
     }
 
-    flags = c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0;
-    c->t  = mrp_transport_create(c->ml, c->atype, &evt, c, flags);
+    c->t = mrp_transport_create(c->ml, c->atype, &evt, c, flags);
 
     if (c->t == NULL) {
         mrp_log_error("Failed to create new transport.");
@@ -576,6 +667,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -a, --address                  address to use\n"
            "  -c, --custom                   use custom messages\n"
            "  -m, --message                  use generic messages (default)\n"
+           "  -r, --raw                      use raw messages\n"
            "  -b, --buggy                    use buggy data descriptors\n"
            "  -t, --log-target=TARGET        log target to use\n"
            "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
@@ -598,7 +690,6 @@ static void config_set_defaults(context_t *ctx)
     mrp_clear(ctx);
     ctx->addrstr    = "tcp4:127.0.0.1:3000";
     ctx->server     = FALSE;
-    ctx->custom     = FALSE;
     ctx->log_mask   = MRP_LOG_UPTO(MRP_LOG_DEBUG);
     ctx->log_target = MRP_LOG_TO_STDERR;
 }
@@ -606,25 +697,26 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "scmbCa:l:t:vdh"
+#   define OPTIONS "scmrbCa:l:t:v:d:h"
     struct option options[] = {
         { "server"    , no_argument      , NULL, 's' },
         { "address"   , required_argument, NULL, 'a' },
         { "custom"    , no_argument      , NULL, 'c' },
-        { "connect"   , no_argument      , NULL, 'C' },
         { "message"   , no_argument      , NULL, 'm' },
+        { "raw"       , no_argument      , NULL, 'r' },
+        { "connect"   , no_argument      , NULL, 'C' },
+
         { "buggy"     , no_argument      , NULL, 'b' },
         { "log-level" , required_argument, NULL, 'l' },
         { "log-target", required_argument, NULL, 't' },
         { "verbose"   , optional_argument, NULL, 'v' },
-        { "debug"     , no_argument      , NULL, 'd' },
+        { "debug"     , required_argument, NULL, 'd' },
         { "help"      , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
 
-    int  opt, debug;
+    int opt;
 
-    debug = FALSE;
     config_set_defaults(ctx);
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
@@ -634,11 +726,30 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
             break;
 
         case 'c':
-            ctx->custom = TRUE;
+            if (ctx->mode == MODE_DEFAULT)
+                ctx->mode = MODE_DATA;
+            else {
+                mrp_log_error("Multiple modes requested.");
+                exit(1);
+            }
             break;
 
         case 'm':
-            ctx->custom = FALSE;
+            if (ctx->mode == MODE_DEFAULT)
+                ctx->mode = MODE_MESSAGE;
+            else {
+                mrp_log_error("Multiple modes requested.");
+                exit(1);
+            }
+            break;
+
+        case 'r':
+            if (ctx->mode == MODE_DEFAULT)
+                ctx->mode = MODE_RAW;
+            else {
+                mrp_log_error("Multiple modes requested.");
+                exit(1);
+            }
             break;
 
         case 'b':
@@ -671,7 +782,9 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
             break;
 
         case 'd':
-            debug = TRUE;
+            ctx->log_mask |= MRP_LOG_MASK_DEBUG;
+            mrp_debug_set_config(optarg);
+            mrp_debug_enable(TRUE);
             break;
 
         case 'h':
@@ -683,9 +796,6 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
             print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
-
-    if (debug)
-        ctx->log_mask |= MRP_LOG_MASK_DEBUG;
 
     return TRUE;
 }
@@ -706,12 +816,15 @@ int main(int argc, char *argv[])
     else
         mrp_log_info("Running as client, using address '%s'...", c.addrstr);
 
-    if (c.custom)
-        mrp_log_info("Using custom messages...");
-    else
-        mrp_log_info("Using generic messages...");
+    switch (c.mode) {
+    case MODE_DATA:    mrp_log_info("Using custom data messages..."); break;
+    case MODE_RAW:     mrp_log_info("Using raw messages...");         break;
+    default:
+    case MODE_MESSAGE: mrp_log_info("Using generic messages...");
+    }
 
-    if (!strncmp(c.addrstr, "tcp", 3) || !strncmp(c.addrstr, "unxs", 4)) {
+    if (!strncmp(c.addrstr, "tcp", 3) || !strncmp(c.addrstr, "unxs", 4) ||
+        !strncmp(c.addrstr, "wsck", 4)) {
         c.stream  = TRUE;
         c.connect = TRUE;
     }

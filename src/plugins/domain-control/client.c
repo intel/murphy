@@ -264,6 +264,9 @@ static void reconnect_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
 {
     mrp_domctl_t *dc = (mrp_domctl_t *)user_data;
 
+    MRP_UNUSED(ml);
+    MRP_UNUSED(t);
+
     if (try_connect(dc))
         stop_reconnect(dc);
 }
@@ -389,6 +392,8 @@ static void process_notify(mrp_domctl_t *dc, mrp_msg_t *msg, uint32_t seq)
     int              t, r, c;
     uint16_t         type;
     mrp_msg_value_t  value;
+
+    MRP_UNUSED(seq);
 
     if (!mrp_msg_get(msg,
                      MRP_PEPMSG_UINT16(NCHANGE, &ntable),
@@ -516,8 +521,11 @@ static void recvfrom_cb(mrp_transport_t *t, mrp_msg_t *msg,
                         mrp_sockaddr_t *addr, socklen_t addrlen,
                         void *user_data)
 {
+    MRP_UNUSED(t);
+    MRP_UNUSED(msg);
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
+    MRP_UNUSED(user_data);
 
     /* XXX TODO:
      *    This should neither be called nor be necessary to specify.
@@ -525,7 +533,7 @@ static void recvfrom_cb(mrp_transport_t *t, mrp_msg_t *msg,
      *    give both recv and recvfrom event callbacks if no connection
      *    event callback is given. However this is not correct because
      *    on a client side one wants to be able to create a connection-
-     *    oriented transport without both connection and recvfrom event
+     *    oriented transport without either connection or recvfrom event
      *    callbacks. This needs to be fixed in transport by moving the
      *    appropriate callback checks lower in the stack to the actual
      *    transport backends.

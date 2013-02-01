@@ -576,9 +576,10 @@ static int internal_senddata(mrp_transport_t *mu, void *data, uint16_t tag)
 
 
 MRP_REGISTER_TRANSPORT(internal, INTERNAL, internal_t, internal_resolve,
-                       internal_open, NULL, internal_close,
+                       internal_open, NULL, internal_close, NULL,
                        internal_bind, internal_listen, internal_accept,
                        internal_connect, internal_disconnect,
                        internal_send, internal_sendto,
                        internal_sendraw, internal_sendrawto,
-                       internal_senddata, internal_senddatato);
+                       internal_senddata, internal_senddatato,
+                       NULL, NULL);

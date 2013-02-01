@@ -54,7 +54,7 @@
 #include <murphy/resource/protocol.h>
 #include <murphy/resource/config-lua.h>
 
-#define ATTRIBUTE_MAX   (sizeof(mrp_attribute_mask_t) * 8)
+#define ATTRIBUTE_MAX MRP_ATTRIBUTE_MAX
 
 
 
@@ -96,6 +96,7 @@ static void print_zones_cb(mrp_console_t *, void *, int, char **argv);
 static void print_classes_cb(mrp_console_t *, void *, int, char **argv);
 static void print_sets_cb(mrp_console_t *, void *, int, char **argv);
 static void print_owners_cb(mrp_console_t *, void *, int, char **argv);
+static void print_resources_cb(mrp_console_t *, void *, int, char **argv);
 
 static void resource_event_handler(uint32_t, mrp_resource_set_t *, void *);
 
@@ -122,7 +123,13 @@ MRP_CONSOLE_GROUP(resource_group, "resource", NULL, NULL, {
                           "prints for each zone the owner application class "
                           "of each resource. The data sources for the "
                           "printout are the internal data structures of the "
-                          "resource library")
+                          "resource library"),
+        MRP_TOKENIZED_CMD("resources" , print_resources_cb , FALSE,
+                          "resources", "prints resources",
+                          "prints all resource definitions and along with "
+                          "all their attributes. The data sources for the "
+                          "printout are the internal data structures of the "
+                          "resource library"),
 
 });
 
@@ -204,6 +211,56 @@ static void print_owners_cb(mrp_console_t *c, void *user_data,
 
     printf("%s", buf);
 }
+
+
+static void print_resources_cb(mrp_console_t *c, void *user_data,
+                               int argc, char **argv)
+{
+    const char **names;
+    mrp_attr_t  *attrs, *a;
+    mrp_attr_t   buf[ATTRIBUTE_MAX];
+    uint32_t     resid;
+
+    MRP_UNUSED(c);
+    MRP_UNUSED(user_data);
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+
+    if (!(names = mrp_resource_definition_get_all_names(0, NULL))) {
+        printf("Failed to read resource definitions.\n");
+        return;
+    }
+
+    printf("Resource definitions:\n");
+    for (resid = 0; names[resid]; resid++) {
+        attrs = mrp_resource_definition_read_all_attributes(resid,
+                                                            ATTRIBUTE_MAX, buf);
+        printf("    Resource '%s'\n", names[resid]);
+        for (a = attrs; a->name; a++) {
+            printf("        attribute %s: ", a->name);
+            switch (a->type) {
+            case mqi_string:
+                printf("'%s'\n", a->value.string);
+                break;
+            case mqi_integer:
+                printf("%d\n", a->value.integer);
+                break;
+            case mqi_unsignd:
+                printf("%u\n", a->value.unsignd);
+                break;
+            case mqi_floating:
+                printf("%f\n", a->value.floating);
+                break;
+            default:
+                printf("<unsupported type>\n");
+                break;
+            }
+        }
+    }
+
+    mrp_free(names);
+}
+
 
 #if 0
 static int set_default_configuration(void)

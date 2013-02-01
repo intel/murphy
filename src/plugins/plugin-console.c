@@ -154,7 +154,7 @@ static void unregister_logger(console_t *c)
 }
 
 
-static void tcp_close_req(mrp_console_t *mc)
+static void strm_close_req(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc->backend_data;
 
@@ -167,7 +167,7 @@ static void tcp_close_req(mrp_console_t *mc)
 }
 
 
-static void udp_close_req(mrp_console_t *mc)
+static void dgrm_close_req(mrp_console_t *mc)
 {
     console_t *c = (console_t *)mc->backend_data;
     mrp_msg_t *msg;
@@ -317,7 +317,7 @@ static void connection_evt(mrp_transport_t *lt, void *user_data)
 
         if (c->t != NULL) {
             req.write      = write_req;
-            req.close      = tcp_close_req;
+            req.close      = strm_close_req;
             req.free       = free_req;
             req.set_prompt = set_prompt_req;
 
@@ -416,7 +416,7 @@ static int dgrm_setup(data_t *data)
             if (t != NULL) {
                 if (mrp_transport_bind(t, &addr, addrlen)) {
                     req.write      = write_req;
-                    req.close      = udp_close_req;
+                    req.close      = dgrm_close_req;
                     req.free       = free_req;
                     req.set_prompt = set_prompt_req;
 
@@ -456,7 +456,8 @@ static int console_init(mrp_plugin_t *plugin)
 
         if (!strncmp(data->address, "tcp4:", 5) ||
             !strncmp(data->address, "tcp6:", 5) ||
-            !strncmp(data->address, "unxs:", 5))
+            !strncmp(data->address, "unxs:", 5) ||
+            !strncmp(data->address, "wsck:", 5))
             ok = strm_setup(data);
         else
             ok = dgrm_setup(data);

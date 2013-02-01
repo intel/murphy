@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
+#include <getopt.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -81,6 +82,9 @@ typedef struct {
  */
 
 typedef struct {
+    const char      *server;             /* server address */
+    int              log_mask;           /* log mask */
+    const char      *log_target;         /* log target */
     mrp_mainloop_t  *ml;                 /* murphy mainloop */
     mrp_transport_t *t;                  /* transport to server */
     int              seqno;              /* sequence number */
@@ -206,7 +210,7 @@ void closed_evt(mrp_transport_t *t, int error, void *user_data)
 }
 
 
-int client_setup(client_t *c, const char *addrstr)
+int client_setup(client_t *c)
 {
     static mrp_transport_evt_t evt;
 
@@ -214,7 +218,8 @@ int client_setup(client_t *c, const char *addrstr)
     socklen_t       addrlen;
     const char     *type;
 
-    addrlen = mrp_transport_resolve(NULL, addrstr, &addr, sizeof(addr), &type);
+    addrlen = mrp_transport_resolve(NULL, c->server,
+                                    &addr, sizeof(addr), &type);
 
     if (addrlen > 0) {
         evt.closed      = closed_evt;
@@ -229,7 +234,7 @@ int client_setup(client_t *c, const char *addrstr)
         }
 
         if (!mrp_transport_connect(c->t, &addr, addrlen)) {
-            mrp_log_error("Failed to connect to %s.", addrstr);
+            mrp_log_error("Failed to connect to %s.", c->server);
             mrp_transport_destroy(c->t);
             c->t = NULL;
             return FALSE;
@@ -238,7 +243,7 @@ int client_setup(client_t *c, const char *addrstr)
         return TRUE;
     }
     else
-        mrp_log_error("Failed to resolve address '%s'.", addrstr);
+        mrp_log_error("Failed to resolve address '%s'.", c->server);
 
     return FALSE;
 }
@@ -266,18 +271,110 @@ static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
 }
 
 
+static void client_set_defaults(client_t *c)
+{
+    mrp_clear(c);
+    c->seqno      = 1;
+    c->server     = DEFAULT_ADDRESS;
+    c->log_mask   = MRP_LOG_UPTO(MRP_LOG_INFO);
+    c->log_target = MRP_LOG_TO_STDERR;
+}
+
+
+static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
+{
+    va_list ap;
+
+    if (fmt && *fmt) {
+        va_start(ap, fmt);
+        vprintf(fmt, ap);
+        va_end(ap);
+    }
+
+    printf("usage: %s [options] [transport-address]\n\n"
+           "The possible options are:\n"
+           "  -s, --server                   server address to connect to\n"
+           "  -t, --log-target=TARGET        log target to use\n"
+           "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
+           "  -l, --log-level=LEVELS         logging level to use\n"
+           "      LEVELS is a comma separated list of info, error and warning\n"
+           "  -v, --verbose                  increase logging verbosity\n"
+           "  -d, --debug                    enable debug messages\n"
+           "  -h, --help                     show help on usage\n",
+           argv0);
+
+    if (exit_code < 0)
+        return;
+    else
+        exit(exit_code);
+}
+
+
+void parse_cmdline(client_t *c, int argc, char **argv)
+{
+#   define OPTIONS "s:l:t:v:d:h"
+    struct option options[] = {
+        { "server"    , required_argument, NULL, 's' },
+        { "log-level" , required_argument, NULL, 'l' },
+        { "log-target", required_argument, NULL, 't' },
+        { "verbose"   , optional_argument, NULL, 'v' },
+        { "debug"     , required_argument, NULL, 'd' },
+        { "help"      , no_argument      , NULL, 'h' },
+        { NULL, 0, NULL, 0 }
+    };
+
+    int opt;
+
+    while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
+        switch (opt) {
+        case 's':
+            c->server = optarg;
+            break;
+
+        case 'v':
+            c->log_mask <<= 1;
+            c->log_mask  |= 1;
+            break;
+
+        case 'l':
+            c->log_mask = mrp_log_parse_levels(optarg);
+            if (c->log_mask < 0)
+                print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
+            break;
+
+        case 't':
+            c->log_target = mrp_log_parse_target(optarg);
+            if (!c->log_target)
+                print_usage(argv[0], EINVAL, "invalid log target '%s'", optarg);
+            break;
+
+        case 'd':
+            c->log_mask |= MRP_LOG_MASK_DEBUG;
+            mrp_debug_set_config(optarg);
+            mrp_debug_enable(TRUE);
+            break;
+
+        case 'h':
+            print_usage(argv[0], -1, "");
+            exit(0);
+            break;
+
+        default:
+            print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
+        }
+    }
+}
+
+
 int main(int argc, char *argv[])
 {
-    client_t    c;
-    const char *addr;
+    client_t c;
 
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argv);
+    client_set_defaults(&c);
+    parse_cmdline(&c, argc, argv);
 
-    mrp_clear(&c);
-
-    mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_INFO));
-    mrp_log_set_target(MRP_LOG_TO_STDOUT);
+    mrp_log_set_mask(c.log_mask);
+    mrp_log_set_target(c.log_target);
 
     c.seqno = 1;
 
@@ -288,12 +385,7 @@ int main(int argc, char *argv[])
 
     mrp_add_sighandler(c.ml, SIGINT, signal_handler, &c);
 
-    if (argc == 2)
-        addr = argv[1];
-    else
-        addr = DEFAULT_ADDRESS;
-
-    if (!input_setup(&c) || !client_setup(&c, addr))
+    if (!input_setup(&c) || !client_setup(&c))
         goto fail;
 
     mrp_mainloop_run(c.ml);

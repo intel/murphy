@@ -43,6 +43,199 @@ MRP_CDECL_BEGIN
 typedef struct mrp_transport_s mrp_transport_t;
 
 
+
+/*
+ * transport socket address
+ */
+
+#define MRP_SOCKADDR_SIZE 256
+
+typedef union {
+    struct sockaddr     any;
+    struct sockaddr_in  ipv4;
+    struct sockaddr_in6 ipv6;
+    struct sockaddr_un  unx;
+    char                data[MRP_SOCKADDR_SIZE];
+} mrp_sockaddr_t;
+
+
+static inline mrp_sockaddr_t *mrp_sockaddr_cpy(mrp_sockaddr_t *d,
+                                               mrp_sockaddr_t *s, socklen_t n)
+{
+    memcpy(d, s, n);
+    return d;
+}
+
+
+/*
+ * various transport flags
+ */
+
+typedef enum {
+    MRP_TRANSPORT_MODE_MSG    = 0x00,    /* generic message encoding */
+    MRP_TRANSPORT_MODE_RAW    = 0x01,    /* uses bitpipe mode */
+    MRP_TRANSPORT_MODE_DATA   = 0x02,    /* uses registered data types */
+    MRP_TRANSPORT_MODE_CUSTOM = 0x03,    /* custom message encoding */
+} mrp_transport_mode_t;
+
+typedef enum {
+    MRP_TRANSPORT_MODE_MASK   = 0x0f,    /* mask of mode bits */
+    MRP_TRANSPORT_INHERIT     = 0x0f,    /* mask of all inherited flags */
+
+    MRP_TRANSPORT_REUSEADDR = 0x10,
+    MRP_TRANSPORT_NONBLOCK  = 0x20,
+    MRP_TRANSPORT_CLOEXEC   = 0x40,
+} mrp_transport_flag_t;
+
+#define MRP_TRANSPORT_MODE(t) ((t)->flags & MRP_TRANSPORT_MODE_MASK)
+
+/*
+ * transport requests
+ *
+ * Transport requests correspond to top-down event propagation in the
+ * communication stack. These requests are made by the core tansport
+ * abstraction layer to the underlying actual transport implementation
+ * to carry out the implementation-specific details of some transport
+ * operation.
+ */
+
+typedef struct {
+    /** Open a new transport. */
+    int  (*open)(mrp_transport_t *t);
+    /** Create a new transport from an existing backend object. */
+    int  (*createfrom)(mrp_transport_t *t, void *obj);
+    /** Bind a transport to a given transport-specific address. */
+    int  (*bind)(mrp_transport_t *t, mrp_sockaddr_t *addr, socklen_t addrlen);
+    /** Listen on a transport for incoming connections. */
+    int  (*listen)(mrp_transport_t *t, int backlog);
+    /** Accept a new transport connection over an existing transport. */
+    int  (*accept)(mrp_transport_t *t, mrp_transport_t *lt);
+    /** Connect a transport to an endpoint. */
+    int  (*connect)(mrp_transport_t *t, mrp_sockaddr_t *addr,
+                    socklen_t addrlen);
+    /** Disconnect a transport, if it is connection-oriented. */
+    int  (*disconnect)(mrp_transport_t *t);
+    /** Close a transport, free all resources from open/accept/connect. */
+    void (*close)(mrp_transport_t *t);
+    /** Set a (possibly type specific) transport option. */
+    int  (*setopt)(mrp_transport_t *t, const char *opt, const void *value);
+    /** Send a message over a (connected) transport. */
+    int (*sendmsg)(mrp_transport_t *t, mrp_msg_t *msg);
+    /** Send raw data over a (connected) transport. */
+    int (*sendraw)(mrp_transport_t *t, void *buf, size_t size);
+    /** Send registered data over a (connected) transport. */
+    int (*senddata)(mrp_transport_t *t, void *data, uint16_t tag);
+    /** Send data with a custom encoder over a transport. */
+    int (*sendcustom)(mrp_transport_t *t, void *data);
+
+    /** Send a message over a(n unconnected) transport. */
+    int (*sendmsgto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
+                     socklen_t addrlen);
+    /** Send raw data over a(n unconnected) transport. */
+    int (*sendrawto)(mrp_transport_t *t, void *buf, size_t size,
+                     mrp_sockaddr_t *addr, socklen_t addrlen);
+    /** Send registered data over a(n unconnected) transport. */
+    int (*senddatato)(mrp_transport_t *t, void *data, uint16_t tag,
+                      mrp_sockaddr_t *addr, socklen_t addrlen);
+    /** Send data with a custom encoder over a transport. */
+    int (*sendcustomto)(mrp_transport_t *t, void *data,
+                        mrp_sockaddr_t *addr, socklen_t addrlen);
+} mrp_transport_req_t;
+
+
+/*
+ * transport events
+ *
+ * Transport events correspond to bottom-up event propagation in the
+ * communication stack. These callbacks are made by the actual transport
+ * implementation to the generic transport abstraction to inform it
+ * about relevant transport events, such as the reception of data, or
+ * transport disconnection by the peer.
+ */
+
+typedef struct {
+    /** Message received on a connected transport. */
+    union {
+        /** Generic message callback for connected transports. */
+        void (*recvmsg)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
+        /** Raw data callback for connected transports. */
+        void (*recvraw)(mrp_transport_t *t, void *data, size_t size,
+                        void *user_data);
+        /** Registered data callback for connected transports. */
+        void (*recvdata)(mrp_transport_t *t, void *data, uint16_t tag,
+                         void *user_data);
+        /** Custom encoded data callback for connected transports. */
+        void (*recvcustom)(mrp_transport_t *t, void *data,
+                           void *user_data);
+    };
+
+    /** Message received on an unconnected transport. */
+    union {
+        /** Generic message callback for unconnected transports. */
+        void (*recvmsgfrom)(mrp_transport_t *t, mrp_msg_t *msg,
+                            mrp_sockaddr_t *addr, socklen_t addrlen,
+                            void *user_data);
+        /** Raw data callback for unconnected transports. */
+        void (*recvrawfrom)(mrp_transport_t *t, void *data, size_t size,
+                            mrp_sockaddr_t *addr, socklen_t addrlen,
+                            void *user_data);
+        /** Registered data callback for unconnected transports. */
+        void (*recvdatafrom)(mrp_transport_t *t, void *data, uint16_t tag,
+                             mrp_sockaddr_t *addr, socklen_t addrlen,
+                             void *user_data);
+        /** Custom encoded data callback for unconnected transports. */
+        void (*recvcustomfrom)(mrp_transport_t *t, void *data,
+                               mrp_sockaddr_t *addr, socklen_t addrlen,
+                               void *user_data);
+    };
+    /** Connection closed by peer. */
+    void (*closed)(mrp_transport_t *t, int error, void *user_data);
+    /** Connection attempt on a socket being listened on. */
+    void (*connection)(mrp_transport_t *t, void *user_data);
+} mrp_transport_evt_t;
+
+
+/*
+ * transport descriptor
+ */
+
+typedef struct {
+    const char          *type;           /* transport type name */
+    size_t               size;           /* full transport struct size */
+    mrp_transport_req_t  req;            /* transport requests */
+    socklen_t          (*resolve)(const char *str, mrp_sockaddr_t *addr,
+                                  socklen_t addrlen, const char **typep);
+    mrp_list_hook_t      hook;           /* to list of registered transports */
+} mrp_transport_descr_t;
+
+
+/*
+ * transport
+ */
+
+#define MRP_TRANSPORT_PUBLIC_FIELDS                                       \
+    mrp_mainloop_t          *ml;                                          \
+    mrp_transport_descr_t   *descr;                                       \
+    mrp_transport_evt_t      evt;                                         \
+    int                    (*check_destroy)(mrp_transport_t *t);          \
+    int                    (*recv_data)(mrp_transport_t *t, void *data,   \
+                                        size_t size,                      \
+                                        mrp_sockaddr_t *addr,             \
+                                        socklen_t addrlen);               \
+    void                    *user_data;                                   \
+    int                      flags;                                       \
+    int                      mode;                                        \
+    int                      busy;                                        \
+    int                      connected : 1;                               \
+    int                      listened : 1;                                \
+    int                      destroyed : 1                                \
+
+
+struct mrp_transport_s {
+    MRP_TRANSPORT_PUBLIC_FIELDS;
+};
+
+
 /*
  * Notes:
  *
@@ -84,181 +277,6 @@ typedef struct mrp_transport_s mrp_transport_t;
  *    backend MUST NOT touch or try to dereference the transport any more
  *    as its resources have already been released.
  */
-
-
-/*
- * transport socket address
- */
-
-#define MRP_SOCKADDR_SIZE 256
-
-typedef union {
-    struct sockaddr     any;
-    struct sockaddr_in  ipv4;
-    struct sockaddr_in6 ipv6;
-    struct sockaddr_un  unx;
-    char                data[MRP_SOCKADDR_SIZE];
-} mrp_sockaddr_t;
-
-
-static inline mrp_sockaddr_t *mrp_sockaddr_cpy(mrp_sockaddr_t *d,
-                                               mrp_sockaddr_t *s, socklen_t n)
-{
-    memcpy(d, s, n);
-    return d;
-}
-
-
-/*
- * various transport flags
- */
-
-typedef enum {
-    MRP_TRANSPORT_REUSEADDR = 0x1,
-    MRP_TRANSPORT_NONBLOCK  = 0x2,
-    MRP_TRANSPORT_CLOEXEC   = 0x4,
-
-    MRP_TRANSPORT_MODE_MSG    = 0x00000000, /* in generic mode */
-    MRP_TRANSPORT_MODE_RAW    = 0x10000000, /* in bitpipe mode */
-    MRP_TRANSPORT_MODE_CUSTOM = 0x20000000, /* in custom type mode */
-    MRP_TRANSPORT_MODE_MASK   = 0x30000000, /* mask for  transport mode */
-
-    MRP_TRANSPORT_INHERIT     = 0x30000000, /* mask of inherited flags */
-} mrp_transport_flag_t;
-
-#define MRP_TRANSPORT_MODE(t) ((t)->flags & MRP_TRANSPORT_MODE_MASK)
-
-/*
- * transport requests
- *
- * Transport requests correspond to top-down event propagation in the
- * communication stack. These requests are made by the core tansport
- * abstraction layer to the underlying actual transport implementation
- * to carry out the implementation-specific details of some transport
- * operation.
- */
-
-typedef struct {
-    /** Open a new transport. */
-    int  (*open)(mrp_transport_t *t);
-    /** Create a new transport from an existing backend object. */
-    int  (*createfrom)(mrp_transport_t *t, void *obj);
-    /** Bind a transport to a given transport-specific address. */
-    int  (*bind)(mrp_transport_t *t, mrp_sockaddr_t *addr, socklen_t addrlen);
-    /** Listen on a transport for incoming connections. */
-    int  (*listen)(mrp_transport_t *t, int backlog);
-    /** Accept a new transport connection over an existing transport. */
-    int  (*accept)(mrp_transport_t *t, mrp_transport_t *lt);
-    /** Connect a transport to an endpoint. */
-    int  (*connect)(mrp_transport_t *t, mrp_sockaddr_t *addr,
-                    socklen_t addrlen);
-    /** Disconnect a transport, if it is connection-oriented. */
-    int  (*disconnect)(mrp_transport_t *t);
-    /** Close a transport, free all resources from open/accept/connect. */
-    void (*close)(mrp_transport_t *t);
-    /** Send a message over a (connected) transport. */
-    int (*sendmsg)(mrp_transport_t *t, mrp_msg_t *msg);
-    /** Send raw data over a (connected) transport. */
-    int (*sendraw)(mrp_transport_t *t, void *buf, size_t size);
-    /** Send custom data over a (connected) transport. */
-    int (*senddata)(mrp_transport_t *t, void *data, uint16_t tag);
-
-    /** Send a message over a(n unconnected) transport. */
-    int (*sendmsgto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
-                     socklen_t addrlen);
-    /** Send raw data over a(n unconnected) transport. */
-    int (*sendrawto)(mrp_transport_t *t, void *buf, size_t size,
-                     mrp_sockaddr_t *addr, socklen_t addrlen);
-    /** Send custom data over a(n unconnected) transport. */
-    int (*senddatato)(mrp_transport_t *t, void *data, uint16_t tag,
-                      mrp_sockaddr_t *addr, socklen_t addrlen);
-} mrp_transport_req_t;
-
-
-/*
- * transport events
- *
- * Transport events correspond to bottom-up event propagation in the
- * communication stack. These callbacks are made by the actual transport
- * implementation to the generic transport abstraction to inform it
- * about relevant transport events, such as the reception of data, or
- * transport disconnection by the peer.
- */
-
-typedef struct {
-    /** Message received on a connected transport. */
-    union {
-        /** Generic message callback for connected transports. */
-        void (*recvmsg)(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
-        /** Raw data callback for connected transports. */
-        void (*recvraw)(mrp_transport_t *t, void *data, size_t size,
-                        void *user_data);
-        /** Custom data callback for connected transports. */
-        void (*recvdata)(mrp_transport_t *t, void *data, uint16_t tag,
-                         void *user_data);
-    };
-
-    /** Message received on an unconnected transport. */
-    union {
-        /** Generic message callback for unconnected transports. */
-        void (*recvmsgfrom)(mrp_transport_t *t, mrp_msg_t *msg,
-                            mrp_sockaddr_t *addr, socklen_t addrlen,
-                            void *user_data);
-        /** Raw data callback for unconnected transports. */
-        void (*recvrawfrom)(mrp_transport_t *t, void *data, size_t size,
-                            mrp_sockaddr_t *addr, socklen_t addrlen,
-                            void *user_data);
-        /** Custom data callback for unconnected transports. */
-        void (*recvdatafrom)(mrp_transport_t *t, void *data, uint16_t tag,
-                             mrp_sockaddr_t *addr, socklen_t addrlen,
-                             void *user_data);
-    };
-    /** Connection closed by peer. */
-    void (*closed)(mrp_transport_t *t, int error, void *user_data);
-    /** Connection attempt on a socket being listened on. */
-    void (*connection)(mrp_transport_t *t, void *user_data);
-} mrp_transport_evt_t;
-
-
-/*
- * transport descriptor
- */
-
-typedef struct {
-    const char          *type;           /* transport type name */
-    size_t               size;           /* full transport struct size */
-    mrp_transport_req_t  req;            /* transport requests */
-    socklen_t          (*resolve)(const char *str, mrp_sockaddr_t *addr,
-                                  socklen_t addrlen, const char **typep);
-    mrp_list_hook_t      hook;           /* to list of registered transports */
-} mrp_transport_descr_t;
-
-
-/*
- * transport
- */
-
-#define MRP_TRANSPORT_PUBLIC_FIELDS                                       \
-    mrp_mainloop_t          *ml;                                          \
-    mrp_transport_descr_t   *descr;                                       \
-    mrp_transport_evt_t      evt;                                         \
-    int                    (*check_destroy)(mrp_transport_t *t);          \
-    int                    (*recv_data)(mrp_transport_t *t, void *data,   \
-                                        size_t size,                      \
-                                        mrp_sockaddr_t *addr,             \
-                                        socklen_t addrlen);               \
-    void                    *user_data;                                   \
-    int                      flags;                                       \
-    int                      busy;                                        \
-    int                      connected : 1;                               \
-    int                      listened : 1;                                \
-    int                      destroyed : 1                                \
-
-
-struct mrp_transport_s {
-    MRP_TRANSPORT_PUBLIC_FIELDS;
-};
-
 
 
 /*
@@ -339,12 +357,13 @@ struct mrp_transport_s {
 
 /** Automatically register a transport on startup. */
 #define MRP_REGISTER_TRANSPORT(_prfx, _typename, _structtype, _resolve,   \
-                               _open, _createfrom, _close,                \
+                               _open, _createfrom, _close, _setopt,       \
                                _bind, _listen, _accept,                   \
                                _connect, _disconnect,                     \
                                _sendmsg, _sendmsgto,                      \
                                _sendraw, _sendrawto,                      \
-                               _senddata, _senddatato)                    \
+                               _senddata, _senddatato,                    \
+                               _sendcustom, _sendcustomto)                \
     static void _prfx##_register_transport(void)                          \
          __attribute__((constructor));                                    \
                                                                           \
@@ -354,20 +373,23 @@ struct mrp_transport_s {
             .size    = sizeof(_structtype),                               \
             .resolve = _resolve,                                          \
             .req     = {                                                  \
-                .open       = _open,                                      \
-                .createfrom = _createfrom,                                \
-                .bind       = _bind,                                      \
-                .listen     = _listen,                                    \
-                .accept     = _accept,                                    \
-                .close      = _close,                                     \
-                .connect    = _connect,                                   \
-                .disconnect = _disconnect,                                \
-                .sendmsg    = _sendmsg,                                   \
-                .sendmsgto  = _sendmsgto,                                 \
-                .sendraw    = _sendraw,                                   \
-                .sendrawto  = _sendrawto,                                 \
-                .senddata   = _senddata,                                  \
-                .senddatato = _senddatato,                                \
+                .open         = _open,                                    \
+                .createfrom   = _createfrom,                              \
+                .bind         = _bind,                                    \
+                .listen       = _listen,                                  \
+                .accept       = _accept,                                  \
+                .close        = _close,                                   \
+                .setopt       = _setopt,                                  \
+                .connect      = _connect,                                 \
+                .disconnect   = _disconnect,                              \
+                .sendmsg      = _sendmsg,                                 \
+                .sendmsgto    = _sendmsgto,                               \
+                .sendraw      = _sendraw,                                 \
+                .sendrawto    = _sendrawto,                               \
+                .senddata     = _senddata,                                \
+                .senddatato   = _senddatato,                              \
+                .sendcustom   = _sendcustom,                              \
+                .sendcustomto = _sendcustomto,                            \
             },                                                            \
         };                                                                \
                                                                           \
@@ -397,6 +419,9 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
                                            void *conn, mrp_transport_evt_t *evt,
                                            void *user_data, int flags,
                                            int connected);
+
+/** Set a (possibly type-specific) transport option. */
+int mrp_transport_setopt(mrp_transport_t *t, const char *opt, const void *val);
 
 /** Resolve an address string to a transport-specific address. */
 socklen_t mrp_transport_resolve(mrp_transport_t *t, const char *str,
@@ -438,12 +463,19 @@ int mrp_transport_sendraw(mrp_transport_t *t, void *data, size_t size);
 int mrp_transport_sendrawto(mrp_transport_t *t, void *data, size_t size,
                             mrp_sockaddr_t *addr, socklen_t addrlen);
 
-/** Send custom data through the given (connected) transport. */
+/** Send registered data through the given (connected) transport. */
 int mrp_transport_senddata(mrp_transport_t *t, void *data, uint16_t tag);
 
-/** Send custom data through the given transport to the remote address. */
+/** Send registered data through the given transport to the remote address. */
 int mrp_transport_senddatato(mrp_transport_t *t, void *data, uint16_t tag,
                              mrp_sockaddr_t *addr, socklen_t addrlen);
+
+/** Send custom data through the given (connected) transport. */
+int mrp_transport_sendcustom(mrp_transport_t *t, void *data);
+
+/** Send registered data through the given transport to the remote address. */
+int mrp_transport_sendcustomto(mrp_transport_t *t, void *data,
+                               mrp_sockaddr_t *addr, socklen_t addrlen);
 
 MRP_CDECL_END
 

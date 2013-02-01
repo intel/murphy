@@ -89,6 +89,28 @@ libmurphy_common_la_DEPENDENCIES = linker-script.common
 libcommonincludedir      = $(includedir)/murphy/common
 libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
 
+if WEBSOCKETS_ENABLED
+libmurphy_common_la_HEADERS +=			\
+		common/fragbuf.h		\
+		common/websocklib.h		\
+		common/websocket.h		\
+		common/json.h
+
+libmurphy_common_la_REGULAR_SOURCES +=		\
+		common/fragbuf.c		\
+		common/websocklib.c		\
+		common/websocket.c		\
+		common/wsck-transport.c 	\
+		common/json.c
+
+libmurphy_common_la_CFLAGS +=			\
+		$(WEBSOCKETS_CFLAGS)
+
+libmurphy_common_la_LIBADD +=			\
+		$(WEBSOCKETS_LIBS)
+endif
+
+
 # linker script generation
 linker-script.common: $(libmurphy_common_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
@@ -996,6 +1018,30 @@ plugin_resource_dbus_la_CFLAGS  = $(RESOURCE_DBUS_PLUGIN_CFLAGS) $(MURPHY_CFLAGS
 plugin_resource_dbus_la_LDFLAGS = -module -avoid-version
 plugin_resource_dbus_la_LIBADD  = $(RESOURCE_DBUS_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-resource-dbus.la
+endif
+endif
+endif
+endif
+
+# resource-wrt plugin
+if BUILD_RESOURCES
+if WEBSOCKETS_ENABLED
+RESOURCE_WRT_PLUGIN_SOURCES = plugins/resource-wrt/plugin-resource-wrt.c
+RESOURCE_WRT_PLUGIN_CFLAGS  = $(WEBSOCKETS_CFLAGS)
+RESOURCE_WRT_PLUGIN_LIBS    =
+
+if !DISABLED_PLUGIN_RESOURCE_WRT
+if BUILTIN_PLUGIN_RESOURCE_WRT
+BUILTIN_PLUGINS += $(RESOURCE_WRT_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(RESOURCE_WRT_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(RESOURCE_WRT_PLUGIN_LIBS)
+else
+plugin_resource_wrt_la_SOURCES = $(RESOURCE_WRT_PLUGIN_SOURCES)
+plugin_resource_wrt_la_CFLAGS  = $(RESOURCE_WRT_PLUGIN_CFLAGS) \
+				 $(MURPHY_CFLAGS) $(AM_CFLAGS)
+plugin_resource_wrt_la_LDFLAGS = -module -avoid-version
+plugin_resource_wrt_la_LIBADD  = $(RESOURCE_WRT_PLUGIN_LIBS)
+plugin_LTLIBRARIES    += plugin-resource-wrt.la
 endif
 endif
 endif

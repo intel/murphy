@@ -406,7 +406,7 @@ void server_init(context_t *c)
 
 
     flags = MRP_TRANSPORT_REUSEADDR |
-        (c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0);
+        (c->custom ? MRP_TRANSPORT_MODE_DATA : 0);
     c->lt = mrp_transport_create(c->ml, c->atype, &evt, c, flags);
 
     if (c->lt == NULL) {
@@ -561,7 +561,7 @@ void client_init(context_t *c)
 
     mrp_list_append(&c->clients, &client->hook);
 
-    flags = c->custom ? MRP_TRANSPORT_MODE_CUSTOM : 0;
+    flags = c->custom ? MRP_TRANSPORT_MODE_DATA : 0;
     client->t  = mrp_transport_create(c->ml, c->atype, &evt, client, flags);
 
     if (client->t == NULL) {

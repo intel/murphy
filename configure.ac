@@ -281,6 +281,31 @@ AC_SUBST(CONSOLE_ENABLED)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_LIBS)
 
+# Check if websockets support was enabled.
+AC_ARG_ENABLE(websockets,
+              [--enable-websockets    enable websockets support],
+              [enable_websockets=$enableval], [enable_websockets=auto])
+
+if test "$enable_websockets" != "no"; then
+    PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets json] ,
+                      [have_websockets=yes], [have_websockets=no])
+    if test "$have_websockets" = "no" -a "$enable_websockets" = "yes"; then
+        AC_MSG_ERROR([libwebsockets or json-c development libraries not found.])
+    fi
+
+    enable_websockets="$have_websockets"
+else
+    AC_MSG_NOTICE([libwebsockets support is disabled.])
+fi
+
+if test "$enable_websockets" = "yes"; then
+    AC_DEFINE([WEBSOCKETS_ENABLED], 1, [Enable websockets support ?])
+fi
+AM_CONDITIONAL(WEBSOCKETS_ENABLED, [test "$enable_websockets" = "yes"])
+AC_SUBST(WEBSOCKETS_ENABLED)
+AC_SUBST(WEBSOCKETS_CFLAGS)
+AC_SUBST(WEBSOCKETS_LIBS)
+
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
 MURPHY_LIBS=""
@@ -375,6 +400,7 @@ AM_CONDITIONAL(DISABLED_PLUGIN_DBUS,     [check_if_disabled dbus])
 AM_CONDITIONAL(DISABLED_PLUGIN_GLIB,     [check_if_disabled glib])
 AM_CONDITIONAL(DISABLED_PLUGIN_CONSOLE,  [check_if_disabled console])
 AM_CONDITIONAL(DISABLED_PLUGIN_RESOURCE_DBUS, [check_if_disabled resource-dbus])
+AM_CONDITIONAL(DISABLED_PLUGIN_RESOURCE_WRT, [check_if_disabled resource-wrt])
 AM_CONDITIONAL(DISABLED_PLUGIN_DOMAIN_CONTROL,
                [check_if_disabled domain-control])
 
@@ -383,6 +409,7 @@ AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,     [check_if_internal dbus])
 AM_CONDITIONAL(BUILTIN_PLUGIN_GLIB,     [check_if_internal glib])
 AM_CONDITIONAL(BUILTIN_PLUGIN_CONSOLE,  [check_if_internal console])
 AM_CONDITIONAL(BUILTIN_PLUGIN_RESOURCE_DBUS, [check_if_internal resource-dbus])
+AM_CONDITIONAL(BUILTIN_PLUGIN_RESOURCE_WRT, [check_if_internal resource-wrt])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DOMAIN_CONTROL,
                [check_if_internal domain-control])
 AM_CONDITIONAL(BUILTIN_PLUGIN_LUA,      [check_if_internal lua])

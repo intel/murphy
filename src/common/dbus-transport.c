@@ -46,7 +46,7 @@
 #define TRANSPORT_PATH       "/murphy/transport"
 #define TRANSPORT_INTERFACE  "Murphy.Transport"
 #define TRANSPORT_MESSAGE    "DeliverMessage"
-#define TRANSPORT_CUSTOM     "DeliverCustom"
+#define TRANSPORT_DATA       "DeliverData"
 #define TRANSPORT_RAW        "DeliverRaw"
 #define TRANSPORT_METHOD     "DeliverMessage"
 
@@ -374,17 +374,22 @@ static int dbus_bind(mrp_transport_t *mt, mrp_sockaddr_t *addrp,
 
     copy_address(&t->local, addr);
 
-    if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
-        method = TRANSPORT_CUSTOM;
+    switch (t->mode) {
+    case MRP_TRANSPORT_MODE_DATA:
+        method = TRANSPORT_DATA;
         cb     = dbus_data_cb;
-    }
-    else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
+        break;
+    case MRP_TRANSPORT_MODE_RAW:
         method = TRANSPORT_RAW;
         cb     = dbus_raw_cb;
-    }
-    else {
+        break;
+    case MRP_TRANSPORT_MODE_MSG:
         method = TRANSPORT_MESSAGE;
         cb     = dbus_msg_cb;
+        break;
+    default:
+        errno = EPROTOTYPE;
+        goto fail;
     }
 
     if (!mrp_dbus_export_method(t->dbus, addr->db_path, TRANSPORT_INTERFACE,
@@ -433,15 +438,16 @@ static void dbus_close(mrp_transport_t *mt)
     int           (*cb)(mrp_dbus_t *, DBusMessage *, void *);
 
     if (t->bound) {
-        if (t->flags & MRP_TRANSPORT_MODE_CUSTOM) {
-            method = TRANSPORT_CUSTOM;
+        switch (t->mode) {
+        case MRP_TRANSPORT_MODE_DATA:
+            method = TRANSPORT_DATA;
             cb     = dbus_data_cb;
-        }
-        else if (t->flags & MRP_TRANSPORT_MODE_RAW) {
+            break;
+        case MRP_TRANSPORT_MODE_RAW:
             method = TRANSPORT_RAW;
             cb     = dbus_raw_cb;
-        }
-        else {
+            break;
+        case MRP_TRANSPORT_MODE_MSG:
             method = TRANSPORT_MESSAGE;
             cb     = dbus_msg_cb;
         }
@@ -792,7 +798,7 @@ static int dbus_senddatato(mrp_transport_t *mt, void *data, uint16_t tag,
 
         if (m != NULL) {
             if (mrp_dbus_send(t->dbus, addr->db_addr, addr->db_path,
-                              TRANSPORT_INTERFACE, TRANSPORT_CUSTOM,
+                              TRANSPORT_INTERFACE, TRANSPORT_DATA,
                               0, NULL, NULL, m))
                 success = TRUE;
             else {
@@ -1701,10 +1707,11 @@ static void *raw_decode(DBusMessage *m, size_t *sizep, const char **sender_id)
 
 
 MRP_REGISTER_TRANSPORT(dbus, DBUS, dbus_t, dbus_resolve,
-                       dbus_open, dbus_createfrom, dbus_close,
+                       dbus_open, dbus_createfrom, dbus_close, NULL,
                        dbus_bind, NULL, NULL,
                        dbus_connect, dbus_disconnect,
                        dbus_sendmsg, dbus_sendmsgto,
                        dbus_sendraw, dbus_sendrawto,
-                       dbus_senddata, dbus_senddatato);
+                       dbus_senddata, dbus_senddatato,
+                       NULL, NULL);
 
