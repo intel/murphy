@@ -32,7 +32,7 @@ end
 
 -- load the dbus resource plugin
 if m:plugin_exists('resource-dbus') then
-    m:load_plugin('resource-dbus', {
+    m:try_load_plugin('resource-dbus', {
         dbus_bus = "system",
         dbus_service = "org.Murphy",
         dbus_track = true,
@@ -54,11 +54,12 @@ end
 
 
 -- define application classes
-application_class { name = "navigator", priority = 4 }
-application_class { name = "phone"    , priority = 3 }
-application_class { name = "game"     , priority = 2 }
-application_class { name = "player"   , priority = 1 }
-application_class { name = "implicit" , priority = 0 }
+application_class { name = "interrupt", priority = 99 }
+application_class { name = "navigator", priority =  4 }
+application_class { name = "phone"    , priority =  3 }
+application_class { name = "game"     , priority =  2 }
+application_class { name = "player"   , priority =  1 }
+application_class { name = "implicit" , priority =  0 }
 
 -- define zone attributes
 zone.attributes {
@@ -113,13 +114,18 @@ resource.class {
      name = "audio_playback",
      shareable = true,
      attributes = {
-         role = { mdb.string, "music", "rw" }
+         role = { mdb.string, "music", "rw" },
+         policy = { mdb.string, "relaxed", "rw" }
      }
 }
 
 resource.class {
      name = "audio_recording",
-     shareable = true
+     shareable = false,
+     attributes = {
+         role = { mdb.string, "music", "rw" },
+         policy = { mdb.string, "relaxed", "rw" }
+     }
 }
 
 resource.class {
