@@ -287,7 +287,7 @@ AC_ARG_ENABLE(websockets,
               [enable_websockets=$enableval], [enable_websockets=auto])
 
 if test "$enable_websockets" != "no"; then
-    PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets json] ,
+    PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets json],
                       [have_websockets=yes], [have_websockets=no])
     if test "$have_websockets" = "no" -a "$enable_websockets" = "yes"; then
         AC_MSG_ERROR([libwebsockets or json-c development libraries not found.])
@@ -300,11 +300,44 @@ fi
 
 if test "$enable_websockets" = "yes"; then
     AC_DEFINE([WEBSOCKETS_ENABLED], 1, [Enable websockets support ?])
+    enable_json=yes
+    AC_DEFINE([JSON_ENABLED], 1, [Enable JSON encoding/decoding support ?])
+else
+    enable_json=no
 fi
 AM_CONDITIONAL(WEBSOCKETS_ENABLED, [test "$enable_websockets" = "yes"])
 AC_SUBST(WEBSOCKETS_ENABLED)
 AC_SUBST(WEBSOCKETS_CFLAGS)
 AC_SUBST(WEBSOCKETS_LIBS)
+
+# If websockets is not enabled/available check if JSON was asked for.
+if test "$enable_json" = "no"; then
+    AC_ARG_ENABLE(json,
+                  [--enable-json    enable JSON encoding/decoding support],
+                  [enable_json=$enableval], [enable_json=auto])
+
+    if test "$enable_json" != "no"; then
+        PKG_CHECK_MODULES(JSON, [json],
+                          [have_json=yes], [have_json=no])
+        if test "$have_json" = "no" -a "$enable_json" = "yes"; then
+            AC_MSG_ERROR([json-c development libraries not found.])
+        fi
+
+        enable_json="$have_json"
+    else
+        AC_MSG_NOTICE([JSON support is disabled.])
+    fi
+
+    if test "$enable_json" = "yes"; then
+        AC_DEFINE([JSON_ENABLED], 1, [Enable json support ?])
+    fi
+    AC_SUBST(JSON_ENABLED)
+    AC_SUBST(JSON_CFLAGS)
+    AC_SUBST(JSON_LIBS)
+fi
+
+AM_CONDITIONAL(JSON_ENABLED, [test "$enable_json" = "yes"])
+
 
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
@@ -542,6 +575,8 @@ echo "glib mainloop support: $enable_glib"
 echo "Qt mainloop support: $enable_qt"
 echo "Murphy console plugin and client: $enable_console"
 echo "Resource management support: $with_resources"
+echo "Websockets support: $enable_websockets"
+echo "JSON encoding/decoding support: $enable_json"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do

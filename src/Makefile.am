@@ -54,6 +54,7 @@ libmurphy_common_la_HEADERS =		\
 		common/file-utils.h	\
 		common/msg.h		\
 		common/refcnt.h		\
+		common/fragbuf.h	\
 		common/transport.h
 
 libmurphy_common_la_REGULAR_SOURCES =		\
@@ -65,6 +66,7 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/utils.c			\
 		common/file-utils.c		\
 		common/msg.c			\
+		common/fragbuf.c		\
 		common/transport.c		\
 		common/stream-transport.c	\
 		common/internal-transport.c	\
@@ -91,13 +93,11 @@ libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
 
 if WEBSOCKETS_ENABLED
 libmurphy_common_la_HEADERS +=			\
-		common/fragbuf.h		\
 		common/websocklib.h		\
 		common/websocket.h		\
 		common/json.h
 
 libmurphy_common_la_REGULAR_SOURCES +=		\
-		common/fragbuf.c		\
 		common/websocklib.c		\
 		common/websocket.c		\
 		common/wsck-transport.c 	\
@@ -108,6 +108,20 @@ libmurphy_common_la_CFLAGS +=			\
 
 libmurphy_common_la_LIBADD +=			\
 		$(WEBSOCKETS_LIBS)
+else
+if JSON_ENABLED
+libmurphy_common_la_HEADERS +=			\
+		common/json.h
+
+libmurphy_common_la_REGULAR_SOURCES +=		\
+		common/json.c
+
+libmurphy_common_la_CFLAGS +=			\
+		$(JSON_CFLAGS)
+
+libmurphy_common_la_LIBADD +=			\
+		$(JSON_LIBS)
+endif
 endif
 
 
