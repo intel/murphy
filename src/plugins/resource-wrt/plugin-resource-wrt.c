@@ -184,10 +184,10 @@ static void error_reply(wrt_client_t *c, const char *type, int seq, int code,
         errmsg[sizeof(errmsg) - 1] = '\0';
         va_end(ap);
 
-        if (mrp_json_add_string (reply, "type"  , type) &&
-            mrp_json_add_integer(reply, "seq"   , seq ) &&
-            mrp_json_add_integer(reply, "status", code) &&
-            mrp_json_add_string (reply, "errmsg", errmsg))
+        if (mrp_json_add_string (reply, "type"   , type) &&
+            mrp_json_add_integer(reply, "seq"    , seq ) &&
+            mrp_json_add_integer(reply, "error"  , code) &&
+            mrp_json_add_string (reply, "message", errmsg))
             send_message(c, reply);
 
         mrp_json_unref(reply);
