@@ -115,6 +115,7 @@ resource.class {
      shareable = true,
      attributes = {
          role = { mdb.string, "music", "rw" },
+         pid = { mdb.string, "<unknown>", "rw" },
          policy = { mdb.string, "relaxed", "rw" }
      }
 }
@@ -124,6 +125,7 @@ resource.class {
      shareable = false,
      attributes = {
          role = { mdb.string, "music", "rw" },
+         pid = { mdb.string, "<unknown>", "rw" },
          policy = { mdb.string, "relaxed", "rw" }
      }
 }
