@@ -289,7 +289,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                 changed = true;
             }
 
-            if ((replyid || changed) && rset->event) {
+            if (replyid || changed) {
                 ev = events + nevent++;
 
                 ev->replyid = replyid;
@@ -305,7 +305,8 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
         mrp_resource_set_updated(rset);
 
-        rset->event(ev->replyid, rset, rset->user_data);
+        if (rset->event)
+            rset->event(ev->replyid, rset, rset->user_data);
     }
 
     mrp_free(events);
