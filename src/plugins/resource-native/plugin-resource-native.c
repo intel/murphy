@@ -575,8 +575,10 @@ static int read_resource(mrp_resource_set_t *rset, mrp_msg_t *req,void **pcurs)
     mrp_log_info("   resource: name:'%s' %s %s", name,
                  mand?"mandatory":"optional ", shared?"shared":"exclusive");
 
-    for (i = 0, arst = 0;    i < ATTRIBUTE_MAX && arst == 0;    i++)
-        arst = read_attribute(req, attrs + i, pcurs);
+    for (i = 0, arst = 0;    i < ATTRIBUTE_MAX;    i++) {
+        if ((arst = read_attribute(req, attrs + i, pcurs)))
+            break;
+    }
 
     memset(attrs + i, 0, sizeof(mrp_attr_t));
 
