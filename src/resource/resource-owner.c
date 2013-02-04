@@ -163,6 +163,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     typedef struct {
         uint32_t replyid;
         mrp_resource_set_t *rset;
+        bool shuffle;
     } event_t;
 
     mrp_resource_owner_t oldowners[RESOURCE_MAX];
@@ -182,6 +183,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     uint32_t rid;
     uint32_t rcnt;
     bool changed;
+    bool shuffle;
     uint32_t replyid;
     uint32_t nevent, maxev;
     event_t *events, *ev, *lastev;
@@ -273,6 +275,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             }
 
             changed = false;
+            shuffle = false;
             replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
 
@@ -280,8 +283,10 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                 rset->resource.mask.grant = grant;
                 changed = true;
 
-                if (!grant && rset->auto_release)
+                if (!grant && rset->auto_release) {
                     rset->state = mrp_resource_release;
+                    shuffle = true;
+                }
             }
 
             if (advice != rset->resource.mask.advice) {
@@ -293,7 +298,8 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                 ev = events + nevent++;
 
                 ev->replyid = replyid;
-                ev->rset = rset;
+                ev->rset    = rset;
+                ev->shuffle = shuffle;
             }
         } /* while rset */
     } /* while class */
@@ -302,6 +308,9 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
     for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
         rset = ev->rset;
+
+        if (ev->shuffle)
+            mrp_application_class_move_resource_set(rset);
 
         mrp_resource_set_updated(rset);
 
