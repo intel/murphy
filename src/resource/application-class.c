@@ -103,7 +103,9 @@ static void insert_into_application_class_table(const char *, uint32_t);
 
 
 mrp_application_class_t *mrp_application_class_create(const char *name,
-                                                      uint32_t pri)
+                                                      uint32_t pri,
+                                                      bool modal,
+                                                      bool share)
 {
     mrp_application_class_t *class;
     mrp_list_hook_t *insert_before, *clhook, *n;
@@ -111,6 +113,11 @@ mrp_application_class_t *mrp_application_class_create(const char *name,
 
     MRP_ASSERT(name, "invalid argument");
 
+    if (modal && share) {
+        mrp_log_error("Class '%s' is both modal and shared. "
+                      "Sharing will be disabled", name);
+        share = false;
+    }
 
     /* looping through all classes to check the uniqueness of the
        name & priority of the new class and find the insertion point */
@@ -141,6 +148,8 @@ mrp_application_class_t *mrp_application_class_create(const char *name,
 
     class->name = mrp_strdup(name);
     class->priority = pri;
+    class->modal = modal;
+    class->share = share;
 
     for (zone = 0;  zone < MRP_ZONE_MAX;  zone++)
         mrp_list_init(&class->resource_sets[zone]);
@@ -328,9 +337,10 @@ uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 }
 
 
-int mrp_application_class_print(char *buf, int len)
+int mrp_application_class_print(char *buf, int len, bool with_rsets)
 {
-#define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
+#define PRINT(fmt, args...) \
+    do { if (p<e) { p += snprintf(p, e-p, fmt , ##args); } } while (0)
 
     mrp_zone_t *zone;
     mrp_application_class_t *class;
@@ -339,6 +349,7 @@ int mrp_application_class_print(char *buf, int len)
     mrp_list_hook_t *list, *rsen, *m;
     uint32_t zid;
     char *p, *e;
+    int width, l;
     int clcnt, rscnt;
 
     MRP_ASSERT(buf && len > 0, "invalid argument");
@@ -346,11 +357,35 @@ int mrp_application_class_print(char *buf, int len)
     e = (p = buf) + len;
     clcnt = rscnt = 0;
 
+    if (!with_rsets) {
+        width = 0;
+        mrp_list_foreach(&class_list, clen, n) {
+            class = mrp_list_entry(clen, mrp_application_class_t, list);
+            if ((l = strlen(class->name)) > width)
+                width = l;
+        }
+    }
+
     PRINT("Application classes:\n");
 
     mrp_list_foreach_back(&class_list, clen, n) {
         class = mrp_list_entry(clen, mrp_application_class_t, list);
-        PRINT("  %3u - %s\n", class->priority, class->name);
+        clcnt++;
+
+        if (with_rsets)
+            PRINT("  %3u - %s ", class->priority, class->name);
+        else
+            PRINT("   %-*s ", width, class->name);
+
+        if (class->modal)
+            PRINT(" modal");
+        if (class->share)
+            PRINT(" share");
+
+        PRINT("\n");
+
+        if (!with_rsets)
+            continue;
 
         for (zid = 0;   zid < MRP_ZONE_MAX;   zid++) {
             zone = mrp_zone_find_by_id(zid);
@@ -372,8 +407,6 @@ int mrp_application_class_print(char *buf, int len)
                 }
             }
         }
-
-        clcnt++;
     }
 
     if (!clcnt)

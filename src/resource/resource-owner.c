@@ -182,6 +182,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     void *clc, *rsc, *rc;
     uint32_t rid;
     uint32_t rcnt;
+    bool force_release;
     bool changed;
     bool shuffle;
     uint32_t replyid;
@@ -203,7 +204,6 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     reset_owners(zoneid, oldowners);
     manager_start_transaction(zone);
 
-
     rcnt = mrp_resource_definition_count();
     clc  = NULL;
 
@@ -211,6 +211,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
         rsc = NULL;
 
         while ((rset=mrp_application_class_iterate_rsets(class,zoneid,&rsc))) {
+            force_release = false;
             mandatory = rset->resource.mask.mandatory;
             grant = 0;
             advice = 0;
@@ -228,6 +229,10 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
                     if (grant_ownership(owner, zone, class, rset, res))
                         grant |= ((mrp_resource_mask_t)1 << rid);
+                    else {
+                        if (owner->rset != rset)
+                            force_release |= owner->modal;
+                    }
                 }
                 if ((grant & mandatory) == mandatory)
                     advice = grant;
@@ -279,13 +284,21 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
 
-            if (grant != rset->resource.mask.grant) {
-                rset->resource.mask.grant = grant;
-                changed = true;
+            if (force_release) {
+                shuffle = (rset->state != mrp_resource_release);
+                changed = shuffle || rset->resource.mask.grant;
+                rset->state = mrp_resource_release;
+                rset->resource.mask.grant = 0;
+            }
+            else {
+                if (grant != rset->resource.mask.grant) {
+                    rset->resource.mask.grant = grant;
+                    changed = true;
 
-                if (!grant && rset->auto_release) {
-                    rset->state = mrp_resource_release;
-                    shuffle = true;
+                    if (!grant && rset->auto_release) {
+                        rset->state = mrp_resource_release;
+                        shuffle = true;
+                    }
                 }
             }
 
@@ -414,13 +427,17 @@ static mrp_resource_owner_t *get_owner(uint32_t zone, uint32_t resid)
 
 static void reset_owners(uint32_t zone, mrp_resource_owner_t *oldowners)
 {
-    void   *ptr  = get_owner(zone, 0);
-    size_t  size = sizeof(mrp_resource_owner_t) * RESOURCE_MAX;
+    mrp_resource_owner_t *owners = get_owner(zone, 0);
+    size_t size = sizeof(mrp_resource_owner_t) * RESOURCE_MAX;
+    size_t i;
 
     if (oldowners)
-        memcpy(oldowners, ptr, size);
+        memcpy(oldowners, owners, size);
 
-    memset(ptr, 0, size);
+    memset(owners, 0, size);
+
+    for (i = 0;   i < RESOURCE_MAX;   i++)
+        owners[i].share = true;
 }
 
 static bool grant_ownership(mrp_resource_owner_t    *owner,
@@ -438,6 +455,9 @@ static bool grant_ownership(mrp_resource_owner_t    *owner,
         return false;
      */
 
+    if (owner->modal)
+        return false;
+
     do { /* not a loop */
         if (!owner->class && !owner->rset) {
             /* nobody owns this, so grab it */
@@ -450,10 +470,9 @@ static bool grant_ownership(mrp_resource_owner_t    *owner,
             break;
         }
 
-        if (owner->share) {
-            /* OK, someone else owns it bu
+        if (rdef->shareable && owner->share) {
+            /* OK, someone else owns it but
                the owner is ready to share it with us */
-            owner->share = res->shared;
             break;
         }
 
@@ -470,8 +489,10 @@ static bool grant_ownership(mrp_resource_owner_t    *owner,
         owner->class = class;
         owner->rset  = rset;
         owner->res   = res;
-        owner->share = res->shared;
+        owner->modal = class->modal;
     }
+
+    owner->share = class->share && res->shared;
 
     return true;
 }

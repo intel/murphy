@@ -68,6 +68,8 @@ enum field_e {
     NAME,
     PRIORITY,
     SHAREABLE,
+    MODAL,
+    SHARE
 };
 
 enum attr_owner_e {
@@ -152,6 +154,7 @@ static void free_attrdefs(mrp_attr_def_t *);
 static mrp_attr_t *check_attrs(lua_State *, int, attr_def_t *);
 static void free_attrs(mrp_attr_t *);
 static int check_attrindex(lua_State *, int, attr_def_t *);
+static int check_boolean(lua_State *, int);
 static field_t field_check(lua_State *, int, const char **);
 static field_t field_name_to_type(const char *, size_t);
 
@@ -419,6 +422,8 @@ static int appclass_create(lua_State *L)
     size_t fldnamlen;
     const char *fldnam;
     int priority = 0;
+    int modal = -1;
+    int share = -1;
     const char *name = NULL;
 
     MRP_LUA_ENTER;
@@ -435,6 +440,14 @@ static int appclass_create(lua_State *L)
             priority = luaL_checkint(L, -1);
             break;
 
+        case MODAL:
+            modal = check_boolean(L, -1);
+            break;
+
+        case SHARE:
+            share = check_boolean(L, -1);
+            break;
+
         default:
             luaL_error(L, "unexpected field '%s'", fldnam);
             break;
@@ -443,9 +456,15 @@ static int appclass_create(lua_State *L)
 
     if (!name)
         luaL_error(L, "missing or wrong name field");
+    if (modal < 0)
+        luaL_error(L, "missing or wrong modal field");
+    if (modal && share)
+        luaL_error(L, "modal class can't share");
+    if (share < 0)
+        luaL_error(L, "missing or wrong share field");
     if (priority < 0)
         luaL_error(L, "negative priority");
-    if (!mrp_application_class_create(name, priority))
+    if (!mrp_application_class_create(name, priority, modal, share))
         luaL_error(L, "failed to create application class '%s'", name);
 
     appclass = (appclass_t *)mrp_lua_create_object(L, APPCLASS_CLASS, name);
@@ -1127,6 +1146,13 @@ static int check_attrindex(lua_State *L, int arg, attr_def_t *def)
 }
 
 
+static int check_boolean(lua_State *L, int idx)
+{
+    if (!lua_isboolean(L, idx))
+        luaL_argerror(L, idx, "expected boolean");
+    return lua_toboolean(L, idx) ? 1 : 0;
+}
+
 
 static field_t field_check(lua_State *L, int idx, const char **ret_fldnam)
 {
@@ -1153,6 +1179,13 @@ static field_t field_name_to_type(const char *name, size_t len)
     case 4:
         if (!strcmp(name, "name"))
             return NAME;
+        break;
+
+    case 5:
+        if (!strcmp(name, "modal"))
+            return MODAL;
+        if (!strcmp(name, "share"))
+            return SHARE;
         break;
 
     case 8:

@@ -40,6 +40,8 @@ struct mrp_application_class_s {
     mrp_list_hook_t  list;
     const char      *name;
     uint32_t         priority;
+    bool             share;
+    bool             modal;
     mrp_list_hook_t  resource_sets[MRP_ZONE_MAX];
 };
 

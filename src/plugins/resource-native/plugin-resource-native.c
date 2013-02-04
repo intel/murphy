@@ -161,23 +161,16 @@ static void print_zones_cb(mrp_console_t *c, void *user_data,
 static void print_classes_cb(mrp_console_t *c, void *user_data,
                              int argc, char **argv)
 {
-    const char **class_names;
-    int i;
+    char buf[8192];
 
     MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    printf("Application classes:\n");
+    mrp_application_class_print(buf, sizeof(buf), false);
 
-    if ((class_names = mrp_application_class_get_all_names(0, NULL))) {
-
-        for (i = 0;  class_names[i];  i++)
-            printf("   %s\n", class_names[i]);
-
-        mrp_free(class_names);
-    }
+    printf("%s", buf);
 }
 
 
@@ -191,7 +184,7 @@ static void print_sets_cb(mrp_console_t *c, void *user_data,
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    mrp_application_class_print(buf, sizeof(buf));
+    mrp_application_class_print(buf, sizeof(buf), true);
 
     printf("%s", buf);
 }
