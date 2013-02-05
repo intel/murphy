@@ -59,6 +59,7 @@ typedef struct {
 
 struct wsl_ctx_s {
     lws_ctx_t       *ctx;                 /* libwebsocket context */
+    wsl_proto_t     *http;                /* has HTTP as upper layer protocol */
     wsl_proto_t     *protos;              /* protocols */
     int              nproto;              /* number of protocols */
     lws_proto_t     *lws_protos;          /* libwebsocket protocols */
@@ -72,7 +73,6 @@ struct wsl_ctx_s {
     lws_t           *pending;             /* pending connection */
     void            *pending_user;        /* user_data of pending */
     wsl_proto_t     *pending_proto;       /* protocol of pending */
-    int              has_http;            /* has HTTP as upper layer protocol */
     mrp_list_hook_t  pure_http;           /* pure HTTP sockets */
 };
 
@@ -296,9 +296,9 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
 {
     lws_ext_t      *builtin = libwebsocket_internal_extensions;
     wsl_ctx_t      *ctx;
-    wsl_proto_t    *up;
+    wsl_proto_t    *up, *http;
     lws_proto_t    *lws_protos, *lp;
-    int             lws_nproto, has_http;
+    int             lws_nproto;
     mrp_io_event_t  events;
     const char     *dev;
     int             port, i;
@@ -337,8 +337,12 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
     ctx->protos = protos;
     ctx->nproto = nproto;
 
-    has_http   = !strncmp(protos[0].name, "http", 4) ? 1 : 0;
-    lws_nproto = (has_http ? nproto : nproto + 1) + 1;
+    if (!strcmp(protos[0].name, "http") || !strcmp(protos[0].name, "http-only"))
+        http = &protos[0];
+    else
+        http = NULL;
+
+    lws_nproto = (http ? nproto : nproto + 1) + 1;
     lws_protos = mrp_allocz_array(lws_proto_t, lws_nproto);
 
     if (lws_protos == NULL)
@@ -346,15 +350,15 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
 
     lws_protos[0].name     = "http";
     lws_protos[0].callback = http_event;
-    if (!has_http)
+    if (!http)
         lws_protos[0].per_session_data_size = sizeof(void *);
     else
         lws_protos[0].per_session_data_size = sizeof(void *);
 
     lp = lws_protos + 1;
-    up = protos + (has_http ? 1 : 0);
+    up = protos + (http ? 1 : 0);
 
-    for (i = has_http; i < nproto; i++) {
+    for (i = (http ? 1 : 0); i < nproto; i++) {
         lp->name                  = up->name;
         lp->callback              = wsl_event;
         lp->per_session_data_size = sizeof(void *);
@@ -364,7 +368,7 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
     }
 
     ctx->lws_protos = lws_protos;
-    ctx->has_http   = has_http;
+    ctx->http       = http;
 
     ctx->epollfd = epoll_create1(EPOLL_CLOEXEC);
 
@@ -774,6 +778,69 @@ int wsl_serve_http_file(wsl_sck_t *sck, const char *path, const char *type)
         return FALSE;
 }
 
+
+#ifdef LWS_OPENSSL_SUPPORT
+
+static void load_extra_certs(wsl_ctx_t *ctx, void *user, lws_event_t event)
+{
+    int is_server;
+
+    if (ctx != NULL && ctx->load_certs != NULL) {
+        if (event == LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS)
+            is_server = TRUE;
+        else
+            is_server = FALSE;
+
+        ctx->load_certs(ctx, (SSL_CTX *)user, is_server);
+    }
+}
+
+
+static int verify_client_cert(void *user, void *in, size_t len)
+{
+    X509_STORE_CTX *x509_ctx;
+    SSL            *ssl;
+    int             pre_ok;
+
+    if (verify_client_cert_cb != NULL) {
+        x509_ctx = (X509_STORE_CTX *)user;
+        ssl      = (SSL *)in;
+        pre_ok   = (int)len;
+
+        if (verify_client_cert_cb(x509_ctx, ssl, pre_ok))
+            return TRUE;
+        else
+            return FALSE;
+    }
+    else
+        return TRUE;
+}
+
+#else /* !LWS_OPENSSL_SUPPORT */
+
+static void load_extra_certs(wsl_ctx_t *ctx, void *user, lws_event_t event)
+{
+    MRP_UNUSED(ctx);
+    MRP_UNUSED(user);
+    MRP_UNUSED(event);
+
+    return;
+}
+
+
+static int verify_client_cert(void *user, void *in, size_t len)
+{
+    MRP_UNUSED(user);
+    MRP_UNUSED(in);
+    MRP_UNUSED(len);
+
+    return TRUE;
+}
+
+#endif
+
+
+
 static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                       void *user, void *in, size_t len)
 {
@@ -898,7 +965,7 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
     case LWS_CALLBACK_HTTP:
         uri = (const char *)in;
 
-        if (!ctx->has_http) {
+        if (ctx->http == NULL) {
             mrp_debug("denying HTTP request of '%s' for httpless context", uri);
             return LWS_EVENT_DENY;
         }
@@ -928,8 +995,7 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                 return LWS_EVENT_DENY;
             }
 
-            up = &ctx->protos[0];
-
+            up = ctx->http;
 
             ctx->pending       = ws;
             ctx->pending_user  = NULL;
@@ -961,10 +1027,40 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
     case LWS_CALLBACK_HTTP_FILE_COMPLETION:
         uri = (const char *)in;
         mrp_debug("serving '%s' over HTTP completed", uri);
+
+        sck = find_pure_http(ctx, ws);
+
+        if (sck != NULL) {               /* known socket, deliver event */
+            up = sck->proto;
+
+            if (up != NULL) {
+                SOCKET_BUSY_REGION(sck, {
+                        up->cbs.http_done(sck, in, sck->user_data,
+                                          up->proto_data);
+                        up->cbs.check(sck, sck->user_data, up->proto_data);
+                    });
+
+                if (check_closed(sck))
+                    return 0;
+            }
+
+            status = LWS_EVENT_OK;
+        }
+
         return LWS_EVENT_OK;
 
         /*
          * events always routed to protocols[0]
+         *
+         * XXX TODO: we need to open up for the upper layers using
+         *     optionally settable wsl_ctx_t-level callbacks at least
+         *
+         *   FILTER_NETWORK_CONNECTION
+         *   FILTER_PROTOCOL_CONNECTION
+         *   OPENSSL_*
+         *
+         * Probably for the sake of completeness we should open up
+         * all of these...
          */
 
     case LWS_CALLBACK_FILTER_NETWORK_CONNECTION:
@@ -977,10 +1073,24 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
         return LWS_EVENT_OK;
 
     case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
-    case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS:
-    case LWS_CALLBACK_OPENSSL_PERFORM_CLIENT_CERT_VERIFICATION:
-        /* we don't support or do anything for SSL at the moment */
+        load_extra_certs(ctx, user, event);
         return LWS_EVENT_OK;
+
+#ifdef LWS_OPENSSL_SUPPORT
+        if (ctx != NULL && ctx->load_certs != NULL)
+            ctx->load_certs(ctx, user, FALSE);
+#endif
+        return LWS_EVENT_OK;
+
+    case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_SERVER_VERIFY_CERTS:
+        load_extra_certs(ctx, user, TRUE);
+        return LWS_EVENT_OK;
+
+    case LWS_CALLBACK_OPENSSL_PERFORM_CLIENT_CERT_VERIFICATION:
+        if (verify_client_cert(user, in, len))
+            return LWS_EVENT_OK;
+        else
+            return LWS_EVENT_DENY;
 
     case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
         /* no extra headers we'd like to add */

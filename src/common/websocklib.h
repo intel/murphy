@@ -55,6 +55,17 @@ typedef struct {
                  void *proto_data);
     /** Check if transport should be destroyed. */
     int  (*check)(wsl_sck_t *sck, void *user_data, void *proto_data);
+
+    /** HTTP (content) request completed. */
+    void (*http_done)(wsl_sck_t *sck, const char *uri, void *user_data,
+                      void *proto_data);
+
+#ifdef LWS_OPENSSL_SUPPORT
+    /** Load extra client or server certificates, if necessary. */
+    void (*load_certs)(wsl_ctx_t *ctx, SSL_CTX *ssl, int is_server);
+#else
+    void (*load_certs)(wsl_ctx_t *, void *, int);
+#endif
 } wsl_callbacks_t;
 
 
