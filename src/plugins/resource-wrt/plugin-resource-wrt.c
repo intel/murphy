@@ -49,6 +49,7 @@
 #include "resource-wrt.h"
 
 #define DEFAULT_ADDRESS "wsck:127.0.0.1:4000/murphy"
+#define DEFAULT_HTTPDIR NULL
 #define ATTRIBUTE_MAX   MRP_ATTRIBUTE_MAX
 
 /*
@@ -57,6 +58,7 @@
 
 enum {
     ARG_ADDRESS,                         /* transport address to use */
+    ARG_HTTPDIR,                         /* content directory for HTTP */
 };
 
 
@@ -70,6 +72,7 @@ typedef struct {
     const char      *addr;               /* address we listen on */
     mrp_list_hook_t  clients;            /* connected clients */
     int              id;                 /* next client id */
+    const char      *root;               /* content directory for HTTP */
 } wrt_data_t;
 
 
@@ -1096,7 +1099,7 @@ static int transport_create(wrt_data_t *data)
     mrp_mainloop_t *ml = data->ctx->ml;
     mrp_sockaddr_t  addr;
     socklen_t       len;
-    const char     *type, *opt, *val;
+    const char     *type, *opt, *val, *root;
     int             flags;
 
     len = mrp_transport_resolve(NULL, data->addr, &addr, sizeof(addr), &type);
@@ -1113,6 +1116,9 @@ static int transport_create(wrt_data_t *data)
                 opt = MRP_WSCK_OPT_SENDMODE;
                 val = MRP_WSCK_SENDMODE_TEXT;
                 mrp_transport_setopt(data->lt, opt, val);
+
+                root = data->root;
+                mrp_transport_setopt(data->lt, MRP_WSCK_OPT_HTTPDIR, root);
 
                 return TRUE;
             }
@@ -1138,6 +1144,7 @@ static int plugin_init(mrp_plugin_t *plugin)
 {
     mrp_plugin_arg_t *args = plugin->args;
     const char       *addr = args[ARG_ADDRESS].str;
+    const char       *root = args[ARG_HTTPDIR].str;
     wrt_data_t       *data;
 
     data = mrp_allocz(sizeof(*data));
@@ -1148,6 +1155,7 @@ static int plugin_init(mrp_plugin_t *plugin)
         data->id   = 1;
         data->ctx  = plugin->ctx;
         data->addr = addr;
+        data->root = root;
 
         if (!transport_create(data))
             goto fail;
@@ -1183,9 +1191,9 @@ static void plugin_exit(mrp_plugin_t *plugin)
 #define PLUGIN_VERSION     MRP_VERSION_INT(0, 0, 1)
 
 static mrp_plugin_arg_t plugin_args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", DEFAULT_ADDRESS)
+    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", DEFAULT_ADDRESS),
+    MRP_PLUGIN_ARGIDX(ARG_HTTPDIR, STRING, "httpdir", DEFAULT_HTTPDIR)
 };
-
 
 MURPHY_REGISTER_PLUGIN("resource-wrt",
                        PLUGIN_VERSION, PLUGIN_DESCRIPTION, PLUGIN_AUTHORS,
