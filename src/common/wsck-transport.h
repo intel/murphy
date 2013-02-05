@@ -8,6 +8,11 @@ MRP_CDECL_BEGIN
 
 #define MRP_AF_WSCK 0xDC                 /* stolen address family */
 
+
+/*
+ * websocket transport address
+ */
+
 #define MRP_WSCKADDR_BASE                                               \
     __SOCKADDR_COMMON(wsck_);            /* wsck_family: MRP_AF_WSCK */ \
     union {                              /* websocket address */        \
@@ -20,26 +25,84 @@ typedef struct {
     MRP_WSCKADDR_BASE;
 } _mrp_wsckaddr_base_t;
 
+
 #define MRP_WSCK_DEFPROTO "murphy"
 #define MRP_WSCK_PROTOLEN (MRP_SOCKADDR_SIZE - sizeof(_mrp_wsckaddr_base_t))
 
-/*
- * websocket transport options and value
- */
-
-#define MRP_WSCK_OPT_SENDMODE     "send-mode" /* sendmode option name */
-#define MRP_WSCK_SENDMODE_TEXT    "text"      /* sendmode text option */
-#define MRP_WSCK_SENDMODE_BINARY  "binary"    /* sendmode blob option */
-
-
-/*
- * websocket transport address
- */
 
 typedef struct {
     MRP_WSCKADDR_BASE;                   /* websocket address */
     char wsck_proto[MRP_WSCK_PROTOLEN];  /* websocket protocol */
 } mrp_wsckaddr_t;
+
+
+/*
+ * websocket transport options and values
+ */
+
+#define MRP_WSCK_OPT_SENDMODE    "send-mode"  /* sendmode option name */
+#define MRP_WSCK_SENDMODE_TEXT   "text"       /* sendmode text option */
+#define MRP_WSCK_SENDMODE_BINARY "binary"     /* sendmode blob option */
+
+
+#define MRP_WSCK_OPT_HTTPDIR  "http-dir"      /* HTTP content root */
+#define MRP_WSCK_OPT_MIMEMAP  "mime-map"      /* suffix-MIME table */
+#define MRP_WSCK_OPT_URIMAP   "uri-map"       /* URI-path table */
+
+/*
+ * It is also possible to serve content over HTTP on a websocket transport.
+ *
+ * This is primarily intended for serving javascript API libraries to
+ * clients talking to you via the same websocket transport. The served
+ * libraries hide the details of the underlying communication protocol
+ * and present a more developer-friendly conventional javascript API.
+ *
+ * Currently the websocket transport provides two mechanisms for
+ * configuring HTTP content serving.
+ *
+ * 1) You can put all the files you're willing to expose via HTTP to a
+ *    dedicated directory and configure it to the transport as the
+ *    MRP_WSCK_OPT_HTTPROOT option. If you serve any other types of
+ *    files than HTML (*.htm, *.html), javascript (*.js), or text
+ *    (*.txt) files than you should also push down a table to map
+ *    the extra file suffices to MIME types. You can do this using
+ *    the MRP_SCK_OPT_MIMEMAP transport option.
+ *
+ * 2) You can use a mapping table that maps URIs to file path / mime
+ *    type pairs. You can push this table down to the transport as
+ *    the MRP_WSCK_URIMAP transport option.
+ *
+ *  HTTPROOT takes a char *, URIMAP takes a mrp_wsck_urimap_t *, and
+ *  MIMEMAP takes a mrp_wsck_mimemap_t * as their values. Both URI
+ *  and MIME type tables need to be NULL-terminated. If you set both
+ *  HTTPROOT and URIMAP, URIMAP entries with relative path names will
+ *  be treated relative to HTTPROOT.
+ *
+ * Notes:
+ *
+ *     If you push down any of these options, the websocket backend
+ *     will use the provided values as such __without__ making an
+ *     internal copy. IOW, you better make sure that the passed values
+ *     are valid throughout the full lifetime of the transport (and
+ *     if that is a transport you listen on also the lifetime of all
+ *     transports accepted on that transport) otherwise you'll end up
+ *     with severe memory corruption.
+ *
+ */
+
+typedef struct {
+    const char *uri;                     /* exported URI */
+    const char *path;                    /* path to file */
+    const char *type;                    /* MIME type to use */
+} mrp_wsck_urimap_t;
+
+typedef struct {
+    const char *suffix;                  /* filename suffix */
+    const char *type;                    /* MIME type */
+} mrp_wsck_mimemap_t;
+
+
+
 
 MRP_CDECL_END
 
