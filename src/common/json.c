@@ -18,7 +18,7 @@ mrp_json_t *mrp_json_create(mrp_json_type_t type, ...)
     mrp_json_t *o;
     const char *s;
     bool        b;
-    int         i;
+    int         i, l;
     double      d;
     va_list     ap;
 
@@ -26,7 +26,11 @@ mrp_json_t *mrp_json_create(mrp_json_type_t type, ...)
     switch (type) {
     case MRP_JSON_STRING:
         s = va_arg(ap, const char *);
-        o = json_object_new_string(s);
+        l = va_arg(ap, int);
+        if (l < 0)
+            o = json_object_new_string(s);
+        else
+            o = json_object_new_string_len(s, l);
         break;
     case MRP_JSON_BOOLEAN:
         b = va_arg(ap, int);
@@ -115,7 +119,7 @@ mrp_json_t *mrp_json_add_member(mrp_json_t *o, const char *key,
     mrp_json_t *m;
     const char *s;
     bool        b;
-    int         i;
+    int         i, l;
     double      d;
     va_list     ap;
 
@@ -123,7 +127,11 @@ mrp_json_t *mrp_json_add_member(mrp_json_t *o, const char *key,
     switch (type) {
     case MRP_JSON_STRING:
         s = va_arg(ap, const char *);
-        m = json_object_new_string(s);
+        l = va_arg(ap, int);
+        if (l < 0)
+            m = json_object_new_string(s);
+        else
+            m = json_object_new_string_len(s, l);
         break;
     case MRP_JSON_BOOLEAN:
         b = va_arg(ap, int);
@@ -319,7 +327,7 @@ mrp_json_t *mrp_json_array_append_item(mrp_json_t *a, mrp_json_type_t type, ...)
     mrp_json_t *v;
     const char *s;
     bool        b;
-    int         i;
+    int         i, l;
     double      d;
     va_list     ap;
 
@@ -327,7 +335,11 @@ mrp_json_t *mrp_json_array_append_item(mrp_json_t *a, mrp_json_type_t type, ...)
     switch (type) {
     case MRP_JSON_STRING:
         s = va_arg(ap, const char *);
-        v = json_object_new_string(s);
+        l = va_arg(ap, int);
+        if (l < 0)
+            v = json_object_new_string(s);
+        else
+            v = json_object_new_string_len(s, l);
         break;
     case MRP_JSON_BOOLEAN:
         b = va_arg(ap, int);
@@ -377,7 +389,7 @@ int mrp_json_array_set_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...)
     mrp_json_t *v;
     const char *s;
     bool        b;
-    int         i;
+    int         i, l;
     double      d;
     va_list     ap;
 
@@ -385,7 +397,11 @@ int mrp_json_array_set_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...)
     switch (type) {
     case MRP_JSON_STRING:
         s = va_arg(ap, const char *);
-        v = json_object_new_string(s);
+        l = va_arg(ap, int);
+        if (l < 0)
+            v = json_object_new_string(s);
+        else
+            v = json_object_new_string_len(s, l);
         break;
     case MRP_JSON_BOOLEAN:
         b = va_arg(ap, int);

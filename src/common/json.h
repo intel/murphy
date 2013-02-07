@@ -71,7 +71,10 @@ mrp_json_t *mrp_json_add_member(mrp_json_t *o, const char *key,
 
 /** Convenience macros to add members of various basic types. */
 #define mrp_json_add_string(o, key, s) \
-    mrp_json_add_member(o, key, MRP_JSON_STRING, s)
+    mrp_json_add_member(o, key, MRP_JSON_STRING, s, -1)
+
+#define mrp_json_add_string_slice(o, key, s, l)         \
+    mrp_json_add_member(o, key, MRP_JSON_STRING, s, l)
 
 #define mrp_json_add_integer(o, key, i) \
     mrp_json_add_member(o, key, MRP_JSON_INTEGER, i)
@@ -140,7 +143,11 @@ mrp_json_t *mrp_json_array_append_item(mrp_json_t *a, mrp_json_type_t type,
 
 /** Convenience macros for appending array items of basic types. */
 #define mrp_json_array_append_string(a, s) \
-    mrp_json_array_append_item(a, MRP_JSON_STRING, s)
+    mrp_json_array_append_item(a, MRP_JSON_STRING, s, -1)
+
+#define mrp_json_array_append_string_slice(a, s, l)       \
+    mrp_json_array_append_item(a, MRP_JSON_STRING, s, l)
+
 
 #define mrp_json_array_append_integer(a, i) \
     mrp_json_array_append_item(a, MRP_JSON_INTEGER, (int)i)
