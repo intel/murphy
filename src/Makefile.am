@@ -1062,7 +1062,7 @@ endif
 endif
 
 # console plugin
-CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/plugin-console.c
+CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/console/plugin-console.c
 CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES) \
 				 plugin-console-func-info.c
 CONSOLE_PLUGIN_CFLAGS  	       =
