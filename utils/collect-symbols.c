@@ -126,6 +126,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 static void set_defaults(config_t *c)
 {
     memset(c, 0, sizeof(*c));
+    c->pattern = "^mrp_|^_mrp";
 }
 
 
