@@ -5,7 +5,7 @@ SUBDIRS         = murphy-db . \
 
 BUILT_SOURCES   =
 
-AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) -DLIBDIR=\"@LIBDIR@\"
+AM_CFLAGS       = $(WARNING_CFLAGS) $(INCLUDES) -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   =
 pkgconfigdir    = ${libdir}/pkgconfig
 
@@ -14,12 +14,13 @@ lib_LTLIBRARIES =
 pkgconfig_DATA  =
 EXTRA_DIST      =
 
-QUIET_GEN       = $(Q:@=@echo '  GEN   '$@;)
+QUIET_GEN      = $(Q:@=@echo '  GEN   '$@;)
 
 LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 
-INCLUDES        = -I$(top_builddir)/src/murphy-db/include -I$(top_builddir)
+INCLUDES        = -I$(top_builddir) -I$(top_builddir)/src \
+		  -I$(top_builddir)/src/murphy-db/include
 BUILT_SOURCES   =
 
 ###################################
@@ -127,7 +128,8 @@ endif
 
 # linker script generation
 linker-script.common: $(libmurphy_common_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_common_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.common
@@ -188,7 +190,8 @@ clean-func-infos::
 
 # lua-utils linker script generation
 linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_lua_utils_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.lua-utils
@@ -240,7 +243,8 @@ clean-func-infos::
 
 # lua-decision linker script generation
 linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_lua_decision_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.lua-decision
@@ -320,7 +324,8 @@ libmurphy_core_la_DEPENDENCIES = linker-script.core        \
 # core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS) \
 		    $(libmurphy_core_lua_bindings_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_core_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.core
@@ -388,7 +393,8 @@ endif
 
 # linker script generation
 linker-script.dbus: $(murphy_dbus_headers)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_dbus_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.dbus
@@ -434,7 +440,8 @@ endif
 
 # linker script generation
 linker-script.pulse: $(murphy_pulse_headers)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_pulse_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.pulse
@@ -479,7 +486,8 @@ endif
 
 # linker script generation
 linker-script.ecore: $(murphy_ecore_headers)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_ecore_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.ecore
@@ -524,7 +532,8 @@ endif
 
 # linker script generation
 linker-script.glib: $(murphy_glib_headers)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_glib_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.glib
@@ -575,7 +584,8 @@ endif
 
 # linker script generation
 linker-script.qt: $(murphy_qt_headers)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_qt_la_CPPFLAGS) -DQT_ENABLED=1" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.qt
@@ -620,8 +630,7 @@ libmurphy_resolver_la_SOURCES =			\
 		resolver-func-info.c
 
 libmurphy_resolver_la_CFLAGS =			\
-		$(AM_CFLAGS)                    \
-		$(INCLUDES)
+		$(AM_CFLAGS)
 
 libmurphy_resolver_la_LDFLAGS =			\
 		-Wl,-version-script=linker-script.resolver \
@@ -656,7 +665,8 @@ clean-func-infos::
 
 # resolver linker script generation
 linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_resolver_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.resolver
@@ -720,10 +730,9 @@ libmurphy_resource_backend_la_SOURCES =                        \
 		$(libmurphy_resource_backend_la_REGULAR_SOURCES)        \
 		resource-func-info.c
 
-libmurphy_resource_backend_la_CFLAGS =                 \
+libmurphy_resource_backend_la_CFLAGS =		\
 		$(AM_CFLAGS)			\
-		$(LUA_CFLAGS)			\
-		$(INCLUDES)
+		$(LUA_CFLAGS)
 
 libmurphy_resource_backend_la_LDFLAGS =                        \
 		-Wl,-version-script=linker-script.resource_backend \
@@ -750,7 +759,8 @@ endif
 
 # resource linker script generation
 linker-script.resource_backend: $(libmurphy_resource_backend_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_resource_backend_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.resource_backend
@@ -791,7 +801,7 @@ libbreedlineinclude_HEADERS = $(libbreedline_la_HEADERS)
 # linker script generation
 linker-script.breedline: $(libbreedline_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-	    -p '^brl_' -o $@ $^
+		-c "$(libbreedline_la_CFLAGS)" -p '^brl_' -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.breedline
@@ -826,7 +836,7 @@ libbreedline_murphyinclude_HEADERS = $(libbreedline_murphy_la_HEADERS)
 # linker script generation
 linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-	    -p '^brl_' -o $@ $^
+	    -c "$(libbreedline_murphy_la_CFLAGS)" -p '^brl_' -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.breedline-murphy
@@ -866,7 +876,7 @@ endif
 # linker script generation
 linker-script.breedline-glib: $(breedline_glib_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-	    -p '^brl_' -o $@ $^
+		-c "$(libbreedline_glib_la_CFLAGS)" -p '^brl_' -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.breedline-glib
@@ -897,8 +907,7 @@ libmurphy_resource_la_SOURCES =         \
         plugins/resource-native/libmurphy-resource/message.c
 
 libmurphy_resource_la_CFLAGS =          \
-        $(AM_CFLAGS)            \
-        $(INCLUDES)
+        $(AM_CFLAGS)
 
 libmurphy_resource_la_LDFLAGS =	\
 		-Wl,-version-script=linker-script.resource	\
@@ -914,7 +923,8 @@ libmurphy_resource_la_DEPENDENCIES = libmurphy-core.la      \
 
 # linker script generation
 linker-script.resource: $(libmurphy_resource_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_resource_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.resource
@@ -1100,8 +1110,8 @@ PLUGIN_RESOURCE_NATIVE_SOURCES = 					\
 		$(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)		\
                 plugin-resource-native-func-info.c
 PLUGIN_RESOURCE_NATIVE_CFLAGS =						\
-		$(LUA_CFLAGS)						\
-		$(INCLUDES)
+		$(LUA_CFLAGS)
+
 PLUGIN_RESOURCE_NATIVE_LIBS =       					\
 		libmurphy-core.la					\
 		libmurphy-common.la					\
@@ -1221,7 +1231,8 @@ endif
 
 # linkedin domain control plugin linker script generation
 linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q -o $@ $^
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_domain_controller_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.domain-control

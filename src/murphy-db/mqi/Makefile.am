@@ -24,7 +24,7 @@ libmqi_la_DEPENDENCIES = $(LINKER_SCRIPT)
 # linker script generation
 $(LINKER_SCRIPT): $(libmqi_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-	    -p "^mqi_" -o $@ $^
+	    -c "$(libmqi_la_CFLAGS)" -p "^mqi_" -o $@ $^
 
 clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)

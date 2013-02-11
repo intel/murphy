@@ -1,0 +1,24 @@
+#!/bin/bash
+
+#LOG=/tmp/gen-linker-script.log
+#echo "$0 $*" > $LOG
+
+COLLECT_SYMBOLS="${0%gen-linker-script}../utils/collect-symbols"
+
+ARGS=""
+
+while [ -n "$*" ]; do
+#   echo "[$ARGS]" 1>&2
+    case $1 in
+        -c) #echo "  [$1] [$2]" 1>&2;
+            ARGS="$ARGS -c '$2'"; shift 2;;
+         *) #echo "  [$1]" 1>&2;
+            ARGS="$ARGS '$1'"   ; shift 1;;
+    esac
+done
+
+#echo "ARGS: [$ARGS]" 1>&2
+#echo "ARGS: [$ARGS]" >> $LOG
+#echo "$COLLECT_SYMBOLS -g $ARGS" >> $LOG
+
+eval "$COLLECT_SYMBOLS -g $ARGS"
