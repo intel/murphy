@@ -284,7 +284,7 @@ MrpConsole.prototype.onkeyup = function (e) {
 /** Key-press handler. */
 MrpConsole.prototype.onkeypress = function (e) {
     var c = this.console;
-    var l;
+    var rows;
 
     switch (e.which) {
     case e.DOM_VK_LEFT:
@@ -292,6 +292,13 @@ MrpConsole.prototype.onkeypress = function (e) {
         if (!c.checkInputPosition())
             return false;
     }
+
+    rows = Math.floor(1 + (c.input.value.length / c.input.cols));
+
+    if (c.input.rows < rows)
+        c.input.rows = rows;
+    else if (c.input.rows > rows)
+        c.input.rows = rows;
 
     return true;
 }
