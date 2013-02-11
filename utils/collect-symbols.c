@@ -129,8 +129,8 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 static void set_defaults(config_t *c)
 {
     memset(c, 0, sizeof(*c));
-    c->pattern = "^mrp_|^_mrp";
     c->preproc = "gcc";
+    c->pattern = "^mrp_|^_mrp";
 }
 
 
@@ -189,7 +189,8 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
             break;
 
         default:
-            print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
+            print_usage(argv[0], EINVAL, "invalid option '%s'\n",
+                        argv[optind]);
         }
     }
 
@@ -202,7 +203,7 @@ static int preprocess_file(const char *preproc, const char *file,
                            const char *cflags, pid_t *pid)
 {
     char cmd[4096], *argv[32];
-    int  fd[2], argc;
+    int  fd[2], argc, i;
 
     /*
      * preprocess the given file
@@ -226,6 +227,22 @@ static int preprocess_file(const char *preproc, const char *file,
     case 0: /* child: exec preprocessor */
         close(fd[RD]);
 
+        /*
+         * Notes:
+         *     Currently we execute the preprocessor by starting a shell
+         *     and feeding it our constructed preprocessor command using
+         *     the '-c' option. If we need to pass options to the pre-
+         *     processor we need to protect those from expansion by the
+         *     intermediate shell. This causes some level of pain if we
+         *     also have a script that gets its arguments somewhere else,
+         *     eg. from a Makefile, and passes those forward to us. This
+         *     is exactly how we are executed during Murphy builds.
+         *
+         *     To reduce the pain perhaps we should leave the shell out,
+         *     search $PATH ourselves for the preprocessor and just exec
+         *     it directly here.
+         */
+
         argc         = 0;
         argv[argc++] = "/bin/sh";
         argv[argc++] = "-c";
@@ -237,6 +254,10 @@ static int preprocess_file(const char *preproc, const char *file,
 
         argv[argc++] = cmd;
         argv[argc]   = NULL;
+
+        for (i = 0; i < argc; i++) {
+            verbose_message(3, "shell arg #%d: '%s'\n", i, argv[i]);
+        }
 
         if (dup2(fd[WR], fileno(stdout)) < 0)
             fatal_error("failed to redirect stdout (%d: %s)",
@@ -839,7 +860,7 @@ static void extract_symbols(const char *preproc, const char *path,
         if (tokens[0].type == TOKEN_LINEMARKER) {
             foreign = !same_file(path, tokens[0].value);
 
-            verbose_message(1, "input switched to %s file '%s'...",
+            verbose_message(2, "input switched to %s file '%s'...\n",
                             foreign ? "foreign" : "input", tokens[0].value);
 
             continue;
@@ -856,7 +877,7 @@ static void extract_symbols(const char *preproc, const char *path,
             if (re == NULL || regexec(re, sym, 0, NULL, 0) == 0)
                 symtab_add(st, sym);
             else
-                verbose_message(1, "filtered non-matching '%s'...\n", sym);
+                verbose_message(2, "filtered non-matching '%s'...\n", sym);
         }
     }
 
@@ -877,10 +898,18 @@ int main(int argc, char *argv[])
     FILE     *out;
     int       err, i;
 
+    if (getenv("__COLLECT_SYMBOLS_DEBUG") != NULL) {
+        verbosity = 3;
+        for (i = 0; i < argc; i++) {
+            verbose_message(0, "argv[%d]: '%s'\n", i, argv[i]);
+        }
+    }
+
     symtab_init(&st);
     parse_cmdline(&cfg, argc, argv);
 
-    verbose_message(1, "using preprocessor '%s'...", cfg.preproc);
+    verbose_message(1, "using preprocessor '%s', cflags '%s'\n", cfg.preproc,
+                    cfg.cflags ? cfg.cflags : "");
 
     if (cfg.pattern != NULL) {
         err = regcomp(&rebuf, cfg.pattern, REG_EXTENDED);
