@@ -54,6 +54,7 @@ typedef struct {
 } ringbuf_t;
 
 typedef struct {
+    char    *preproc;                    /* preprocessor to use */
     char    *pattern;                    /* symbol pattern */
     char   **files;                      /* files to parse for symbols */
     int      nfile;                      /* number of files */
@@ -69,7 +70,7 @@ typedef struct {
 } symtab_t;
 
 
-static int verbosity = 0;
+static int verbosity = 1;
 
 
 static void fatal_error(const char *fmt, ...)
@@ -108,11 +109,13 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 
     printf("usage: %s [options]\n\n"
            "The possible options are:\n"
+           "  -P  --preproc <preprocessor> preprocessor to use [gcc]\n"
            "  -c, --compiler-flags <flags> flags to pass to compiler\n"
            "  -p, --pattern <pattern>      symbol regexp pattern\n"
            "  -o, --output <path>          write output to the given file\n"
            "  -g, --gnu-ld <script>        generate GNU ld linker script\n"
-           "  -v, --verbose                run in verbose mode\n"
+           "  -v, --verbose                increase verbosity\n"
+           "  -q, --quiet                  decrease verbosity\n"
            "  -h, --help                   show this help on usage\n",
            argv0);
 
@@ -127,18 +130,21 @@ static void set_defaults(config_t *c)
 {
     memset(c, 0, sizeof(*c));
     c->pattern = "^mrp_|^_mrp";
+    c->preproc = "gcc";
 }
 
 
 static void parse_cmdline(config_t *cfg, int argc, char **argv)
 {
-#   define OPTIONS "c:p:o:gvh"
+#   define OPTIONS "P:c:p:o:gvqh"
     struct option options[] = {
+        { "preprocessor"  , required_argument, NULL, 'P' },
         { "compiler-flags", required_argument, NULL, 'c' },
         { "pattern"       , required_argument, NULL, 'p' },
         { "output"        , required_argument, NULL, 'o' },
         { "gnu-ld"        , no_argument      , NULL, 'g' },
         { "verbose"       , no_argument      , NULL, 'v' },
+        { "quiet"         , no_argument      , NULL, 'q' },
         { "help"          , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
@@ -149,6 +155,10 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
         switch (opt) {
+        case 'P':
+            cfg->preproc = optarg;
+            break;
+
         case 'c':
             cfg->cflags = optarg;
             break;
@@ -169,6 +179,10 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
             verbosity++;
             break;
 
+        case 'q':
+            verbosity--;
+            break;
+
         case 'h':
             print_usage(argv[0], -1, "");
             exit(0);
@@ -184,7 +198,8 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
 }
 
 
-static int preprocess_file(const char *file, const char *cflags, pid_t *pid)
+static int preprocess_file(const char *preproc, const char *file,
+                           const char *cflags, pid_t *pid)
 {
     char cmd[4096], *argv[32];
     int  fd[2], argc;
@@ -216,9 +231,9 @@ static int preprocess_file(const char *file, const char *cflags, pid_t *pid)
         argv[argc++] = "-c";
 
         if (cflags != NULL)
-            snprintf(cmd, sizeof(cmd), "gcc %s -E %s", cflags, file);
+            snprintf(cmd, sizeof(cmd), "%s %s -E %s", preproc, cflags, file);
         else
-            snprintf(cmd, sizeof(cmd), "gcc -E %s", file);
+            snprintf(cmd, sizeof(cmd), "%s -E %s", preproc, file);
 
         argv[argc++] = cmd;
         argv[argc]   = NULL;
@@ -803,8 +818,8 @@ static void symtab_dump(symtab_t *st, int gnuld, FILE *out)
 }
 
 
-static void extract_symbols(const char *path, const char *cflags,
-                            symtab_t *st, regex_t *re)
+static void extract_symbols(const char *preproc, const char *path,
+                            const char *cflags, symtab_t *st, regex_t *re)
 {
     input_t   in;
     ringbuf_t rb;
@@ -815,7 +830,7 @@ static void extract_symbols(const char *path, const char *cflags,
     char     *sym;
     int       pp_status, foreign;
 
-    fd = preprocess_file(path, cflags, &pp_pid);
+    fd = preprocess_file(preproc, path, cflags, &pp_pid);
 
     input_init(&in, fd);
     ringbuf_init(&rb);
@@ -865,6 +880,8 @@ int main(int argc, char *argv[])
     symtab_init(&st);
     parse_cmdline(&cfg, argc, argv);
 
+    verbose_message(1, "using preprocessor '%s'...", cfg.preproc);
+
     if (cfg.pattern != NULL) {
         err = regcomp(&rebuf, cfg.pattern, REG_EXTENDED);
 
@@ -880,7 +897,7 @@ int main(int argc, char *argv[])
         re = NULL;
 
     for (i = 0; i < cfg.nfile; i++)
-        extract_symbols(cfg.files[i], cfg.cflags, &st, re);
+        extract_symbols(cfg.preproc, cfg.files[i], cfg.cflags, &st, re);
 
     if (cfg.output != NULL) {
         out = fopen(cfg.output, "w");
