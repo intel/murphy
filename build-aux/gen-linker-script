@@ -64,6 +64,13 @@ while [ -n "${1#-}" ]; do
 	-q)
 	    QUIET="yes"
 	    ;;
+        -c)
+            # This is only for command-line compatibility with collect-symbols
+            # to minimize the impact of switching back and forth (if needed).
+            # collect-symbols gets compilation flags passed using the -c
+            # option which we simply ignore here when using ctags.
+            shift
+            ;;
         -*)
             error "Unknown option '$1'."
             usage
