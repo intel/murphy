@@ -3,8 +3,12 @@ m = murphy.get()
 -- try loading console plugin
 m:try_load_plugin('console')
 
+m:try_load_plugin('console', 'webconsole', {
+                             address = 'wsck:127.0.0.1:3000/murphy',
+                             httpdir = 'src/plugins/console'         })
+
 -- load a test plugin
-if m:plugin_exists('test') then
+if m:plugin_exists('test.disabled') then
     m:load_plugin('test', {
                        string2  = 'this is now string2',
                        boolean2 = true,
@@ -32,7 +36,7 @@ end
 
 -- load the dbus resource plugin
 if m:plugin_exists('resource-dbus') then
-    m:load_plugin('resource-dbus', {
+    m:try_load_plugin('resource-dbus', {
         dbus_bus = "system",
         dbus_service = "org.Murphy",
         dbus_track = true,
