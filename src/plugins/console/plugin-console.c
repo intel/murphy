@@ -721,7 +721,7 @@ static mrp_plugin_arg_t console_args[] = {
 
 MURPHY_REGISTER_CORE_PLUGIN("console",
                             CONSOLE_VERSION, CONSOLE_DESCRIPTION,
-                            CONSOLE_AUTHORS, CONSOLE_HELP, MRP_SINGLETON,
+                            CONSOLE_AUTHORS, CONSOLE_HELP, MRP_MULTIPLE,
                             console_init, console_exit,
                             console_args, MRP_ARRAY_SIZE(console_args),
                             NULL, 0, NULL, 0, NULL);
