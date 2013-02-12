@@ -418,7 +418,7 @@ static int element_create_from_lua(lua_State *L)
 
     MRP_LUA_ENTER;
 
-    el = (mrp_lua_element_t *)mrp_lua_create_object(L, ELEMENT_CLASS, NULL);
+    el = (mrp_lua_element_t *)mrp_lua_create_object(L, ELEMENT_CLASS, NULL,0);
     el->install = element_install;
 
     table = lua_gettop(L);
@@ -644,7 +644,7 @@ static int sink_create_from_lua(lua_State *L)
 
     MRP_LUA_ENTER;
 
-    sink = (mrp_lua_sink_t *)mrp_lua_create_object(L, SINK_CLASS, NULL);
+    sink = (mrp_lua_sink_t *)mrp_lua_create_object(L, SINK_CLASS, NULL,0);
     sink->install = sink_install;
 
     table = lua_gettop(L);

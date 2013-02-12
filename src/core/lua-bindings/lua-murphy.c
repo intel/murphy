@@ -110,6 +110,7 @@ int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b)
 static void init_lua_utils(lua_State *L)
 {
     mrp_create_funcbridge_class(L);
+    mrp_create_funcarray_class(L);
 }
 
 

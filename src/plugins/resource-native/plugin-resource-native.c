@@ -52,7 +52,6 @@
 #include <murphy/resource/config-api.h>
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
-#include <murphy/resource/config-lua.h>
 
 #define ATTRIBUTE_MAX MRP_ATTRIBUTE_MAX
 
@@ -1043,23 +1042,9 @@ static int initiate_transport(mrp_plugin_t *plugin)
 
 static void initiate_lua_configuration(mrp_plugin_t *plugin)
 {
-    static bool initialised = false;
-
-    lua_State *L;
-
     MRP_UNUSED(plugin);
 
-    if (!initialised && (L =  mrp_lua_get_lua_state())) {
-
-        mrp_lua_create_application_class(L);
-        mrp_lua_create_zone_class(L);
-        mrp_lua_create_resource_class_class(L);
-
-        mrp_debug("lua classes are ready for resource "
-                  "configuration and management");
-
-        initialised = true;
-    }
+    mrp_resource_configuration_init();
 }
 
 static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,

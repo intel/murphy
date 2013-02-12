@@ -32,6 +32,8 @@
 
 #include <murphy/resource/data-types.h>
 
+void mrp_resource_configuration_init(void);
+
 int mrp_zone_definition_create(mrp_attr_def_t *attrdefs);
 uint32_t mrp_zone_create(const char *name, mrp_attr_t *attrs);
 

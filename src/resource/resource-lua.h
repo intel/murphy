@@ -27,59 +27,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_RESOURCE_SET_H__
-#define __MURPHY_RESOURCE_SET_H__
+#ifndef __MURPHY_RESOURCE_LUA_H__
+#define __MURPHY_RESOURCE_LUA_H__
 
-#include <murphy/common/list.h>
+#include <lua.h>
+
+#include <murphy/common/hashtbl.h>
 
 #include "data-types.h"
 
+struct mrp_resource_ownersref_s {
+    uint32_t              zoneid;
+    mrp_resource_owner_t *owners;
+};
 
-
-struct mrp_resource_set_s {
-    mrp_list_hook_t                 list;
-    uint32_t                        id;
-    mrp_resource_state_t            state;
-    bool                            auto_release;
-    struct {
-        struct {
-            mrp_resource_mask_t all;
-            mrp_resource_mask_t mandatory;
-            mrp_resource_mask_t grant;
-            mrp_resource_mask_t advice;
-        } mask;
-        mrp_list_hook_t list;
-        bool share;
-    }                               resource;
-    struct {
-        mrp_list_hook_t list;
-        mrp_resource_client_t *ptr;
-        uint32_t reqno;
-    }                               client;
-    struct {
-        mrp_list_hook_t list;
-        mrp_application_class_t *ptr;
-        uint32_t priority;
-    }                               class;
-    uint32_t                        zone;
-    struct {
-        uint32_t id;
-        uint32_t stamp;
-    }                               request;
-    mrp_resource_event_cb_t         event;
-    void                           *user_data;
+struct mrp_resource_setref_s {
+    mrp_resource_set_t   *rset;
 };
 
 
-mrp_resource_set_t *mrp_resource_set_find_by_id(uint32_t);
-mrp_resource_t     *mrp_resource_set_find_resource(uint32_t, const char *);
-uint32_t            mrp_get_resource_set_count(void);
-void                mrp_resource_set_updated(mrp_resource_set_t *);
-int                 mrp_resource_set_print(mrp_resource_set_t *, size_t,
-                                           char *, int);
+void mrp_resource_lua_init(lua_State *);
 
+bool mrp_resource_lua_veto(mrp_zone_t *, mrp_resource_set_t *,
+                           mrp_resource_owner_t *, mrp_resource_mask_t);
+void mrp_resource_lua_set_owners(mrp_zone_t *, mrp_resource_owner_t *);
 
-#endif  /* __MURPHY_RESOURCE_SET_H__ */
+void mrp_resource_lua_register_resource_set(mrp_resource_set_t *);
+void mrp_resource_lua_unregister_resource_set(mrp_resource_set_t *);
+void mrp_resource_lua_add_resource_to_resource_set(mrp_resource_set_t *,
+                                                   mrp_resource_t *);
+
+#endif  /* __MURPHY_RESOURCE_LUA_H__ */
 
 /*
  * Local Variables:

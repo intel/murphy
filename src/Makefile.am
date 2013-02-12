@@ -703,8 +703,7 @@ libmurphy_resource_backend_la_HEADERS =                        \
 		resource/client-api.h           \
 		resource/manager-api.h          \
 		resource/config-api.h           \
-		resource/protocol.h		\
-		resource/config-lua.h
+		resource/protocol.h
 
 libmurphy_resource_backend_la_REGULAR_SOURCES =                \
 		resource/attribute.c		\
@@ -714,7 +713,8 @@ libmurphy_resource_backend_la_REGULAR_SOURCES =                \
 		resource/resource-owner.c	\
 		resource/resource-client.c	\
 		resource/zone.c			\
-		resource/config-lua.c
+		resource/config-lua.c		\
+		resource/resource-lua.c
 
 libmurphy_resource_backend_la_SOURCES =                        \
 		$(libmurphy_resource_backend_la_REGULAR_SOURCES)        \

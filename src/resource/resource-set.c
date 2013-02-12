@@ -45,15 +45,25 @@
 #include "resource.h"
 #include "resource-client.h"
 #include "resource-owner.h"
+#include "resource-lua.h"
 
 
 #define STAMP_MAX     ((uint32_t)1 << MRP_KEY_STAMP_BITS)
 #define PRIORITY_MAX  ((uint32_t)1 << MRP_KEY_PRIORITY_BITS)
 
+
 static MRP_LIST_HOOK(resource_set_list);
 static uint32_t resource_set_count;
+static mrp_htbl_t *id_hash;
 
-static mrp_resource_t *find_resource(mrp_resource_set_t *, const char *);
+static int add_to_id_hash(mrp_resource_set_t *);
+static void remove_from_id_hash(mrp_resource_set_t *);
+
+static mrp_resource_t *find_resource_by_name(mrp_resource_set_t *,const char*);
+#if 0
+static mrp_resource_t *find_resource_by_id(mrp_resource_set_t *, uint32_t);
+#endif
+
 static uint32_t get_request_stamp(void);
 static const char *state_str(mrp_resource_state_t);
 
@@ -100,6 +110,9 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
         rset->user_data = user_data;
 
         resource_set_count++;
+
+        add_to_id_hash(rset);
+        mrp_resource_lua_register_resource_set(rset);
     }
 
     return rset;
@@ -115,6 +128,9 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
         state = rset->state;
 
         rset->event = NULL; /* make sure nothing is sent any more */
+
+        mrp_resource_lua_unregister_resource_set(rset);
+        remove_from_id_hash(rset);
 
         if (state == mrp_resource_acquire)
             mrp_resource_set_release(rset, MRP_RESOURCE_REQNO_INVALID);
@@ -135,7 +151,10 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
     }
 }
 
-
+mrp_resource_set_t *mrp_resource_set_find_by_id(uint32_t id)
+{
+    return id_hash ? mrp_htbl_lookup(id_hash, NULL + id) : NULL;
+}
 
 uint32_t mrp_get_resource_set_id(mrp_resource_set_t *rset)
 {
@@ -170,6 +189,22 @@ mrp_resource_client_t *mrp_get_resource_set_client(mrp_resource_set_t *rset)
     MRP_ASSERT(rset, "invalid argument");
 
     return rset->client.ptr;
+}
+
+mrp_resource_t *mrp_resource_set_find_resource(uint32_t rsetid,
+                                               const char *resnam)
+{
+    mrp_resource_set_t *rset;
+    mrp_resource_t *res;
+
+    MRP_ASSERT(resnam, "invalid argument");
+
+    if (!(rset = mrp_resource_set_find_by_id(rsetid)))
+        res = NULL;
+    else
+        res = find_resource_by_name(rset, resnam);
+
+    return res;
 }
 
 
@@ -223,6 +258,8 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
 
     mrp_list_append(&rset->resource.list, &res->list);
 
+    mrp_resource_lua_add_resource_to_resource_set(rset, res);
+
     return 0;
 }
 
@@ -235,7 +272,7 @@ mrp_attr_t *mrp_resource_set_read_attribute(mrp_resource_set_t *rset,
 
     MRP_ASSERT(rset && resnam, "invalid argument");
 
-    if (!(res = find_resource(rset, resnam)))
+    if (!(res = find_resource_by_name(rset, resnam)))
         return NULL;
 
     return mrp_resource_read_attribute(res, attridx, buf);
@@ -250,7 +287,7 @@ mrp_attr_t *mrp_resource_set_read_all_attributes(mrp_resource_set_t *rset,
 
     MRP_ASSERT(rset && resnam, "invalid argument");
 
-    if (!(res = find_resource(rset, resnam)))
+    if (!(res = find_resource_by_name(rset, resnam)))
         return NULL;
 
     return mrp_resource_read_all_attributes(res, buflen, buf);
@@ -264,7 +301,7 @@ int mrp_resource_set_write_attributes(mrp_resource_set_t *rset,
 
     MRP_ASSERT(rset && resnam && attrs, "invalid argument");
 
-    if (!(res = find_resource(rset, resnam)))
+    if (!(res = find_resource_by_name(rset, resnam)))
         return -1;
 
     if (mrp_resource_write_attributes(res, attrs) < 0)
@@ -379,7 +416,68 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
 #undef PRINT
 }
 
-static mrp_resource_t *find_resource(mrp_resource_set_t *rset,const char *name)
+static uint32_t rset_hash(const void *key)
+{
+    return (uint32_t)(key - NULL);
+}
+
+static int rset_comp(const void *key1, const void *key2)
+{
+    uint32_t k1 = key1 - NULL;
+    uint32_t k2 = key2 - NULL;
+
+    return (k1 == k2) ? 0 : ((k1 > k2) ? 1 : -1);
+}
+
+static void init_id_hash(void)
+{
+    mrp_htbl_config_t cfg;
+
+    if (!id_hash) {
+        cfg.nentry  = 32;
+        cfg.comp    = rset_comp;
+        cfg.hash    = rset_hash;
+        cfg.free    = NULL;
+        cfg.nbucket = cfg.nentry;
+
+        id_hash = mrp_htbl_create(&cfg);
+
+        MRP_ASSERT(id_hash, "failed to make id_hash for resource sets");
+    }
+}
+
+static int add_to_id_hash(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    init_id_hash();
+
+    if (!mrp_htbl_insert(id_hash, NULL + rset->id, rset))
+        return -1;
+
+    return 0;
+}
+
+static void remove_from_id_hash(mrp_resource_set_t *rset)
+{
+    mrp_resource_set_t *deleted;
+
+    if (id_hash && rset) {
+        deleted = mrp_htbl_remove(id_hash, NULL + rset->id, false);
+
+        MRP_ASSERT(!deleted || deleted == rset, "confused with data "
+                   "structures when deleting resource-set from id hash");
+
+        /* in case we were not compiled with debug enabled */
+        if (deleted != rset) {
+            mrp_log_error("confused with data structures when deleting "
+                          "resource-set '%u' from id hash", rset->id);
+        }
+    }
+}
+
+static mrp_resource_t *find_resource_by_name(mrp_resource_set_t *rset,
+                                             const char *name)
 {
     mrp_list_hook_t *entry, *n;
     mrp_resource_t *res;
@@ -399,6 +497,30 @@ static mrp_resource_t *find_resource(mrp_resource_set_t *rset,const char *name)
 
     return NULL;
 }
+
+#if 0
+static mrp_resource_t *find_resource_by_id(mrp_resource_set_t *rset,
+                                           uint32_t id)
+{
+    mrp_list_hook_t *entry, *n;
+    mrp_resource_t *res;
+    mrp_resource_def_t *rdef;
+
+    MRP_ASSERT(rset, "invalid_argument");
+
+    mrp_list_foreach(&rset->resource.list, entry, n) {
+        res = mrp_list_entry(entry, mrp_resource_t, list);
+        rdef = res->def;
+
+        MRP_ASSERT(rdef, "confused with data structures");
+
+        if (id == rdef->id)
+            return res;
+    }
+
+    return NULL;
+}
+#endif
 
 static uint32_t get_request_stamp(void)
 {

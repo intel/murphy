@@ -456,8 +456,8 @@ static void remove_from_name_hash(mrp_application_class_t *class)
     if (class && class->name && name_hash) {
         deleted = mrp_htbl_remove(name_hash, (void *)class->name, false);
 
-        MRP_ASSERT(deleted == class, "confused with data structures when "
-                   "deleting resource-class from name hash");
+        MRP_ASSERT(!deleted || deleted == class, "confused with data "
+                   "structures when deleting resource-class from name hash");
 
         /* in case we were not compiled with debug enabled */
         if (deleted != class) {

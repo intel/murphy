@@ -128,11 +128,12 @@ void  mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *class);
 void  mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def);
 
 void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *class,
-                            const char *name);
+                            const char *name, int);
 void  mrp_lua_set_object_name(lua_State  *L, mrp_lua_classdef_t *def,
                               const char *name);
+void mrp_lua_set_object_index(lua_State *L, mrp_lua_classdef_t *def, int idx);
 
-void  mrp_lua_destroy_object(lua_State *L, const char *name, void *object);
+void  mrp_lua_destroy_object(lua_State *L, const char *name,int, void *object);
 
 int   mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def,
                           const char *name);

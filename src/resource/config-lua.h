@@ -30,9 +30,22 @@
 #ifndef __MURPHY_RESOURCE_CONFIG_LUA_H__
 #define __MURPHY_RESOURCE_CONFIG_LUA_H__
 
-void mrp_lua_create_application_class(lua_State *L);
-void mrp_lua_create_zone_class(lua_State *L);
-void mrp_lua_create_resource_class_class(lua_State *L);
+#include <lua.h>
+#include <murphy/core/lua-utils/funcbridge.h>
+#include <murphy/resource/data-types.h>
+
+typedef struct mrp_lua_resmethod_s   mrp_lua_resmethod_t;
+
+struct mrp_lua_resmethod_s {
+    mrp_funcarray_t *veto;
+};
+
+
+mrp_lua_resmethod_t *mrp_lua_get_resource_methods(void);
+
+uint32_t mrp_lua_to_resource_id(lua_State *, int);
+
+int mrp_lua_resource_create(lua_State *, mrp_resource_t *);
 
 
 #endif  /* __MURPHY_RESOURCE_CONFIG_LUA_H__ */
