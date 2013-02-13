@@ -620,14 +620,15 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
     if (msg == NULL)
         return;
 
+    rarr = r = NULL;
+
     if (mrp_json_add_integer(msg, "id"    , rsid ) &&
         mrp_json_add_string (msg, "state" , state) &&
         mrp_json_add_integer(msg, "grant" , grant) &&
         mrp_json_add_integer(msg, "advice", advice)) {
 
-        all  = grant | advice;
-        it   = NULL;
-        rarr = r = NULL;
+        all = grant | advice;
+        it  = NULL;
 
         while ((res = mrp_resource_set_iterate_resources(rset, &it)) != NULL) {
             mask = mrp_resource_get_mask(res);
