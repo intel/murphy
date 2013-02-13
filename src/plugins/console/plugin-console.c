@@ -49,7 +49,12 @@
 #include <murphy/plugins/console-protocol.h>
 
 #define DEFAULT_ADDRESS "unxs:@murphy-console"    /* default console address */
-#define DEFAULT_HTTPDIR "/etc/murphy/html"        /* default content dir */
+
+#ifdef MURPHY_DATADIR                             /* default content dir */
+#    define DEFAULT_HTTPDIR MURPHY_DATADIR"/webconsole"
+#else
+#    define DEFAULT_HTTPDIR "/usr/share/murphy/webconsole"
+#endif
 
 
 /*

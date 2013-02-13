@@ -109,6 +109,12 @@ libmurphy_common_la_CFLAGS +=			\
 
 libmurphy_common_la_LIBADD +=			\
 		$(WEBSOCKETS_LIBS)
+
+EXTRA_DIST     += $(webconsole_DATA);
+webconsoledir   = $(datadir)/murphy/webconsole
+webconsole_DATA = 				\
+		plugins/console/console.js	\
+		plugins/console/console.html
 else
 if JSON_ENABLED
 libmurphy_common_la_HEADERS +=			\
