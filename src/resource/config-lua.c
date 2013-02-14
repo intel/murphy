@@ -80,6 +80,7 @@ enum field_e {
     MODAL,
     SHARE,
     GRANT,
+    ORDER,
     SHARED,
     METHOD,
     OWNERS,
@@ -197,6 +198,8 @@ static mrp_attr_t *check_attrs(lua_State *, int, attr_def_t *);
 static void free_attrs(mrp_attr_t *);
 static int check_attrindex(lua_State *, int, attr_def_t *);
 static int check_boolean(lua_State *, int);
+static mrp_resource_order_t check_order(lua_State *, int);
+static int push_order(lua_State *, mrp_resource_order_t);
 static field_t field_check(lua_State *, int, const char **);
 static field_t field_name_to_type(const char *, size_t);
 
@@ -573,6 +576,7 @@ static int appclass_create(lua_State *L)
     int priority = 0;
     int modal = -1;
     int share = -1;
+    mrp_resource_order_t order = 0;
     const char *name = NULL;
 
     MRP_LUA_ENTER;
@@ -597,6 +601,10 @@ static int appclass_create(lua_State *L)
             share = check_boolean(L, -1);
             break;
 
+        case ORDER:
+            order = check_order(L, -1);
+            break;
+
         default:
             luaL_error(L, "unexpected field '%s'", fldnam);
             break;
@@ -611,9 +619,11 @@ static int appclass_create(lua_State *L)
         luaL_error(L, "modal class can't share");
     if (share < 0)
         luaL_error(L, "missing or wrong share field");
+    if (!order)
+        luaL_error(L, "missing or wrong order field");
     if (priority < 0)
         luaL_error(L, "negative priority");
-    if (!mrp_application_class_create(name, priority, modal, share))
+    if (!mrp_application_class_create(name, priority, modal, share, order))
         luaL_error(L, "failed to create application class '%s'", name);
 
     appclass = (appclass_t *)mrp_lua_create_object(L, APPCLASS_CLASS, name,0);
@@ -643,6 +653,9 @@ static int appclass_getfield(lua_State *L)
         switch (fld) {
         case NAME:       lua_pushstring(L, ac->name);         break;
         case PRIORITY:   lua_pushinteger(L, ac->priority);    break;
+        case MODAL:      lua_pushboolean(L, ac->modal);       break;
+        case SHARE:      lua_pushboolean(L, ac->share);       break;
+        case ORDER:      push_order(L, ac->order);            break;
         default:         lua_pushnil(L);                      break;
         }
     }
@@ -1514,6 +1527,36 @@ static int check_boolean(lua_State *L, int idx)
     return lua_toboolean(L, idx) ? 1 : 0;
 }
 
+static mrp_resource_order_t check_order(lua_State *L, int idx)
+{
+    const char *str = luaL_checkstring(L, idx);
+
+    if (!strcasecmp(str, "fifo"))
+        return MRP_RESOURCE_ORDER_FIFO;
+
+    if (!strcasecmp(str, "lifo"))
+        return MRP_RESOURCE_ORDER_LIFO;
+
+    luaL_error(L, "invalid value for order ('fifo' or 'lifo' accepted only)");
+
+    return MRP_RESOURCE_ORDER_UNKNOWN;
+}
+
+static int push_order(lua_State *L, mrp_resource_order_t order)
+{
+    const char *str;
+
+    switch (order) {
+    case MRP_RESOURCE_ORDER_FIFO:   str = "fifo";        break;
+    case MRP_RESOURCE_ORDER_LIFO:   str = "lifo";        break;
+    default:                        str = "<unknown>";   break;
+    }
+
+    lua_pushstring(L, str);
+
+    return 1;
+}
+
 
 static field_t field_check(lua_State *L, int idx, const char **ret_fldnam)
 {
@@ -1558,6 +1601,8 @@ static field_t field_name_to_type(const char *name, size_t len)
             return SHARE;
         if (!strcmp(name, "grant"))
             return GRANT;
+        if (!strcmp(name, "order"))
+            return ORDER;
         break;
 
     case 6:

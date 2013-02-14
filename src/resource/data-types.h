@@ -50,6 +50,7 @@
 #define MRP_ATTRIBUTE_MAX (sizeof(mrp_attribute_mask_t) * 8)
 
 typedef enum   mrp_resource_state_e     mrp_resource_state_t;
+typedef enum   mrp_resource_order_e     mrp_resource_order_t;
 typedef enum   mrp_resource_access_e    mrp_resource_access_t;
 
 typedef struct mrp_resource_client_s    mrp_resource_client_t;
@@ -85,6 +86,12 @@ enum mrp_resource_access_e {
     MRP_RESOURCE_READ  = 1,
     MRP_RESOURCE_WRITE = 2,
     MRP_RESOURCE_RW    = (MRP_RESOURCE_READ | MRP_RESOURCE_WRITE)
+};
+
+enum mrp_resource_order_e {
+    MRP_RESOURCE_ORDER_UNKNOWN = 0,
+    MRP_RESOURCE_ORDER_FIFO,
+    MRP_RESOURCE_ORDER_LIFO
 };
 
 union mrp_attr_value_u {

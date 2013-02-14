@@ -54,12 +54,12 @@ end
 
 
 -- define application classes
-application_class { name="interrupt", priority=99, modal=true , share=false }
-application_class { name="navigator", priority=4 , modal=false, share=true  }
-application_class { name="phone"    , priority=3 , modal=false, share=true  }
-application_class { name="game"     , priority=2 , modal=false, share=true  }
-application_class { name="player"   , priority=1 , modal=false, share=true  }
-application_class { name="implicit" , priority=0 , modal=false, share=true  }
+application_class { name="interrupt", priority=99, modal=true , share=false, order="fifo" }
+application_class { name="navigator", priority=4 , modal=false, share=true , order="fifo" }
+application_class { name="phone"    , priority=3 , modal=false, share=true , order="lifo" }
+application_class { name="game"     , priority=2 , modal=false, share=true , order="lifo" }
+application_class { name="player"   , priority=1 , modal=false, share=true , order="lifo" }
+application_class { name="implicit" , priority=0 , modal=false, share=true , order="lifo" }
 
 -- define zone attributes
 zone.attributes {

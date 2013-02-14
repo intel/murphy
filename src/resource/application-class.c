@@ -83,6 +83,8 @@
 #define USAGE_KEY(p)    (((uint32_t)(p) & USAGE_MASK)    << USAGE_SHIFT)
 #define PRIORITY_KEY(p) (((uint32_t)(p) & PRIORITY_MASK) << PRIORITY_SHIFT)
 
+#define STAMP_MAX       STAMP_MASK
+
 typedef struct {
     const char *class_name;
     uint32_t    priority;
@@ -103,9 +105,10 @@ static void insert_into_application_class_table(const char *, uint32_t);
 
 
 mrp_application_class_t *mrp_application_class_create(const char *name,
-                                                      uint32_t pri,
-                                                      bool modal,
-                                                      bool share)
+                                                    uint32_t pri,
+                                                    bool modal,
+                                                    bool share,
+                                                    mrp_resource_order_t order)
 {
     mrp_application_class_t *class;
     mrp_list_hook_t *insert_before, *clhook, *n;
@@ -150,6 +153,7 @@ mrp_application_class_t *mrp_application_class_create(const char *name,
     class->priority = pri;
     class->modal = modal;
     class->share = share;
+    class->order = order;
 
     for (zone = 0;  zone < MRP_ZONE_MAX;  zone++)
         mrp_list_init(&class->resource_sets[zone]);
@@ -318,6 +322,9 @@ void mrp_application_class_move_resource_set(mrp_resource_set_t *rset)
 
 uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 {
+    mrp_application_class_t *class;
+    bool     lifo;
+    uint32_t rqstamp;
     uint32_t priority;
     uint32_t usage;
     uint32_t state;
@@ -326,10 +333,15 @@ uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 
     MRP_ASSERT(rset, "invalid argument");
 
+    class = rset->class.ptr;
+    lifo  = (class->order == MRP_RESOURCE_ORDER_LIFO);
+
+    rqstamp  = rset->request.stamp;
+
     priority = PRIORITY_KEY(rset->class.priority);
     usage    = USAGE_KEY(rset->resource.share ? 1 : 0);
     state    = STATE_KEY(rset->state == mrp_resource_acquire ? 1 : 0);
-    stamp    = STAMP_KEY(rset->request.stamp);
+    stamp    = STAMP_KEY(lifo ? rqstamp : STAMP_MAX - rqstamp);
 
     key = priority | usage | state | stamp;
 
