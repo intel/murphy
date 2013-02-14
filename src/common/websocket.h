@@ -75,6 +75,10 @@ void *mrp_websock_close(mrp_websock_t *sck);
 /** Send data over a connected websocket. */
 int mrp_websock_send(mrp_websock_t *sck, void *payload, size_t size);
 
+/** Serve the given file, with MIME type, over the given websocket. */
+int mrp_websock_server_http_file(mrp_websock_t *sck, const char *path,
+                                 const char *mime);
+
 MRP_CDECL_END
 
 

@@ -61,3 +61,10 @@ int mrp_websock_send(mrp_websock_t *sck, void *payload, size_t size)
 {
     return wsl_send(sck, payload, size);
 }
+
+
+int mrp_websock_server_http_file(mrp_websock_t *sck, const char *path,
+                                 const char *mime)
+{
+    return wsl_serve_http_file(sck, path, mime);
+}

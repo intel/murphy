@@ -359,7 +359,7 @@ WrtResourceManager.prototype.connect = function (server) {
 
         this.server = server
 
-        if (typeof MozWebSocker != "undefined" )
+        if (typeof MozWebSocket != "undefined")
             this.sck = new MozWebSocket(this.server, "murphy");
         else
             this.sck = new WebSocket(this.server, "murphy");

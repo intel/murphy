@@ -1,0 +1,92 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-15">
+
+<style type="text/css">
+textarea.console_input {
+    font-size: 12pt;
+    font-family: monospace;
+    background-color: black;
+    padding: 2px;
+    margin: 0 0 0 0;
+    color: white;
+    resize: none;
+    overflow: visible;
+}
+
+textarea.console_output {
+    font-size: 12pt;
+    font-family: monospace;
+    background-color: black;
+    padding: 2px;
+    margin: 0 0 0 0;
+    color: white;
+    resize: none;
+}
+</style>
+
+<script type="text/javascript" src="console.js"></script>
+
+<title>Murphy Console (disconnected)</title>
+</head>
+
+
+<body onLoad="setupConsole();">
+
+<script type="text/javascript">
+
+var mrpc = null;
+
+function setupConsole () {
+    var cmds = {
+        connect:    cmd_connect,
+        disconnect: cmd_disconnect,
+        resize:     cmd_resize
+    };
+
+    mrpc = new MrpConsole("console_div", cmds);
+    var addr = mrpc.socketUri(document.URL);
+
+    console.log("Trying to connect to Murphy @ " + addr);
+
+    mrpc.connect(addr, "murphy");
+    mrpc.focus();
+
+    mrpc.onconnected = function () {
+        document.title = "Murphy Console @ " + addr;
+        mrpc.append("Connection to Murphy console established.\n");
+    };
+
+    mrpc.onclosed = function () {
+        document.title = "Murphy Console (disconnected)";
+        mrpc.append("Murphy console connection closed.\n");
+        mrpc.append("Use 'connect' to try to reconnect.\n");
+    };
+}
+
+
+function cmd_connect(args) {
+    var addr;
+
+    addr = mrpc.socketUri(document.URL);
+    console.log("Trying to reconnect...");
+    mrpc.connect(addr, "murphy");
+}
+
+
+function cmd_disconnect() {
+
+    console.log("Disconnecting...");
+    addr = mrpc.disconnect();
+}
+
+
+function cmd_resize(args) {
+    mrpc.resize(args[0], args[1]);
+}
+
+
+</script>
+
+<div id="console_div"></div>
+</body></html>

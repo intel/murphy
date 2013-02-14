@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head> <meta charset=utf-8 /> <title>Resource-Webruntime Test</title>
   <script src="resource-api.js"></script>
@@ -100,6 +99,11 @@ function resourceSetEvent (mask) {
     setContent('advice', advice);
     setContent('granted', gnames);
     setContent('allocable', anames);
+
+    if (this.isGranted("audio_playback"))
+        playAudio();
+    else
+        stopAudio();
 }
 
 
@@ -275,6 +279,61 @@ function release() {
     ctx.rset.release();
 }
 
+function fileSelected() {
+    var elem = document.getElementById('filepath');
+
+    console.log("File selected: " + elem.value);
+}
+
+
+function audioError(event) {
+    /*console.log('error:' + event.target.error.code);
+    setStatus("audio path: not valid");*/
+}
+
+
+function checkAudio() {
+    var audio = document.getElementById('audio');
+
+    if (audio.networkState == 1)
+        setStatus("audio path: OK");
+    else
+        setStatus("audio path: invalid");
+}
+
+
+function checkPath() {
+    var txt   = document.getElementById('filepath');
+    var audio = document.getElementById('audio');
+    var path  = "http://127.0.0.1/" + txt.value;
+
+    console.log("trying " + path);
+
+    audio.src = path;
+
+    if (audio.checkTimer)
+        window.clearTimeout(audio.checkTimer);
+
+    audio.checkTimer = window.setTimeout(function() { checkAudio(); }, 250);
+    audio.load();
+}
+
+
+function playAudio() {
+    var audio = document.getElementById('audio');
+
+    if (audio.networkState == 1)
+        audio.play();
+}
+
+
+function stopAudio() {
+    var audio = document.getElementById('audio');
+
+    audio.pause();
+}
+
+
 </script>
 
 </head>
@@ -283,6 +342,12 @@ function release() {
 
 
 <table>
+    <tr>
+        <th align=left>Audio File:</th>
+        <td align=left><input id=filepath type="text" accept="audio/*"
+                              onchange="fileSelected();"
+                              onkeyup="checkPath();"></td>
+    </tr>
     <tr>
         <th align=left>Actions:</th>
         <td align=left>
@@ -322,9 +387,7 @@ function release() {
     </tr>
     <tr>
       <td>
-        <audio>
-           <source src="http://127.0.0.1/the_ritual_10.ogg"
-                   type='audio/ogg;codecs="vorbis"'>
+        <audio id=audio preload=metadata onerror="audioError(event);">
         </audio>
       <td>
     </tr>

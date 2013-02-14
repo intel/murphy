@@ -49,7 +49,7 @@ clean-scanner:
 # linker script generation
 $(LINKER_SCRIPT): $(libmql_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-	    -p "^mql_" -o $@ $^
+	    -c "$(libmql_la_CFLAGS)" -p "^mql_" -o $@ $^
 
 clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)

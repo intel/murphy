@@ -55,6 +55,17 @@ typedef struct {
                  void *proto_data);
     /** Check if transport should be destroyed. */
     int  (*check)(wsl_sck_t *sck, void *user_data, void *proto_data);
+
+    /** HTTP (content) request completed. */
+    void (*http_done)(wsl_sck_t *sck, const char *uri, void *user_data,
+                      void *proto_data);
+
+#ifdef LWS_OPENSSL_SUPPORT
+    /** Load extra client or server certificates, if necessary. */
+    void (*load_certs)(wsl_ctx_t *ctx, SSL_CTX *ssl, int is_server);
+#else
+    void (*load_certs)(wsl_ctx_t *, void *, int);
+#endif
 } wsl_callbacks_t;
 
 
@@ -92,6 +103,8 @@ typedef enum {
  * logging levels
  */
 
+#ifndef WEBSOCKETS_OLD
+
 typedef enum {
     WSL_LOG_NONE    = 0x0,
     WSL_LOG_ERROR   = LLL_ERR,
@@ -106,6 +119,25 @@ typedef enum {
     WSL_LOG_EXTRA   = LLL_PARSER | LLL_HEADER | LLL_EXT | LLL_CLIENT,
     WSL_LOG_VERBOSE = WSL_LOG_ALL | WSL_LOG_EXTRA
 } wsl_loglevel_t;
+
+#else /* !WEBSOCKETS_OLD */
+
+typedef enum {
+    WSL_LOG_NONE    = 0x0,
+    WSL_LOG_ERROR   = 0x0,
+    WSL_LOG_WARNING = 0x0,
+    WSL_LOG_INFO    = 0x0,
+    WSL_LOG_DEBUG   = 0x0,
+    WSL_LOG_ALL     = 0x0,
+    WSL_LOG_PARSER  = 0x0,
+    WSL_LOG_HEADER  = 0x0,
+    WSL_LOG_EXT     = 0x0,
+    WSL_LOG_CLIENT  = 0x0,
+    WSL_LOG_EXTRA   = 0x0,
+    WSL_LOG_VERBOSE = 0x0,
+} wsl_loglevel_t;
+
+#endif /* !WEBSOCKETS_OLD */
 
 /** Set libwebsock logging level _and_ redirect to murphy logging infra. */
 void wsl_set_loglevel(wsl_loglevel_t mask);

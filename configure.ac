@@ -8,8 +8,8 @@ AC_INIT([murphy],
         m4_esyscmd([build-aux/git-version-gen .tarball-version]),
         [krisztian.litkey at intel.com])
 
-AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src])
+AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADER([src/config.h])
 AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION)
 
@@ -281,40 +281,14 @@ AC_SUBST(CONSOLE_ENABLED)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_LIBS)
 
-# Check if websockets support was enabled.
-AC_ARG_ENABLE(websockets,
-              [--enable-websockets    enable websockets support],
-              [enable_websockets=$enableval], [enable_websockets=auto])
+# Check if websocket support was/can be enabled.
+CHECK_WEBSOCKETS()
 
-if test "$enable_websockets" != "no"; then
-    PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets json],
-                      [have_websockets=yes], [have_websockets=no])
-    if test "$have_websockets" = "no" -a "$enable_websockets" = "yes"; then
-        AC_MSG_ERROR([libwebsockets or json-c development libraries not found.])
-    fi
-
-    enable_websockets="$have_websockets"
-else
-    AC_MSG_NOTICE([libwebsockets support is disabled.])
-fi
-
-if test "$enable_websockets" = "yes"; then
-    AC_DEFINE([WEBSOCKETS_ENABLED], 1, [Enable websockets support ?])
-    enable_json=yes
-    AC_DEFINE([JSON_ENABLED], 1, [Enable JSON encoding/decoding support ?])
-else
-    enable_json=no
-fi
-AM_CONDITIONAL(WEBSOCKETS_ENABLED, [test "$enable_websockets" = "yes"])
-AC_SUBST(WEBSOCKETS_ENABLED)
-AC_SUBST(WEBSOCKETS_CFLAGS)
-AC_SUBST(WEBSOCKETS_LIBS)
-
-# If websockets is not enabled/available check if JSON was asked for.
+# If websockets was not enabled/available check if JSON was asked for.
 if test "$enable_json" = "no"; then
     AC_ARG_ENABLE(json,
-                  [--enable-json    enable JSON encoding/decoding support],
-                  [enable_json=$enableval], [enable_json=auto])
+                  [  --enable-json       enable JSON encoding/decoding support],
+                  [enable_json=$enableval], [enable_json=no])
 
     if test "$enable_json" != "no"; then
         PKG_CHECK_MODULES(JSON, [json],
@@ -528,6 +502,7 @@ fi
 AC_CONFIG_FILES([build-aux/shave
 		 build-aux/shave-libtool
 		 Makefile
+                 utils/Makefile
 		 src/Makefile
 		 src/common/tests/Makefile
 		 src/core/tests/Makefile

@@ -30,15 +30,16 @@
 #ifndef __MURPHY_TRANSPORT_H__
 #define __MURPHY_TRANSPORT_H__
 
-MRP_CDECL_BEGIN
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 
+#include <murphy/common/macros.h>
 #include <murphy/common/list.h>
 #include <murphy/common/mainloop.h>
 #include <murphy/common/msg.h>
+
+MRP_CDECL_BEGIN
 
 typedef struct mrp_transport_s mrp_transport_t;
 
