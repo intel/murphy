@@ -112,7 +112,7 @@ static int volume_create(lua_State *L)
     const char *fldnam;
     volume_t   *vol;
 
-    vol = (volume_t *)mrp_lua_create_object(L, VOLUME_CLASS, NULL);
+    vol = (volume_t *)mrp_lua_create_object(L, VOLUME_CLASS, NULL,0);
 
     table = lua_gettop(L);
 

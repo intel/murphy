@@ -98,6 +98,7 @@ typedef struct {
     char *                zone;
     char *                rsetd;
     uint32_t              rsetf;
+    uint32_t              priority;
     resource_def_array_t *resources;
     string_array_t       *class_names;
     string_array_t       *zone_names;
@@ -1297,13 +1298,13 @@ static void create_resource_set(client_t   *client,
                                 const char *class,
                                 const char *zone,
                                 const char *def,
-                                uint32_t    flags)
+                                uint32_t    flags,
+                                uint32_t    priority)
 {
 #define PUSH(msg, tag, typ, val) \
     mrp_msg_append(msg, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
 
     char  *buf;
-    uint32_t priority = 0;
     mrp_msg_t *req;
     char *p;
     char c;
@@ -1526,10 +1527,13 @@ static void sighandler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum,
 
 static void usage(client_t *client, int exit_code)
 {
-    printf("Usage: %s [-h] [-v] [-a] [class zone resources]\n\nwhere\n"
+    printf("Usage: %s [-h] [-v] [-r] [-a] [-p pri] [class zone resources]\n"
+           "\nwhere\n"
            "\t-h\t\tprints this help\n"
            "\t-v\t\tverbose mode (dumps the transport messages)\n"
-           "\t-a\t\tautorelease mode\n"
+           "\t-a\t\tautoacquire mode\n"
+           "\t-r\t\tautorelease mode\n"
+           "\t-p priority\t\tresource set priority (priority is 0-7)\n"
            "\tclass\t\tapplication class of the resource set\n"
            "\tzone\t\tzone wher the resource set lives\n"
            "\tresources\tcomma separated list of resources. Each resource is\n"
@@ -1557,9 +1561,11 @@ static void usage(client_t *client, int exit_code)
 
 static void parse_arguments(client_t *client, int argc, char **argv)
 {
+    unsigned long pri;
+    char *e;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hva")) != -1) {
+    while ((opt = getopt(argc, argv, "hvrap:")) != -1) {
         switch (opt) {
         case 'h':
             usage(client, 0);
@@ -1567,7 +1573,17 @@ static void parse_arguments(client_t *client, int argc, char **argv)
             client->msgdump = true;
             break;
         case 'a':
+            client->rsetf |= RESPROTO_RSETFLAG_AUTOACQUIRE;
+            break;
+        case 'r':
             client->rsetf |= RESPROTO_RSETFLAG_AUTORELEASE;
+            break;
+        case 'p':
+            pri = strtoul(optarg, &e, 10);
+            if (e == optarg || *e || pri > 7)
+                usage(client, EINVAL);
+            else
+                client->priority = pri;
             break;
         default:
             usage(client, EINVAL);
@@ -1612,7 +1628,7 @@ int main(int argc, char **argv)
         print_prompt(client, false);
     else {
         create_resource_set(client, client->class, client->zone,
-                            client->rsetd, client->rsetf);
+                            client->rsetd, client->rsetf, client->priority);
     }
 
     mrp_add_io_watch(client->ml, 0, MRP_IO_EVENT_IN, console_input, client);

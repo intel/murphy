@@ -107,14 +107,15 @@ void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
 
 void *mrp_lua_create_object(lua_State          *L,
                             mrp_lua_classdef_t *def,
-                            const char         *name)
+                            const char         *name,
+                            int                 idx)
 {
     int class = 0;
     size_t size;
     userdata_t *userdata;
 
-    if (name) {
-        if (!valid_id(name))
+    if (name || idx) {
+        if (name && !valid_id(name))
             return NULL;
 
         mrp_lua_get_class_table(L, def);
@@ -148,8 +149,12 @@ void *mrp_lua_create_object(lua_State          *L,
     if (name) {
         lua_pushstring(L, name);
         lua_pushvalue(L, -2);
-
         lua_rawset(L, class);
+    }
+
+    if (idx) {
+        lua_pushvalue(L, -1);
+        lua_rawseti(L, class, idx);
     }
 
     return (void *)(userdata + 1);
@@ -171,7 +176,21 @@ void mrp_lua_set_object_name(lua_State          *L,
     }
 }
 
-void mrp_lua_destroy_object(lua_State *L, const char *name, void *data)
+void mrp_lua_set_object_index(lua_State          *L,
+                              mrp_lua_classdef_t *def,
+                              int                 idx)
+{
+    mrp_lua_get_class_table(L, def);
+    luaL_checktype(L, -1, LUA_TTABLE);
+
+    lua_pushvalue(L, -2);
+
+    lua_rawseti(L, -2, idx);
+
+    lua_pop(L, 1);
+}
+
+void mrp_lua_destroy_object(lua_State *L, const char *name,int idx, void *data)
 {
     userdata_t *userdata = (userdata_t *)data - 1;
     mrp_lua_classdef_t *def;
@@ -188,15 +207,24 @@ void mrp_lua_destroy_object(lua_State *L, const char *name, void *data)
 
         luaL_unref(L, LUA_REGISTRYINDEX, userdata->luatbl);
 
-        mrp_lua_get_class_table(L, def);
-        luaL_checktype(L, -1, LUA_TTABLE);
+        if (name || idx) {
+            mrp_lua_get_class_table(L, def);
+            luaL_checktype(L, -1, LUA_TTABLE);
 
-        lua_pushstring(L, name);
-        lua_pushnil(L);
+            if (name) {
+                lua_pushstring(L, name);
+                lua_pushnil(L);
+                lua_rawset(L, -3);
+            }
 
-        lua_rawset(L, -3);
+            if (idx) {
+                lua_pushnil(L);
+                lua_rawseti(L, -2, idx);
+            }
 
-        lua_pop(L, 1);
+            lua_pop(L, 1);
+        }
+
     }
 }
 

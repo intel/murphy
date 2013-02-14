@@ -83,6 +83,8 @@
 #define USAGE_KEY(p)    (((uint32_t)(p) & USAGE_MASK)    << USAGE_SHIFT)
 #define PRIORITY_KEY(p) (((uint32_t)(p) & PRIORITY_MASK) << PRIORITY_SHIFT)
 
+#define STAMP_MAX       STAMP_MASK
+
 typedef struct {
     const char *class_name;
     uint32_t    priority;
@@ -103,7 +105,10 @@ static void insert_into_application_class_table(const char *, uint32_t);
 
 
 mrp_application_class_t *mrp_application_class_create(const char *name,
-                                                      uint32_t pri)
+                                                    uint32_t pri,
+                                                    bool modal,
+                                                    bool share,
+                                                    mrp_resource_order_t order)
 {
     mrp_application_class_t *class;
     mrp_list_hook_t *insert_before, *clhook, *n;
@@ -111,6 +116,11 @@ mrp_application_class_t *mrp_application_class_create(const char *name,
 
     MRP_ASSERT(name, "invalid argument");
 
+    if (modal && share) {
+        mrp_log_error("Class '%s' is both modal and shared. "
+                      "Sharing will be disabled", name);
+        share = false;
+    }
 
     /* looping through all classes to check the uniqueness of the
        name & priority of the new class and find the insertion point */
@@ -141,6 +151,9 @@ mrp_application_class_t *mrp_application_class_create(const char *name,
 
     class->name = mrp_strdup(name);
     class->priority = pri;
+    class->modal = modal;
+    class->share = share;
+    class->order = order;
 
     for (zone = 0;  zone < MRP_ZONE_MAX;  zone++)
         mrp_list_init(&class->resource_sets[zone]);
@@ -261,13 +274,18 @@ int mrp_application_class_add_resource_set(const char *class_name,
 
     rset->class.ptr = class;
     rset->zone = mrp_zone_get_id(zone);
-    rset->request.id = reqid;
 
-    if (rset->state == mrp_resource_no_request)
-        rset->state = mrp_resource_release;
+    if (rset->state == mrp_resource_acquire)
+        mrp_resource_set_acquire(rset, reqid);
+    else {
+        rset->request.id = reqid;
 
-    mrp_application_class_move_resource_set(rset);
-    mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+        if (rset->state == mrp_resource_no_request)
+            rset->state = mrp_resource_release;
+
+        mrp_application_class_move_resource_set(rset);
+        mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+    }
     
     return 0;
 }
@@ -304,6 +322,9 @@ void mrp_application_class_move_resource_set(mrp_resource_set_t *rset)
 
 uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 {
+    mrp_application_class_t *class;
+    bool     lifo;
+    uint32_t rqstamp;
     uint32_t priority;
     uint32_t usage;
     uint32_t state;
@@ -312,10 +333,15 @@ uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 
     MRP_ASSERT(rset, "invalid argument");
 
+    class = rset->class.ptr;
+    lifo  = (class->order == MRP_RESOURCE_ORDER_LIFO);
+
+    rqstamp  = rset->request.stamp;
+
     priority = PRIORITY_KEY(rset->class.priority);
     usage    = USAGE_KEY(rset->resource.share ? 1 : 0);
     state    = STATE_KEY(rset->state == mrp_resource_acquire ? 1 : 0);
-    stamp    = STAMP_KEY(rset->request.stamp);
+    stamp    = STAMP_KEY(lifo ? rqstamp : STAMP_MAX - rqstamp);
 
     key = priority | usage | state | stamp;
 
@@ -323,9 +349,10 @@ uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *rset)
 }
 
 
-int mrp_application_class_print(char *buf, int len)
+int mrp_application_class_print(char *buf, int len, bool with_rsets)
 {
-#define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
+#define PRINT(fmt, args...) \
+    do { if (p<e) { p += snprintf(p, e-p, fmt , ##args); } } while (0)
 
     mrp_zone_t *zone;
     mrp_application_class_t *class;
@@ -334,6 +361,7 @@ int mrp_application_class_print(char *buf, int len)
     mrp_list_hook_t *list, *rsen, *m;
     uint32_t zid;
     char *p, *e;
+    int width, l;
     int clcnt, rscnt;
 
     MRP_ASSERT(buf && len > 0, "invalid argument");
@@ -341,11 +369,35 @@ int mrp_application_class_print(char *buf, int len)
     e = (p = buf) + len;
     clcnt = rscnt = 0;
 
+    if (!with_rsets) {
+        width = 0;
+        mrp_list_foreach(&class_list, clen, n) {
+            class = mrp_list_entry(clen, mrp_application_class_t, list);
+            if ((l = strlen(class->name)) > width)
+                width = l;
+        }
+    }
+
     PRINT("Application classes:\n");
 
     mrp_list_foreach_back(&class_list, clen, n) {
         class = mrp_list_entry(clen, mrp_application_class_t, list);
-        PRINT("  %3u - %s\n", class->priority, class->name);
+        clcnt++;
+
+        if (with_rsets)
+            PRINT("  %3u - %s ", class->priority, class->name);
+        else
+            PRINT("   %-*s ", width, class->name);
+
+        if (class->modal)
+            PRINT(" modal");
+        if (class->share)
+            PRINT(" share");
+
+        PRINT("\n");
+
+        if (!with_rsets)
+            continue;
 
         for (zid = 0;   zid < MRP_ZONE_MAX;   zid++) {
             zone = mrp_zone_find_by_id(zid);
@@ -367,8 +419,6 @@ int mrp_application_class_print(char *buf, int len)
                 }
             }
         }
-
-        clcnt++;
     }
 
     if (!clcnt)
@@ -418,8 +468,8 @@ static void remove_from_name_hash(mrp_application_class_t *class)
     if (class && class->name && name_hash) {
         deleted = mrp_htbl_remove(name_hash, (void *)class->name, false);
 
-        MRP_ASSERT(deleted == class, "confused with data structures when "
-                   "deleting resource-class from name hash");
+        MRP_ASSERT(!deleted || deleted == class, "confused with data "
+                   "structures when deleting resource-class from name hash");
 
         /* in case we were not compiled with debug enabled */
         if (deleted != class) {

@@ -27,36 +27,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MURPHY_APPLICATION_CLASS_H__
-#define __MURPHY_APPLICATION_CLASS_H__
+#ifndef __MURPHY_RESOURCE_LUA_H__
+#define __MURPHY_RESOURCE_LUA_H__
 
-#include <murphy/common/list.h>
+#include <lua.h>
+
+#include <murphy/common/hashtbl.h>
 
 #include "data-types.h"
 
-
-
-struct mrp_application_class_s {
-    mrp_list_hook_t       list;
-    const char           *name;
-    uint32_t              priority;
-    bool                  share;
-    bool                  modal;
-    mrp_resource_order_t  order;
-    mrp_list_hook_t       resource_sets[MRP_ZONE_MAX];
+struct mrp_resource_ownersref_s {
+    uint32_t              zoneid;
+    mrp_resource_owner_t *owners;
 };
 
-mrp_application_class_t *mrp_application_class_find(const char *);
-mrp_application_class_t *mrp_application_class_iterate_classes(void **);
-mrp_resource_set_t *
-mrp_application_class_iterate_rsets(mrp_application_class_t*,uint32_t,void**);
-
-void mrp_application_class_move_resource_set(mrp_resource_set_t *);
-
-uint32_t mrp_application_class_get_sorting_key(mrp_resource_set_t *);
+struct mrp_resource_setref_s {
+    mrp_resource_set_t   *rset;
+};
 
 
-#endif  /* __MURPHY_APPLICATION_CLASS_H__ */
+void mrp_resource_lua_init(lua_State *);
+
+bool mrp_resource_lua_veto(mrp_zone_t *, mrp_resource_set_t *,
+                           mrp_resource_owner_t *, mrp_resource_mask_t);
+void mrp_resource_lua_set_owners(mrp_zone_t *, mrp_resource_owner_t *);
+
+void mrp_resource_lua_register_resource_set(mrp_resource_set_t *);
+void mrp_resource_lua_unregister_resource_set(mrp_resource_set_t *);
+void mrp_resource_lua_add_resource_to_resource_set(mrp_resource_set_t *,
+                                                   mrp_resource_t *);
+
+#endif  /* __MURPHY_RESOURCE_LUA_H__ */
 
 /*
  * Local Variables:

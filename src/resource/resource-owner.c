@@ -47,9 +47,8 @@
 #include "resource-set.h"
 #include "resource.h"
 #include "zone.h"
+#include "resource-lua.h"
 
-
-#define RESOURCE_MAX        (sizeof(mrp_resource_mask_t) * 8)
 #define NAME_LENGTH          24
 
 #define ZONE_ID_IDX          0
@@ -64,8 +63,8 @@ typedef struct {
     mrp_attr_value_t  attrs[MQI_COLUMN_MAX];
 } owner_row_t;
 
-static mrp_resource_owner_t  resource_owners[MRP_ZONE_MAX * RESOURCE_MAX];
-static mqi_handle_t          owner_tables[RESOURCE_MAX];
+static mrp_resource_owner_t  resource_owners[MRP_ZONE_MAX * MRP_RESOURCE_MAX];
+static mqi_handle_t          owner_tables[MRP_RESOURCE_MAX];
 
 static mrp_resource_owner_t *get_owner(uint32_t, uint32_t);
 static void reset_owners(uint32_t, mrp_resource_owner_t *);
@@ -111,14 +110,14 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
 
     if (!initialized) {
         mqi_open();
-        for (i = 0;  i < RESOURCE_MAX;  i++)
+        for (i = 0;  i < MRP_RESOURCE_MAX;  i++)
             owner_tables[i] = MQI_HANDLE_INVALID;
         initialized = true;
     }
 
     MRP_ASSERT(sizeof(base_coldefs) < sizeof(coldefs),"too many base columns");
     MRP_ASSERT(rdef, "invalid argument");
-    MRP_ASSERT(rdef->id < RESOURCE_MAX, "confused with data structures");
+    MRP_ASSERT(rdef->id < MRP_RESOURCE_MAX, "confused with data structures");
     MRP_ASSERT(owner_tables[rdef->id] == MQI_HANDLE_INVALID,
                "owner table already exist");
 
@@ -163,17 +162,18 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     typedef struct {
         uint32_t replyid;
         mrp_resource_set_t *rset;
+        bool shuffle;
     } event_t;
 
-    mrp_resource_owner_t oldowners[RESOURCE_MAX];
-    mrp_resource_owner_t backup[RESOURCE_MAX];
+    mrp_resource_owner_t oldowners[MRP_RESOURCE_MAX];
+    mrp_resource_owner_t backup[MRP_RESOURCE_MAX];
     mrp_zone_t *zone;
     mrp_application_class_t *class;
     mrp_resource_set_t *rset;
     mrp_resource_t *res;
     mrp_resource_def_t *rdef;
     mrp_resource_mgr_ftbl_t *ftbl;
-    mrp_resource_owner_t *owner, *old;
+    mrp_resource_owner_t *owner, *old, *owners;
     mrp_resource_mask_t mask;
     mrp_resource_mask_t mandatory;
     mrp_resource_mask_t grant;
@@ -181,7 +181,9 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     void *clc, *rsc, *rc;
     uint32_t rid;
     uint32_t rcnt;
+    bool force_release;
     bool changed;
+    bool shuffle;
     uint32_t replyid;
     uint32_t nevent, maxev;
     event_t *events, *ev, *lastev;
@@ -201,7 +203,6 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     reset_owners(zoneid, oldowners);
     manager_start_transaction(zone);
 
-
     rcnt = mrp_resource_definition_count();
     clc  = NULL;
 
@@ -209,6 +210,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
         rsc = NULL;
 
         while ((rset=mrp_application_class_iterate_rsets(class,zoneid,&rsc))) {
+            force_release = false;
             mandatory = rset->resource.mask.mandatory;
             grant = 0;
             advice = 0;
@@ -226,9 +228,17 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
                     if (grant_ownership(owner, zone, class, rset, res))
                         grant |= ((mrp_resource_mask_t)1 << rid);
+                    else {
+                        if (owner->rset != rset)
+                            force_release |= owner->modal;
+                    }
                 }
-                if ((grant & mandatory) == mandatory)
+                owners = get_owner(zoneid, 0);
+                if ((grant & mandatory) == mandatory &&
+                    mrp_resource_lua_veto(zone, rset, owners, grant))
+                {
                     advice = grant;
+                }
                 else {
                     /* rollback, ie. restore the backed up state */
                     rc = NULL;
@@ -252,6 +262,8 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
                     if ((advice & mandatory) != mandatory)
                         advice = 0;
+
+                    mrp_resource_lua_set_owners(zone, owners);
                 }
                 break;
 
@@ -273,15 +285,26 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             }
 
             changed = false;
+            shuffle = false;
             replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
 
-            if (grant != rset->resource.mask.grant) {
-                rset->resource.mask.grant = grant;
-                changed = true;
+            if (force_release) {
+                shuffle = (rset->state != mrp_resource_release);
+                changed = shuffle || rset->resource.mask.grant;
+                rset->state = mrp_resource_release;
+                rset->resource.mask.grant = 0;
+            }
+            else {
+                if (grant != rset->resource.mask.grant) {
+                    rset->resource.mask.grant = grant;
+                    changed = true;
 
-                if (!grant && rset->auto_release)
-                    rset->state = mrp_resource_release;
+                    if (!grant && rset->auto_release) {
+                        rset->state = mrp_resource_release;
+                        shuffle = true;
+                    }
+                }
             }
 
             if (advice != rset->resource.mask.advice) {
@@ -289,11 +312,12 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                 changed = true;
             }
 
-            if ((replyid || changed) && rset->event) {
+            if (replyid || changed) {
                 ev = events + nevent++;
 
                 ev->replyid = replyid;
-                ev->rset = rset;
+                ev->rset    = rset;
+                ev->shuffle = shuffle;
             }
         } /* while rset */
     } /* while class */
@@ -303,9 +327,13 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
         rset = ev->rset;
 
+        if (ev->shuffle)
+            mrp_application_class_move_resource_set(rset);
+
         mrp_resource_set_updated(rset);
 
-        rset->event(ev->replyid, rset, rset->user_data);
+        if (rset->event)
+            rset->event(ev->replyid, rset, rset->user_data);
     }
 
     mrp_free(events);
@@ -397,20 +425,25 @@ int mrp_resource_owner_print(char *buf, int len)
 
 static mrp_resource_owner_t *get_owner(uint32_t zone, uint32_t resid)
 {
-    MRP_ASSERT(zone < MRP_ZONE_MAX && resid < RESOURCE_MAX,"invalid argument");
+    MRP_ASSERT(zone < MRP_ZONE_MAX && resid < MRP_RESOURCE_MAX,
+               "invalid argument");
 
-    return resource_owners + (zone * RESOURCE_MAX + resid);
+    return resource_owners + (zone * MRP_RESOURCE_MAX + resid);
 }
 
 static void reset_owners(uint32_t zone, mrp_resource_owner_t *oldowners)
 {
-    void   *ptr  = get_owner(zone, 0);
-    size_t  size = sizeof(mrp_resource_owner_t) * RESOURCE_MAX;
+    mrp_resource_owner_t *owners = get_owner(zone, 0);
+    size_t size = sizeof(mrp_resource_owner_t) * MRP_RESOURCE_MAX;
+    size_t i;
 
     if (oldowners)
-        memcpy(oldowners, ptr, size);
+        memcpy(oldowners, owners, size);
 
-    memset(ptr, 0, size);
+    memset(owners, 0, size);
+
+    for (i = 0;   i < MRP_RESOURCE_MAX;   i++)
+        owners[i].share = true;
 }
 
 static bool grant_ownership(mrp_resource_owner_t    *owner,
@@ -428,6 +461,9 @@ static bool grant_ownership(mrp_resource_owner_t    *owner,
         return false;
      */
 
+    if (owner->modal)
+        return false;
+
     do { /* not a loop */
         if (!owner->class && !owner->rset) {
             /* nobody owns this, so grab it */
@@ -440,10 +476,9 @@ static bool grant_ownership(mrp_resource_owner_t    *owner,
             break;
         }
 
-        if (owner->share) {
-            /* OK, someone else owns it bu
+        if (rdef->shareable && owner->share) {
+            /* OK, someone else owns it but
                the owner is ready to share it with us */
-            owner->share = res->shared;
             break;
         }
 
@@ -460,8 +495,10 @@ static bool grant_ownership(mrp_resource_owner_t    *owner,
         owner->class = class;
         owner->rset  = rset;
         owner->res   = res;
-        owner->share = res->shared;
+        owner->modal = class->modal;
     }
+
+    owner->share = class->share && res->shared;
 
     return true;
 }
@@ -481,6 +518,9 @@ static bool advice_ownership(mrp_resource_owner_t    *owner,
       if (forbid_grant())
         return false;
      */
+
+    if (owner->modal)
+        return false;
 
     do { /* not a loop */
         if (!owner->class && !owner->rset)

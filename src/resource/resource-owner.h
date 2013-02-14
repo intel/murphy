@@ -35,10 +35,16 @@
 
 
 struct mrp_resource_owner_s {
-    mrp_application_class_t *class;  /**< owner application class */
-    mrp_resource_set_t      *rset;   /**< owner resource set  */
-    mrp_resource_t          *res;    /**< owner resource */
-    bool                     share;  /**< do not use this  */
+    mrp_application_class_t *class;    /**< owner application class */
+    mrp_resource_set_t      *rset;     /**< owner resource set  */
+    mrp_resource_t          *res;      /**< owner resource */
+    /* the following fields are for
+       internal use only. They used during
+       update and have no meaningful values
+       outside of the update procedure */
+    bool                     modal;
+    bool                     share;
+    bool                     release;
 };
 
 

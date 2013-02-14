@@ -46,6 +46,7 @@
 typedef union  mrp_funcbridge_value_u  mrp_funcbridge_value_t;
 typedef enum   mrp_funcbridge_type_e   mrp_funcbridge_type_t;
 typedef struct mrp_funcbridge_s        mrp_funcbridge_t;
+typedef struct mrp_funcarray_s         mrp_funcarray_t;
 
 typedef bool (*mrp_funcbridge_cfunc_t)(lua_State *, void *,
                                        const char *, mrp_funcbridge_value_t *,
@@ -76,8 +77,17 @@ struct mrp_funcbridge_s {
     int                     refcnt;
 };
 
+struct mrp_funcarray_s {
+    size_t             nfunc;
+    mrp_funcbridge_t **funcs;
+    int                luatbl;
+};
 
-void              mrp_create_funcbridge_class(lua_State *);
+
+void mrp_create_funcbridge_class(lua_State *);
+void mrp_create_funcarray_class(lua_State *);
+
+
 mrp_funcbridge_t *mrp_funcbridge_create_cfunc(lua_State *, const char *,
                                               const char *,
                                               mrp_funcbridge_cfunc_t, void *);
@@ -91,6 +101,13 @@ bool              mrp_funcbridge_call_from_c(lua_State *,  mrp_funcbridge_t *,
                                              mrp_funcbridge_value_t *);
 mrp_funcbridge_t *mrp_funcbridge_check(lua_State *, int);
 int               mrp_funcbridge_push(lua_State *, mrp_funcbridge_t *);
+
+mrp_funcarray_t  *mrp_funcarray_create(lua_State *);
+bool              mrp_funcarray_call_from_c(lua_State *, mrp_funcarray_t *,
+                                            const char *,
+                                            mrp_funcbridge_value_t *);
+mrp_funcarray_t  *mrp_funcarray_check(lua_State *, int);
+
 
 
 #endif  /* __MURPHY_LUA_FUNCBRIDGE_H__ */

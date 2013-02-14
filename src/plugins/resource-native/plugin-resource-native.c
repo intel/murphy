@@ -52,7 +52,6 @@
 #include <murphy/resource/config-api.h>
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
-#include <murphy/resource/config-lua.h>
 
 #define ATTRIBUTE_MAX MRP_ATTRIBUTE_MAX
 
@@ -161,23 +160,16 @@ static void print_zones_cb(mrp_console_t *c, void *user_data,
 static void print_classes_cb(mrp_console_t *c, void *user_data,
                              int argc, char **argv)
 {
-    const char **class_names;
-    int i;
+    char buf[8192];
 
     MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    printf("Application classes:\n");
+    mrp_application_class_print(buf, sizeof(buf), false);
 
-    if ((class_names = mrp_application_class_get_all_names(0, NULL))) {
-
-        for (i = 0;  class_names[i];  i++)
-            printf("   %s\n", class_names[i]);
-
-        mrp_free(class_names);
-    }
+    printf("%s", buf);
 }
 
 
@@ -191,7 +183,7 @@ static void print_sets_cb(mrp_console_t *c, void *user_data,
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    mrp_application_class_print(buf, sizeof(buf));
+    mrp_application_class_print(buf, sizeof(buf), true);
 
     printf("%s", buf);
 }
@@ -575,8 +567,10 @@ static int read_resource(mrp_resource_set_t *rset, mrp_msg_t *req,void **pcurs)
     mrp_log_info("   resource: name:'%s' %s %s", name,
                  mand?"mandatory":"optional ", shared?"shared":"exclusive");
 
-    for (i = 0, arst = 0;    i < ATTRIBUTE_MAX && arst == 0;    i++)
-        arst = read_attribute(req, attrs + i, pcurs);
+    for (i = 0, arst = 0;    i < ATTRIBUTE_MAX;    i++) {
+        if ((arst = read_attribute(req, attrs + i, pcurs)))
+            break;
+    }
 
     memset(attrs + i, 0, sizeof(mrp_attr_t));
 
@@ -596,22 +590,24 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
 {
     static uint16_t reqtyp = RESPROTO_CREATE_RESOURCE_SET;
 
-    resource_data_t    *data   = client->data;
-    mrp_plugin_t       *plugin = data->plugin;
-    mrp_resource_set_t *rset   = 0;
-    mrp_msg_t          *rpl;
-    uint32_t            flags;
-    uint32_t            priority;
-    const char         *class;
-    const char         *zone;
-    uint16_t            tag;
-    uint16_t            type;
-    size_t              size;
-    mrp_msg_value_t     value;
-    uint32_t            rsid;
-    int                 arst;
-    int32_t             status;
-    bool                auto_release;
+    resource_data_t        *data   = client->data;
+    mrp_plugin_t           *plugin = data->plugin;
+    mrp_resource_set_t     *rset   = 0;
+    mrp_msg_t              *rpl;
+    uint32_t                flags;
+    uint32_t                priority;
+    const char             *class;
+    const char             *zone;
+    uint16_t                tag;
+    uint16_t                type;
+    size_t                  size;
+    mrp_msg_value_t         value;
+    uint32_t                rsid;
+    int                     arst;
+    int32_t                 status;
+    bool                    auto_release;
+    bool                    auto_acquire;
+    mrp_resource_event_cb_t event_cb;
 
     MRP_ASSERT(client, "invalid argument");
     MRP_ASSERT(client->rscli, "confused with data structures");
@@ -648,9 +644,15 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
                  flags, priority, class, zone);
 
     auto_release = (flags & RESPROTO_RSETFLAG_AUTORELEASE);
+    auto_acquire = (flags & RESPROTO_RSETFLAG_AUTOACQUIRE);
+
+    if (flags & RESPROTO_RSETFLAG_NOEVENTS)
+        event_cb = NULL;
+    else
+        event_cb = resource_event_handler;
 
     rset = mrp_resource_set_create(client->rscli, auto_release, priority,
-                                   resource_event_handler, client);
+                                   event_cb, client);
     if (!rset)
         goto reply;
 
@@ -660,6 +662,8 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
         ;
 
     if (arst > 0) {
+        if (auto_acquire)
+            mrp_resource_set_acquire(rset,seqno);
         if (mrp_application_class_add_resource_set(class,zone,rset,seqno) == 0)
             status = 0;
     }
@@ -1038,23 +1042,9 @@ static int initiate_transport(mrp_plugin_t *plugin)
 
 static void initiate_lua_configuration(mrp_plugin_t *plugin)
 {
-    static bool initialised = false;
-
-    lua_State *L;
-
     MRP_UNUSED(plugin);
 
-    if (!initialised && (L =  mrp_lua_get_lua_state())) {
-
-        mrp_lua_create_application_class(L);
-        mrp_lua_create_zone_class(L);
-        mrp_lua_create_resource_class_class(L);
-
-        mrp_debug("lua classes are ready for resource "
-                  "configuration and management");
-
-        initialised = true;
-    }
+    mrp_resource_configuration_init();
 }
 
 static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,

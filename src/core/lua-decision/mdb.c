@@ -434,7 +434,7 @@ int mrp_lua_dependency_add(lua_State *L, const char *name)
         if (lua_isnil(L, -1)) {
             lua_pop(L, 1);
 
-            if ((dep = mrp_lua_create_object(L, DEPENDENCY_CLASS, name)))
+            if ((dep = mrp_lua_create_object(L, DEPENDENCY_CLASS, name,0)))
                 refcnt = dep->refcnt = 1;
             else
                 luaL_error(L, "failed to create MDB dependency '%s'", name);
@@ -463,7 +463,7 @@ static int table_create_from_lua(lua_State *L)
 
     MRP_LUA_ENTER;
 
-    tbl = (mrp_lua_mdb_table_t *)mrp_lua_create_object(L, TABLE_CLASS, NULL);
+    tbl = (mrp_lua_mdb_table_t *)mrp_lua_create_object(L, TABLE_CLASS, NULL,0);
 
     tbl->builtin = true;
     tbl->handle = MQI_HANDLE_INVALID;
@@ -985,7 +985,7 @@ static int select_create_from_lua(lua_State *L)
 
     MRP_LUA_ENTER;
 
-    sel = (mrp_lua_mdb_select_t *)mrp_lua_create_object(L, SELECT_CLASS, NULL);
+    sel = (mrp_lua_mdb_select_t *)mrp_lua_create_object(L,SELECT_CLASS,NULL,0);
 
     MRP_LUA_FOREACH_FIELD(L, 2, fldnam, fldnamlen) {
 
