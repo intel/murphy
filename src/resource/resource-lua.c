@@ -64,7 +64,8 @@ enum field_e {
     RESOURCE_SET,
     ATTRIBUTES,
     RESOURCE,
-    STATE
+    STATE,
+    ID
 };
 
 struct ownerref_s {
@@ -428,7 +429,9 @@ static int ownerref_getfield(lua_State *L)
 
 static int ownerref_setfield(lua_State *L)
 {
-    mrp_resource_owner_t *owner = ownerref_check(L, 1);
+    /* mrp_resource_owner_t *owner = ownerref_check(L, 1); */
+
+    MRP_UNUSED(L);
 
     MRP_LUA_ENTER;
 
@@ -477,6 +480,10 @@ static int setref_getfield(lua_State *L)
 
         switch (field) {
 
+        case ID:
+            lua_pushinteger(L, rset->id);
+            break;
+
         case STATE:
             switch (rset->state) {
             case mrp_resource_no_request:  state = "no_request";  break;
@@ -485,6 +492,10 @@ static int setref_getfield(lua_State *L)
             default:                       state = "<invalid>";   break;
             }
             lua_pushstring(L, state);
+            break;
+
+        case APPLICATION_CLASS:
+            lua_pushstring(L, rset->class.ptr->name);
             break;
 
         default:
@@ -602,6 +613,11 @@ static field_t field_check(lua_State *L, int idx, const char **ret_fldnam)
 static field_t field_name_to_type(const char *name, size_t len)
 {
     switch (len) {
+
+    case 2:
+        if (!strcmp(name, "id"))
+            return ID;
+        break;
 
     case 5:
         if (!strcmp(name, "state"))
