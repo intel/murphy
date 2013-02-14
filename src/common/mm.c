@@ -168,19 +168,21 @@ static memblk_t *memblk_resize(memblk_t *blk, size_t size, const char *file,
         resized = realloc(blk, __mm.hdrsize + size);
 
         if (resized != NULL) {
-            mrp_list_append(&__mm.blocks, &blk->hook);
+            mrp_list_init(&resized->hook);
 
-            __mm.cur_alloc -= blk->size;
+            mrp_list_append(&__mm.blocks, &resized->hook);
+
+            __mm.cur_alloc -= resized->size;
             __mm.cur_alloc += size;
             __mm.max_alloc  = MRP_MAX(__mm.max_alloc, __mm.cur_alloc);
 
-            blk->file = file;
-            blk->line = line;
-            blk->func = func;
+            resized->file = file;
+            resized->line = line;
+            resized->func = func;
 
-            memcpy(blk->bt, bt, __mm.depth * sizeof(*bt));
+            memcpy(resized->bt, bt, __mm.depth * sizeof(*bt));
 
-            blk->size = size;
+            resized->size = size;
         }
         else
             mrp_list_append(&__mm.blocks, &blk->hook);
