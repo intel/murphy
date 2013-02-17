@@ -1145,7 +1145,7 @@ static int select_update(lua_State *L, int tbl, mrp_lua_mdb_select_t *sel)
         }
         else {
             sel->result = result;
-            nrow = mql_result_rows_get_row_column_count(result);
+            nrow = mql_result_rows_get_row_count(result);
         }
     }
 
