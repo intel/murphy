@@ -157,6 +157,9 @@ void *mrp_lua_create_object(lua_State          *L,
         lua_rawseti(L, class, idx);
     }
 
+    if (class)
+        lua_remove(L, class);
+
     return (void *)(userdata + 1);
 }
 
