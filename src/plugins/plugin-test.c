@@ -50,6 +50,7 @@ enum {
     ARG_DOUBLE1,
     ARG_FAILINIT,
     ARG_FAILEXIT,
+    ARG_REST,
 };
 
 
@@ -394,7 +395,7 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 
 static int test_init(mrp_plugin_t *plugin)
 {
-    mrp_plugin_arg_t *args;
+    mrp_plugin_arg_t *args, *arg;
     test_data_t      *data;
 
     mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
@@ -410,6 +411,26 @@ static int test_init(mrp_plugin_t *plugin)
     printf("  double:  %f\n", args[ARG_DOUBLE1].dbl);
     printf("init fail: %s\n", args[ARG_FAILINIT].bln ? "TRUE" : "FALSE");
     printf("exit fail: %s\n", args[ARG_FAILEXIT].bln ? "TRUE" : "FALSE");
+
+    mrp_plugin_foreach_undecl_arg(&args[ARG_REST], arg) {
+        mrp_log_info("got argument %s of type 0x%x", arg->key, arg->type);
+    }
+
+    {
+        char *rkeys[] = { "foo", "bar", "foobar", "barfoo", NULL };
+        int   i;
+
+        for (i = 0; rkeys[i] != NULL; i++) {
+            arg = mrp_plugin_find_undecl_arg(&args[ARG_REST], rkeys[i], 0);
+
+            if (arg != NULL)
+                mrp_log_info("found undeclared arg '%s' (type 0x%x)", arg->key,
+                             arg->type);
+            else
+                mrp_log_info("undeclared arg '%s' not found", arg->key);
+        }
+    }
+
 
 #if 0
     if (!export_methods(plugin))
@@ -468,6 +489,7 @@ static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_DOUBLE1 , DOUBLE, "double"  , -3.141           ),
     MRP_PLUGIN_ARGIDX(ARG_FAILINIT, BOOL  , "failinit", FALSE            ),
     MRP_PLUGIN_ARGIDX(ARG_FAILEXIT, BOOL  , "failexit", FALSE            ),
+    MRP_PLUGIN_ARGIDX(ARG_REST    , UNDECL, NULL      , NULL             ),
 };
 
 static mrp_method_descr_t exports[] = {

@@ -364,8 +364,8 @@ int mrp_request_plugin(mrp_context_t *ctx, const char *name,
 
 int mrp_unload_plugin(mrp_plugin_t *plugin)
 {
-    mrp_plugin_arg_t *pa, *da;
-    int               i;
+    mrp_plugin_arg_t *pa, *da, *ra;
+    int               i, j;
 
     if (plugin != NULL) {
         if (plugin->refcnt == 0) {
@@ -375,9 +375,19 @@ int mrp_unload_plugin(mrp_plugin_t *plugin)
             da = plugin->descriptor->args;
             if (pa != da) {
                 for (i = 0; i < plugin->descriptor->narg; i++, pa++, da++) {
-                    if (pa->type == MRP_PLUGIN_ARG_TYPE_STRING)
+                    if (pa->type == MRP_PLUGIN_ARG_TYPE_STRING) {
                         if (pa->str != da->str)
                             mrp_free(pa->str);
+                    }
+                    else if (pa->type == MRP_PLUGIN_ARG_TYPE_UNDECL) {
+                        for (j = 0, ra = pa->rest.args;
+                             j < pa->rest.narg;
+                             j++, ra++) {
+                            mrp_free(ra->key);
+                            if (ra->type == MRP_PLUGIN_ARG_TYPE_STRING)
+                                mrp_free(ra->str);
+                        }
+                    }
                 }
                 mrp_free(plugin->args);
             }
@@ -638,11 +648,102 @@ static int parse_plugin_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *parg)
 }
 
 
+static int parse_undeclared_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *pa)
+{
+    mrp_plugin_arg_t *a;
+    char             *value, *end;
+
+    if (mrp_reallocz(pa->rest.args, pa->rest.narg, pa->rest.narg + 1)) {
+        a = pa->rest.args + pa->rest.narg++;
+        a->key = mrp_strdup(arg->key);
+
+        if (a->key == NULL)
+            return FALSE;
+
+        if (!strncmp(arg->str, "string:", 7)) {
+            value = arg->str + 7;
+        string:
+            a->type = MRP_PLUGIN_ARG_TYPE_STRING;
+            a->str  = mrp_strdup(value);
+
+            if (a->str != NULL)
+                return TRUE;
+            else
+                return FALSE;
+        }
+        else if (!strncmp(arg->str, "bool:", 5)) {
+            a->type = MRP_PLUGIN_ARG_TYPE_BOOL;
+            if      (!strcasecmp(arg->str + 5, "TRUE"))  a->bln = TRUE;
+            else if (!strcasecmp(arg->str + 5, "FALSE")) a->bln = FALSE;
+            else                                         return FALSE;
+        }
+        else if (!strncmp(arg->str, "int32:", 6)) {
+            a->type = MRP_PLUGIN_ARG_TYPE_INT32;
+            a->i32  = (int32_t)strtol(arg->str + 6, &end, 0);
+
+            if (end && !*end)
+                return TRUE;
+            else
+                return FALSE;
+        }
+        else if (!strncmp(arg->str, "uint32:", 7)) {
+            a->type = MRP_PLUGIN_ARG_TYPE_UINT32;
+            a->u32  = (uint32_t)strtoul(arg->str + 7, &end, 0);
+
+            if (end && !*end)
+                return TRUE;
+            else
+                return FALSE;
+        }
+        else if (!strncmp(arg->str, "double:", 7)) {
+            a->type = MRP_PLUGIN_ARG_TYPE_DOUBLE;
+            a->dbl  = strtod(arg->str + 7, &end);
+
+            if (end && !*end)
+                return TRUE;
+            else
+                return FALSE;
+        }
+        else {
+            if (!strcasecmp(arg->str, "TRUE") ||
+                !strcasecmp(arg->str, "FALSE")) {
+                a->type = MRP_PLUGIN_ARG_TYPE_BOOL;
+                a->bln  = arg->str[0] == 't' || arg->str[0] == 'T';
+
+                return TRUE;
+            }
+            if (arg->str[0] == '-' || arg->str[0] == '+' ||
+                (arg->str[0] == '0' && arg->str[1] == 'x') ||
+                ('0' <= arg->str[0] && arg->str[0] <= '9')) {
+                a->i32 = strtol(arg->str, &end, 0);
+
+                if (end && !*end) {
+                    a->type = MRP_PLUGIN_ARG_TYPE_INT32;
+                    return TRUE;
+                }
+                a->dbl = strtod(arg->str, &end);
+
+                if (end && !*end) {
+                    a->type = MRP_PLUGIN_ARG_TYPE_DOUBLE;
+                    return TRUE;
+                }
+            }
+            else {
+                value = arg->str;
+                goto string;
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+
 static int parse_plugin_args(mrp_plugin_t *plugin,
                              mrp_plugin_arg_t *argv, int argc)
 {
     mrp_plugin_descr_t *descr;
-    mrp_plugin_arg_t   *valid, *args, *pa, *a;
+    mrp_plugin_arg_t   *valid, *args, *pa, *a, *rest;
     int                 i, j, cnt;
 
     if (argv == NULL) {
@@ -668,11 +769,17 @@ static int parse_plugin_args(mrp_plugin_t *plugin,
     memcpy(args, descr->args, descr->narg * sizeof(*args));
     plugin->args = args;
 
-    j = 0;
+    rest = NULL;
+    j    = 0;
     for (i = 0, a = argv; i < argc; i++, a++) {
         for (cnt = 0, pa = NULL; pa == NULL && cnt < descr->narg; cnt++) {
-            if (!strcmp(a->key, args[j].key))
-                pa = args + j;
+            if (args[j].type != MRP_PLUGIN_ARG_TYPE_UNDECL) {
+                if (!strcmp(a->key, args[j].key))
+                    pa = args + j;
+            }
+            else
+                rest = args + j;
+
             if (++j >= descr->narg)
                 j = 0;
         }
@@ -680,6 +787,13 @@ static int parse_plugin_args(mrp_plugin_t *plugin,
         if (pa != NULL) {
             if (!parse_plugin_arg(a, pa)) {
                 mrp_log_error("Invalid argument '%s' for plugin '%s'.",
+                              a->key, plugin->instance);
+                return FALSE;
+            }
+        }
+        else if (rest != NULL) {
+            if (!parse_undeclared_arg(a, rest)) {
+                mrp_log_error("Failed to parse argument '%s' for plugin '%s'.",
                               a->key, plugin->instance);
                 return FALSE;
             }
@@ -692,6 +806,21 @@ static int parse_plugin_args(mrp_plugin_t *plugin,
     }
 
     return TRUE;
+}
+
+
+mrp_plugin_arg_t *mrp_plugin_find_undecl_arg(mrp_plugin_arg_t *unspec,
+                                             const char *key,
+                                             mrp_plugin_arg_type_t type)
+{
+    mrp_plugin_arg_t *arg;
+    int               i;
+
+    for (i = 0, arg = unspec->rest.args; i < unspec->rest.narg; i++, arg++)
+        if (!strcmp(arg->key, key) && (!type || type == arg->type))
+            return arg;
+
+    return NULL;
 }
 
 

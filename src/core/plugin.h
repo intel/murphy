@@ -83,10 +83,13 @@ typedef enum {
     MRP_PLUGIN_ARG_TYPE_UINT32,
     MRP_PLUGIN_ARG_TYPE_INT32,
     MRP_PLUGIN_ARG_TYPE_DOUBLE,
+    MRP_PLUGIN_ARG_TYPE_UNDECL,
     /* add more as needed */
 } mrp_plugin_arg_type_t;
 
-typedef struct {
+typedef struct mrp_plugin_arg_s mrp_plugin_arg_t;
+
+struct mrp_plugin_arg_s {
     char                  *key;          /* plugin argument name */
     mrp_plugin_arg_type_t  type;         /* plugin argument type */
     union {                              /* default/supplied value */
@@ -95,8 +98,12 @@ typedef struct {
         uint32_t           u32;          /* 32-bit unsigned values */
         int32_t            i32;          /* 32-bit signed values */
         double             dbl;          /* double prec. floating pt. values */
+        struct {                         /* other undeclared arguments */
+            mrp_plugin_arg_t *args;
+            int               narg;
+        } rest;
     };
-} mrp_plugin_arg_t;
+};
 
 
 /** Macro for declaring a plugin argument table. */
@@ -121,6 +128,9 @@ typedef struct {
 #define MRP_PLUGIN_ARG_DOUBLE(name, defval)                                \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_DOUBLE, { dbl: defval } }
 
+#define MRP_PLUGIN_ARG_UNDECL(name, defval)                                \
+    { key: "*", type: MRP_PLUGIN_ARG_TYPE_UNDECL,  { str: NULL } }
+
 /** Similar convenience macros for indexed argument access. */
 #define MRP_PLUGIN_ARGIDX_STRING(idx, name, defval) \
     [idx] MRP_PLUGIN_ARG_STRING(name, defval)
@@ -139,6 +149,16 @@ typedef struct {
 
 #define MRP_PLUGIN_ARGIDX_DOUBLE(idx, name, defval) \
     [idx] MRP_PLUGIN_ARG_DOUBLE(name, defval)
+
+#define MRP_PLUGIN_ARGIDX_UNDECL(idx, name, defval) \
+    [idx] MRP_PLUGIN_ARG_UNDECL(name, defval)
+
+/** Macro for looping through all collected undeclared arguments. */
+#define mrp_plugin_foreach_undecl_arg(_undecl, _arg)                    \
+    for ((_arg) = (_undecl)->rest.args;                                 \
+         (_arg) - (_undecl)->rest.args < (_undecl)->rest.narg;          \
+         (_arg)++)
+
 
 /**
  * Generic convenience macro for indexed argument access.
@@ -397,6 +417,11 @@ int mrp_start_plugin(mrp_plugin_t *plugin);
 int mrp_stop_plugin(mrp_plugin_t *plugin);
 int mrp_request_plugin(mrp_context_t *ctx, const char *name,
                        const char *instance);
+
+mrp_plugin_arg_t *mrp_plugin_find_undecl_arg(mrp_plugin_arg_t *undecl,
+                                             const char *key,
+                                             mrp_plugin_arg_type_t type);
+
 
 static inline mrp_plugin_t *mrp_ref_plugin(mrp_plugin_t *plugin)
 {
