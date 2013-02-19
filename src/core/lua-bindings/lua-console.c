@@ -119,6 +119,35 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
+static void debug_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    mrp_lua_debug_t level;
+
+    MRP_UNUSED(c);
+    MRP_UNUSED(user_data);
+
+    if (argc == 3) {
+        if      (!strcmp(argv[2], "disable"))  level = MRP_LUA_DEBUG_DISABLED;
+        else if (!strcmp(argv[2], "enable"))   level = MRP_LUA_DEBUG_ENABLED;
+        else if (!strcmp(argv[2], "detailed")) level = MRP_LUA_DEBUG_DETAILED;
+        else {
+            printf("Invalid Lua debug level '%s'.\n", argv[2]);
+            printf("The valid levels are: disable, enable, detailed.\n");
+            return;
+        }
+
+        if (mrp_lua_set_debug(level))
+            printf("Lua debugging level set to '%s'.\n", argv[2]);
+        else
+            printf("Failed to set Lua debugging level to '%s'.\n", argv[2]);
+    }
+    else {
+        printf("Invalid usage.\n");
+        printf("Argument must be disable, enable, or detailed.\n");
+    }
+}
+
+
 #define LUA_GROUP_DESCRIPTION                                    \
     "Lua commands allows one to evaluate Lua code either from\n" \
     "the console command line itself, or from sourced files.\n"
@@ -136,10 +165,16 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 #define SOURCE_SUMMARY     "evaluate the Lua script from the given <lua-file>"
 #define SOURCE_DESCRIPTION "Read and evaluate the contents of <lua-file>.\n"
 
+#define DEBUG_SYNTAX       "debug {disable, enable, detailed}"
+#define DEBUG_SUMMARY      "configure Murphy Lua debugging."
+#define DEBUG_DESCRIPTION  "Configure Murphy Lua debugging."
+
 MRP_CORE_CONSOLE_GROUP(lua_group, "lua", LUA_GROUP_DESCRIPTION, NULL, {
         MRP_TOKENIZED_CMD("source", source_cb, FALSE,
                           SOURCE_SYNTAX, SOURCE_SUMMARY, SOURCE_DESCRIPTION),
         MRP_RAWINPUT_CMD("eval", eval_cb,
                          MRP_CONSOLE_CATCHALL | MRP_CONSOLE_SELECTABLE,
                          EVAL_SYNTAX, EVAL_SUMMARY, EVAL_DESCRIPTION),
+        MRP_TOKENIZED_CMD("debug", debug_cb, FALSE,
+                          DEBUG_SYNTAX, DEBUG_SUMMARY, DEBUG_DESCRIPTION),
     });

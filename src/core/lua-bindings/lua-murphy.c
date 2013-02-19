@@ -40,7 +40,7 @@
 
 static mrp_context_t *context;
 static MRP_LIST_HOOK(bindings);
-
+static int debug_level;
 
 static int create_murphy_object(lua_State *L)
 {
@@ -195,4 +195,101 @@ lua_State *mrp_lua_get_lua_state(void)
         return context->lua_state;
     else
         return NULL;
+}
+
+
+static void lua_debug(lua_State *L, lua_Debug *ar)
+{
+    if (ar->event != LUA_HOOKTAILRET)
+        lua_getinfo(L, "Snl", ar);
+
+    switch (ar->event) {
+    case LUA_HOOKCALL:
+        if (ar->what && ar->what[0] == 'C')
+            mrp_debug("=> <Lua C function>");
+        else if (ar->what && ar->what[0] == 'L') {
+            mrp_debug("=> %s@%s:%d",
+                      ar->name ? ar->name : "",
+                      ar->source ? ar->source  + 1: "<unknown>",
+                      ar->currentline);
+        }
+        else
+            mrp_debug("=> %s", ar->what ? ar->what : "<unknown>");
+        break;
+
+    case LUA_HOOKRET:
+        mrp_debug("<= (return)");
+        break;
+
+    case LUA_HOOKTAILRET:
+        mrp_debug("<= (tail return)");
+        break;
+
+    case LUA_HOOKLINE:
+        if (ar->what && ar->what[0] == 'C')
+            mrp_debug(" @ <Lua function in C>");
+        else if (ar->what && ar->what[0] == 'L') {
+            mrp_debug(" @ %s:%d",
+                      ar->source ? ar->source  + 1: "<unknown>",
+                      ar->currentline);
+        }
+        else
+            mrp_debug(" @ %s", ar->what ? ar->what : "<unknown>");
+        break;
+
+    default:
+        break;
+    }
+}
+
+
+static int setup_debug_hook(int mask)
+{
+    mrp_context_t *ctx     = mrp_lua_get_murphy_context();
+    lua_State     *L       = ctx ? ctx->lua_state : NULL;
+
+    return (L != NULL && lua_sethook(L, lua_debug, mask, 0));
+}
+
+
+static void clear_debug_hook(void)
+{
+    mrp_context_t *ctx = mrp_lua_get_murphy_context();
+    lua_State     *L   = ctx ? ctx->lua_state : NULL;
+
+    if (L != NULL)
+        lua_sethook(L, lua_debug, 0, 0);
+}
+
+
+
+
+int mrp_lua_set_debug(mrp_lua_debug_t level)
+{
+    int success;
+
+    if (debug_level)
+        clear_debug_hook();
+
+    switch (level) {
+    case MRP_LUA_DEBUG_DISABLED:
+        success = TRUE;
+        break;
+
+    case MRP_LUA_DEBUG_ENABLED:
+        success = setup_debug_hook(LUA_MASKCALL | LUA_MASKRET);
+        break;
+
+    case MRP_LUA_DEBUG_DETAILED:
+        success = setup_debug_hook(LUA_MASKCALL | LUA_MASKRET | LUA_MASKLINE);
+        break;
+
+    default:
+        success = FALSE;
+    }
+
+    if (success)
+        debug_level = level;
+
+    return success;
 }

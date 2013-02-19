@@ -83,5 +83,17 @@ int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b);
 /** Check and get murphy context for the bindings. */
 mrp_context_t *mrp_lua_check_murphy_context(lua_State *L, int index);
 
+/*
+ * level of debugging detail
+ */
+
+typedef enum {
+    MRP_LUA_DEBUG_DISABLED = 0,          /* debugging disabled */
+    MRP_LUA_DEBUG_ENABLED,               /* debugging enabled  */
+    MRP_LUA_DEBUG_DETAILED,              /* detailed debugging enabled */
+} mrp_lua_debug_t;
+
+/** Configure murphy lua debugging. */
+int mrp_lua_set_debug(mrp_lua_debug_t level);
 
 #endif /* __MURPHY_LUA_BINDINGS_H__ */
