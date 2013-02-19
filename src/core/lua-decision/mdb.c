@@ -1685,7 +1685,7 @@ static void adjust_lua_table_size(lua_State *L,
     }
 
     if (old_size > new_size) {
-        for (rowidx = old_size - 1;  rowidx >= new_size;   rowidx--) {
+        for (rowidx = new_size; rowidx < old_size; rowidx++) {
             lua_pushinteger(L, (int)(rowidx+1));
             lua_pushnil(L);
             lua_rawset(L, tbl);
