@@ -118,8 +118,8 @@ void input_cb(brl_t *brl, const char *input, void *user_data)
         brl_show_prompt(brl);
         return;
     }
-
-    client_error("failed to send request to server.");
+    else
+        return;
 }
 
 
