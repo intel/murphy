@@ -93,7 +93,12 @@ static void transaction_event_cb(mqi_event_t *e, void *user_data)
     switch (e->event) {
     case mqi_transaction_end:
         mrp_debug("transaction ended");
-        schedule_notification(pdp);
+        if (mqi_get_transaction_depth() == 1) {
+            mrp_debug("was not nested, scheduling notification");
+            schedule_notification(pdp);
+        }
+        else
+            mrp_debug("was nested");
         break;
 
     case mqi_transaction_start:
