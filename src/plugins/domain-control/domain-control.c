@@ -31,17 +31,20 @@
 
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
+#include <murphy/common/wsck-transport.h>
 
 #include "proxy.h"
-#include "table.h"
 #include "message.h"
+#include "table.h"
 #include "notify.h"
 #include "domain-control.h"
 
-static int create_transports(pdp_t *pdp);
-static void destroy_transports(pdp_t *pdp);
+static mrp_transport_t *create_transport(pdp_t *pdp, const char *address);
+static void destroy_transport(mrp_transport_t *t);
 
-pdp_t *create_domain_control(mrp_context_t *ctx, const char *address)
+pdp_t *create_domain_control(mrp_context_t *ctx,
+                             const char *extaddr, const char *intaddr,
+                             const char *wrtaddr, const char *httpdir)
 {
     pdp_t *pdp;
 
@@ -49,12 +52,38 @@ pdp_t *create_domain_control(mrp_context_t *ctx, const char *address)
 
     if (pdp != NULL) {
         pdp->ctx     = ctx;
-        pdp->address = address;
+        pdp->address = extaddr;
 
-        if (init_proxies(pdp) && init_tables(pdp) && create_transports(pdp))
-            return pdp;
-        else
-            destroy_domain_control(pdp);
+        if (init_proxies(pdp) && init_tables(pdp)) {
+
+            if (extaddr && *extaddr)
+                pdp->extt = create_transport(pdp, extaddr);
+
+            if (intaddr && *intaddr)
+                pdp->intt = create_transport(pdp, intaddr);
+
+            if (wrtaddr && *wrtaddr) {
+                pdp->wrtt = create_transport(pdp, wrtaddr);
+
+                if (pdp->wrtt != NULL) {
+                    const char *sm_opt = MRP_WSCK_OPT_SENDMODE;
+                    const char *sm_val = MRP_WSCK_SENDMODE_TEXT;
+                    const char *hd_opt = MRP_WSCK_OPT_HTTPDIR;
+                    const char *hd_val = httpdir;
+
+                    mrp_transport_setopt(pdp->wrtt, sm_opt, sm_val);
+                    mrp_transport_setopt(pdp->wrtt, hd_opt, hd_val);
+                }
+            }
+
+
+            if ((!extaddr || !*extaddr || pdp->extt != NULL) &&
+                (!intaddr || !*intaddr || pdp->intt != NULL) &&
+                (!wrtaddr || !*wrtaddr || pdp->wrtt != NULL))
+                return pdp;
+        }
+
+        destroy_domain_control(pdp);
     }
 
     return NULL;
@@ -66,7 +95,9 @@ void destroy_domain_control(pdp_t *pdp)
     if (pdp != NULL) {
         destroy_proxies(pdp);
         destroy_tables(pdp);
-        destroy_transports(pdp);
+        destroy_transport(pdp->extt);
+        destroy_transport(pdp->intt);
+        destroy_transport(pdp->wrtt);
 
         mrp_free(pdp);
     }
@@ -98,220 +129,178 @@ void schedule_notification(pdp_t *pdp)
 }
 
 
-static void send_ack_reply(mrp_transport_t *t, uint32_t seq)
+static int msg_send_message(pep_proxy_t *proxy, msg_t *msg)
 {
-    mrp_msg_t *msg;
+    mrp_msg_t *tmsg;
 
-    msg = create_ack_message(seq);
+    tmsg = msg_encode_message(msg);
 
-    if (msg != NULL) {
-        mrp_transport_send(t, msg);
-        mrp_msg_unref(msg);
+    if (tmsg != NULL) {
+        mrp_transport_send(proxy->t, tmsg);
+        mrp_msg_unref(tmsg);
+
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
+
+static int msg_send_ack(pep_proxy_t *proxy, uint32_t seq)
+{
+    ack_msg_t ack;
+
+    mrp_clear(&ack);
+    ack.type = MSG_TYPE_ACK;
+    ack.seq  = seq;
+
+    return proxy->ops->send_msg(proxy, (msg_t *)&ack);
+}
+
+
+static int msg_send_nak(pep_proxy_t *proxy, uint32_t seq,
+                        int32_t error, const char *msg)
+{
+    nak_msg_t nak;
+
+    mrp_clear(&nak);
+    nak.type   =  MSG_TYPE_NAK;
+    nak.seq    = seq;
+    nak.error  = error;
+    nak.msg    = msg;
+
+    return proxy->ops->send_msg(proxy, (msg_t *)&nak);
+}
+
+
+
+static void process_register(pep_proxy_t *proxy, register_msg_t *reg)
+{
+    int         error;
+    const char *errmsg;
+
+    if (register_proxy(proxy, reg->name, reg->tables, reg->ntable,
+                       reg->watches, reg->nwatch, &error, &errmsg)) {
+        msg_send_ack(proxy, reg->seq);
+        proxy->notify_all = TRUE;
+        schedule_notification(proxy->pdp);
+    }
+    else
+        msg_send_nak(proxy, reg->seq, error, errmsg);
+}
+
+
+static void process_unregister(pep_proxy_t *proxy, unregister_msg_t *unreg)
+{
+    msg_send_ack(proxy, unreg->seq);
+}
+
+
+static void process_set(pep_proxy_t *proxy, set_msg_t *set)
+{
+    int         error;
+    const char *errmsg;
+
+    if (set_proxy_tables(proxy, set->tables, set->ntable, &error, &errmsg)) {
+        msg_send_ack(proxy, set->seq);
+    }
+    else
+        msg_send_nak(proxy, set->seq, error, errmsg);
+}
+
+
+static void process_message(pep_proxy_t *proxy, msg_t *msg)
+{
+    char *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+
+    switch (msg->any.type) {
+    case MSG_TYPE_REGISTER:
+        process_register(proxy, &msg->reg);
+        break;
+    case MSG_TYPE_UNREGISTER:
+        process_unregister(proxy, &msg->unreg);
+        break;
+    case MSG_TYPE_SET:
+        process_set(proxy, &msg->set);
+        break;
+    default:
+        mrp_log_error("Unexpected message 0x%x from client %s.",
+                      msg->any.type, name);
+        break;
     }
 }
 
 
-static void send_nak_reply(mrp_transport_t *t, uint32_t seq, int error,
-                           const char *errmsg)
+static int msg_op_send_msg(pep_proxy_t *proxy, msg_t *msg)
 {
-    mrp_msg_t *msg;
-
-    msg = create_nak_message(seq, error, errmsg);
-
-    if (msg != NULL) {
-        mrp_transport_send(t, msg);
-        mrp_msg_unref(msg);
-    }
+    return msg_send_message(proxy, msg);
 }
 
 
-static int process_register_request(pep_proxy_t *proxy, mrp_msg_t *req,
-                                    uint32_t seq)
+static void msg_op_unref_msg(void *msg)
 {
-    mrp_transport_t    *t = proxy->t;
-    char               *name;
-    mrp_domctl_table_t *tables;
-    mrp_domctl_watch_t *watches;
-    uint16_t            utable, uwatch;
-    int                 ntable, nwatch;
-    int                 error;
-    const char         *errmsg;
-
-    if (mrp_msg_get(req,
-                    MRP_PEPMSG_STRING(NAME   , &name  ),
-                    MRP_PEPMSG_UINT16(NTABLE , &utable),
-                    MRP_PEPMSG_UINT16(NWATCH , &uwatch),
-                    MRP_MSG_END)) {
-        ntable  = utable;
-        nwatch  = uwatch;
-        tables  = alloca(ntable * sizeof(*tables));
-        watches = alloca(nwatch * sizeof(*watches));
-
-        if (decode_register_message(req, tables, ntable, watches, nwatch)) {
-            if (register_proxy(proxy, name, tables, ntable, watches, nwatch,
-                               &error, &errmsg)) {
-                send_ack_reply(t, seq);
-                proxy->notify_all = TRUE;
-                schedule_notification(proxy->pdp);
-
-                return TRUE;
-            }
-        }
-        else
-            goto malformed;
-    }
-    else {
-    malformed:
-        error  = EINVAL;
-        errmsg = "malformed register message";
-    }
-
-    send_nak_reply(t, seq, error, errmsg);
-
-    return FALSE;
+    mrp_msg_unref((mrp_msg_t *)msg);
 }
 
 
-static void process_unregister_request(pep_proxy_t *proxy, uint32_t seq)
+static int msg_op_create_notify(pep_proxy_t *proxy)
 {
-    send_ack_reply(proxy->t, seq);
-    unregister_proxy(proxy);
+    if (proxy->notify_msg == NULL)
+        proxy->notify_msg = msg_create_notify();
+
+    if (proxy->notify_msg != NULL)
+        return TRUE;
+    else
+        return FALSE;
 }
 
 
-static void process_set_request(pep_proxy_t *proxy, mrp_msg_t *msg,
-                                uint32_t seq)
+static int msg_op_update_notify(pep_proxy_t *proxy, int tblid, mql_result_t *r)
 {
-    mrp_domctl_data_t  *data, *d;
-    mrp_domctl_value_t *values, *v;
-    void               *it;
-    uint16_t            ntable, ntotal, nrow, ncol;
-    uint16_t            tblid;
-    int                 t, r, c;
-    uint16_t            type;
-    mrp_msg_value_t     value;
-    int                 error;
-    const char         *errmsg;
+    int n;
 
-    if (!mrp_msg_get(msg,
-                     MRP_PEPMSG_UINT16(NCHANGE, &ntable),
-                     MRP_PEPMSG_UINT16(NTOTAL , &ntotal),
-                     MRP_MSG_END))
-        return;
+    n = msg_update_notify((mrp_msg_t *)proxy->notify_msg, tblid, r);
 
-    data   = alloca(sizeof(*data)   * ntable);
-    values = alloca(sizeof(*values) * ntotal);
-
-    it     = NULL;
-    d      = data;
-    v      = values;
-
-    for (t = 0; t < ntable; t++) {
-        if (!mrp_msg_iterate_get(msg, &it,
-                                 MRP_PEPMSG_UINT16(TBLID, &tblid),
-                                 MRP_PEPMSG_UINT16(NROW , &nrow ),
-                                 MRP_PEPMSG_UINT16(NCOL , &ncol ),
-                                 MRP_MSG_END))
-            goto reply_nak;
-
-        if (tblid >= proxy->ntable)
-            goto reply_nak;
-
-        d->id      = tblid;
-        d->ncolumn = ncol;
-        d->nrow    = nrow;
-        d->rows    = alloca(sizeof(*d->rows) * nrow);
-
-        for (r = 0; r < nrow; r++) {
-            d->rows[r] = v;
-
-            for (c = 0; c < ncol; c++) {
-                if (!mrp_msg_iterate_get(msg, &it,
-                                         MRP_PEPMSG_ANY(DATA, &type, &value),
-                                         MRP_MSG_END))
-                    goto reply_nak;
-
-                switch (type) {
-                case MRP_MSG_FIELD_STRING:
-                    v->type = MRP_DOMCTL_STRING;
-                    v->str  = value.str;
-                    break;
-                case MRP_MSG_FIELD_SINT32:
-                    v->type = MRP_DOMCTL_INTEGER;
-                    v->s32  = value.s32;
-                    break;
-                case MRP_MSG_FIELD_UINT32:
-                    v->type = MRP_DOMCTL_UNSIGNED;
-                    v->u32  = value.u32;
-                    break;
-                case MRP_MSG_FIELD_DOUBLE:
-                    v->type = MRP_DOMCTL_DOUBLE;
-                    v->dbl  = value.dbl;
-                    break;
-                default:
-                    goto reply_nak;
-                }
-
-                v++;
-            }
-        }
-
-        d++;
+    if (n >= 0) {
+        proxy->notify_ncolumn += n;
+        proxy->notify_ntable++;
     }
 
-    if (set_proxy_tables(proxy, data, ntable, &error, &errmsg)) {
-        send_ack_reply(proxy->t, seq);
-    }
-    else {
-    reply_nak:
-        send_nak_reply(proxy->t, seq, error, errmsg);
-    }
+    return n;
 }
 
 
-static void recv_cb(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
+static int msg_op_send_notify(pep_proxy_t *proxy)
 {
-    pep_proxy_t *proxy = (pep_proxy_t *)user_data;
-    char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
-    uint16_t     type;
-    uint32_t     seq;
+    mrp_msg_t *msg     = proxy->notify_msg;
+    uint16_t   nchange = proxy->notify_ntable;
+    uint16_t   ntotal  = proxy->notify_ncolumn;
 
-    /*
-      mrp_log_info("Message from client %p:", proxy);
-      mrp_msg_dump(msg, stdout);
-    */
+    mrp_msg_set(msg, MSG_UINT16(NCHANGE, nchange));
+    mrp_msg_set(msg, MSG_UINT16(NTOTAL , ntotal));
 
-    if (!mrp_msg_get(msg,
-                     MRP_PEPMSG_UINT16(MSGTYPE, &type),
-                     MRP_PEPMSG_UINT32(MSGSEQ , &seq ),
-                     MRP_MSG_END)) {
-        mrp_log_error("Malformed message from client %s.", name);
-        send_nak_reply(t, 0, EINVAL, "malformed message");
-    }
-    else {
-        switch (type) {
-        case MRP_PEPMSG_REGISTER:
-            if (!process_register_request(proxy, msg, seq))
-                destroy_proxy(proxy);
-            break;
-
-        case MRP_PEPMSG_UNREGISTER:
-            process_unregister_request(proxy, seq);
-            break;
-
-        case MRP_PEPMSG_SET:
-            process_set_request(proxy, msg, seq);
-            break;
-
-        default:
-            break;
-        }
-    }
+    return mrp_transport_send(proxy->t, msg);
 }
 
 
-static void connect_cb(mrp_transport_t *ext, void *user_data)
+static void msg_op_free_notify(pep_proxy_t *proxy)
 {
+    mrp_msg_unref((mrp_msg_t *)proxy->notify_msg);
+    proxy->notify_msg = NULL;
+}
+
+
+static void msg_connect_cb(mrp_transport_t *t, void *user_data)
+{
+    static proxy_ops_t ops = {
+        .send_msg      = msg_op_send_msg,
+        .unref         = msg_op_unref_msg,
+        .create_notify = msg_op_create_notify,
+        .update_notify = msg_op_update_notify,
+        .send_notify   = msg_op_send_notify,
+        .free_notify   = msg_op_free_notify,
+    };
+
     pdp_t       *pdp = (pdp_t *)user_data;
     pep_proxy_t *proxy;
     int          flags;
@@ -320,10 +309,12 @@ static void connect_cb(mrp_transport_t *ext, void *user_data)
 
     if (proxy != NULL) {
         flags    = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_NONBLOCK;
-        proxy->t = mrp_transport_accept(ext, proxy, flags);
+        proxy->t = mrp_transport_accept(t, proxy, flags);
 
-        if (proxy->t != NULL)
+        if (proxy->t != NULL) {
+            proxy->ops = &ops;
             mrp_log_info("Accepted new client connection.");
+        }
         else {
             mrp_log_error("Failed to accept new client connection.");
             destroy_proxy(proxy);
@@ -332,7 +323,7 @@ static void connect_cb(mrp_transport_t *ext, void *user_data)
 }
 
 
-static void closed_cb(mrp_transport_t *t, int error, void *user_data)
+static void msg_closed_cb(mrp_transport_t *t, int error, void *user_data)
 {
     pep_proxy_t *proxy = (pep_proxy_t *)user_data;
     char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
@@ -350,66 +341,248 @@ static void closed_cb(mrp_transport_t *t, int error, void *user_data)
 }
 
 
-static int create_ext_transport(pdp_t *pdp)
+static void msg_recv_cb(mrp_transport_t *t, mrp_msg_t *tmsg, void *user_data)
 {
-    static mrp_transport_evt_t evt;
+    pep_proxy_t *proxy = (pep_proxy_t *)user_data;
+    char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+    msg_t       *msg;
 
-    mrp_transport_t *t;
-    mrp_sockaddr_t   addr;
-    socklen_t        addrlen;
-    int              flags;
-    const char      *type;
+    MRP_UNUSED(t);
 
-    t       = NULL;
-    addrlen = mrp_transport_resolve(NULL, pdp->address,
-                                    &addr, sizeof(addr), &type);
+    /*
+      mrp_log_info("Message from client %p:", proxy);
+      mrp_msg_dump(msg, stdout);
+    */
 
-    if (addrlen > 0) {
-        evt.closed      = closed_cb;
-        evt.recvmsg     = recv_cb;
-        evt.recvmsgfrom = NULL;
-        evt.connection  = connect_cb;
+    msg = msg_decode_message(tmsg);
 
-        flags = MRP_TRANSPORT_REUSEADDR;
-        t     = mrp_transport_create(pdp->ctx->ml, type, &evt, pdp, flags);
+    if (msg != NULL) {
+        process_message(proxy, msg);
+        msg_free_message(msg);
+    }
+    else {
+        mrp_log_error("Failed to decode message from %s.", name);
+        msg_send_nak(proxy, msg->any.seq, 1, "failed to decode message");
+    }
+}
 
-        if (t != NULL) {
-            if (mrp_transport_bind(t, &addr, addrlen) &&
-                mrp_transport_listen(t, 4)) {
-                mrp_log_info("Listening on transport %s...", pdp->address);
-                pdp->ext = t;
 
-                return TRUE;
-            }
-            else
-                mrp_log_error("Failed to bind transport to %s.", pdp->address);
-        }
-        else
-            mrp_log_error("Failed to create transport for %s.", pdp->address);
+static int wrt_send_message(pep_proxy_t *proxy, msg_t *msg)
+{
+    mrp_json_t *tmsg;
+
+    tmsg = json_encode_message(msg);
+
+    if (tmsg != NULL) {
+        mrp_transport_sendcustom(proxy->t, tmsg);
+        mrp_json_unref(tmsg);
+
+        return TRUE;
     }
     else
-        mrp_log_error("Invalid transport address %s.", pdp->address);
-
-    return FALSE;
+        return FALSE;
 }
 
 
-static void destroy_ext_transport(pdp_t *pdp)
+static int wrt_op_send_msg(pep_proxy_t *proxy, msg_t *msg)
 {
-    if (pdp != NULL) {
-        mrp_transport_destroy(pdp->ext);
-        pdp->ext = NULL;
+    return wrt_send_message(proxy, msg);
+}
+
+
+static void wrt_op_unref_msg(void *msg)
+{
+    mrp_json_unref((mrp_json_t *)msg);
+}
+
+
+static int wrt_op_create_notify(pep_proxy_t *proxy)
+{
+    if (proxy->notify_msg == NULL)
+        proxy->notify_msg = json_create_notify();
+
+    if (proxy->notify_msg != NULL)
+        return TRUE;
+    else
+        return FALSE;
+}
+
+
+static int wrt_op_update_notify(pep_proxy_t *proxy, int tblid, mql_result_t *r)
+{
+    int n;
+
+    n = json_update_notify((mrp_json_t *)proxy->notify_msg, tblid, r);
+
+    if (n >= 0) {
+        proxy->notify_ncolumn += n;
+        proxy->notify_ntable++;
+    }
+
+    return n;
+}
+
+
+static int wrt_op_send_notify(pep_proxy_t *proxy)
+{
+    mrp_json_t *msg     = proxy->notify_msg;
+    int         nchange = proxy->notify_ntable;
+    int         ntotal  = proxy->notify_ncolumn;
+
+    if (mrp_json_add_integer(msg, "nchange", nchange) &&
+        mrp_json_add_integer(msg, "ntotal" , ntotal))
+        return mrp_transport_sendcustom(proxy->t, msg);
+    else
+        return FALSE;
+}
+
+
+static void wrt_op_free_notify(pep_proxy_t *proxy)
+{
+    mrp_json_unref((mrp_json_t *)proxy->notify_msg);
+    proxy->notify_msg = NULL;
+}
+
+
+static void wrt_connect_cb(mrp_transport_t *t, void *user_data)
+{
+    static proxy_ops_t ops = {
+        .send_msg      = wrt_op_send_msg,
+        .unref         = wrt_op_unref_msg,
+        .create_notify = wrt_op_create_notify,
+        .update_notify = wrt_op_update_notify,
+        .send_notify   = wrt_op_send_notify,
+        .free_notify   = wrt_op_free_notify,
+    };
+
+    pdp_t       *pdp = (pdp_t *)user_data;
+    pep_proxy_t *proxy;
+    int          flags;
+
+    proxy = create_proxy(pdp);
+
+    if (proxy != NULL) {
+        flags    = MRP_TRANSPORT_REUSEADDR | MRP_TRANSPORT_NONBLOCK;
+        proxy->t = mrp_transport_accept(t, proxy, flags);
+
+        if (proxy->t != NULL) {
+            proxy->ops = &ops;
+            mrp_log_info("Accepted new client connection.");
+        }
+        else {
+            mrp_log_error("Failed to accept new client connection.");
+            destroy_proxy(proxy);
+        }
     }
 }
 
 
-static int create_transports(pdp_t *pdp)
+static void wrt_closed_cb(mrp_transport_t *t, int error, void *user_data)
 {
-    return create_ext_transport(pdp);
+    pep_proxy_t *proxy = (pep_proxy_t *)user_data;
+    char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+
+    MRP_UNUSED(t);
+
+    if (error)
+        mrp_log_error("Transport to client %s closed (%d: %s).",
+                      name, error, strerror(error));
+    else
+        mrp_log_info("Transport to client %s closed.", name);
+
+    mrp_log_info("Destroying client %s.", name);
+    destroy_proxy(proxy);
 }
 
 
-static void destroy_transports(pdp_t *pdp)
+static void wrt_recv_cb(mrp_transport_t *t, void *data, void *user_data)
 {
-    destroy_ext_transport(pdp);
+    pep_proxy_t *proxy = (pep_proxy_t *)user_data;
+    char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+    msg_t       *msg;
+    int          seqno;
+
+    MRP_UNUSED(t);
+
+    /*
+      mrp_log_info("Message from WRT client %p:", proxy);
+    */
+
+    msg = json_decode_message(data);
+
+    if (msg != NULL) {
+        process_message(proxy, msg);
+        msg_free_message(msg);
+    }
+    else {
+        if (!mrp_json_get_integer(data, "seq", &seqno))
+            seqno = 0;
+        mrp_log_error("Failed to decode message from %s.", name);
+        msg_send_nak(proxy, seqno, 1, "failed to decode message");
+    }
+}
+
+
+
+
+static mrp_transport_t *create_transport(pdp_t *pdp, const char *address)
+{
+    static mrp_transport_evt_t msg_evt, wrt_evt;
+
+    mrp_transport_evt_t *e;
+    mrp_transport_t     *t;
+    mrp_sockaddr_t       addr;
+    socklen_t            alen;
+    int                  flags;
+    const char          *type;
+
+    t    = NULL;
+    alen = mrp_transport_resolve(NULL, address, &addr, sizeof(addr), &type);
+
+    if (alen <= 0) {
+        mrp_log_error("Failed to resolve transport address '%s'.", address);
+        return NULL;
+    }
+
+    flags = MRP_TRANSPORT_REUSEADDR;
+
+    if (strncmp(address, "wsck", 4) != 0) {
+        e = &msg_evt;
+
+        e->connection  = msg_connect_cb;
+        e->closed      = msg_closed_cb;
+        e->recvmsg     = msg_recv_cb;
+        e->recvmsgfrom = NULL;
+    }
+    else {
+        e = &wrt_evt;
+
+        e->connection     = wrt_connect_cb;
+        e->closed         = wrt_closed_cb;
+        e->recvcustom     = wrt_recv_cb;
+        e->recvcustomfrom = NULL;
+
+        flags |= MRP_TRANSPORT_MODE_CUSTOM;
+    }
+
+    t = mrp_transport_create(pdp->ctx->ml, type, e, pdp, flags);
+
+    if (t != NULL) {
+        if (mrp_transport_bind(t, &addr, alen) && mrp_transport_listen(t, 4))
+            return t;
+        else {
+            mrp_log_error("Failed to bind to transport address '%s'.", address);
+            mrp_transport_destroy(t);
+        }
+    }
+    else
+        mrp_log_error("Failed to create transport '%s'.", address);
+
+    return NULL;
+}
+
+
+static void destroy_transport(mrp_transport_t *t)
+{
+    mrp_transport_destroy(t);
 }

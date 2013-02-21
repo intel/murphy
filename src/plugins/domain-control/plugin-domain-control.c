@@ -36,12 +36,35 @@
 #include "domain-control.h"
 #include "client.h"
 
+#define DEFAULT_EXTADDR MRP_DEFAULT_DOMCTL_ADDRESS
+#define NO_ADDR         NULL
+
+#ifdef MURPHY_DATADIR
+#    define DEFAULT_HTTPDIR MURPHY_DATADIR"/domain-control"
+#else
+#    define DEFAULT_HTTPDIR "/usr/share/murphy/domain-control"
+#endif
+
+enum {
+    ARG_EXTADDR,                         /* external transport address */
+    ARG_INTADDR,                         /* internal transport address */
+    ARG_WRTADDR,                         /* WRT transport address */
+    ARG_HTTPDIR                          /* content directory for HTTP */
+};
+
 
 static int plugin_init(mrp_plugin_t *plugin)
 {
-    const char *address = MRP_DEFAULT_DOMCTL_ADDRESS;
+    const char *extaddr = plugin->args[ARG_EXTADDR].str;
+    const char *intaddr = plugin->args[ARG_INTADDR].str;
+    const char *wrtaddr = plugin->args[ARG_WRTADDR].str;
+    const char *httpdir = plugin->args[ARG_HTTPDIR].str;
 
-    plugin->data = create_domain_control(plugin->ctx, address);
+    plugin->data = create_domain_control(plugin->ctx,
+                                         extaddr && *extaddr ? extaddr : NULL,
+                                         intaddr && *intaddr ? intaddr : NULL,
+                                         wrtaddr && *wrtaddr ? wrtaddr : NULL,
+                                         httpdir);
 
     return (plugin->data != NULL);
 }
@@ -62,25 +85,41 @@ static void cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    printf("domctrl:%s() called...\n", __FUNCTION__);
+    printf("domctl:%s() called...\n", __FUNCTION__);
 }
 
 
-#define PLUGIN_DESCRIPTION "Murphy domain control plugin."
-#define PLUGIN_VERSION     MRP_VERSION_INT(0, 0, 1)
-#define PLUGIN_HELP        "TODO..."
-#define PLUGIN_AUTHORS     "Krisztian Litkey <krisztian.litkey@intel.com>"
+#define DOMCTL_DESCRIPTION "Murphy domain-control plugin."
+#define DOMCTL_HELP                                                         \
+    "The domain-control plugin provides a control interface for Murphy\n"    \
+    "domain controllers. A domain controller is an entity capable of\n"      \
+    "enforcing domain-specific policies in a certain resource domain, eg.\n" \
+    "audio, video, CPU-scheduling, etc. The domain-control plugin allows\n"  \
+    "such entities to export and import domain-specific data to and from\n"  \
+    "Murphy. Domain controllers typically import either ready decisions\n"   \
+    "for their domain or data necessary for local decision making in\n"      \
+    "the controller itself. The controllers typically export also some\n"    \
+    "domain-specific data to Murphy which can then be used for decision\n"   \
+    "making in other domains other domains.\n"
 
-MRP_CONSOLE_GROUP(plugin_commands, "domain-control", NULL, NULL, {
+#define DOMCTL_VERSION MRP_VERSION_INT(0, 0, 2)
+#define DOMCTL_AUTHORS "Krisztian Litkey <krisztian.litkey@intel.com>"
+
+MRP_CONSOLE_GROUP(domctl_commands, "domain-control", NULL, NULL, {
         MRP_TOKENIZED_CMD("cmd", cmd_cb, TRUE,
                           "cmd [args]", "a command", "A command..."),
 });
 
+static mrp_plugin_arg_t domctl_args[] = {
+    MRP_PLUGIN_ARGIDX(ARG_EXTADDR, STRING, "external_address", DEFAULT_EXTADDR),
+    MRP_PLUGIN_ARGIDX(ARG_INTADDR, STRING, "internal_address", NO_ADDR        ),
+    MRP_PLUGIN_ARGIDX(ARG_WRTADDR, STRING, "wrt_address"     , NO_ADDR        ),
+    MRP_PLUGIN_ARGIDX(ARG_HTTPDIR, STRING, "httpdir", DEFAULT_HTTPDIR)
+};
+
 MURPHY_REGISTER_PLUGIN("domain-control",
-                       PLUGIN_VERSION, PLUGIN_DESCRIPTION,
-                       PLUGIN_AUTHORS, PLUGIN_HELP, MRP_SINGLETON,
+                       DOMCTL_VERSION, DOMCTL_DESCRIPTION,
+                       DOMCTL_AUTHORS, DOMCTL_HELP, MRP_MULTIPLE,
                        plugin_init, plugin_exit,
-                       NULL, 0, /* plugin argument table */
-                       NULL, 0, /* exported methods */
-                       NULL, 0, /* imported methods */
-                       &plugin_commands);
+                       domctl_args, MRP_ARRAY_SIZE(domctl_args),
+                       NULL, 0, NULL, 0, &domctl_commands);

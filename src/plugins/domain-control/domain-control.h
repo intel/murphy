@@ -32,7 +32,9 @@
 
 #include "domain-control-types.h"
 
-pdp_t *create_domain_control(mrp_context_t *ctx, const char *address);
+pdp_t *create_domain_control(mrp_context_t *ctx, const char *ext_addr,
+                             const char *int_addr, const char *wrt_addr,
+                             const char *httpdir);
 void destroy_domain_control(pdp_t *pdp);
 
 void schedule_notification(pdp_t *pdp);

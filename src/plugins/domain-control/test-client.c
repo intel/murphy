@@ -138,13 +138,13 @@ static stream_t streams[] = {
 #define STREAM_WHERE  NULL
 
 mrp_domctl_table_t media_tables[] = {
-    MRP_DOMCTL_TABLE("devices", DEVICE_COLUMNS, DEVICE_INDEX),
-    MRP_DOMCTL_TABLE("streams", STREAM_COLUMNS, STREAM_INDEX),
+    MRP_DOMCTL_TABLE("test-devices", DEVICE_COLUMNS, DEVICE_INDEX),
+    MRP_DOMCTL_TABLE("test-streams", STREAM_COLUMNS, STREAM_INDEX),
 };
 
 mrp_domctl_watch_t media_watches[] = {
-    MRP_DOMCTL_WATCH("devices", DEVICE_SELECT, DEVICE_WHERE, 0),
-    MRP_DOMCTL_WATCH("streams", STREAM_SELECT, STREAM_WHERE, 0),
+    MRP_DOMCTL_WATCH("test-devices", DEVICE_SELECT, DEVICE_WHERE, 0),
+    MRP_DOMCTL_WATCH("test-streams", STREAM_SELECT, STREAM_WHERE, 0),
 };
 
 
@@ -216,13 +216,13 @@ static call_t calls[] = {
 #define CALL_WHERE  NULL
 
 mrp_domctl_table_t zone_tables[] = {
-    MRP_DOMCTL_TABLE("zones", ZONE_COLUMNS, ZONE_INDEX),
-    MRP_DOMCTL_TABLE("calls", CALL_COLUMNS, CALL_INDEX),
+    MRP_DOMCTL_TABLE("test-zones", ZONE_COLUMNS, ZONE_INDEX),
+    MRP_DOMCTL_TABLE("test-calls", CALL_COLUMNS, CALL_INDEX),
 };
 
 mrp_domctl_watch_t zone_watches[] = {
-    MRP_DOMCTL_WATCH("zones", ZONE_SELECT, ZONE_WHERE, 0),
-    MRP_DOMCTL_WATCH("calls", CALL_SELECT, CALL_WHERE, 0)
+    MRP_DOMCTL_WATCH("test-zones", ZONE_SELECT, ZONE_WHERE, 0),
+    MRP_DOMCTL_WATCH("test-calls", CALL_SELECT, CALL_WHERE, 0)
 };
 
 mrp_domctl_table_t *exports;
@@ -461,8 +461,21 @@ static void list_calls(void)
 }
 
 
+static void init_devices(void)
+{
+    mrp_clear(&devices);
+}
+
+
 static void reset_devices(void)
 {
+    int i;
+
+    for (i = 0; i < (int)MRP_ARRAY_SIZE(devices); i++) {
+        mrp_free((char *)devices[i].name);
+        mrp_free((char *)devices[i].type);
+    }
+
     mrp_clear(&devices);
 }
 
@@ -507,8 +520,21 @@ void update_devices(mrp_domctl_data_t *data)
 }
 
 
+static void init_streams(void)
+{
+    mrp_clear(&streams);
+}
+
+
 static void reset_streams(void)
 {
+    int i;
+
+    for (i = 0; i < (int)MRP_ARRAY_SIZE(streams); i++) {
+        mrp_free((char *)streams[i].name);
+        mrp_free((char *)streams[i].role);
+    }
+
     mrp_clear(&streams);
 }
 
@@ -553,8 +579,19 @@ void update_streams(mrp_domctl_data_t *data)
 }
 
 
+static void init_zones(void)
+{
+    mrp_clear(&zones);
+}
+
+
 static void reset_zones(void)
 {
+    int i;
+
+    for (i = 0; i < (int)MRP_ARRAY_SIZE(zones); i++)
+        mrp_free((char *)zones[i].name);
+
     mrp_clear(&zones);
 }
 
@@ -597,8 +634,21 @@ void update_zones(mrp_domctl_data_t *data)
 }
 
 
+static void init_calls(void)
+{
+    mrp_clear(&calls);
+}
+
+
 static void reset_calls(void)
 {
+    int i;
+
+    for (i = 0; i < (int)MRP_ARRAY_SIZE(calls); i++) {
+        mrp_free((char *)calls[i].state);
+        mrp_free((char *)calls[i].modem);
+    }
+
     mrp_clear(&calls);
 }
 
@@ -926,20 +976,22 @@ static void export_data(client_t *c)
     mrp_domctl_data_t  *tables;
     int                 ntable = 2;
     mrp_domctl_value_t *values, *v;
-    int                 i;
+    int                 i, id;
 
     tables = alloca(sizeof(*tables) * ntable);
     values = alloca(sizeof(*values) * NVALUE);
     v      = values;
 
     if (!c->zone) {
-        tables[0].id      = 0;
-        tables[0].ncolumn = 4;
-        tables[0].nrow    = NDEVICE;
-        tables[0].rows    = alloca(sizeof(*tables[0].rows) * tables[0].nrow);
+        id = 0;
+
+        tables[id].id      = id;
+        tables[id].ncolumn = 4;
+        tables[id].nrow    = NDEVICE;
+        tables[id].rows    = alloca(sizeof(*tables[id].rows) * tables[id].nrow);
 
         for (i = 0; i < (int)NDEVICE; i++) {
-            tables[0].rows[i] = v;
+            tables[id].rows[i] = v;
             v[0].type = MRP_DOMCTL_STRING ; v[0].str = devices[i].name;
             v[1].type = MRP_DOMCTL_STRING ; v[1].str = devices[i].type;
             v[2].type = MRP_DOMCTL_INTEGER; v[2].s32 = devices[i].public;
@@ -947,13 +999,15 @@ static void export_data(client_t *c)
             v += 4;
         }
 
-        tables[1].id      = 1;
-        tables[1].ncolumn = 4;
-        tables[1].nrow    = NSTREAM;
-        tables[1].rows    = alloca(sizeof(*tables[1].rows) * tables[1].nrow);
+        id++;
+
+        tables[id].id      = id;
+        tables[id].ncolumn = 4;
+        tables[id].nrow    = NSTREAM;
+        tables[id].rows    = alloca(sizeof(*tables[id].rows) * tables[id].nrow);
 
         for (i = 0; i < (int)NSTREAM; i++) {
-            tables[1].rows[i] = v;
+            tables[id].rows[i] = v;
             v[0].type = MRP_DOMCTL_STRING  ; v[0].str = streams[i].name;
             v[1].type = MRP_DOMCTL_STRING  ; v[1].str = streams[i].role;
             v[2].type = MRP_DOMCTL_UNSIGNED; v[2].s32 = streams[i].owner;
@@ -962,26 +1016,30 @@ static void export_data(client_t *c)
         }
     }
     else {
-        tables[0].id      = 0;
-        tables[0].ncolumn = 3;
-        tables[0].nrow    = NZONE;
-        tables[0].rows    = alloca(sizeof(*tables[0].rows) * tables[0].nrow);
+        id = 0;
+
+        tables[id].id      = id;
+        tables[id].ncolumn = 3;
+        tables[id].nrow    = NZONE;
+        tables[id].rows    = alloca(sizeof(*tables[id].rows) * tables[id].nrow);
 
         for (i = 0; i < (int)NZONE; i++) {
-            tables[0].rows[i] = v;
+            tables[id].rows[i] = v;
             v[0].type = MRP_DOMCTL_STRING ; v[0].str = zones[i].name;
             v[1].type = MRP_DOMCTL_INTEGER; v[1].s32 = zones[i].occupied;
             v[2].type = MRP_DOMCTL_INTEGER; v[2].s32 = zones[i].active;
             v += 3;
         }
 
-        tables[1].id      = 1;
-        tables[1].ncolumn = 3;
-        tables[1].nrow    = NCALL;
-        tables[1].rows    = alloca(sizeof(*tables[0].rows) * tables[1].nrow);
+        id++;
+
+        tables[id].id      = id;
+        tables[id].ncolumn = 3;
+        tables[id].nrow    = NCALL;
+        tables[id].rows    = alloca(sizeof(*tables[0].rows) * tables[id].nrow);
 
         for (i = 0; i < (int)NCALL; i++) {
-            tables[1].rows[i] = v;
+            tables[id].rows[i] = v;
             v[0].type = MRP_DOMCTL_INTEGER; v[0].s32 = calls[i].id;
             v[1].type = MRP_DOMCTL_STRING ; v[1].str = calls[i].state;
             v[2].type = MRP_DOMCTL_STRING ; v[2].str = calls[i].modem;
@@ -1038,8 +1096,8 @@ static void client_setup(client_t *c)
                     call->modem = mrp_strdup(call->modem);
                 }
 
-                reset_devices();
-                reset_streams();
+                init_devices();
+                init_streams();
             }
             else {
                 device_t *d;
@@ -1055,8 +1113,8 @@ static void client_setup(client_t *c)
                     s->role = mrp_strdup(s->role);
                 }
 
-                reset_zones();
-                reset_calls();
+                init_zones();
+                init_calls();
             }
         }
         else
@@ -1069,6 +1127,15 @@ static void client_setup(client_t *c)
 
 static void client_cleanup(client_t *c)
 {
+    if (c->zone) {
+        reset_devices();
+        reset_streams();
+    }
+    else {
+        reset_zones();
+        reset_calls();
+    }
+
     mrp_mainloop_destroy(c->ml);
     mrp_domctl_destroy(c->dc);
 

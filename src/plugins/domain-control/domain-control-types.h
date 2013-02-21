@@ -35,6 +35,7 @@
 #include <murphy/common/transport.h>
 #include <murphy/common/hashtbl.h>
 #include <murphy/core/context.h>
+#include <murphy-db/mql.h>
 
 #include "client.h"
 
@@ -42,7 +43,7 @@ typedef struct pep_proxy_s pep_proxy_t;
 typedef struct pep_table_s pep_table_t;
 typedef struct pep_watch_s pep_watch_t;
 typedef struct pdp_s       pdp_t;
-
+typedef union  msg_u       msg_t;
 
 /*
  * a domain controller (on the client side)
@@ -112,6 +113,17 @@ struct pep_watch_s {
  * a policy enforcement point (on the server side)
  */
 
+typedef struct {
+    int  (*send_msg)(pep_proxy_t *proxy, msg_t *msg);
+    void (*unref)(void *data);
+    int  (*create_notify)(pep_proxy_t *proxy);
+    int  (*update_notify)(pep_proxy_t *proxy, int tblid, mql_result_t *r);
+    int  (*send_notify)(pep_proxy_t *proxy);
+    void (*free_notify)(pep_proxy_t *proxy);
+} proxy_ops_t;
+
+
+
 struct pep_proxy_s {
     char              *name;             /* enforcement point name */
     pdp_t             *pdp;              /* domain controller context */
@@ -120,8 +132,9 @@ struct pep_proxy_s {
     pep_table_t       *tables;           /* tables owned by this */
     int                ntable;           /* number of tables */
     mrp_list_hook_t    watches;          /* tables watched by this */
+    proxy_ops_t       *ops;              /* transport/messaging operations */
     int                notify_update;    /* whether needs notification */
-    mrp_msg_t         *notify_msg;       /* notification being built */
+    void              *notify_msg;       /* notification being built */
     int                notify_ntable;    /* number of changed tables */
     int                notify_ncolumn;   /* total columns in notification */
     int                notify_fail : 1;  /* notification failure */
@@ -136,7 +149,9 @@ struct pep_proxy_s {
 struct pdp_s {
     mrp_context_t   *ctx;                /* murphy context */
     const char      *address;            /* external transport address */
-    mrp_transport_t *ext;                /* external transport */
+    mrp_transport_t *extt;               /* external transport */
+    mrp_transport_t *wrtt;               /* WRT transport */
+    mrp_transport_t *intt;               /* internal transport */
     mrp_list_hook_t  proxies;            /* list of enforcement points */
     mrp_list_hook_t  tables;             /* list of tables we track */
     mrp_htbl_t      *watched;            /* tracked tables by name */

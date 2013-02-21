@@ -1149,8 +1149,8 @@ DOMAIN_CONTROL_PLUGIN_SOURCES = plugins/domain-control/plugin-domain-control.c \
 				plugins/domain-control/domain-control.c        \
 				plugins/domain-control/proxy.c		       \
 				plugins/domain-control/table.c                 \
-				plugins/domain-control/message.c               \
-				plugins/domain-control/notify.c
+				plugins/domain-control/notify.c 	       \
+				plugins/domain-control/message.c
 DOMAIN_CONTROL_PLUGIN_LOADER  = linkedin-domain-control-loader.c
 
 
@@ -1210,9 +1210,9 @@ libmurphy_domain_controller_ladir =			\
 libmurphy_domain_controller_la_HEADERS =		\
 		plugins/domain-control/client.h
 
-libmurphy_domain_controller_la_SOURCES  = plugins/domain-control/client.c      \
-					  plugins/domain-control/table-common.c\
-					  plugins/domain-control/message.c
+libmurphy_domain_controller_la_SOURCES = 		\
+		plugins/domain-control/client.c		\
+		plugins/domain-control/message.c
 libmurphy_domain_controller_la_CFLAGS   =
 libmurphy_domain_controller_la_LIBADD   = libmurphy-common.la     \
 					  murphy-db/mql/libmql.la \

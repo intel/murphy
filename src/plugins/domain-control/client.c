@@ -36,8 +36,8 @@
 #include <murphy/common/transport.h>
 
 #include "domain-control-types.h"
-#include "table.h"
 #include "message.h"
+#include "table.h"
 #include "client.h"
 
 
@@ -214,10 +214,20 @@ static void notify_connect(mrp_domctl_t *dc)
 
 static int domctl_register(mrp_domctl_t *dc)
 {
-    mrp_msg_t *msg;
-    int        success;
+    register_msg_t  reg;
+    mrp_msg_t      *msg;
+    int             success;
 
-    msg = create_register_message(dc);
+    mrp_clear(&reg);
+    reg.type    = MSG_TYPE_REGISTER;
+    reg.seq     = 0;
+    reg.name    = dc->name;
+    reg.tables  = dc->tables;
+    reg.ntable  = dc->ntable;
+    reg.watches = dc->watches;
+    reg.nwatch  = dc->nwatch;
+
+    msg = msg_encode_message((msg_t *)&reg);
 
     if (msg != NULL) {
         success = mrp_transport_send(dc->t, msg);
@@ -330,6 +340,7 @@ void mrp_domctl_disconnect(mrp_domctl_t *dc)
 int mrp_domctl_set_data(mrp_domctl_t *dc, mrp_domctl_data_t *tables, int ntable,
                      mrp_domctl_status_cb_t cb, void *user_data)
 {
+    set_msg_t  set;
     mrp_msg_t *msg;
     uint32_t   seq = dc->seqno++;
     int        success, i;
@@ -342,14 +353,15 @@ int mrp_domctl_set_data(mrp_domctl_t *dc, mrp_domctl_data_t *tables, int ntable,
             return FALSE;
     }
 
-    msg = create_set_message(seq, tables, ntable);
+    mrp_clear(&set);
+    set.type   = MSG_TYPE_SET;
+    set.seq    = seq;
+    set.tables = tables;
+    set.ntable = ntable;
+
+    msg = msg_encode_message((msg_t *)&set);
 
     if (msg != NULL) {
-        /*
-          mrp_log_info("set data message message:");
-          mrp_msg_dump(msg, stdout);
-        */
-
         success = mrp_transport_send(dc->t, msg);
         mrp_msg_unref(msg);
 
@@ -363,115 +375,34 @@ int mrp_domctl_set_data(mrp_domctl_t *dc, mrp_domctl_data_t *tables, int ntable,
 }
 
 
-static void process_ack(mrp_domctl_t *dc, uint32_t seq)
+static void process_ack(mrp_domctl_t *dc, ack_msg_t *ack)
 {
-    if (seq != 0)
-        notify_pending(dc, seq, 0, NULL);
+    if (ack->seq != 0)
+        notify_pending(dc, ack->seq, 0, NULL);
     else
         notify_connect(dc);
 }
 
 
-static void process_nak(mrp_domctl_t *dc, uint32_t seq, int32_t err,
-                        const char *msg)
+static void process_nak(mrp_domctl_t *dc, nak_msg_t *nak)
 {
-    if (seq != 0)
-        notify_pending(dc, seq, err, msg);
+    if (nak->seq != 0)
+        notify_pending(dc, nak->seq, nak->error, nak->msg);
     else
-        notify_disconnect(dc, err, msg);
+        notify_disconnect(dc, nak->error, nak->msg);
 }
 
 
-static void process_notify(mrp_domctl_t *dc, mrp_msg_t *msg, uint32_t seq)
+static void process_notify(mrp_domctl_t *dc, notify_msg_t *notify)
 {
-    mrp_domctl_data_t  *data, *d;
-    mrp_domctl_value_t *values, *v;
-    void            *it;
-    uint16_t         ntable, ntotal, nrow, ncol;
-    uint16_t         tblid;
-    int              t, r, c;
-    uint16_t         type;
-    mrp_msg_value_t  value;
-
-    MRP_UNUSED(seq);
-
-    if (!mrp_msg_get(msg,
-                     MRP_PEPMSG_UINT16(NCHANGE, &ntable),
-                     MRP_PEPMSG_UINT16(NTOTAL , &ntotal),
-                     MRP_MSG_END))
-        return;
-
-    data   = alloca(sizeof(*data)   * ntable);
-    values = alloca(sizeof(*values) * ntotal);
-
-    it     = NULL;
-    d      = data;
-    v      = values;
-
-    for (t = 0; t < ntable; t++) {
-        if (!mrp_msg_iterate_get(msg, &it,
-                                 MRP_PEPMSG_UINT16(TBLID, &tblid),
-                                 MRP_PEPMSG_UINT16(NROW , &nrow ),
-                                 MRP_PEPMSG_UINT16(NCOL , &ncol ),
-                                 MRP_MSG_END))
-            return;
-
-        if (tblid >= dc->nwatch)
-            return;
-
-        d->id      = tblid;
-        d->ncolumn = ncol;
-        d->nrow    = nrow;
-        d->rows    = alloca(sizeof(*d->rows) * nrow);
-
-        for (r = 0; r < nrow; r++) {
-            d->rows[r] = v;
-
-            for (c = 0; c < ncol; c++) {
-                if (!mrp_msg_iterate_get(msg, &it,
-                                         MRP_PEPMSG_ANY(DATA, &type, &value),
-                                         MRP_MSG_END))
-                    return;
-
-                switch (type) {
-                case MRP_MSG_FIELD_STRING:
-                    v->type = MRP_DOMCTL_STRING;
-                    v->str  = value.str;
-                    break;
-                case MRP_MSG_FIELD_SINT32:
-                    v->type = MRP_DOMCTL_INTEGER;
-                    v->s32  = value.s32;
-                    break;
-                case MRP_MSG_FIELD_UINT32:
-                    v->type = MRP_DOMCTL_UNSIGNED;
-                    v->u32  = value.u32;
-                    break;
-                case MRP_MSG_FIELD_DOUBLE:
-                    v->type = MRP_DOMCTL_DOUBLE;
-                    v->dbl  = value.dbl;
-                    break;
-                default:
-                    return;
-                }
-
-                v++;
-            }
-        }
-
-        d++;
-    }
-
-    dc->watch_cb(dc, data, ntable, dc->user_data);
+    dc->watch_cb(dc, notify->tables, notify->ntable, dc->user_data);
 }
 
 
-static void recv_cb(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
+static void recv_cb(mrp_transport_t *t, mrp_msg_t *tmsg, void *user_data)
 {
     mrp_domctl_t  *dc = (mrp_domctl_t *)user_data;
-    uint16_t       type;
-    uint32_t       seq;
-    int32_t        error;
-    const char    *errmsg;
+    msg_t         *msg;
 
     MRP_UNUSED(t);
 
@@ -480,40 +411,31 @@ static void recv_cb(mrp_transport_t *t, mrp_msg_t *msg, void *user_data)
       mrp_msg_dump(msg, stdout);
     */
 
-    if (!mrp_msg_get(msg,
-                     MRP_PEPMSG_UINT16(MSGTYPE, &type),
-                     MRP_PEPMSG_UINT32(MSGSEQ , &seq ),
-                     MRP_MSG_END)) {
+    msg = msg_decode_message(tmsg);
+
+    if (msg != NULL) {
+        switch (msg->any.type) {
+        case MSG_TYPE_NOTIFY:
+            process_notify(dc, &msg->notify);
+            break;
+        case MSG_TYPE_ACK:
+            process_ack(dc, &msg->ack);
+            break;
+        case MSG_TYPE_NAK:
+            process_nak(dc, &msg->nak);
+            break;
+        default:
+            mrp_domctl_disconnect(dc);
+            notify_disconnect(dc, EINVAL, "unexpected message from server");
+            break;
+        }
+
+        msg_free_message(msg);
+    }
+    else {
         mrp_domctl_disconnect(dc);
-        notify_disconnect(dc, EINVAL, "malformed message from client");
-        return;
+        notify_disconnect(dc, EINVAL, "invalid message from server");
     }
-
-    switch (type) {
-    case MRP_PEPMSG_ACK:
-        process_ack(dc, seq);
-        break;
-
-    case MRP_PEPMSG_NAK:
-        error  = EINVAL;
-        errmsg = "request failed, unknown error";
-
-        mrp_msg_get(msg,
-                    MRP_PEPMSG_SINT32(ERRCODE, &error),
-                    MRP_PEPMSG_STRING(ERRMSG , &errmsg),
-                    MRP_MSG_END);
-
-        process_nak(dc, seq, error, errmsg);
-        break;
-
-    case MRP_PEPMSG_NOTIFY:
-        process_notify(dc, msg, seq);
-        break;
-
-    default:
-        break;
-    }
-
 }
 
 

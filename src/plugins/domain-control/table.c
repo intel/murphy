@@ -49,8 +49,6 @@
 
 static pep_table_t *lookup_watch_table(pdp_t *pdp, const char *name);
 
-#include "table-common.c"
-
 /*
  * proxied and tracked tables
  */

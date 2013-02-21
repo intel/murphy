@@ -71,131 +71,56 @@ static void check_watch_notification(pep_watch_t *w)
 static int collect_watch_notification(pep_watch_t *w)
 {
     pep_proxy_t  *proxy = w->proxy;
-    pep_table_t  *t     = w->table;
     mql_result_t *r     = NULL;
-    uint16_t      tid   = w->id;
-    uint16_t      nrow, ncol;
-    mrp_msg_t    *msg;
-    int           i, j;
-    int           types[MQI_COLUMN_MAX];
-    const char   *str;
-    uint32_t      u32;
-    int32_t       s32;
-    double        dbl;
+    int           n;
 
-    mrp_debug("updating %s watch for %s", t->name, proxy->name);
+    mrp_debug("updating %s watch for %s", w->table->name, proxy->name);
 
     if (proxy->notify_msg == NULL) {
-        proxy->notify_msg = create_notify_message();
-
-        if (proxy->notify_msg == NULL)
+        if (!proxy->ops->create_notify(proxy))
             goto fail;
     }
 
-    if (t->h != MQI_HANDLE_INVALID) {
+    if (w->table->h != MQI_HANDLE_INVALID) {
         if (!exec_mql(mql_result_rows, &r, "select %s from %s%s%s",
-                      w->mql_columns, t->name,
-                     w->mql_where[0] ? " where " : "", w->mql_where)) {
-            mrp_debug("select from table %s failed", t->name);
+                      w->mql_columns, w->table->name,
+                      w->mql_where[0] ? " where " : "", w->mql_where)) {
+            mrp_debug("select from table %s failed", w->table->name);
             goto fail;
         }
     }
 
-    if (r != NULL) {
-        nrow = mql_result_rows_get_row_count(r);
-        ncol = mql_result_rows_get_row_column_count(r);
-    }
-    else
-        nrow = ncol = 0;
-
-    msg = proxy->notify_msg;
-
-    if (!mrp_msg_append(msg, MRP_PEPMSG_UINT16(TBLID, tid))  ||
-        !mrp_msg_append(msg, MRP_PEPMSG_UINT16(NROW , nrow)) ||
-        !mrp_msg_append(msg, MRP_PEPMSG_UINT16(NCOL , ncol)))
-        goto fail;
-
-    for (i = 0; i < ncol; i++)
-        types[i] = mql_result_rows_get_row_column_type(r, i);
-
-    for (i = 0; i < nrow; i++) {
-        for (j = 0; j < ncol; j++) {
-            switch (types[j]) {
-            case mqi_string:
-                str = mql_result_rows_get_string(r, j, i, NULL, 0);
-                if (!mrp_msg_append(msg, MRP_PEPMSG_STRING(DATA, str)))
-                    goto fail;
-                break;
-            case mqi_integer:
-                s32 = mql_result_rows_get_integer(r, j, i);
-                if (!mrp_msg_append(msg, MRP_PEPMSG_SINT32(DATA, s32)))
-                    goto fail;
-                break;
-            case mqi_unsignd:
-                u32 = mql_result_rows_get_unsigned(r, j, i);
-                if (!mrp_msg_append(msg, MRP_PEPMSG_UINT32(DATA, u32)))
-                    goto fail;
-                break;
-
-            case mqi_floating:
-                dbl = mql_result_rows_get_floating(r, j, i);
-                if (!mrp_msg_append(msg, MRP_PEPMSG_DOUBLE(DATA, dbl)))
-                    goto fail;
-                break;
-
-            default:
-                goto fail;
-            }
-        }
-    }
+    n = proxy->ops->update_notify(proxy, w->id, r);
 
     if (r != NULL)
         mql_result_free(r);
 
-    proxy->notify_ncolumn += nrow * ncol;
-    proxy->notify_ntable++;
+    if (n >= 0)
+        return TRUE;
+    else {
+    fail:
+        proxy->ops->free_notify(proxy);
+        proxy->notify_fail = TRUE;
 
-    return TRUE;
-
- fail:
-    if (r != NULL)
-        mql_result_free(r);
-    mrp_msg_unref(proxy->notify_msg);
-    proxy->notify_msg = NULL;
-    proxy->notify_fail = TRUE;
-
-    return FALSE;
+        return FALSE;
+    }
 }
 
 
 static int send_proxy_notification(pep_proxy_t *proxy)
 {
-    uint16_t nchange, ntotal;
-
     if (proxy->notify_msg == NULL)
         return TRUE;
 
     if (!proxy->notify_fail) {
         mrp_debug("notifying client %s", proxy->name);
 
-        nchange = proxy->notify_ntable;
-        ntotal  = proxy->notify_ncolumn;
-
-        mrp_msg_set(proxy->notify_msg, MRP_PEPMSG_UINT16(NCHANGE, nchange));
-        mrp_msg_set(proxy->notify_msg, MRP_PEPMSG_UINT16(NTOTAL , ntotal ));
-
-        /*
-          mrp_log_info("Notification message for client %s:", proxy->name);
-          mrp_msg_dump(proxy->notify_msg, stdout);
-        */
-
-        mrp_transport_send(proxy->t, proxy->notify_msg);
+        proxy->ops->send_notify(proxy);
+        proxy->ops->free_notify(proxy);
     }
     else
         mrp_log_error("Failed to generate/send notification to %s.",
                       proxy->name);
-
-    mrp_msg_unref(proxy->notify_msg);
 
     proxy->notify_msg     = NULL;
     proxy->notify_ntable  = 0;
