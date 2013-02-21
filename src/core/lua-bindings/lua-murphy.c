@@ -200,46 +200,74 @@ lua_State *mrp_lua_get_lua_state(void)
 
 static void lua_debug(lua_State *L, lua_Debug *ar)
 {
-    if (ar->event != LUA_HOOKTAILRET)
-        lua_getinfo(L, "Snl", ar);
+#define RUNNING(_ar, _what) ((_ar)->what != NULL && !strcmp((_ar)->what, _what))
+#define ALIGNFMT "%*.*s"
+#define ALIGNARG 4 * depth, 4 * depth, ""
+
+    static int depth = 0;
+
+    lua_Debug   f;
+    const char *type, *name;
+    char        loc[1024];
 
     switch (ar->event) {
-    case LUA_HOOKCALL:
-        if (ar->what && ar->what[0] == 'C')
-            mrp_debug("=> <Lua C function>");
-        else if (ar->what && ar->what[0] == 'L') {
-            mrp_debug("=> %s@%s:%d",
-                      ar->name ? ar->name : "",
-                      ar->source ? ar->source  + 1: "<unknown>",
-                      ar->currentline);
-        }
-        else
-            mrp_debug("=> %s", ar->what ? ar->what : "<unknown>");
-        break;
-
     case LUA_HOOKRET:
-        mrp_debug("<= (return)");
+        depth--;
+        mrp_debug(ALIGNFMT"<= return", ALIGNARG);
         break;
 
     case LUA_HOOKTAILRET:
-        mrp_debug("<= (tail return)");
+        depth--;
+        mrp_debug(ALIGNFMT"<= tail return", ALIGNARG);
+        break;
+
+    case LUA_HOOKCALL:
+        mrp_clear(&f);
+        if (lua_getstack(L, 1, &f) && lua_getinfo(L, "Snl", &f)) {
+            if      (RUNNING(&f, "C"))    type = "Lua-C";
+            else if (RUNNING(&f, "Lua"))  type = "Lua";
+            else if (RUNNING(&f, "main")) type = "Lua-main";
+            else if (RUNNING(&f, "tail")) {
+                mrp_debug(ALIGNFMT"=> %*.*stail-call", ALIGNARG);
+                depth++;
+                return;
+            }
+
+            name = f.name ? f.name : NULL;
+
+            if (f.currentline != -1 && f.short_src != NULL)
+                snprintf(loc, sizeof(loc), "@ %s:%d", f.short_src,
+                         f.currentline);
+            else
+                loc[0] = '\0';
+
+            if (name)
+                mrp_debug(ALIGNFMT"=> %s %s %s", ALIGNARG, type, name, loc);
+            else
+                mrp_debug(ALIGNFMT"=> %s %s", ALIGNARG, type, loc);
+        }
+        else
+            mrp_debug(ALIGNFMT"=> Lua", ALIGNARG);
+
+        depth++;
         break;
 
     case LUA_HOOKLINE:
-        if (ar->what && ar->what[0] == 'C')
-            mrp_debug(" @ <Lua function in C>");
-        else if (ar->what && ar->what[0] == 'L') {
-            mrp_debug(" @ %s:%d",
-                      ar->source ? ar->source  + 1: "<unknown>",
-                      ar->currentline);
-        }
+        mrp_clear(&f);
+
+        if (lua_getstack(L, 1, &f) && lua_getinfo(L, "Snl", &f))
+            mrp_debug(ALIGNFMT" @ %s:%d", ALIGNARG, f.short_src, f.currentline);
         else
-            mrp_debug(" @ %s", ar->what ? ar->what : "<unknown>");
+            mrp_debug(ALIGNFMT" @ line %d", ALIGNARG, ar->currentline);
         break;
 
     default:
         break;
     }
+
+#undef RUNNING
+#undef ALIGNFMT
+#undef ALIGNARG
 }
 
 
