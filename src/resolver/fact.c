@@ -184,7 +184,12 @@ static void transaction_event(mqi_event_t *e, void *user_data)
     case mqi_transaction_end:
         mrp_debug("DB transaction ended.");
         check_fact_tables(r);
-        schedule_target_autoupdate(r);
+        if (mqi_get_transaction_depth() == 1) {
+            mrp_debug("was not nested, scheduling update");
+            schedule_target_autoupdate(r);
+        }
+        else
+            mrp_debug("was nested");
         break;
     case mqi_transaction_start:
         mrp_debug("DB transaction started.");
