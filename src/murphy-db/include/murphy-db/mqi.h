@@ -174,6 +174,7 @@ mqi_handle_t mqi_begin_transaction(void);
 int mqi_commit_transaction(mqi_handle_t);
 int mqi_rollback_transaction(mqi_handle_t);
 mqi_handle_t mqi_get_transaction_handle(void);
+uint32_t mqi_get_transaction_depth(void);
 mqi_handle_t mqi_create_table(char *, uint32_t, char **, mqi_column_def_t *);
 int mqi_create_index(mqi_handle_t, char **);
 int mqi_drop_table(mqi_handle_t);

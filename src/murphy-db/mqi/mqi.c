@@ -476,6 +476,13 @@ mqi_handle_t mqi_get_transaction_handle(void)
     return TX_HANDLE(tx->useid, depth);
 }
 
+
+uint32_t mqi_get_transaction_depth(void)
+{
+    return txdepth;
+}
+
+
 mqi_handle_t mqi_create_table(char *name,
                               uint32_t flags,
                               char **index_columns,
