@@ -2,6 +2,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 #include <arpa/inet.h>
 
 #include <murphy/common/macros.h>
@@ -304,8 +306,8 @@ static void epoll_event(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
  * Notes:
  *     In some environments we might be forced to run with really old
  *     versions of libwebsockets. This causes some amount of pain as
- *     as some of those features are quite essential for building a
- *     reasonable abstraction on top of libwebsockets.
+ *     some of the recent features in libwebsockets are essential for
+ *     building a reasonable abstraction on top of it.
  *
  *     Most notably, versions prior to 0291eb3..d764e84 (Oct 19 2012)
  *     do not support per-context user data. Since we need to associate
@@ -502,6 +504,66 @@ static lws_ctx_t *lws_create_ctx(int port, const char *dev,
 #endif /* !WEBSOCKETS_OLD */
 
 
+static int find_device(struct sockaddr *sa, char *buf, size_t size)
+{
+    struct sockaddr *ia;
+    struct ifreq     ifreq[64];
+    struct ifconf    ifconf;
+    int              status, sck, n, i;
+
+    /*
+     * XXX FIXME: we only handle primary addresses at the moment...
+     */
+
+    if (size < IFNAMSIZ) {
+        errno = ENOBUFS;
+        return -1;
+    }
+
+    if (sa->sa_family != AF_INET) {      /* libwebsockets can't handle IPv6 */
+        errno = EAFNOSUPPORT;
+        return -1;
+    }
+
+    if (((struct sockaddr_in *)sa)->sin_addr.s_addr == 0x0) {
+        *buf = '\0';
+        return 0;
+    }
+
+    sck = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (sck < 0)
+        return -1;
+
+    ifconf.ifc_len = sizeof(ifreq);
+    ifconf.ifc_buf = (char *)&ifreq[0];
+
+    status = ioctl(sck, SIOCGIFCONF, &ifconf);
+    close(sck);
+
+    if (status < 0)
+        return -1;
+
+    n = ifconf.ifc_len / sizeof(ifreq[0]);
+
+    for (i = 0; i < n; i++) {
+        ia = &ifreq[i].ifr_addr;
+
+        if (ia->sa_family == sa->sa_family) {
+            if (((struct sockaddr_in *)sa)->sin_addr.s_addr ==
+                ((struct sockaddr_in *)ia)->sin_addr.s_addr) {
+                snprintf(buf, IFNAMSIZ - 1, ifreq[i].ifr_name);
+                buf[IFNAMSIZ - 1] = '\0';
+                return 0;
+            }
+        }
+    }
+
+    errno = EADDRNOTAVAIL;
+    return -1;
+}
+
+
 wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
                               wsl_proto_t *protos, int nproto, void *user_data)
 {
@@ -512,28 +574,29 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
     int             lws_nproto;
     mrp_io_event_t  events;
     const char     *dev;
+    char            ifname[IFNAMSIZ + 1];
     int             port, i;
 
+    dev  = NULL;
+    port = 0;
 
-    if (addr == NULL) {
-        dev  = NULL;
-        port = 0;
-    }
-    else {
-        switch (addr->sa_family) {
-        case AF_INET:
-            dev  = NULL;
-            port = (int)ntohs(((struct sockaddr_in *)addr)->sin_port);
-            break;
-
-        case AF_INET6:
-            dev  = NULL;
-            port = (int)ntohs(((struct sockaddr_in6 *)addr)->sin6_port);
-            break;
-
-        default:
-            errno = EINVAL;
+    if (addr != NULL) {
+        if (find_device(addr, ifname, sizeof(ifname)) < 0)
             return NULL;
+        else {
+            mrp_debug("address mapped to device '%s'",
+                      *ifname ? ifname : "<any>");
+
+            dev = ifname;
+
+            switch (addr->sa_family) {
+            case AF_INET:
+                port = ntohs(((struct sockaddr_in *)addr)->sin_port);
+                break;
+            case AF_INET6:
+                port = ntohs(((struct sockaddr_in6 *)addr)->sin6_port);
+                break;
+            }
         }
     }
 

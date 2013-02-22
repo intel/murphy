@@ -248,18 +248,6 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     if (t->ctx != NULL)
         return FALSE;
 
-    /*
-     * Unfortunately instead of binding to an address/port pair, the
-     * underlying libwebsockets library API allows one to bind to a
-     * device/port pair, with NULL being a wildcard device.
-     *
-     * XXX TODO:
-     * For the time being, we ignore the given address and always bind
-     * to all interfaces. Later we can try to be a bit cleverer and eg.
-     * add glue code that digs out the device name based on the address
-     * (whenever this is unique).
-     */
-
     wa = (mrp_wsckaddr_t *)addr;
 
     switch (wa->wsck_addr.family) {
