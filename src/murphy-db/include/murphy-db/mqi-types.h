@@ -33,6 +33,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/** macro to tag a variable unused */
+#define MQI_UNUSED(var) ((void)var)
+
 /** maximum number of rows a query can produce */
 #define MQI_QUERY_RESULT_MAX   8192
 /** the maximum number columns a table can have */

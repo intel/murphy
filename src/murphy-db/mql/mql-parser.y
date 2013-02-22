@@ -412,7 +412,7 @@ create_table: table_flags TKN_TABLE {
 
 
 table_definition: TKN_IDENTIFIER TKN_LEFT_PAREN column_defs TKN_RIGHT_PAREN {
-    if (mqi_create_table($1, table_flags, NULL, coldefs) < 0)
+    if (mqi_create_table($1, table_flags, NULL, coldefs) == MQI_HANDLE_INVALID)
         MQL_ERROR(errno, "Can't create table: %s\n", strerror(errno));
     else
         MQL_SUCCESS;
@@ -1405,7 +1405,7 @@ int yy_mql_input(void *dst, unsigned dstlen)
         if (mqlbuf) {
             if ((len = strlen(mqlbuf)) < 1)
                 len = 0;
-            else if (len + 1 <= dstlen) {
+            else if ((unsigned)len + 1 <= dstlen) {
                 memcpy(dst, mqlbuf, len + 1);
                 mqlbuf += len;
             }
@@ -1514,14 +1514,14 @@ static void print_query_result(mqi_column_desc_t *coldescs,
 
         clghs[j] = clgh;
 
-        if (clgh < sizeof(name))
+        if (clgh < (int)sizeof(name))
             name[clgh] = '\0';
 
         n += fprintf(mqlout, "%s%*s", j?" ":"", clgh,name);
 
     }
 
-    if (n > sizeof(name)-1)
+    if (n > (int)sizeof(name)-1)
         n = sizeof(name)-1;
     memset(name, '-', n);
     name[n] = '\0';

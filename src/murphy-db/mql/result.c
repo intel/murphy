@@ -175,7 +175,7 @@ mql_result_t *mql_result_error_create(int code, const char *fmt, ...)
     l = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
 
-    if (l > sizeof(buf))
+    if (l > (int)sizeof(buf))
         l = sizeof(buf) - 1;
 
     if ((rslt = calloc(1, sizeof(result_error_t) + l + 1))) {
@@ -656,7 +656,7 @@ mql_result_t *mql_result_string_create_table_list(int n, char **names)
     char  *p;
     int    i;
 
-    MDB_CHECKARG(n >= 0 && n < MQI_DIMENSION(nlgh) && names, NULL);
+    MDB_CHECKARG(n >= 0 && n < (int)MQI_DIMENSION(nlgh) && names, NULL);
 
     len = 1;  /* zero terminator */
 
@@ -1153,7 +1153,7 @@ mql_result_t *mql_result_string_create_row_list(int                 ncol,
      */
     for (i = 0;   i < ncol;   i++) {
         if ((cwidth = cwidths[i])) {
-            if (cwidth <= (len = strlen(colnams[i]))) {
+            if (cwidth <= (int)(len = strlen(colnams[i]))) {
                 /* truncate */
                 memcpy(p, colnams[i], cwidth);
                 p[cwidth] = ' ';

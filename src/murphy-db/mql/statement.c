@@ -776,6 +776,8 @@ static mql_result_t *exec_show_tables(mql_result_type_t type,
     char         *names[4096];
     int           n;
 
+    MQI_UNUSED(type);
+
     if ((n = mqi_show_tables(st->flags, names, MQI_DIMENSION(names))) < 0) {
         rslt = mql_result_error_create(errno, "can't show tables: %s",
                                        strerror(errno));

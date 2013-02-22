@@ -412,7 +412,7 @@ int mqi_commit_transaction(mqi_handle_t h)
 
     MDB_CHECKARG(h != MQI_HANDLE_INVALID && depth < MQI_TXDEPTH_MAX, -1);
     MDB_PREREQUISITE(dbs && ndb > 0, -1);
-    MDB_ASSERT(txdepth > 0 && depth == txdepth - 1, EBADSLT, -1);
+    MDB_ASSERT(txdepth > 0 && depth == (uint32_t)txdepth - 1, EBADSLT, -1);
 
     tx = txstack + depth;
 
@@ -443,7 +443,7 @@ int mqi_rollback_transaction(mqi_handle_t h)
 
     MDB_CHECKARG(h != MQI_HANDLE_INVALID && depth < MQI_TXDEPTH_MAX, -1);
     MDB_PREREQUISITE(dbs && ndb > 0, -1);
-    MDB_ASSERT(txdepth > 0 && depth == txdepth - 1, EBADSLT, -1);
+    MDB_ASSERT(txdepth > 0 && depth == (uint32_t)txdepth - 1, EBADSLT, -1);
 
     tx = txstack + depth;
 

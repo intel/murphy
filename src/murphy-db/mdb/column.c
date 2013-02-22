@@ -184,6 +184,11 @@ int mdb_column_print(mdb_column_t *cdesc, void *data, char *buf, int len)
 
 static int print_blob(uint8_t *data, int data_len, char *buf, int buflen)
 {
+    MQI_UNUSED(data);
+    MQI_UNUSED(data_len);
+    MQI_UNUSED(buf);
+    MQI_UNUSED(buflen);
+
     return 0;
 }
 

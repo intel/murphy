@@ -147,6 +147,10 @@ int mqi_data_print_varchar(void *data, char *buf, int len)
 
 int mqi_data_print_blob(void *data, char *buf, int len)
 {
+    MQI_UNUSED(data);
+    MQI_UNUSED(buf);
+    MQI_UNUSED(len);
+
     return 0;
 }
 

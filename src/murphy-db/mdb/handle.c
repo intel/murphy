@@ -214,7 +214,7 @@ static mdb_handle_t index_alloc(indextbl_t *indextbl, int index, void *data)
     indextbl_entry_t *entries, *entry;
     size_t size;
 
-    MDB_CHECKARG(index >= 0 && index < HANDLE_INDEX_MAX && data,
+    MDB_CHECKARG(index >= 0 && (mdb_handle_t)index < HANDLE_INDEX_MAX && data,
                  MDB_HANDLE_INVALID);
 
     if (index >= indextbl->nentry) {

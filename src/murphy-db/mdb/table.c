@@ -504,7 +504,7 @@ int mdb_table_print_rows(mdb_table_t *tbl, char *buf, int len)
         p += mdb_column_print_header(tbl->columns + i, p, e-p);
 
     if (p + ((l = p - buf) + 3) < e) {
-        if (l > sizeof(dashes) - 1)
+        if (l > (int)sizeof(dashes) - 1)
             l = sizeof(dashes) - 1;
 
         memset(dashes, '-', l);
@@ -660,6 +660,8 @@ static int select_all(mdb_table_t       *tbl,
     mqi_column_desc_t *result_dsc;
     int                cindex;
     int                j;
+
+    MQI_UNUSED(dim);
 
     for (it.cursor = NULL, nresult = 0;
          (row = table_iterator(tbl, &it));

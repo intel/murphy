@@ -417,6 +417,9 @@ int mdb_hash_function_pointer(int bits, int nchain, int klen, void *key)
 #define MASK(t)  ((((uint##t##_t)1) << (sizeof(int) * 8 - 3)) - 1)
     int hash;
 
+    MQI_UNUSED(bits);
+    MQI_UNUSED(klen);
+
 #if __SIZEOF_POINTER__ == 8
     hash = (int)(((uint64_t)key >> 2) & MASK(64)) % nchain;
 #else

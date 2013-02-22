@@ -340,7 +340,7 @@ START_TEST(transaction_begin)
 {
     mqi_handle_t tx;
 
-    fail_if(txdepth >= MQI_DIMENSION(transactions), "too many nested "
+    fail_if(txdepth >= (int)MQI_DIMENSION(transactions), "too many nested "
             "transactions. Only %d allowed", MQI_DIMENSION(transactions));
 
     tx = MQI_BEGIN;
@@ -599,7 +599,7 @@ START_TEST(transaction_rollback)
     for (i = 0;  i < n;  i++) {
         r = rows + i;
 
-        for (found = 0, j = 0;  j < MQI_DIMENSION(artists)-1;  j++) {
+        for (found = 0, j = 0;  j < (int)MQI_DIMENSION(artists)-1;  j++) {
             a = artists[j];
 
             if (a->id == r->id &&
@@ -832,7 +832,7 @@ START_TEST(nested_transactions)
 
     PREREQUISITE(create_table_persons);
 
-    if (nnest > sizeof(txids) / sizeof(txids[0]))
+    if (nnest > (int)(sizeof(txids) / sizeof(txids[0])))
         nnest = sizeof(txids) / sizeof(txids[0]);
 
     for (cnt = 0; cnt < 16; cnt++) {
@@ -1003,7 +1003,7 @@ static void transaction_event_cb(mqi_event_t *evt, void *user_data)
  /* mqi_transact_event_t *te    = &evt->transact; */
     trigger_t            *trig;
 
-    if (ntrigger >= MQI_DIMENSION(triggers)) {
+    if (ntrigger >= (int)MQI_DIMENSION(triggers)) {
         if (verbose)
             printf("test framework error: trigger log overflow\n");
         return;
@@ -1033,7 +1033,7 @@ static void table_event_cb(mqi_event_t *evt, void *user_data)
     mqi_table_event_t *te    = &evt->table;
     trigger_t         *trig;
 
-    if (ntrigger >= MQI_DIMENSION(triggers)) {
+    if (ntrigger >= (int)MQI_DIMENSION(triggers)) {
         if (verbose)
             printf("test framework error: trigger log overflow\n");
         return;
@@ -1067,7 +1067,7 @@ static void row_event_cb(mqi_event_t *evt, void *user_data)
     trigger_t        *trig;
     query_t          *row;
 
-    if (ntrigger >= MQI_DIMENSION(triggers)) {
+    if (ntrigger >= (int)MQI_DIMENSION(triggers)) {
         if (verbose)
             printf("test framework error: trigger log overflow\n");
         return;
@@ -1112,7 +1112,7 @@ static void column_event_cb(mqi_event_t *evt, void *user_data)
     trigger_t          *trig;
     query_t            *row;
 
-    if (ntrigger >= MQI_DIMENSION(triggers)) {
+    if (ntrigger >= (int)MQI_DIMENSION(triggers)) {
         if (verbose)
             printf("test framework error: trigger log overflow\n");
         return;

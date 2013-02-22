@@ -305,7 +305,7 @@ START_TEST(precompile_transaction_statements)
         fail_unless(MQI_DIMENSION(string) == MQI_DIMENSION(stmnt),
                     "internal error: dimension mismatch in %s()", __FILE__);
 
-        for (i = 0;  i < MQI_DIMENSION(string);  i++) {
+        for (i = 0;  i < (int)MQI_DIMENSION(string);  i++) {
             if (!(*(stmnt[i]) = mql_precompile(string[i]))) {
                 fail("precompilation error of '%s' (%s)",
                      string[i], strerror(errno));
@@ -914,6 +914,8 @@ static TCase *basic_tests(void)
 
 static void transaction_event_cb(mql_result_t *result, void *user_data)
 {
+    MQI_UNUSED(user_data);
+
     if (result->type == mql_result_string) {
         if (verbose)
             printf("---\n%s\n", mql_result_string_get(result));
@@ -928,6 +930,8 @@ static void transaction_event_cb(mql_result_t *result, void *user_data)
 
 static void table_event_cb(mql_result_t *result, void *user_data)
 {
+    MQI_UNUSED(user_data);
+
     if (result->type == mql_result_string) {
         if (verbose)
             printf("---\n%s\n", mql_result_string_get(result));
@@ -942,6 +946,8 @@ static void table_event_cb(mql_result_t *result, void *user_data)
 
 static void row_event_cb(mql_result_t *result, void *user_data)
 {
+    MQI_UNUSED(user_data);
+
     if (result->type == mql_result_string) {
         if (verbose)
             printf("---\n%s\n", mql_result_string_get(result));
@@ -956,6 +962,8 @@ static void row_event_cb(mql_result_t *result, void *user_data)
 
 static void column_event_cb(mql_result_t *result, void *user_data)
 {
+    MQI_UNUSED(user_data);
+
     if (result->type == mql_result_string) {
         if (verbose)
             printf("---\n%s\n", mql_result_string_get(result));
