@@ -47,6 +47,12 @@
 
 #define BRL_UNUSED(var) (void)var
 
+#ifdef __GNUC__
+#    define BRL_UNLIKELY(cond) __builtin_expect((cond), 0)
+#else
+#    define BRL_UNLIKELY(cond) __builtin_expect((cond), 0)
+#endif
+
 #define BRL_CURSOR_START "\x1b[0G"       /* move cursor to start of line */
 #define BRL_CURSOR_FORW  "\x1b[%dC"      /* move cursor forward by %d */
 #define BRL_ERASE_RIGHT  "\x1b[0K"       /* erase right of cursor */
@@ -317,6 +323,7 @@ int brl_set_prompt(brl_t *brl, const char *prompt)
 
 void brl_hide_prompt(brl_t *brl)
 {
+    static int warned = 0;
     char buf[32];
     int  n, o;
 
@@ -325,6 +332,11 @@ void brl_hide_prompt(brl_t *brl)
     n = snprintf(buf, sizeof(buf), "%s%s", BRL_CURSOR_START, BRL_ERASE_RIGHT);
     o = write(brl->fd, buf, n);
     restore_rawmode(brl);
+
+    if (BRL_UNLIKELY(o < 0 && !warned)) {           /* make gcc happy */
+        fprintf(stderr, "write to fd %d failed\n", brl->fd);
+        warned = 1;
+    }
 }
 
 
@@ -697,6 +709,8 @@ static int terminal_size(int fd, int *nrow, int *ncol)
 
 static void redraw_prompt(brl_t *brl)
 {
+    static int warned = 0;
+
     char *prompt, *buf, *p;
     int   plen, dlen, space, start, trunc;
     int   l, n, o;
@@ -762,12 +776,22 @@ static void redraw_prompt(brl_t *brl)
     l = plen + dlen + 64;
     p = buf;
 
+    if (BRL_UNLIKELY(o < 0 && !warned)) {           /* make gcc happy */
+        fprintf(stderr, "write to fd %d failed\n", brl->fd);
+        warned = 1;
+    }
+
     /* re-position cursor to the current insertion offset */
     n  = snprintf(p, l, BRL_CURSOR_START""BRL_CURSOR_FORW,
                   plen + brl->offs - start);
     p += n;
     l -= n;
     o = write(brl->fd, buf, (p - buf));
+
+    if (BRL_UNLIKELY(o < 0 && !warned)) {           /* make gcc happy */
+        fprintf(stderr, "write to fd %d failed\n", brl->fd);
+        warned = 1;
+    }
 }
 
 
