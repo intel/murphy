@@ -85,6 +85,9 @@ typedef struct {
     socklen_t        alen;               /* address length */
     console_t       *c;                  /* datagram console being served */
     const char      *httpdir;            /* WRT console agent directory */
+    const char      *sslcert;            /* path to SSL certificate */
+    const char      *sslpkey;            /* path to SSL private key */
+    const char      *sslca;              /* path to SSL CA */
 } data_t;
 
 
@@ -601,7 +604,10 @@ static int wsock_setup(data_t *data)
 {
     static mrp_transport_evt_t evt;
 
-    mrp_mainloop_t  *ml = data->ctx->ml;
+    mrp_mainloop_t  *ml   = data->ctx->ml;
+    const char      *cert = data->sslcert;
+    const char      *pkey = data->sslpkey;
+    const char      *ca   = data->sslca;
     mrp_transport_t *t;
     const char      *type;
     mrp_sockaddr_t   addr;
@@ -628,6 +634,12 @@ static int wsock_setup(data_t *data)
     t     = mrp_transport_create(ml, type, &evt, data, flags);
 
     if (t != NULL) {
+        if (cert || pkey || ca) {
+            mrp_transport_setopt(t, MRP_WSCK_OPT_SSL_CERT, cert);
+            mrp_transport_setopt(t, MRP_WSCK_OPT_SSL_PKEY, pkey);
+            mrp_transport_setopt(t, MRP_WSCK_OPT_SSL_CA  , ca);
+        }
+
         if (mrp_transport_bind(t, &addr, alen) && mrp_transport_listen(t, 1)) {
             mrp_transport_setopt(t, MRP_WSCK_OPT_HTTPDIR, data->httpdir);
             data->t = t;
@@ -649,8 +661,11 @@ static int wsock_setup(data_t *data)
 
 
 enum {
-    ARG_ADDRESS,                          /* console transport address */
-    ARG_HTTPDIR                           /* content directory for HTTP */
+    ARG_ADDRESS,                         /* console transport address */
+    ARG_HTTPDIR,                         /* content directory for HTTP */
+    ARG_SSLCERT,                         /* path to SSL certificate */
+    ARG_SSLPKEY,                         /* path to SSL private key */
+    ARG_SSLCA                            /* path to SSL CA */
 };
 
 
@@ -666,6 +681,9 @@ static int console_init(mrp_plugin_t *plugin)
         data->ctx     = plugin->ctx;
         data->address = plugin->args[ARG_ADDRESS].str;
         data->httpdir = plugin->args[ARG_HTTPDIR].str;
+        data->sslcert = plugin->args[ARG_SSLCERT].str;
+        data->sslpkey = plugin->args[ARG_SSLPKEY].str;
+        data->sslca   = plugin->args[ARG_SSLCA].str;
 
         mrp_log_info("Using console address '%s'...", data->address);
 
@@ -720,8 +738,11 @@ static void console_exit(mrp_plugin_t *plugin)
 
 
 static mrp_plugin_arg_t console_args[] = {
-    MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", DEFAULT_ADDRESS),
-    MRP_PLUGIN_ARGIDX(ARG_HTTPDIR, STRING, "httpdir", DEFAULT_HTTPDIR)
+    MRP_PLUGIN_ARGIDX(ARG_ADDRESS , STRING, "address", DEFAULT_ADDRESS),
+    MRP_PLUGIN_ARGIDX(ARG_HTTPDIR , STRING, "httpdir", DEFAULT_HTTPDIR),
+    MRP_PLUGIN_ARGIDX(ARG_SSLCERT , STRING, "sslcert", NULL),
+    MRP_PLUGIN_ARGIDX(ARG_SSLPKEY , STRING, "sslpkey", NULL),
+    MRP_PLUGIN_ARGIDX(ARG_SSLCA   , STRING, "sslca"  , NULL)
 };
 
 MURPHY_REGISTER_CORE_PLUGIN("console",
