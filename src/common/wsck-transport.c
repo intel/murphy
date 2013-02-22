@@ -631,6 +631,7 @@ static int resolve_address(const char *str, mrp_wsckaddr_t *wa, socklen_t alen)
 }
 
 
+#if 0
 static int print_address(char *buf, size_t size, mrp_wsckaddr_t *wa)
 {
     struct sockaddr *saddr;
@@ -674,7 +675,7 @@ static int print_address(char *buf, size_t size, mrp_wsckaddr_t *wa)
         return -1;
     }
 }
-
+#endif
 
 static void connection_cb(wsl_ctx_t *ctx, char *addr, const char *protocol,
                           void *user_data, void *proto_data)

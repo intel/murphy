@@ -117,7 +117,8 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                      void *user, void *in, size_t len);
 static void destroy_context(wsl_ctx_t *ctx);
-static void destroy_context_table(void);
+
+static void MRP_EXIT destroy_context_table(void);
 
 
 
