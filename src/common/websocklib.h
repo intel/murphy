@@ -139,12 +139,20 @@ typedef enum {
 
 #endif /* !WEBSOCKETS_OLD */
 
+typedef enum {
+    WSL_NO_SSL         = 0,              /* plain connection, no SSL */
+    WSL_SSL            = 1,              /* SSL, deny self-signed certs */
+    WSL_SSL_SELFSIGNED = 2,              /* SSL, allow self-signed certs */
+} wsl_ssl_t;
+
 /** Set libwebsock logging level _and_ redirect to murphy logging infra. */
 void wsl_set_loglevel(wsl_loglevel_t mask);
 
 /** Create a websocket context. */
 wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *sa,
-                              wsl_proto_t *protos, int nproto, void *user_data);
+                              wsl_proto_t *protos, int nproto,
+                              const char *ssl_cert, const char *ssl_pkey,
+                              const char *ssl_ca, void *user_data);
 
 /** Add a reference to a context. */
 wsl_ctx_t *wsl_ref_context(wsl_ctx_t *ctx);
@@ -154,7 +162,7 @@ int wsl_unref_context(wsl_ctx_t *ctx);
 
 /** Create a new websocket connection using a given protocol. */
 wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
-                       const char *protocol, void *user_data);
+                       const char *protocol, wsl_ssl_t ssl, void *user_data);
 
 /** Accept a pending connection. */
 wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data);

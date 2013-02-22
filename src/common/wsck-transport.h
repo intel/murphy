@@ -48,6 +48,10 @@ typedef struct {
 #define MRP_WSCK_OPT_HTTPDIR  "http-dir"      /* HTTP content root */
 #define MRP_WSCK_OPT_MIMEMAP  "mime-map"      /* suffix-MIME table */
 #define MRP_WSCK_OPT_URIMAP   "uri-map"       /* URI-path table */
+#define MRP_WSCK_OPT_SSL_CERT "ssl-cert"      /* path to SSL certificate */
+#define MRP_WSCK_OPT_SSL_PKEY "ssl-pkey"      /* path to SSL priv. key */
+#define MRP_WSCK_OPT_SSL_CA   "ssl-ca"        /* path to SSL CA */
+#define MRP_WSCK_OPT_SSL      "ssl"           /* whether to connect with SSL */
 
 /*
  * It is also possible to serve content over HTTP on a websocket transport.

@@ -14,6 +14,7 @@ typedef wsl_ctx_t       mrp_websock_context_t;
 typedef wsl_sck_t       mrp_websock_t;
 typedef wsl_callbacks_t mrp_websock_evt_t;
 typedef wsl_proto_t     mrp_websock_proto_t;
+typedef wsl_ssl_t       mrp_wsl_ssl_t;
 
 /*
  * websocket log levels (mapped)
@@ -49,6 +50,9 @@ mrp_websock_context_t *mrp_websock_create_context(mrp_mainloop_t *ml,
                                                   struct sockaddr *sa,
                                                   mrp_websock_proto_t *proto,
                                                   int nproto,
+                                                  const char *ssl_cert,
+                                                  const char *ssl_pkey,
+                                                  const char *ssl_ca,
                                                   void *user_data);
 
 /** Add a reference to a websocket context. */
@@ -60,7 +64,7 @@ int mrp_websock_unref_context(mrp_websock_context_t *ctx);
 /** Create and connect a websocket to a given address. */
 mrp_websock_t *mrp_websock_connect(mrp_websock_context_t *ctx,
                                    struct sockaddr *sa, const char *protocol,
-                                   void *user_data);
+                                   mrp_wsl_ssl_t ssl, void *user_data);
 
 /** Accept a pending connection of a context. */
 mrp_websock_t *mrp_websock_accept_pending(mrp_websock_context_t *ctx,

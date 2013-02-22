@@ -67,6 +67,10 @@ typedef struct {
     const char         *http_root;       /* HTTP content root */
     mrp_wsck_urimap_t  *uri_table;       /* URI-to-path table */
     mrp_wsck_mimemap_t *mime_table;      /* suffix to MIME-type table */
+    const char         *ssl_cert;        /* path to SSL certificate */
+    const char         *ssl_pkey;        /* path to SSL private key */
+    const char         *ssl_ca;          /* path to SSL CA */
+    wsl_ssl_t           ssl;             /* SSL mode (wsl_ssl_t) */
     mrp_list_hook_t     http_clients;    /* pure HTTP clients */
 } wsck_t;
 
@@ -203,6 +207,14 @@ static int wsck_setopt(mrp_transport_t *mt, const char *opt, const void *val)
         t->mime_table = (void *)val;
     else if (!strcmp(opt, MRP_WSCK_OPT_URIMAP))
         t->uri_table = (void *)val;
+    else if (!strcmp(opt, MRP_WSCK_OPT_SSL_CERT))
+        t->ssl_cert = (const char *)val;
+    else if (!strcmp(opt, MRP_WSCK_OPT_SSL_PKEY))
+        t->ssl_pkey = (const char *)val;
+    else if (!strcmp(opt, MRP_WSCK_OPT_SSL_CA))
+        t->ssl_ca = (const char *)val;
+    else if (!strcmp(opt, MRP_WSCK_OPT_SSL))
+        t->ssl = *(wsl_ssl_t *)val;
     else
         success = FALSE;
 
@@ -258,7 +270,8 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
     }
 
-    t->ctx = wsl_create_context(t->ml, sa, &proto[0], MRP_ARRAY_SIZE(proto), t);
+    t->ctx = wsl_create_context(t->ml, sa, &proto[0], MRP_ARRAY_SIZE(proto),
+                                t->ssl_cert, t->ssl_pkey, t->ssl_ca, t);
 
     if (t->ctx != NULL)
         return TRUE;
@@ -340,12 +353,13 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
     }
 
-    t->ctx = wsl_create_context(t->ml, NULL, &proto, 1, t);
+    t->ctx = wsl_create_context(t->ml, NULL, &proto, 1,
+                                t->ssl_cert, t->ssl_pkey, t->ssl_ca, t);
 
     if (t->ctx == NULL)
         return FALSE;
 
-    t->sck = wsl_connect(t->ctx, sa, "murphy", t);
+    t->sck = wsl_connect(t->ctx, sa, "murphy", t->ssl, t);
 
     if (t->sck != NULL) {
         t->connected = TRUE;

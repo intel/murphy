@@ -565,7 +565,9 @@ static int find_device(struct sockaddr *sa, char *buf, size_t size)
 
 
 wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
-                              wsl_proto_t *protos, int nproto, void *user_data)
+                              wsl_proto_t *protos, int nproto,
+                              const char *ssl_cert, const char *ssl_pkey,
+                              const char *ssl_ca, void *user_data)
 {
     lws_ext_t      *builtin = libwebsocket_internal_extensions;
     wsl_ctx_t      *ctx;
@@ -657,7 +659,7 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *addr,
         goto fail;
 
     ctx->ctx = lws_create_ctx(port, dev, lws_protos, builtin,
-                              NULL, NULL, NULL, -1, -1, 0, ctx);
+                              ssl_cert, ssl_pkey, ssl_ca, -1, -1, 0, ctx);
 
     if (ctx->ctx != NULL) {
         ctx->user_data = user_data;
@@ -759,7 +761,7 @@ static wsl_sck_t *find_pure_http(wsl_ctx_t *ctx, lws_t *ws)
 
 
 wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
-                       const char *protocol, void *user_data)
+                       const char *protocol, wsl_ssl_t ssl, void *user_data)
 {
     wsl_sck_t   *sck, **ptr;
     wsl_proto_t *up;
@@ -845,7 +847,7 @@ wsl_sck_t *wsl_connect(wsl_ctx_t *ctx, struct sockaddr *sa,
 
             sck->sck = libwebsocket_client_connect_extended(ctx->ctx,
                                                             astr, port,
-                                                            LWS_NO_SSL,
+                                                            ssl,
                                                             "/", astr, astr,
                                                             protocol, -1,
                                                             ptr);

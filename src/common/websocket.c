@@ -12,9 +12,14 @@ mrp_websock_context_t *mrp_websock_create_context(mrp_mainloop_t *ml,
                                                   struct sockaddr *sa,
                                                   mrp_websock_proto_t *proto,
                                                   int nproto,
+                                                  const char *ssl_cert,
+                                                  const char *ssl_pkey,
+                                                  const char *ssl_ca,
                                                   void *user_data)
 {
-    return wsl_create_context(ml, sa, proto, nproto, user_data);
+    return wsl_create_context(ml, sa, proto, nproto,
+                              ssl_cert, ssl_pkey, ssl_ca,
+                              user_data);
 }
 
 
@@ -32,9 +37,9 @@ int mrp_websock_unref_context(mrp_websock_context_t *ctx)
 
 mrp_websock_t *mrp_websock_connect(mrp_websock_context_t *ctx,
                                    struct sockaddr *sa, const char *protocol,
-                                   void *user_data)
+                                   mrp_wsl_ssl_t ssl, void *user_data)
 {
-    return wsl_connect(ctx, sa, protocol, user_data);
+    return wsl_connect(ctx, sa, protocol, ssl, user_data);
 }
 
 
