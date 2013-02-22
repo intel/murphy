@@ -4,8 +4,11 @@ m = murphy.get()
 m:try_load_plugin('console')
 
 m:try_load_plugin('console', 'webconsole', {
-                             address = 'wsck:127.0.0.1:3000/murphy',
-                             httpdir = 'src/plugins/console'         })
+                              address = 'wsck:127.0.0.1:3000/murphy',
+                              httpdir = 'src/plugins/console',
+--                              sslcert = 'src/plugins/console/console.crt',
+--                              sslpkey = 'src/plugins/console/console.key'
+         })
 
 -- load a test plugin
 if m:plugin_exists('test.disabled') then
