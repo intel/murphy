@@ -63,6 +63,7 @@ if test "$enable_websockets" != "no"; then
         if test "$old_websockets" = "yes"; then
             WEBSOCKETS_CFLAGS="$WEBSOCKET_CFLAGS -DWEBSOCKETS_OLD"
         fi
+        LDFLAGS="$saved_LDFLAGS"
     fi
 else
     AC_MSG_NOTICE([libwebsockets support is disabled.])
