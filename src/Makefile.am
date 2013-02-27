@@ -56,6 +56,7 @@ libmurphy_common_la_HEADERS =		\
 		common/msg.h		\
 		common/refcnt.h		\
 		common/fragbuf.h	\
+		common/json.h		\
 		common/transport.h
 
 libmurphy_common_la_REGULAR_SOURCES =		\
@@ -68,6 +69,7 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/file-utils.c		\
 		common/msg.c			\
 		common/fragbuf.c		\
+		common/json.c			\
 		common/transport.c		\
 		common/stream-transport.c	\
 		common/internal-transport.c	\
@@ -78,13 +80,15 @@ libmurphy_common_la_SOURCES =				\
 		common-func-info.c
 
 libmurphy_common_la_CFLAGS  =		\
-		$(AM_CFLAGS)
+		$(AM_CFLAGS)		\
+		$(JSON_CFLAGS)
 
 libmurphy_common_la_LDFLAGS =					\
 		-Wl,-version-script=linker-script.common	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_common_la_LIBADD  = 		\
+		$(JSON_LIBS)		\
 		-lrt
 
 libmurphy_common_la_DEPENDENCIES = linker-script.common
@@ -95,14 +99,12 @@ libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
 if WEBSOCKETS_ENABLED
 libmurphy_common_la_HEADERS +=			\
 		common/websocklib.h		\
-		common/websocket.h		\
-		common/json.h
+		common/websocket.h
 
 libmurphy_common_la_REGULAR_SOURCES +=		\
 		common/websocklib.c		\
 		common/websocket.c		\
-		common/wsck-transport.c 	\
-		common/json.c
+		common/wsck-transport.c
 
 libmurphy_common_la_CFLAGS +=			\
 		$(WEBSOCKETS_CFLAGS)
@@ -115,20 +117,6 @@ webconsoledir   = $(datadir)/murphy/webconsole
 webconsole_DATA = 				\
 		plugins/console/console.js	\
 		plugins/console/console.html
-else
-if JSON_ENABLED
-libmurphy_common_la_HEADERS +=			\
-		common/json.h
-
-libmurphy_common_la_REGULAR_SOURCES +=		\
-		common/json.c
-
-libmurphy_common_la_CFLAGS +=			\
-		$(JSON_CFLAGS)
-
-libmurphy_common_la_LIBADD +=			\
-		$(JSON_LIBS)
-endif
 endif
 
 

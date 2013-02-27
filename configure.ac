@@ -281,62 +281,34 @@ AC_SUBST(CONSOLE_ENABLED)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_LIBS)
 
+# Check for json(-c).
+PKG_CHECK_MODULES(JSON, [json])
+
+AC_MSG_CHECKING([for json_tokener_get_error()])
+saved_CFLAGS="$CFLAGS"
+saved_LDFLAGS="$LDFLAGS"
+CFLAGS="$(pkg-config --cflags json)"
+LDFLAGS="$(pkg-config --libs json)"
+AC_LINK_IFELSE(
+   [AC_LANG_PROGRAM(
+         [[#include <json.h>]],
+         [[json_tokener *tok = NULL;
+           if (json_tokener_get_error(tok) != json_tokener_success)
+              return 0;
+           else
+               return 1;]])],
+    [have_json_tokener_get_error=yes],
+    [have_json_tokener_get_error=no])
+AC_MSG_RESULT([$have_json_tokener_get_error])
+CFLAGS="$saved_CFLAGS"
+LDFLAGS="$saved_LDFLAGS"
+
+if test "$have_json_tokener_get_error" = "yes"; then
+    AC_DEFINE([HAVE_JSON_TOKENER_GET_ERROR], 1, [json_tokener_get_error ?])
+fi
+
 # Check if websocket support was/can be enabled.
 CHECK_WEBSOCKETS()
-
-# If websockets was not enabled/available check if JSON was asked for.
-if test "$enable_json" = "no"; then
-    AC_ARG_ENABLE(json,
-                  [  --enable-json       enable JSON encoding/decoding support],
-                  [enable_json=$enableval], [enable_json=no])
-
-    if test "$enable_json" != "no"; then
-        PKG_CHECK_MODULES(JSON, [json],
-                          [have_json=yes], [have_json=no])
-        if test "$have_json" = "no" -a "$enable_json" = "yes"; then
-            AC_MSG_ERROR([json-c development libraries not found.])
-        fi
-
-        enable_json="$have_json"
-    else
-        AC_MSG_NOTICE([JSON support is disabled.])
-    fi
-
-    if test "$enable_json" = "yes"; then
-        AC_DEFINE([JSON_ENABLED], 1, [Enable json support ?])
-    fi
-    AC_SUBST(JSON_ENABLED)
-    AC_SUBST(JSON_CFLAGS)
-    AC_SUBST(JSON_LIBS)
-fi
-
-AM_CONDITIONAL(JSON_ENABLED, [test "$enable_json" = "yes"])
-
-# If JSON is enabled, check if we have json_tokener_get_error().
-if test "$enable_json" = "yes"; then
-    AC_MSG_CHECKING([for json_tokener_get_error()])
-    saved_CFLAGS="$CFLAGS"
-    saved_LDFLAGS="$LDFLAGS"
-    CFLAGS="$(pkg-config --cflags json)"
-    LDFLAGS="$(pkg-config --libs json)"
-    AC_LINK_IFELSE(
-        [AC_LANG_PROGRAM(
-             [[#include <json.h>]],
-             [[json_tokener *tok = NULL;
-               if (json_tokener_get_error(tok) != json_tokener_success)
-                   return 0;
-               else
-                   return 1;]])],
-        [have_json_tokener_get_error=yes],
-        [have_json_tokener_get_error=no])
-    AC_MSG_RESULT([$have_json_tokener_get_error])
-    CFLAGS="$saved_CFLAGS"
-    LDFLAGS="$saved_LDFLAGS"
-
-    if test "$have_json_tokener_get_error" = "yes"; then
-        AC_DEFINE([HAVE_JSON_TOKENER_GET_ERROR], 1, [json_tokener_get_error ?])
-    fi
-fi
 
 
 # Set up murphy CFLAGS and LIBS.
@@ -577,7 +549,6 @@ echo "Qt mainloop support: $enable_qt"
 echo "Murphy console plugin and client: $enable_console"
 echo "Resource management support: $with_resources"
 echo "Websockets support: $enable_websockets"
-echo "JSON encoding/decoding support: $enable_json"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do
