@@ -16,7 +16,18 @@ if m:plugin_exists('test.disabled') then
                        string2  = 'this is now string2',
                        boolean2 = true,
                        int32 = -981,
-                       double = 2.73 })
+                       double = 2.73,
+                       object = {
+                           foo = 1,
+                           bar = 'bar',
+                           foobar = 3.141,
+                           barfoo = 'bar foo',
+                           array = { 'one', 'two', 'three',
+                                     { 1, 'two', 3, 'four' } },
+                           yees = true,
+                           noou = false
+                       }
+                 })
 --    m:load_plugin('test', 'test2')
 --    m:info("Successfully loaded two instances of test...")
 end
@@ -51,6 +62,12 @@ else
     m:info("No dbus resource plugin found...")
 end
 
+-- load the WRT resource plugin
+if m:plugin_exists('resource-wrt') then
+    m:try_load_plugin('resource-wrt')
+else
+    m:info("No WRT resource plugin found...")
+end
 
 -- load the domain control plugin if it exists
 if m:plugin_exists('domain-control') then
