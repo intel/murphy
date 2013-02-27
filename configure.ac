@@ -312,6 +312,32 @@ fi
 
 AM_CONDITIONAL(JSON_ENABLED, [test "$enable_json" = "yes"])
 
+# If JSON is enabled, check if we have json_tokener_get_error().
+if test "$enable_json" = "yes"; then
+    AC_MSG_CHECKING([for json_tokener_get_error()])
+    saved_CFLAGS="$CFLAGS"
+    saved_LDFLAGS="$LDFLAGS"
+    CFLAGS="$(pkg-config --cflags json)"
+    LDFLAGS="$(pkg-config --libs json)"
+    AC_LINK_IFELSE(
+        [AC_LANG_PROGRAM(
+             [[#include <json.h>]],
+             [[json_tokener *tok = NULL;
+               if (json_tokener_get_error(tok) != json_tokener_success)
+                   return 0;
+               else
+                   return 1;]])],
+        [have_json_tokener_get_error=yes],
+        [have_json_tokener_get_error=no])
+    AC_MSG_RESULT([$have_json_tokener_get_error])
+    CFLAGS="$saved_CFLAGS"
+    LDFLAGS="$saved_LDFLAGS"
+
+    if test "$have_json_tokener_get_error" = "yes"; then
+        AC_DEFINE([HAVE_JSON_TOKENER_GET_ERROR], 1, [json_tokener_get_error ?])
+    fi
+fi
+
 
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
