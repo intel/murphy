@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/time.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -105,8 +106,76 @@ typedef struct {
     uint32_t              rset_id;
 } client_t;
 
+typedef struct {
+    uint32_t              seqno;
+    uint64_t              time;
+} reqstamp_t;
+
+#define HASH_BITS         8
+#define HASH_MAX          (((uint32_t)1) << HASH_BITS)
+#define HASH_MASK         (HASH_MAX - 1)
+#define HASH_FUNC(s)      ((uint32_t)(s) & HASH_MASK)
+
+static reqstamp_t         reqstamps[HASH_MAX];
+static uint64_t           totaltime;
+static uint32_t           reqcount;
 
 static void print_prompt(client_t *, bool);
+
+
+static uint64_t reqstamp_current_time(void)
+{
+    struct timeval tv;
+
+    if (gettimeofday(&tv, NULL) < 0)
+        return 0ULL;
+
+    return ((uint64_t)tv.tv_sec * 1000000ULL) + (uint64_t)tv.tv_usec;
+}
+
+static void reqstamp_start(uint32_t seqno)
+{
+    reqstamp_t *rs  = reqstamps + HASH_FUNC(seqno);
+    uint64_t    now = reqstamp_current_time();
+
+    if (!rs->seqno && !rs->time && now) {
+        rs->seqno = seqno;
+        rs->time  = now;
+    }
+}
+
+static void reqstamp_intermediate(uint32_t seqno)
+{
+    reqstamp_t *rs   = reqstamps + HASH_FUNC(seqno);
+    uint64_t    now  = reqstamp_current_time();
+
+    if (rs->seqno == seqno && rs->time && now > rs->time) {
+        printf("request %u was responded in %.2lf msec\n",
+               seqno, (double)(now - rs->time) / 1000.0);
+    }
+}
+
+static void reqstamp_end(uint32_t seqno)
+{
+    reqstamp_t *rs   = reqstamps + HASH_FUNC(seqno);
+    uint64_t    now  = reqstamp_current_time();
+    uint64_t    diff = 0;
+
+    if (rs->seqno == seqno && rs->time) {
+        if (now > rs->time) {
+            diff = now - rs->time;
+        }
+
+        printf("request %u was processed in %.2lf msec\n",
+               seqno, (double)diff / 1000.0);
+
+        rs->seqno = 0;
+        rs->time = 0ULL;
+
+        totaltime += diff;
+        reqcount++;
+    }
+}
 
 
 static void str_array_free(string_array_t *arr)
@@ -943,26 +1012,34 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
         return;
     }
 
+
     switch (request) {
     case RESPROTO_QUERY_RESOURCES:
+        reqstamp_end(seqno);
         resource_query_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_QUERY_CLASSES:
+        reqstamp_end(seqno);
         class_query_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_QUERY_ZONES:
+        reqstamp_end(seqno);
         zone_query_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_CREATE_RESOURCE_SET:
+        reqstamp_end(seqno);
         create_resource_set_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_ACQUIRE_RESOURCE_SET:
+        reqstamp_intermediate(seqno);
         acquire_resource_set_response(client, seqno, true, msg, &cursor);
         break;
     case RESPROTO_RELEASE_RESOURCE_SET:
+        reqstamp_intermediate(seqno);
         acquire_resource_set_response(client, seqno, false, msg, &cursor);
         break;
     case RESPROTO_RESOURCES_EVENT:
+        reqstamp_end(seqno);
         resource_event(client, seqno, msg, &cursor);
         break;
     default:
@@ -1039,6 +1116,8 @@ static mrp_msg_t *create_request(uint32_t seqno, mrp_resproto_request_t req)
         mrp_log_error("Unable to create new message");
         exit(ENOMEM);
     }
+
+    reqstamp_start(seqno);
 
     return msg;
 }
@@ -1634,6 +1713,9 @@ int main(int argc, char **argv)
     mrp_add_io_watch(client->ml, 0, MRP_IO_EVENT_IN, console_input, client);
 
     mrp_mainloop_run(client->ml);
+
+    printf("%u requests, avarage request processing time %.2lfmsec\n",
+           reqcount, (double)(totaltime / (uint64_t)reqcount) / 1000.0);
 
     printf("exiting now ...\n");
 
