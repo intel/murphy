@@ -53,8 +53,8 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv);
  * configuration file processing
  */
 
-#define MRP_CFG_MAXLINE 4096             /* input line length limit */
-#define MRP_CFG_MAXARGS   64             /* command argument limit */
+#define MRP_CFG_MAXLINE (16 * 1024)      /* input line length limit */
+#define MRP_CFG_MAXARGS  64              /* command argument limit */
 
 /* configuration keywords */
 #define MRP_KEYWORD_LOAD    "load-plugin"

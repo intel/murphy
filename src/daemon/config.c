@@ -393,7 +393,8 @@ static void free_message(any_action_t *action);
 
 static char *get_next_token(input_t *in);
 static int get_next_line(input_t *in, char **args, size_t size);
-
+static char *replace_tokens(input_t *in, char *first, char *last,
+                            char *token, int size);
 
 #define A(type, keyword, parse, exec, free) \
     [ACTION_##type] = { MRP_KEYWORD_##keyword, parse, exec, free }
@@ -545,7 +546,7 @@ static any_action_t *parse_load(input_t *in, char **argv, int argc)
     load_action_t    *action;
     action_type_t     type;
     mrp_plugin_arg_t *args, *a;
-    int               i, start;
+    int               narg, i, start;
     char             *k, *v;
 
     MRP_UNUSED(in);
@@ -589,21 +590,37 @@ static any_action_t *parse_load(input_t *in, char **argv, int argc)
         start = 2;
     }
 
+    narg = 0;
     if (start < argc) {
         if ((args = mrp_allocz_array(typeof(*args), argc - 1)) != NULL) {
             for (i = start, a = args; i < argc; i++, a++) {
                 if (*argv[i] == MRP_START_COMMENT)
                     break;
 
+                mrp_debug("argument #%d: '%s'", i - start, argv[i]);
+
                 k = argv[i];
                 v = strchr(k, '=');
 
                 if (v != NULL)
                     *v++ = '\0';
+                else {
+                    if (i + 2 < argc) {
+                        if (argv[i+1][0] == '=' && argv[i+1][1] == '\0') {
+                            v  = argv[i + 2];
+                            i += 2;
+                        }
+                    }
+                    else {
+                        mrp_log_error("Invalid plugin load argument '%s'.", k);
+                        goto fail;
+                    }
+                }
 
                 a->type = MRP_PLUGIN_ARG_TYPE_STRING;
                 a->key  = mrp_strdup(k);
                 a->str  = v ? mrp_strdup(v) : NULL;
+                narg++;
 
                 if (a->key == NULL || (a->str == NULL && v != NULL)) {
                     mrp_log_error("Failed to allocate plugin arg %s%s%s.",
@@ -615,7 +632,7 @@ static any_action_t *parse_load(input_t *in, char **argv, int argc)
     }
 
     action->args = args;
-    action->narg = argc - start;
+    action->narg = narg;
 
     return (any_action_t *)action;
 
@@ -695,6 +712,7 @@ static any_action_t *parse_if_else(input_t *in, char **argv, int argc)
     branch = mrp_allocz(sizeof(*branch));
 
     if (branch != NULL) {
+        mrp_list_init(&branch->hook);
         mrp_list_init(&branch->pos);
         mrp_list_init(&branch->neg);
 
@@ -962,16 +980,93 @@ static void free_message(any_action_t *action)
 
 static int get_next_line(input_t *in, char **args, size_t size)
 {
-    char *token;
-    int   narg;
+#define BLOCK_START(s)                                                   \
+    ((s[0] == '{' || s[0] == '[') && (s[1] == '\0' || s[1] == '\n'))
+#define BLOCK_END(s)                                                     \
+    ((s[0] == '}' || s[0] == ']') && (s[1] == '\0' || s[1] == '\n'))
+
+    char *token, *p;
+    char  block[2], json[MRP_CFG_MAXLINE];
+    int   narg, nest, beg;
+    int   i, n, l, tot;
 
     narg = 0;
+    nest = 0;
+    beg  = -1;
     while ((token = get_next_token(in)) != NULL && narg < (int)size) {
         if (in->error)
             return -1;
 
-        if (token[0] != '\n')
+        mrp_debug("read input token '%s'", token);
+
+        if (token[0] != '\n') {
+            if (BLOCK_START(token)) {
+                if (!nest) {
+                    mrp_debug("collecting JSON argument");
+
+                    block[0] = token[0];
+                    block[1] = (block[0] == '{' ? '}' : ']');
+                    nest = 1;
+                    beg  = narg;
+                    tot  = 1;
+                }
+                else {
+                    if (token[0] == block[0])
+                        nest++;
+                }
+            }
+
             args[narg++] = token;
+
+            if (beg >= 0) {              /* if collecting, update length */
+                tot += strlen(token) + 1;
+                if (strchr(token, ' ') || strchr(token, '\t'))
+                    tot += 2;            /* will need quoting */
+            }
+
+            if (BLOCK_END(token) && nest > 0) {
+                if (token[0] == block[1])
+                    nest--;
+
+                if (nest == 0) {
+                    mrp_debug("finished collecting JSON argument");
+
+                    if (tot > (int)sizeof(json) - 1) {
+                        mrp_log_error("Maximum token length exceeded.");
+                        return -1;
+                    }
+
+                    p = json;
+                    l = tot;
+                    for (i = beg; i < narg; i++) {
+                        if (strchr(args[i], ' ') || strchr(args[i], '\t'))
+                            n = snprintf(p, l, "'%s'", args[i]);
+                        else
+                            n = snprintf(p, l, "%s", args[i]);
+                        if (n >= l)
+                            return -1;
+                        p += n;
+                        l -= n;
+                    }
+
+                    mrp_debug("collected JSON token: '%s'", json);
+
+                    args[beg] = replace_tokens(in, args[beg], args[narg-1],
+                                               json, (int)(p - json));
+
+                    if (args[beg] == NULL) {
+                        mrp_log_error("Failed to replace block of tokens.");
+                        return -1;
+                    }
+                    else
+                        narg = beg + 1;
+
+                    block[0] = '\0';
+                    block[1] = '\0';
+                    beg      = -1;
+                }
+            }
+        }
         else {
             if (narg && *args[0] != MRP_START_COMMENT && *args[0] != '\n')
                 return narg;
@@ -1008,6 +1103,24 @@ static inline void skip_rest_of_line(input_t *in)
 {
     while (*in->out != '\n' && in->out < in->in)
         in->out++;
+}
+
+
+static char *replace_tokens(input_t *in, char *first, char *last,
+                            char *token, int size)
+{
+    char *beg = first;
+    char *end = last + strlen(last) + 1;
+
+    if (!(in->buf < beg && end < in->out))
+        return NULL;
+
+    if ((end - beg) < size)
+        return NULL;
+
+    strcpy(first, token);
+
+    return first;
 }
 
 
@@ -1100,6 +1213,7 @@ static char *get_next_token(input_t *in)
              */
         case '\'':
         case '\"':
+            in->was_newline = FALSE;
             if (!quote) {
                 quote      = *p++;
                 quote_line = in->line;
@@ -1109,12 +1223,17 @@ static char *get_next_token(input_t *in)
                     quote      = FALSE;
                     quote_line = 0;
                     p++;
+                    *q++ = '\0';
+
+                    in->out  = p;
+                    in->next = q;
+
+                    return in->token;
                 }
                 else {
                     *q++ = *p++;
                 }
             }
-            in->was_newline = FALSE;
             break;
 
             /*
