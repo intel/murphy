@@ -38,6 +38,7 @@
 #include <murphy/common/log.h>
 #include <murphy/common/list.h>
 #include <murphy/common/refcnt.h>
+#include <murphy/common/json.h>
 #include <murphy/core/context.h>
 #include <murphy/core/console-command.h>
 
@@ -83,6 +84,7 @@ typedef enum {
     MRP_PLUGIN_ARG_TYPE_UINT32,
     MRP_PLUGIN_ARG_TYPE_INT32,
     MRP_PLUGIN_ARG_TYPE_DOUBLE,
+    MRP_PLUGIN_ARG_TYPE_OBJECT,
     MRP_PLUGIN_ARG_TYPE_UNDECL,
     /* add more as needed */
 } mrp_plugin_arg_type_t;
@@ -98,6 +100,10 @@ struct mrp_plugin_arg_s {
         uint32_t           u32;          /* 32-bit unsigned values */
         int32_t            i32;          /* 32-bit signed values */
         double             dbl;          /* double prec. floating pt. values */
+        struct {                         /* a JSON object */
+            char       *str;
+            mrp_json_t *json;
+        } obj;
         struct {                         /* other undeclared arguments */
             mrp_plugin_arg_t *args;
             int               narg;
@@ -128,6 +134,10 @@ struct mrp_plugin_arg_s {
 #define MRP_PLUGIN_ARG_DOUBLE(name, defval)                                \
     { key: name, type: MRP_PLUGIN_ARG_TYPE_DOUBLE, { dbl: defval } }
 
+#define MRP_PLUGIN_ARG_OBJECT(name, defval)                                \
+    { key: name, type: MRP_PLUGIN_ARG_TYPE_OBJECT,                         \
+            { obj: { str: defval, json: NULL } } }
+
 #define MRP_PLUGIN_ARG_UNDECL(name, defval)                                \
     { key: "*", type: MRP_PLUGIN_ARG_TYPE_UNDECL,  { str: NULL } }
 
@@ -149,6 +159,9 @@ struct mrp_plugin_arg_s {
 
 #define MRP_PLUGIN_ARGIDX_DOUBLE(idx, name, defval) \
     [idx] MRP_PLUGIN_ARG_DOUBLE(name, defval)
+
+#define MRP_PLUGIN_ARGIDX_OBJECT(idx, name, defval) \
+    [idx] MRP_PLUGIN_ARG_OBJECT(name, defval)
 
 #define MRP_PLUGIN_ARGIDX_UNDECL(idx, name, defval) \
     [idx] MRP_PLUGIN_ARG_UNDECL(name, defval)

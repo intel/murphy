@@ -373,21 +373,42 @@ int mrp_unload_plugin(mrp_plugin_t *plugin)
 
             pa = plugin->args;
             da = plugin->descriptor->args;
+
             if (pa != da) {
-                for (i = 0; i < plugin->descriptor->narg; i++, pa++, da++) {
-                    if (pa->type == MRP_PLUGIN_ARG_TYPE_STRING) {
+                for (i = 0; i < plugin->descriptor->narg; i++) {
+                    switch (pa->type) {
+                    case MRP_PLUGIN_ARG_TYPE_STRING:
                         if (pa->str != da->str)
                             mrp_free(pa->str);
-                    }
-                    else if (pa->type == MRP_PLUGIN_ARG_TYPE_UNDECL) {
-                        for (j = 0, ra = pa->rest.args;
-                             j < pa->rest.narg;
-                             j++, ra++) {
+                        break;
+
+                    case MRP_PLUGIN_ARG_TYPE_OBJECT:
+                        mrp_json_unref(pa->obj.json);
+                        break;
+
+                    case MRP_PLUGIN_ARG_TYPE_UNDECL:
+                        ra = pa->rest.args;
+                        for (j = 0; j < pa->rest.narg; j++) {
                             mrp_free(ra->key);
-                            if (ra->type == MRP_PLUGIN_ARG_TYPE_STRING)
+                            switch (ra->type) {
+                            case MRP_PLUGIN_ARG_TYPE_STRING:
                                 mrp_free(ra->str);
+                                break;
+                            case MRP_PLUGIN_ARG_TYPE_OBJECT:
+                                mrp_json_unref(ra->obj.json);
+                                break;
+                            default:
+                                break;
+                            }
+                            ra++;
                         }
+                        break;
+                    default:
+                        break;
                     }
+
+                    pa++;
+                    da++;
                 }
                 mrp_free(plugin->args);
             }
@@ -598,7 +619,10 @@ static mrp_plugin_descr_t *open_builtin(const char *name)
 
 static int parse_plugin_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *parg)
 {
-    char *end;
+    char        *end;
+    mrp_json_t **json;
+    char        *jstr;
+    int          jlen;
 
     switch (parg->type) {
     case MRP_PLUGIN_ARG_TYPE_STRING:
@@ -642,6 +666,15 @@ static int parse_plugin_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *parg)
         else
             return FALSE;
 
+    case MRP_PLUGIN_ARG_TYPE_OBJECT:
+        jstr = arg->obj.str;
+        jlen = strlen(jstr);
+        json = &parg->obj.json;
+        if (mrp_json_parse_object(&jstr, &jlen, json) < 0 || jlen != 0)
+            return FALSE;
+        else
+            return TRUE;
+
     default:
         return FALSE;
     }
@@ -652,6 +685,7 @@ static int parse_undeclared_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *pa)
 {
     mrp_plugin_arg_t *a;
     char             *value, *end;
+    int               prfx;
 
     if (mrp_reallocz(pa->rest.args, pa->rest.narg, pa->rest.narg + 1)) {
         a = pa->rest.args + pa->rest.narg++;
@@ -659,6 +693,13 @@ static int parse_undeclared_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *pa)
 
         if (a->key == NULL)
             return FALSE;
+
+        if (arg->str == NULL) {
+            a->type = MRP_PLUGIN_ARG_TYPE_STRING;
+            a->str  = NULL;
+
+            return TRUE;
+        }
 
         if (!strncmp(arg->str, "string:", 7)) {
             value = arg->str + 7;
@@ -703,6 +744,19 @@ static int parse_undeclared_arg(mrp_plugin_arg_t *arg, mrp_plugin_arg_t *pa)
                 return TRUE;
             else
                 return FALSE;
+        }
+        else if (!strncmp(arg->str, "object:", prfx=7) ||
+                 !strncmp(arg->str, "json:"  , prfx=5)) {
+            mrp_json_t **json = &a->obj.json;
+            char        *jstr = a->obj.str + prfx;
+            int          jlen = strlen(jstr);
+
+            if (mrp_json_parse_object(&jstr, &jlen, json) < 0 || jlen != 0)
+                return FALSE;
+            else {
+                a->type = MRP_PLUGIN_ARG_TYPE_OBJECT;
+                return TRUE;
+            }
         }
         else {
             if (!strcasecmp(arg->str, "TRUE") ||
@@ -768,6 +822,17 @@ static int parse_plugin_args(mrp_plugin_t *plugin,
 
     memcpy(args, descr->args, descr->narg * sizeof(*args));
     plugin->args = args;
+
+    for (i = 0, pa = plugin->args; i < descr->narg; i++, pa++) {
+        if (pa->type == MRP_PLUGIN_ARG_TYPE_OBJECT) {
+            mrp_json_t **json = &pa->obj.json;
+            char        *jstr = pa->obj.str;
+            int          jlen = strlen(jstr);
+
+            if (mrp_json_parse_object(&jstr, &jlen, json) < 0 || jlen != 0)
+                return FALSE;
+        }
+    }
 
     rest = NULL;
     j    = 0;
