@@ -198,6 +198,9 @@ int mrp_json_array_get_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...);
            it.entry) : 0);                                      \
          it.entry = it.entry->next)
 
+/** Parse a JSON object from the given string. */
+int mrp_json_parse_object(char **str, int *len, mrp_json_t **op);
+
 MRP_CDECL_END
 
 #endif /* __MURPHY_JSON_H__ */

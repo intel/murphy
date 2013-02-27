@@ -3,6 +3,7 @@
 #include <string.h>
 #include <json/json.h>
 
+#include "murphy/config.h"
 #include <murphy/common/macros.h>
 #include <murphy/common/log.h>
 #include <murphy/common/debug.h>
@@ -499,4 +500,60 @@ int mrp_json_array_get_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...)
     va_end(ap);
 
     return success;
+}
+
+
+int mrp_json_parse_object(char **strp, int *lenp, mrp_json_t **op)
+{
+    char         *str = *strp;
+    int           len = lenp ? *lenp : 0;
+    mrp_json_t   *o   = NULL;
+    json_tokener *tok = NULL;
+    int           res = -1;
+
+    if (*strp == NULL) {
+        *op = NULL;
+        if (lenp != NULL)
+            *lenp = 0;
+
+        return 0;
+    }
+
+    str = *strp;
+    len = *lenp;
+
+    if (len <= 0)
+        len = strlen(str);
+
+    tok = json_tokener_new();
+
+    if (tok != NULL) {
+        o = json_tokener_parse_ex(tok, str, len);
+
+        if (o != NULL) {
+            *strp += tok->char_offset;
+            if (lenp != NULL)
+                *lenp -= tok->char_offset;
+
+            res = 0;
+        }
+        else {
+#ifdef HAVE_JSON_TOKENER_GET_ERROR
+            if (json_tokener_get_error(tok) != json_tokener_success)
+                errno = EINVAL;
+#else
+            if (tok->err != json_tokener_success)
+                errno = EINVAL;
+#endif
+            else
+                res = 0;
+        }
+
+        json_tokener_free(tok);
+    }
+    else
+        errno = ENOMEM;
+
+    *op = o;
+    return res;
 }
