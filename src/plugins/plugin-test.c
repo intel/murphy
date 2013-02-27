@@ -30,6 +30,7 @@
 #include <errno.h>
 
 #include <murphy/common/macros.h>
+#include <murphy/common/json.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
@@ -50,6 +51,7 @@ enum {
     ARG_DOUBLE1,
     ARG_FAILINIT,
     ARG_FAILEXIT,
+    ARG_OBJECT,
     ARG_REST,
 };
 
@@ -396,12 +398,14 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 static int test_init(mrp_plugin_t *plugin)
 {
     mrp_plugin_arg_t *args, *arg;
+    mrp_json_t       *json;
     test_data_t      *data;
 
     mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
                  plugin->instance);
 
     args = plugin->args;
+    json = args[ARG_OBJECT].obj.json;
     printf(" string1:  %s\n", args[ARG_STRING1].str);
     printf(" string2:  %s\n", args[ARG_STRING2].str);
     printf("boolean1:  %s\n", args[ARG_BOOLEAN1].bln ? "TRUE" : "FALSE");
@@ -411,6 +415,7 @@ static int test_init(mrp_plugin_t *plugin)
     printf("  double:  %f\n", args[ARG_DOUBLE1].dbl);
     printf("init fail: %s\n", args[ARG_FAILINIT].bln ? "TRUE" : "FALSE");
     printf("exit fail: %s\n", args[ARG_FAILEXIT].bln ? "TRUE" : "FALSE");
+    printf("   object: %s\n", mrp_json_object_to_string(json));
 
     mrp_plugin_foreach_undecl_arg(&args[ARG_REST], arg) {
         mrp_log_info("got argument %s of type 0x%x", arg->key, arg->type);
@@ -427,7 +432,7 @@ static int test_init(mrp_plugin_t *plugin)
                 mrp_log_info("found undeclared arg '%s' (type 0x%x)", arg->key,
                              arg->type);
             else
-                mrp_log_info("undeclared arg '%s' not found", arg->key);
+                mrp_log_info("undeclared arg '%s' not found", rkeys[i]);
         }
     }
 
@@ -479,6 +484,15 @@ static void test_exit(mrp_plugin_t *plugin)
 #define TEST_VERSION     MRP_VERSION_INT(0, 0, 1)
 #define TEST_AUTHORS     "D. Duck <donald.duck@ducksburg.org>"
 
+#define DEFAULT_OBJECT   "{\n"                             \
+    "    'foo':   'this is json.foo',\n"                   \
+    "    'bar':   'this is json.bar',\n"                   \
+    "    'one':   1,\n"                                    \
+    "    'two':   2,\n"                                    \
+    "    'pi':    3.141,\n"                                \
+    "    'array': [ 1, 2, 'three', 'four', 5 ]\n"          \
+    "}\n"
+
 static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_STRING1 , STRING, "string1" , "default string1"),
     MRP_PLUGIN_ARGIDX(ARG_STRING2 , STRING, "string2" , "default string2"),
@@ -489,6 +503,7 @@ static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX(ARG_DOUBLE1 , DOUBLE, "double"  , -3.141           ),
     MRP_PLUGIN_ARGIDX(ARG_FAILINIT, BOOL  , "failinit", FALSE            ),
     MRP_PLUGIN_ARGIDX(ARG_FAILEXIT, BOOL  , "failexit", FALSE            ),
+    MRP_PLUGIN_ARGIDX(ARG_OBJECT  , OBJECT, "object"  , DEFAULT_OBJECT   ),
     MRP_PLUGIN_ARGIDX(ARG_REST    , UNDECL, NULL      , NULL             ),
 };
 
