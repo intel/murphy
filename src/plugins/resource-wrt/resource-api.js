@@ -432,6 +432,21 @@ WrtResourceManager.prototype.createResourceSet = function (resources, options) {
                                resources: resources });
 }
 
+/** Determine a WebSocket URI based on an HTTP URI. */
+WrtResourceManager.prototype.socketUri = function (http_uri) {
+    var proto, colon, rest;
+
+    colon = http_uri.indexOf(':');           /* get first colon */
+    proto = http_uri.substring(0, colon);    /* get protocol */
+    rest  = http_uri.substring(colon + 3);   /* get URI sans protocol:// */
+    addr  = rest.split("/")[0];              /* strip URI path from address */
+
+    switch (proto) {
+    case "http":  return "ws://"  + addr;
+    case "https": return "wss://" + addr;
+    default:      return null;
+    }
+}
 
 /** Acquire the resource set. */
 WrtResourceSet.prototype.acquire = function () {

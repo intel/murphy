@@ -47,9 +47,15 @@
 #include <murphy/resource/protocol.h>
 
 #include "resource-wrt.h"
+#include "config.h"
+
+#ifdef MURPHY_DATADIR                             /* default content dir */
+#    define DEFAULT_HTTPDIR MURPHY_DATADIR"/resource-wrt"
+#else
+#    define DEFAULT_HTTPDIR "/usr/share/murphy/resource-wrt"
+#endif
 
 #define DEFAULT_ADDRESS "wsck:127.0.0.1:4000/murphy"
-#define DEFAULT_HTTPDIR NULL
 #define ATTRIBUTE_MAX   MRP_ATTRIBUTE_MAX
 
 /*
@@ -59,6 +65,9 @@
 enum {
     ARG_ADDRESS,                         /* transport address to use */
     ARG_HTTPDIR,                         /* content directory for HTTP */
+    ARG_SSLCERT,                         /* path to SSL certificate */
+    ARG_SSLPKEY,                         /* path to SSL private key */
+    ARG_SSLCA                            /* path to SSL CA */
 };
 
 
@@ -72,7 +81,11 @@ typedef struct {
     const char      *addr;               /* address we listen on */
     mrp_list_hook_t  clients;            /* connected clients */
     int              id;                 /* next client id */
-    const char      *root;               /* content directory for HTTP */
+    const char      *httpdir;            /* WRT-resource agent directory */
+    const char      *sslcert;            /* path to SSL certificate */
+    const char      *sslpkey;            /* path to SSL private key */
+    const char      *sslca;              /* path to SSL CA */
+
 } wrt_data_t;
 
 
@@ -1097,10 +1110,15 @@ static int transport_create(wrt_data_t *data)
         .closed           = closed_evt,
     };
 
-    mrp_mainloop_t *ml = data->ctx->ml;
+    mrp_mainloop_t *ml   = data->ctx->ml;
+    const char     *root = data->httpdir;
+    const char     *cert = data->sslcert;
+    const char     *pkey = data->sslpkey;
+    const char     *ca   = data->sslca;
+
     mrp_sockaddr_t  addr;
     socklen_t       len;
-    const char     *type, *opt, *val, *root;
+    const char     *type, *opt, *val;
     int             flags;
 
     len = mrp_transport_resolve(NULL, data->addr, &addr, sizeof(addr), &type);
@@ -1110,6 +1128,12 @@ static int transport_create(wrt_data_t *data)
         data->lt = mrp_transport_create(ml, type, &evt, data, flags);
 
         if (data->lt != NULL) {
+            if (cert || pkey || ca) {
+                mrp_transport_setopt(data->lt, MRP_WSCK_OPT_SSL_CERT, cert);
+                mrp_transport_setopt(data->lt, MRP_WSCK_OPT_SSL_PKEY, pkey);
+                mrp_transport_setopt(data->lt, MRP_WSCK_OPT_SSL_CA  , ca);
+            }
+
             if (mrp_transport_bind(data->lt, &addr, len) &&
                 mrp_transport_listen(data->lt, 0)) {
                 mrp_log_info("Listening on transport '%s'...", data->addr);
@@ -1117,8 +1141,6 @@ static int transport_create(wrt_data_t *data)
                 opt = MRP_WSCK_OPT_SENDMODE;
                 val = MRP_WSCK_SENDMODE_TEXT;
                 mrp_transport_setopt(data->lt, opt, val);
-
-                root = data->root;
                 mrp_transport_setopt(data->lt, MRP_WSCK_OPT_HTTPDIR, root);
 
                 return TRUE;
@@ -1143,20 +1165,20 @@ static void transport_destroy(wrt_data_t *data)
 
 static int plugin_init(mrp_plugin_t *plugin)
 {
-    mrp_plugin_arg_t *args = plugin->args;
-    const char       *addr = args[ARG_ADDRESS].str;
-    const char       *root = args[ARG_HTTPDIR].str;
-    wrt_data_t       *data;
+    wrt_data_t *data;
 
     data = mrp_allocz(sizeof(*data));
 
     if (data != NULL) {
         mrp_list_init(&data->clients);
 
-        data->id   = 1;
-        data->ctx  = plugin->ctx;
-        data->addr = addr;
-        data->root = root;
+        data->id      = 1;
+        data->ctx     = plugin->ctx;
+        data->addr    = plugin->args[ARG_ADDRESS].str;
+        data->httpdir = plugin->args[ARG_HTTPDIR].str;
+        data->sslcert = plugin->args[ARG_SSLCERT].str;
+        data->sslpkey = plugin->args[ARG_SSLPKEY].str;
+        data->sslca   = plugin->args[ARG_SSLCA].str;
 
         if (!transport_create(data))
             goto fail;
@@ -1193,7 +1215,11 @@ static void plugin_exit(mrp_plugin_t *plugin)
 
 static mrp_plugin_arg_t plugin_args[] = {
     MRP_PLUGIN_ARGIDX(ARG_ADDRESS, STRING, "address", DEFAULT_ADDRESS),
-    MRP_PLUGIN_ARGIDX(ARG_HTTPDIR, STRING, "httpdir", DEFAULT_HTTPDIR)
+    MRP_PLUGIN_ARGIDX(ARG_HTTPDIR, STRING, "httpdir", DEFAULT_HTTPDIR),
+    MRP_PLUGIN_ARGIDX(ARG_SSLCERT, STRING, "sslcert", NULL),
+    MRP_PLUGIN_ARGIDX(ARG_SSLPKEY, STRING, "sslpkey", NULL),
+    MRP_PLUGIN_ARGIDX(ARG_SSLCA  , STRING, "sslca"  , NULL)
+
 };
 
 MURPHY_REGISTER_PLUGIN("resource-wrt",

@@ -1060,6 +1060,13 @@ plugin_resource_wrt_la_CFLAGS  = $(RESOURCE_WRT_PLUGIN_CFLAGS) \
 plugin_resource_wrt_la_LDFLAGS = -module -avoid-version
 plugin_resource_wrt_la_LIBADD  = $(RESOURCE_WRT_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-resource-wrt.la
+
+EXTRA_DIST       += $(resource_wrt_DATA);
+resource_wrtdir   = $(datadir)/murphy/resource-wrt
+resource_wrt_DATA = 					\
+		plugins/resource-wrt/resource-api.js	\
+		plugins/resource-wrt/resource-test.html
+
 endif
 endif
 endif
