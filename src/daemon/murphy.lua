@@ -64,7 +64,12 @@ end
 
 -- load the WRT resource plugin
 if m:plugin_exists('resource-wrt') then
-    m:try_load_plugin('resource-wrt')
+    m:try_load_plugin('resource-wrt', {
+                          address = "wsck:127.0.0.1:4000/murphy",
+                          httpdir = "src/plugins/resource-wrt",
+--                          sslcert = 'src/plugins/resource-wrt/resource.crt',
+--                          sslpkey = 'src/plugins/resource-wrt/resource.key'
+                      })
 else
     m:info("No WRT resource plugin found...")
 end
