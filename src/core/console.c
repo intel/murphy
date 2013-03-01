@@ -305,8 +305,12 @@ static mrp_console_group_t *find_group(mrp_context_t *ctx, const char *name)
     mrp_list_hook_t     *p, *n;
     mrp_console_group_t *grp;
 
-    if (*name == '/')
+    if (*name == '/') {
         name++;
+
+        if (!*name)
+            return NULL;
+    }
 
     if (ctx != NULL) {
         mrp_list_foreach(&ctx->cmd_groups, p, n) {
@@ -489,6 +493,9 @@ static char *raw_argument(char *raw, const char *grp, const char *cmd)
             _p += _l;                                                     \
     } while (0)
 
+    while (*raw == '/')
+        raw++;
+
     SKIP_WHITESPACE(raw);
     SKIP_PREFIX(raw, grp);
     SKIP_WHITESPACE(raw);
@@ -571,6 +578,22 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
                 goto prompt;
         }
         else {
+            if (argv[0][0] == '/') {
+                grp = find_group(c->ctx, argv[0]);
+
+                if (grp != NULL) {
+                    c->grp = grp;
+                    goto prompt;
+                }
+                else if (argv[0][1] == '\0') {
+                    c->grp = NULL;
+                    c->cmd = NULL;
+                    goto prompt;
+                }
+                else
+                    goto unknown_command;
+            }
+
             if (c->cmd == NULL) {
                 cmd = find_command(c->grp, argv[0], &fallback);
 
@@ -611,7 +634,6 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
 
         goto execute;
     }
-
 
     /*
      * take care of commands while at the top-level
