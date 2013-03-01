@@ -157,43 +157,6 @@ static memblk_t *memblk_alloc(size_t size, const char *file, int line,
 }
 
 
-static memblk_t *memblk_resize(memblk_t *blk, size_t size, const char *file,
-                               int line, const char *func, void **bt)
-{
-    memblk_t *resized;
-
-    if (blk != NULL) {
-        mrp_list_delete(&blk->hook);
-
-        resized = realloc(blk, __mm.hdrsize + size);
-
-        if (resized != NULL) {
-            mrp_list_init(&resized->hook);
-
-            mrp_list_append(&__mm.blocks, &resized->hook);
-
-            __mm.cur_alloc -= resized->size;
-            __mm.cur_alloc += size;
-            __mm.max_alloc  = MRP_MAX(__mm.max_alloc, __mm.cur_alloc);
-
-            resized->file = file;
-            resized->line = line;
-            resized->func = func;
-
-            memcpy(resized->bt, bt, __mm.depth * sizeof(*bt));
-
-            resized->size = size;
-        }
-        else
-            mrp_list_append(&__mm.blocks, &blk->hook);
-
-        return resized;
-    }
-    else
-        return memblk_alloc(size, file, line, func, bt);
-}
-
-
 static void memblk_free(memblk_t *blk, const char *file, int line,
                         const char *func, void **bt)
 {
@@ -213,6 +176,49 @@ static void memblk_free(memblk_t *blk, const char *file, int line,
 
         free(blk);
     }
+}
+
+
+static memblk_t *memblk_resize(memblk_t *blk, size_t size, const char *file,
+                               int line, const char *func, void **bt)
+{
+    memblk_t *resized;
+
+    if (blk != NULL) {
+        mrp_list_delete(&blk->hook);
+
+        if (size != 0) {
+            resized = realloc(blk, __mm.hdrsize + size);
+
+            if (resized != NULL) {
+                mrp_list_init(&resized->hook);
+
+                mrp_list_append(&__mm.blocks, &resized->hook);
+
+                __mm.cur_alloc -= resized->size;
+                __mm.cur_alloc += size;
+                __mm.max_alloc  = MRP_MAX(__mm.max_alloc, __mm.cur_alloc);
+
+                resized->file = file;
+                resized->line = line;
+                resized->func = func;
+
+                memcpy(resized->bt, bt, __mm.depth * sizeof(*bt));
+
+                resized->size = size;
+            }
+            else
+                mrp_list_append(&__mm.blocks, &blk->hook);
+        }
+        else {
+            resized = NULL;
+            memblk_free(blk, file, line, func, bt);
+        }
+
+        return resized;
+    }
+    else
+        return memblk_alloc(size, file, line, func, bt);
 }
 
 
