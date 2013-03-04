@@ -123,6 +123,30 @@ mrp_sighandler_t *mrp_add_sighandler(mrp_mainloop_t *ml, int signum,
 /** Unregister a signal handler. */
 void mrp_del_sighandler(mrp_sighandler_t *h);
 
+/*
+ * wakeup callbacks
+ */
+
+/** I/O events */
+typedef enum {
+    MRP_WAKEUP_EVENT_NONE  = 0x0,        /* no event */
+    MRP_WAKEUP_EVENT_TIMER = 0x1,        /* woken up by timeout */
+    MRP_WAKEUP_EVENT_IO    = 0x2,        /* woken up by I/O (or signal) */
+    MRP_WAKEUP_EVENT_ANY   = 0x3,        /* mask of all events */
+} mrp_wakeup_event_t;
+
+typedef struct mrp_wakeup_s mrp_wakeup_t;
+
+/** Wakeup callback notification type. */
+typedef void (*mrp_wakeup_cb_t)(mrp_mainloop_t *ml, mrp_wakeup_t *w,
+                                mrp_wakeup_event_t event, void *user_data);
+
+/** Add a wakeup callback. */
+mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
+                             mrp_wakeup_cb_t cb, void *user_data);
+
+/** Remove a wakeup callback. */
+void mrp_del_wakeup(mrp_wakeup_t *w);
 
 /*
  * subloops - external mainloops pumped by this mainloop

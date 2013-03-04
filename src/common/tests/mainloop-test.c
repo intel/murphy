@@ -175,6 +175,9 @@ typedef struct {
 
 static test_timer_t *timers;
 
+static mrp_wakeup_t *wakeup;
+
+
 
 static int timeval_diff(struct timeval *tv1, struct timeval *tv2)
 {
@@ -581,6 +584,47 @@ static void check_signals(void)
         else
             info("MRPH signal #%d: OK (%d/%d)", t->id, t->received, t->sent);
     }
+}
+
+
+static void wakeup_cb(mrp_mainloop_t *ml, mrp_wakeup_t *w,
+                      mrp_wakeup_event_t event, void *user_data)
+{
+    static struct timeval  prev = { 0, 0 };
+    const char            *evt;
+    struct timeval         now;
+    double                 diff;
+
+    MRP_UNUSED(ml);
+    MRP_UNUSED(w);
+    MRP_UNUSED(user_data);
+
+    timeval_now(&now);
+
+    if (event == MRP_WAKEUP_EVENT_TIMER)
+        evt = "timer";
+    else
+        evt = "I/O (or signal)";
+
+    if (MRP_LIKELY(prev.tv_usec != 0)){
+        diff = timeval_diff(&now, &prev) / 1000.0;
+        info("woken up by %s, %.2f msecs since previous", evt, diff);
+    }
+
+    prev = now;
+}
+
+
+static void setup_wakeup(mrp_mainloop_t *ml)
+{
+    wakeup = mrp_add_wakeup(ml, MRP_WAKEUP_EVENT_ANY, wakeup_cb, NULL);
+}
+
+
+static void cleanup_wakeup(void)
+{
+    mrp_del_wakeup(wakeup);
+    wakeup = NULL;
 }
 
 
@@ -1674,6 +1718,8 @@ int main(int argc, char *argv[])
     if (mrp_add_timer(ml, 1000, check_quit, NULL) == NULL)
         fatal("failed to create quit-check timer");
 
+    setup_wakeup(ml);
+
     mainloop_run(&cfg);
 
     check_io();
@@ -1696,6 +1742,8 @@ int main(int argc, char *argv[])
             glib_pump_cleanup();
     }
 #endif
+
+    cleanup_wakeup();
 
     mainloop_cleanup(&cfg);
 }

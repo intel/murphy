@@ -115,6 +115,20 @@ struct mrp_sighandler_s {
 };
 
 
+/*
+ * wakeup notifications
+ */
+
+struct mrp_wakeup_s {
+    mrp_list_hook_t      hook;                   /* to list of wakeup cbs */
+    mrp_list_hook_t      deleted;                /* to list of pending delete */
+    int                (*free)(void *ptr);       /* cb to free memory */
+    mrp_mainloop_t      *ml;                     /* mainloop */
+    mrp_wakeup_event_t   events;                 /* wakeup event mask */
+    mrp_wakeup_cb_t      cb;                     /* user callback */
+    void                *user_data;              /* opaque user data */
+};
+
 #define mark_deleted(o) do {                                    \
         (o)->cb = NULL;                                         \
         mrp_list_append(&(o)->ml->deleted, &(o)->deleted);      \
@@ -205,6 +219,8 @@ struct mrp_mainloop_s {
 
     mrp_list_hook_t      deferred;               /* list of deferred cbs */
     mrp_list_hook_t      inactive_deferred;      /* inactive defferred cbs */
+
+    mrp_list_hook_t      wakeups;                /* list of wakeup cbs */
 
     int                  poll_timeout;           /* next poll timeout */
     int                  poll_result;            /* return value from poll */
@@ -857,6 +873,48 @@ void mrp_del_sighandler(mrp_sighandler_t *h)
     }
 }
 
+/*
+ * wakeup notifications
+ */
+
+mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
+                             mrp_wakeup_cb_t cb, void *user_data)
+{
+    mrp_wakeup_t *w;
+
+    if (cb == NULL)
+        return NULL;
+
+    if ((w = mrp_allocz(sizeof(*w))) != NULL) {
+        mrp_list_init(&w->hook);
+        mrp_list_init(&w->deleted);
+        w->ml        = ml;
+        w->events    = events;
+        w->cb        = cb;
+        w->user_data = user_data;
+
+        mrp_list_append(&ml->wakeups, &w->hook);
+    }
+
+    return w;
+}
+
+
+void mrp_del_wakeup(mrp_wakeup_t *w)
+{
+    /*
+     * Notes: It is not safe to simply free this entry here as we might
+     *        be dispatching with this entry being the next to process.
+     *        We just mark this here deleted and take care of the rest
+     *        in the dispatching loop.
+     */
+
+    if (w != NULL) {
+        mrp_debug("marking wakeup %p deleted", w);
+        mark_deleted(w);
+    }
+}
+
 
 /*
  * external mainloops we pump
@@ -1200,6 +1258,20 @@ static void purge_sighandlers(mrp_mainloop_t *ml)
 }
 
 
+static void purge_wakeups(mrp_mainloop_t *ml)
+{
+    mrp_list_hook_t *p, *n;
+    mrp_wakeup_t    *w;
+
+    mrp_list_foreach(&ml->wakeups, p, n) {
+        w = mrp_list_entry(p, typeof(*w), hook);
+        mrp_list_delete(&w->hook);
+        mrp_list_delete(&w->deleted);
+        mrp_free(w);
+    }
+}
+
+
 static void purge_deleted(mrp_mainloop_t *ml)
 {
     mrp_list_hook_t *p, *n;
@@ -1253,6 +1325,7 @@ mrp_mainloop_t *mrp_mainloop_create(void)
             mrp_list_init(&ml->deferred);
             mrp_list_init(&ml->inactive_deferred);
             mrp_list_init(&ml->sighandlers);
+            mrp_list_init(&ml->wakeups);
             mrp_list_init(&ml->deleted);
             mrp_list_init(&ml->subloops);
 
@@ -1282,6 +1355,7 @@ void mrp_mainloop_destroy(mrp_mainloop_t *ml)
         purge_timers(ml);
         purge_deferred(ml);
         purge_sighandlers(ml);
+        purge_wakeups(ml);
         purge_subloops(ml);
         purge_deleted(ml);
 
@@ -1571,6 +1645,45 @@ static int poll_subloop(mrp_subloop_t *sl)
 }
 
 
+static void dispatch_wakeup(mrp_mainloop_t *ml)
+{
+    mrp_list_hook_t    *p, *n;
+    mrp_wakeup_t       *w;
+    mrp_wakeup_event_t  event;
+
+    if (ml->poll_timeout == 0) {
+        mrp_debug("skipping wakeup callbacks (poll timeout was 0)");
+        return;
+    }
+
+    if (ml->poll_result == 0) {
+        mrp_debug("woken up by timeout");
+        event = MRP_WAKEUP_EVENT_TIMER;
+    }
+    else {
+        mrp_debug("woken up by I/O (or signal)");
+        event = MRP_WAKEUP_EVENT_IO;
+    }
+
+    mrp_list_foreach(&ml->wakeups, p, n) {
+        w = mrp_list_entry(p, typeof(*w), hook);
+
+        if (!(w->events & event))
+            continue;
+
+        if (!is_deleted(w)) {
+            mrp_debug("dispatching wakeup cb %p", w);
+            w->cb(ml, w, event, w->user_data);
+        }
+        else
+            mrp_debug("skipping deleted wakeup cb %p", w);
+
+        if (ml->quit)
+            break;
+    }
+}
+
+
 static void dispatch_deferred(mrp_mainloop_t *ml)
 {
     mrp_list_hook_t *p, *n;
@@ -1744,6 +1857,11 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
 
 int mrp_mainloop_dispatch(mrp_mainloop_t *ml)
 {
+    dispatch_wakeup(ml);
+
+    if (ml->quit)
+        goto quit;
+
     dispatch_deferred(ml);
 
     if (ml->quit)
