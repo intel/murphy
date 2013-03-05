@@ -109,6 +109,7 @@ typedef enum {
 
 int mrp_mm_config(mrp_mm_type_t type);
 void mrp_mm_check(FILE *fp);
+void mrp_mm_dump(FILE *fp);
 
 void *mrp_mm_alloc(size_t size, const char *file, int line, const char *func);
 void *mrp_mm_realloc(void *ptr, size_t size, const char *file, int line,
@@ -164,6 +165,19 @@ int mrp_objpool_grow(mrp_objpool_t *pool, int nobj);
 
 /** Shrink @pool by @nobj new objects, if possible. */
 int mrp_objpool_shrink(mrp_objpool_t *pool, int nobj);
+
+/** Get the value of a boolean key from the configuration. */
+int mrp_mm_config_bool(const char *key, int defval);
+
+/** Get the value of a boolean key from the configuration. */
+int32_t mrp_mm_config_int32(const char *key, int32_t defval);
+
+/** Get the value of a boolean key from the configuration. */
+uint32_t mrp_mm_config_uint32(const char *key, uint32_t defval);
+
+/** Get the value of a string key from the configuration. */
+int mrp_mm_config_string(const char *key, const char *defval,
+                         char *buf, size_t size);
 
 MRP_CDECL_END
 

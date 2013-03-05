@@ -38,6 +38,7 @@
 #include <murphy/common/log.h>
 #include <murphy/common/list.h>
 #include <murphy/common/mm.h>
+#include <murphy/common/hashtbl.h>
 
 
 #define BACKTRACE_DEPTH  8                    /* backtrace depth to save */
@@ -75,6 +76,7 @@ typedef struct {
 
 typedef struct {
     mrp_list_hook_t hook;                     /* to allocated blocks */
+    mrp_list_hook_t more;                     /* with the same backtrace */
     const char     *file;                     /* file of immediate caller */
     int             line;                     /* line of immediate caller */
     const char     *func;                     /* name of immediate caller */
@@ -92,13 +94,133 @@ static mm_t __mm = {                          /* allocator state */
 };
 
 
+static const char *get_config_key(const char *config, const char *key)
+{
+    const char *beg;
+    int         len;
+
+    if (config != NULL) {
+        len = strlen(key);
+
+        beg = config;
+        while (beg != NULL) {
+            beg = strstr(beg, key);
+
+            if (beg != NULL) {
+                if ((beg == config || beg[-1] == ':') &&
+                    (beg[len] == '=' || beg[len] == ':' || beg[len] == '\0'))
+                    return (beg[len] == '=' ? beg + len + 1 : "");
+                else
+                    beg++;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+
+static int32_t get_config_int32(const char *cfg, const char *key,
+                                int32_t defval)
+{
+    const char *v;
+    char       *end;
+    int         i;
+
+    v = get_config_key(cfg, key);
+
+    if (v != NULL) {
+        if (*v) {
+            i = strtol(v, &end, 10);
+
+            if (end && (!*end || *end == ':'))
+                return i;
+        }
+    }
+
+    return defval;
+}
+
+
+static uint32_t get_config_uint32(const char *cfg, const char *key,
+                                  uint32_t defval)
+{
+    const char *v;
+    char       *end;
+    int         i;
+
+    v = get_config_key(cfg, key);
+
+    if (v != NULL) {
+        if (*v) {
+            i = strtol(v, &end, 10);
+
+            if (end && (!*end || *end == ':'))
+                return i;
+        }
+    }
+
+    return defval;
+}
+
+
+static int get_config_bool(const char *config, const char *key, int defval)
+{
+    const char *v;
+
+    v = get_config_key(config, key);
+
+    if (v != NULL) {
+        if (*v) {
+
+            if ((!strncasecmp(v, "false", 5) && (v[5] == ':' || !v[5])) ||
+                (!strncasecmp(v, "true" , 4) && (v[4] == ':' || !v[4])))
+                return (v[0] == 't' || v[0] == 'T');
+        }
+        else if (*v == '\0')
+            return TRUE;
+    }
+
+    return defval;
+}
+
+
+static int get_config_string(const char *cfg, const char *key,
+                             const char *defval, char *buf, size_t size)
+{
+    const char *v;
+    char       *end;
+    int         len;
+
+    v = get_config_key(cfg, key);
+
+    if (v == NULL)
+        v = defval;
+
+    end = strchr(v, ':');
+
+    if (end != NULL)
+        len = end - v;
+    else
+        len = strlen(v);
+
+    len = snprintf(buf, size, "%*.*s", len, len, v);
+
+    if (len >= (int)size - 1)
+        buf[size - 1] = '\0';
+
+    return len;
+}
+
+
+
 static void __attribute__((constructor)) setup(void)
 {
-    char *config;
+    char *config = getenv(MRP_MM_CONFIG_ENVVAR);
 
     mrp_list_init(&__mm.blocks);
 
-    __mm.depth   = BACKTRACE_DEPTH;
+    __mm.depth   = get_config_int32(config, "depth", BACKTRACE_DEPTH);
     __mm.hdrsize = MRP_ALIGN(MRP_OFFSET(memblk_t, bt[__mm.depth]),
                              MRP_MM_ALIGN);
 
@@ -107,12 +229,10 @@ static void __attribute__((constructor)) setup(void)
     __mm.cur_alloc  = 0;
     __mm.max_alloc  = 0;
 
-    __mm.poison     = 0xdeadbeef;
+    __mm.poison     = get_config_uint32(config, "poison", 0xdeadbeef);
     __mm.chunk_size = sysconf(_SC_PAGESIZE) * 2;
 
-    config = getenv(MRP_MM_CONFIG_ENVVAR);
-
-    if (config == NULL || strcmp(config, "debug") != 0)
+    if (config == NULL || !get_config_bool(config, "debug", FALSE))
         mrp_mm_config(MRP_MM_PASSTHRU);
     else
         mrp_mm_config(MRP_MM_DEBUG);
@@ -121,8 +241,37 @@ static void __attribute__((constructor)) setup(void)
 
 static void __attribute__((destructor)) cleanup(void)
 {
-    if (__mm.mode == MRP_MM_DEBUG)
-        mrp_mm_check(stdout);
+    if (__mm.mode == MRP_MM_DEBUG) {
+        mrp_mm_dump(stdout);
+        /*mrp_mm_check(stdout);*/
+    }
+}
+
+
+
+int32_t mrp_mm_config_int32(const char *key, int32_t defval)
+{
+    return get_config_int32(getenv(MRP_MM_CONFIG_ENVVAR), key, defval);
+}
+
+
+uint32_t mrp_mm_config_uint32(const char *key, uint32_t defval)
+{
+    return get_config_uint32(getenv(MRP_MM_CONFIG_ENVVAR), key, defval);
+}
+
+
+int mrp_mm_config_bool(const char *key, int defval)
+{
+    return get_config_bool(getenv(MRP_MM_CONFIG_ENVVAR), key, defval);
+}
+
+
+int mrp_mm_config_string(const char *key, const char *defval,
+                         char *buf, size_t size)
+{
+    return get_config_string(getenv(MRP_MM_CONFIG_ENVVAR), key, defval,
+                             buf, size);
 }
 
 
@@ -137,6 +286,7 @@ static memblk_t *memblk_alloc(size_t size, const char *file, int line,
 
     if ((blk = malloc(__mm.hdrsize + size)) != NULL) {
         mrp_list_init(&blk->hook);
+        mrp_list_init(&blk->more);
         mrp_list_append(&__mm.blocks, &blk->hook);
 
         blk->file = file;
@@ -451,23 +601,222 @@ int mrp_mm_config(mrp_mm_type_t type)
     }
 }
 
-void mrp_mm_check(FILE *fp)
+
+#define NBUCKET 1024
+
+static int btcmp(void **bt1, void **bt2)
+{
+    ptrdiff_t diff;
+    int       i;
+
+    for (i = 0; i < __mm.depth; i++) {
+        diff = bt1[i] - bt2[i];
+
+        if (diff < 0)
+            return -1;
+        else if (diff > 0)
+            return +1;
+    }
+
+    return 0;
+}
+
+
+static uint32_t blkhash(memblk_t *blk)
+{
+    uint32_t h;
+    int      i;
+
+    h = 0;
+    for (i = 0; i < __mm.depth; i++)
+        h ^= (blk->bt[i] - NULL) & 0xffffffffUL;
+
+    return h % NBUCKET;
+}
+
+
+static memblk_t *blkfind(mrp_list_hook_t *buckets, memblk_t *blk)
+{
+    uint32_t         h    = blkhash(blk);
+    mrp_list_hook_t *head = buckets + h;
+    mrp_list_hook_t *p, *n;
+    memblk_t        *b;
+
+    mrp_list_foreach(head, p, n) {
+        b = mrp_list_entry(p, typeof(*b), hook);
+        if (!btcmp(&b->bt[0], &blk->bt[0]))
+            return b;
+    }
+
+    return NULL;
+}
+
+
+static void collect_blocks(mrp_list_hook_t *buckets)
+{
+    mrp_list_hook_t *p, *n;
+    memblk_t        *head, *blk;
+    uint32_t         h;
+    int              i;
+
+    for (i = 0; i < NBUCKET; i++)
+        mrp_list_init(buckets + i);
+
+    mrp_list_foreach(&__mm.blocks, p, n) {
+        blk = mrp_list_entry(p, typeof(*blk), hook);
+
+        mrp_list_init(&blk->more);
+        head = blkfind(buckets, blk);
+
+        if (head != NULL) {
+            mrp_list_append(&head->more, &blk->more);
+            head->size += blk->size;
+        }
+        else {
+            h = blkhash(blk);
+            mrp_list_delete(&blk->hook);
+            mrp_list_append(buckets + h, &blk->hook);
+        }
+    }
+}
+
+
+static uint32_t group_usage(memblk_t *head, int exclude_head)
 {
     mrp_list_hook_t *p, *n;
     memblk_t        *blk;
+    uint32_t         total;
 
-    fprintf(fp, "Checking unfreed memory...\n");
-    mrp_list_foreach(&__mm.blocks, p, n) {
-        blk = mrp_list_entry(p, memblk_t, hook);
-
-        fprintf(fp, "unfreed block %p of size %zd (from %s@%s:%d)\n",
-               memblk_to_ptr(blk), blk->size, blk->func, blk->file, blk->line);
+    total = exclude_head ? 0 : head->size;
+    mrp_list_foreach(&head->more, p, n) {
+        blk = mrp_list_entry(p, typeof(*blk), more);
+        total += blk->size;
     }
 
-#if 0
-    test_sizes();
-#endif
+    return total;
 }
+
+
+static void dump_group(FILE *fp, memblk_t *head)
+{
+    mrp_list_hook_t  *p, *n;
+    memblk_t         *blk;
+    char            **syms, *sym;
+    uint32_t          total;
+    int               nblk, i;
+
+    fprintf(fp, "Allocations with call stack fingerprint:\n");
+    syms = backtrace_symbols(head->bt, __mm.depth);
+    for (i = 0; i < __mm.depth && head->bt[i]; i++) {
+        sym = syms && syms[i] ? strrchr(syms[i], '/') : NULL;
+        fprintf(fp, "    %p (%s)\n", head->bt[i], sym ? sym + 1 : "<unknown>");
+    }
+    free(syms);
+
+    total = head->size - group_usage(head, TRUE);
+    nblk  = 1;
+
+    fprintf(fp, "        %lu bytes at %p\n", (unsigned long)total,
+            memblk_to_ptr(head));
+
+    mrp_list_foreach(&head->more, p, n) {
+        blk = mrp_list_entry(p, typeof(*blk), more);
+
+        total += blk->size;
+        nblk++;
+
+        fprintf(fp, "        %zd bytes at %p\n", blk->size, memblk_to_ptr(blk));
+    }
+
+    if (nblk > 1)
+        fprintf(fp, "    total %lu bytes in %d blocks\n",
+                (unsigned long)total, nblk);
+}
+
+
+static void sort_blocks(mrp_list_hook_t *buckets, mrp_list_hook_t *sorted)
+{
+    mrp_list_hook_t *bp, *bn, *sp, *sn;
+    memblk_t        *head, *entry, *next;
+    int              i;
+
+    mrp_list_init(sorted);
+
+    for (i = 0; i < NBUCKET; i++) {
+        mrp_list_foreach(buckets + i, bp, bn) {
+            head = mrp_list_entry(bp, typeof(*head), hook);
+
+            next = NULL;
+            mrp_list_foreach(sorted, sp, sn) {
+                entry = mrp_list_entry(sp, typeof(*entry), hook);
+
+                if (head->size <= entry->size) {
+                    next = entry;
+                    break;
+                }
+            }
+
+            mrp_list_delete(&head->hook);
+
+            if (next != NULL)
+                mrp_list_insert_before(&next->hook, &head->hook);
+            else
+                mrp_list_append(sorted, &head->hook);
+        }
+    }
+}
+
+
+static void dump_blocks(FILE *fp, mrp_list_hook_t *sorted)
+{
+    mrp_list_hook_t *p, *n;
+    memblk_t        *head;
+
+    mrp_list_foreach(sorted, p, n) {
+        head = mrp_list_entry(p, typeof(*head), hook);
+        dump_group(fp, head);
+    }
+}
+
+
+static void relink_blocks(mrp_list_hook_t *sorted)
+{
+    mrp_list_hook_t *p, *n;
+    memblk_t        *head;
+    uint32_t         rest;
+
+    mrp_list_foreach(sorted, p, n) {
+        head = mrp_list_entry(p, typeof(*head), hook);
+        mrp_list_delete(&head->hook);
+        mrp_list_append(&__mm.blocks, &head->hook);
+
+        rest = group_usage(head, TRUE);
+        head->size -= rest;
+    }
+}
+
+
+void mrp_mm_dump(FILE *fp)
+{
+    mrp_list_hook_t buckets[NBUCKET];
+    mrp_list_hook_t sorted;
+
+    mrp_list_init(&sorted);
+
+    collect_blocks(buckets);
+    sort_blocks(buckets, &sorted);
+    dump_blocks(fp, &sorted);
+    relink_blocks(&sorted);
+}
+
+
+void mrp_mm_check(FILE *fp)
+{
+    mrp_mm_dump(fp);
+}
+
+
+
 
 
 /*
