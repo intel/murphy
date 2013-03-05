@@ -507,15 +507,16 @@ static void *lua_alloc(void *ud, void *optr, size_t olsize, size_t nlsize)
 
 static void setup_allocator(lua_State *L)
 {
-    char *cfg = getenv(MRP_MM_CONFIG_ENVVAR);
-    int   i;
+    int debug, i;
 
-    if (cfg == NULL || strncmp(cfg, "debug", 5)) {
+    debug = mrp_mm_config_bool("lua", FALSE);
+
+    if (!debug) {
         mrp_debug("%s not set to debug*, using native Lua allocator",
                   MRP_MM_CONFIG_ENVVAR);
     }
     else {
-        mrp_debug("overriding native Lua allocator");
+        mrp_debug("Lua memory tracking enabled, overriding native allocator");
 
         for (i = 0; i < (int)MRP_ARRAY_SIZE(buckets); i++)
             mrp_list_init(buckets + i);
