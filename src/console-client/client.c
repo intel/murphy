@@ -90,36 +90,52 @@ typedef struct {
     int              seqno;              /* sequence number */
     recvbuf_t        buf;                /* receive buffer */
     brl_t           *brl;                /* breedline for terminal input */
+    char           **cmds;               /* commands to run */
+    int              ncmd;               /* number of commands */
+    int              ccmd;               /* current command */
 } client_t;
+
+
+int send_cmd(client_t *c, const char *cmd)
+{
+    mrp_msg_t *msg;
+    uint16_t   tag, type;
+    uint32_t   len;
+    int        success;
+
+    len = cmd ? strlen(cmd) + 1 : 0;
+
+    if (len > 1) {
+        tag  = MRP_CONSOLE_INPUT;
+        type = MRP_MSG_FIELD_BLOB;
+        msg  = mrp_msg_create(tag, type, len, cmd, NULL);
+
+        if (msg != NULL) {
+            success = mrp_transport_send(c->t, msg);
+            mrp_msg_unref(msg);
+            return success;
+        }
+
+        return FALSE;
+    }
+    else
+        return TRUE;
+}
 
 
 void input_cb(brl_t *brl, const char *input, void *user_data)
 {
-    client_t  *c = (client_t *)user_data;
-    mrp_msg_t *msg;
-    uint16_t   tag, type;
-    uint32_t   len;
-
-    len = input ? strlen(input) + 1: 0;
+    client_t *c   = (client_t *)user_data;
+    int       len = input ? strlen(input) + 1 : 0;
 
     if (len > 1) {
         brl_add_history(brl, input);
         brl_hide_prompt(brl);
 
-        tag  = MRP_CONSOLE_INPUT;
-        type = MRP_MSG_FIELD_BLOB;
-        msg  = mrp_msg_create(tag, type, len, input, NULL);
-
-        if (msg != NULL) {
-            mrp_transport_send(c->t, msg);
-            mrp_msg_unref(msg);
-        }
+        send_cmd(c, input);
 
         brl_show_prompt(brl);
-        return;
     }
-    else
-        return;
 }
 
 
@@ -152,6 +168,27 @@ static void input_cleanup(client_t *c)
 }
 
 
+static void hide_prompt(client_t *c)
+{
+    if (c->brl)
+        brl_hide_prompt(c->brl);
+}
+
+
+static void set_prompt(client_t *c, const char *prompt)
+{
+    if (c->brl)
+        brl_set_prompt(c->brl, prompt);
+}
+
+
+static void show_prompt(client_t *c)
+{
+    if (c->brl)
+        brl_show_prompt(c->brl);
+}
+
+
 void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
                   mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
 {
@@ -164,7 +201,7 @@ void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
 
-    brl_hide_prompt(c->brl);
+    hide_prompt(c);
 
     if ((f = mrp_msg_find(msg, MRP_CONSOLE_OUTPUT)) != NULL) {
         output = f->str;
@@ -173,14 +210,21 @@ void recvfrom_evt(mrp_transport_t *t, mrp_msg_t *msg,
     }
     else if ((f = mrp_msg_find(msg, MRP_CONSOLE_PROMPT)) != NULL) {
         prompt = f->str;
-        brl_set_prompt(c->brl, prompt);
+        set_prompt(c, prompt);
     }
     else if ((f = mrp_msg_find(msg, MRP_CONSOLE_BYE)) != NULL) {
         mrp_mainloop_quit(c->ml, 0);
         return;
     }
 
-    brl_show_prompt(c->brl);
+    if (c->cmds != NULL) {
+        if (c->ccmd < c->ncmd)
+            send_cmd(c, c->cmds[c->ccmd++]);
+        else
+            mrp_mainloop_quit(c->ml, 0);
+    }
+
+    show_prompt(c);
 }
 
 
@@ -283,7 +327,8 @@ static void client_set_defaults(client_t *c)
 
 static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 {
-    va_list ap;
+    va_list     ap;
+    const char *exe;
 
     if (fmt && *fmt) {
         va_start(ap, fmt);
@@ -291,9 +336,11 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
         va_end(ap);
     }
 
-    printf("usage: %s [options] [transport-address]\n\n"
+    exe = strrchr(argv0, '/');
+
+    printf("usage: %s [options] [console-commands]\n\n"
            "The possible options are:\n"
-           "  -s, --server                   server address to connect to\n"
+           "  -s, --server <address>         server transport to connect to\n"
            "  -t, --log-target=TARGET        log target to use\n"
            "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
            "  -l, --log-level=LEVELS         logging level to use\n"
@@ -302,6 +349,13 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -d, --debug                    enable debug messages\n"
            "  -h, --help                     show help on usage\n",
            argv0);
+    printf("\n");
+    printf("If commands are given on the command line, the console will ");
+    printf("first execute\nthem then exit after receiving a response to ");
+    printf("the last command. If no commands\n");
+    printf("are given on the command line, the console will prompt for ");
+    printf("commands to execute.\nFor a short summary of commands ");
+    printf("try running '%s help'.\n", exe ? exe + 1 : argv0);
 
     if (exit_code < 0)
         return;
@@ -310,7 +364,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 }
 
 
-void parse_cmdline(client_t *c, int argc, char **argv)
+int parse_cmdline(client_t *c, int argc, char **argv)
 {
 #   define OPTIONS "s:l:t:v:d:h"
     struct option options[] = {
@@ -363,15 +417,18 @@ void parse_cmdline(client_t *c, int argc, char **argv)
             print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
+
+    return optind;
 }
 
 
 int main(int argc, char *argv[])
 {
     client_t c;
+    int      next;
 
     client_set_defaults(&c);
-    parse_cmdline(&c, argc, argv);
+    next = parse_cmdline(&c, argc, argv);
 
     mrp_log_set_mask(c.log_mask);
     mrp_log_set_target(c.log_target);
@@ -385,13 +442,28 @@ int main(int argc, char *argv[])
 
     mrp_add_sighandler(c.ml, SIGINT, signal_handler, &c);
 
-    if (!input_setup(&c) || !client_setup(&c))
+    if (next >= argc) {
+        if (!input_setup(&c))
+            goto fail;
+        c.cmds = NULL;
+        c.ncmd = 0;
+        c.ccmd = 0;
+    }
+    else {
+        c.cmds = argv + next;
+        c.ncmd = argc - next;
+        c.ccmd = 0;
+    }
+
+    if (!client_setup(&c))
         goto fail;
 
     mrp_mainloop_run(c.ml);
 
     client_cleanup(&c);
-    input_cleanup(&c);
+
+    if (next >= argc)
+        input_cleanup(&c);
 
     return 0;
 
