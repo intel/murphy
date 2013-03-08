@@ -253,7 +253,8 @@ function connect() {
 
     ctx.mgr = mgr;
 
-    mgr.connect("ws://127.0.0.1:4000");
+    console.log("server URI: " + mgr.socketUri(document.URL));
+    mgr.connect(mgr.socketUri(document.URL));
 }
 
 
