@@ -145,7 +145,7 @@ static int wsck_open(mrp_transport_t *mt)
     wsck_t *t = (wsck_t *)mt;
 
     mrp_list_init(&t->http_clients);
-    wsl_set_loglevel(WSL_LOG_ALL | WSL_LOG_EXTRA);
+    wsl_set_loglevel(WSL_LOG_ALL/* | WSL_LOG_EXTRA*/);
 
     return TRUE;
 }
