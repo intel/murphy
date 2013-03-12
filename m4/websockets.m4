@@ -16,26 +16,85 @@ AC_ARG_ENABLE(websockets,
 if test "$enable_websockets" != "no"; then
     PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets],
                       [have_websockets=yes], [have_websockets=no])
+    if test "$have_websockets" = "yes"; then
+        WEBSOCKETS_CFLAGS="`pkg-config --cflags libwebsockets`"
+        # Check for a couple of recent features we need to adopt to.
+        saved_CFLAGS="$CFLAGS"
+        saved_LDFLAGS="$LDFLAGS"
+        CFLAGS="`pkg-config --cflags libwebsockets`"
+        LDFLAGS="`pkg-config --libs libwebsockets`"
 
-    # Now check for older websockets.
-    saved_LDFLAGS="$LDFLAGS"
-    LDFLAGS="-lwebsockets"
-    AC_MSG_CHECKING([for WEBSOCKETS without pkg-config support])
-    AC_LINK_IFELSE(
-       [AC_LANG_PROGRAM(
-             [[#include <stdlib.h>
-               #include <libwebsockets.h>]],
-             [[struct libwebsocket_context *ctx;
-               ctx = libwebsocket_create_context(0, NULL, NULL, NULL,
-                                                 NULL, NULL, NULL,
-                                                 -1, -1, 0, NULL);]])],
-        [have_websockets=yes],
-        [have_websockets=no])
-    AC_MSG_RESULT([$have_websockets])
+        # Check for new context creation API.
+        AC_MSG_CHECKING([for WEBSOCKETS new context creation API])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[struct libwebsocket_context *ctx;
+                   ctx = libwebsocket_create_context(NULL);]])],
+            [websockets_cci=yes],
+            [websockets_cci=no])
+        AC_MSG_RESULT([$websockets_cci])
 
-    # If still no luck, check for a really old libwebsockets
-    # still without per-context user data.
+        # Check for new libwebsockets_get_internal_extensions.
+        AC_MSG_CHECKING([for WEBSOCKETS internal extension query API])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[struct libwebsocket_extension *ext;
+                   ext = libwebsocket_get_internal_extensions();]])],
+            [websockets_query_ext=yes],
+            [websockets_query_ext=no])
+        AC_MSG_RESULT([$websockets_query_ext])
+
+        # Check for newer lws_set_log_level API.
+        # Note that we cheat heavily here: instead of rolling a proper
+        # test, we blindly assume gcc, turn on the -Werror flag (to catch
+        # calls with a mismatching function pointer) and hope that we will
+        # not get false negatives because of other warnings.
+        no_werror_CFLAGS="$CFLAGS"
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING([for WEBSOCKETS updated logging API.])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>
+                   static void logger(int level, const char *line) {
+                       return;
+                   }]],
+                 [[lws_set_log_level(LLL_INFO, logger);]])],
+            [websockets_log_with_level=yes],
+            [websockets_log_with_level=no])
+        AC_MSG_RESULT([$websockets_log_with_level])
+
+        CFLAGS="$saved_CFLAGS"
+        LDFLAGS="$saved_LDFLAGS"
+    else
+        WEBSOCKETS_CFLAGS=""
+    fi
+
+    # Check for older websockets.
     if test "$have_websockets" = "no"; then
+        saved_LDFLAGS="$LDFLAGS"
+        LDFLAGS="-lwebsockets"
+        AC_MSG_CHECKING([for WEBSOCKETS without pkg-config support])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[struct libwebsocket_context *ctx;
+                   ctx = libwebsocket_create_context(0, NULL, NULL, NULL,
+                                                     NULL, NULL, NULL,
+                                                     -1, -1, 0, NULL);]])],
+            [have_websockets=yes;old_websockets=no],
+            [have_websockets=no])
+        AC_MSG_RESULT([$have_websockets])
+    fi
+
+    # Check if we have a really old libwebsockets, still without
+    # per-context user data.
+    if test "$old_websockets" != "no"; then
         AC_MSG_CHECKING([for really old WEBSOCKETS])
         AC_LINK_IFELSE(
             [AC_LANG_PROGRAM(
@@ -46,14 +105,22 @@ if test "$enable_websockets" != "no"; then
                                                      NULL, NULL,
                                                      -1, -1, 0);]])],
             [have_websockets=yes;old_websockets=yes],
-            [have_websockets=no])
-        AC_MSG_RESULT([$have_websockets])
+            [old_websockets=no])
+        AC_MSG_RESULT([$old_websockets])
     fi
 
-    WEBSOCKETS_CFLAGS=""
     WEBSOCKETS_LIBS="-lwebsockets"
     if test "$old_websockets" = "yes"; then
-        WEBSOCKETS_CFLAGS="$WEBSOCKET_CFLAGS -DWEBSOCKETS_OLD"
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_OLD"
+    fi
+    if test "$websockets_cci" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CONTEXT_INFO"
+    fi
+    if test "$websockets_query_ext" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_QUERY_EXTENSIONS"
+    fi
+    if test "$websockets_log_with_level" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_LOG_WITH_LEVEL"
     fi
     LDFLAGS="$saved_LDFLAGS"
 else

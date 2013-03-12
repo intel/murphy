@@ -145,7 +145,7 @@ static int wsck_open(mrp_transport_t *mt)
     wsck_t *t = (wsck_t *)mt;
 
     mrp_list_init(&t->http_clients);
-    wsl_set_loglevel(WSL_LOG_ALL);
+    wsl_set_loglevel(WSL_LOG_ALL | WSL_LOG_EXTRA);
 
     return TRUE;
 }
@@ -251,6 +251,7 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     };
 
     wsck_t          *t  = (wsck_t *)mt;
+    wsl_ctx_cfg_t    cfg;
     mrp_wsckaddr_t  *wa;
     struct sockaddr *sa;
 
@@ -270,8 +271,18 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
     }
 
-    t->ctx = wsl_create_context(t->ml, sa, &proto[0], MRP_ARRAY_SIZE(proto),
-                                t->ssl_cert, t->ssl_pkey, t->ssl_ca, t);
+    mrp_clear(&cfg);
+    cfg.addr      = sa;
+    cfg.protos    = &proto[0];
+    cfg.nproto    = MRP_ARRAY_SIZE(proto);
+    cfg.ssl_cert  = t->ssl_cert;
+    cfg.ssl_pkey  = t->ssl_pkey;
+    cfg.ssl_ca    = t->ssl_ca;
+    cfg.gid       = WSL_NO_GID;
+    cfg.uid       = WSL_NO_UID;
+    cfg.user_data = t;
+
+    t->ctx = wsl_create_context(t->ml, &cfg);
 
     if (t->ctx != NULL)
         return TRUE;
@@ -334,9 +345,9 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     };
 
     wsck_t          *t = (wsck_t *)mt;
+    wsl_ctx_cfg_t    cfg;
     mrp_wsckaddr_t  *wa;
     struct sockaddr *sa;
-
     if (addr->any.sa_family != MRP_AF_WSCK || addrlen != sizeof(*wa))
         return FALSE;
 
@@ -353,8 +364,18 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
     }
 
-    t->ctx = wsl_create_context(t->ml, NULL, &proto, 1,
-                                t->ssl_cert, t->ssl_pkey, t->ssl_ca, t);
+    mrp_clear(&cfg);
+    cfg.addr      = NULL;
+    cfg.protos    = &proto;
+    cfg.nproto    = 1;
+    cfg.ssl_cert  = t->ssl_cert;
+    cfg.ssl_pkey  = t->ssl_pkey;
+    cfg.ssl_ca    = t->ssl_ca;
+    cfg.gid       = WSL_NO_GID;
+    cfg.uid       = WSL_NO_UID;
+    cfg.user_data = t;
+
+    t->ctx = wsl_create_context(t->ml, &cfg);
 
     if (t->ctx == NULL)
         return FALSE;

@@ -10,6 +10,7 @@ MRP_CDECL_BEGIN
  * websocket types (mapped)
  */
 
+typedef wsl_ctx_cfg_t   mrp_websock_config_t;
 typedef wsl_ctx_t       mrp_websock_context_t;
 typedef wsl_sck_t       mrp_websock_t;
 typedef wsl_callbacks_t mrp_websock_evt_t;
@@ -47,13 +48,7 @@ void mrp_websock_set_loglevel(mrp_websock_loglevel_t mask);
 
 /** Create a websocket context. */
 mrp_websock_context_t *mrp_websock_create_context(mrp_mainloop_t *ml,
-                                                  struct sockaddr *sa,
-                                                  mrp_websock_proto_t *proto,
-                                                  int nproto,
-                                                  const char *ssl_cert,
-                                                  const char *ssl_pkey,
-                                                  const char *ssl_ca,
-                                                  void *user_data);
+                                                  mrp_websock_config_t *cfg);
 
 /** Add a reference to a websocket context. */
 mrp_websock_context_t *mrp_websock_ref_context(mrp_websock_context_t *ctx);

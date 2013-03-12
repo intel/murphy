@@ -145,14 +145,36 @@ typedef enum {
     WSL_SSL_SELFSIGNED = 2,              /* SSL, allow self-signed certs */
 } wsl_ssl_t;
 
+
+/*
+ * websockets context configuration
+ */
+
+#define WSL_NO_GID -1
+#define WSL_NO_UID -1
+
+typedef struct {
+    struct sockaddr *addr;               /* address/port to listen on */
+    wsl_proto_t     *protos;             /* protocols to serve */
+    int              nproto;             /* number of protocols */
+    const char      *ssl_cert;           /* SSL certificate path */
+    const char      *ssl_pkey;           /* SSL private key path */
+    const char      *ssl_ca;             /* SSL CA path */
+    const char      *ssl_ciphers;        /* SSL cipher list */
+    int              gid;                /* group ID to change to, or -1 */
+    int              uid;                /* user ID to change to, or -1 */
+    void            *user_data;          /* opaque user data */
+    int              timeout;            /* keepalive timeout */
+    int              nprobe;             /* number of keepalive probes */
+    int              interval;           /* keepalive probe interval */
+} wsl_ctx_cfg_t;
+
+
 /** Set libwebsock logging level _and_ redirect to murphy logging infra. */
 void wsl_set_loglevel(wsl_loglevel_t mask);
 
 /** Create a websocket context. */
-wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, struct sockaddr *sa,
-                              wsl_proto_t *protos, int nproto,
-                              const char *ssl_cert, const char *ssl_pkey,
-                              const char *ssl_ca, void *user_data);
+wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, wsl_ctx_cfg_t *cfg);
 
 /** Add a reference to a context. */
 wsl_ctx_t *wsl_ref_context(wsl_ctx_t *ctx);

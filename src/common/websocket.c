@@ -9,17 +9,9 @@ void mrp_websock_set_loglevel(mrp_websock_loglevel_t mask)
 
 
 mrp_websock_context_t *mrp_websock_create_context(mrp_mainloop_t *ml,
-                                                  struct sockaddr *sa,
-                                                  mrp_websock_proto_t *proto,
-                                                  int nproto,
-                                                  const char *ssl_cert,
-                                                  const char *ssl_pkey,
-                                                  const char *ssl_ca,
-                                                  void *user_data)
+                                                  mrp_websock_config_t *cfg)
 {
-    return wsl_create_context(ml, sa, proto, nproto,
-                              ssl_cert, ssl_pkey, ssl_ca,
-                              user_data);
+    return wsl_create_context(ml, cfg);
 }
 
 
