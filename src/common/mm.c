@@ -284,23 +284,27 @@ static memblk_t *memblk_alloc(size_t size, const char *file, int line,
 {
     memblk_t *blk;
 
-    if ((blk = malloc(__mm.hdrsize + size)) != NULL) {
-        mrp_list_init(&blk->hook);
-        mrp_list_init(&blk->more);
-        mrp_list_append(&__mm.blocks, &blk->hook);
+    if (MRP_UNLIKELY(size == 0))
+        blk = NULL;
+    else {
+        if ((blk = malloc(__mm.hdrsize + size)) != NULL) {
+            mrp_list_init(&blk->hook);
+            mrp_list_init(&blk->more);
+            mrp_list_append(&__mm.blocks, &blk->hook);
 
-        blk->file = file;
-        blk->line = line;
-        blk->func = func;
-        blk->size = size;
+            blk->file = file;
+            blk->line = line;
+            blk->func = func;
+            blk->size = size;
 
-        memcpy(blk->bt, bt, __mm.depth * sizeof(*bt));
+            memcpy(blk->bt, bt, __mm.depth * sizeof(*bt));
 
-        __mm.cur_blocks++;
-        __mm.cur_alloc += size;
+            __mm.cur_blocks++;
+            __mm.cur_alloc += size;
 
-        __mm.max_blocks = MRP_MAX(__mm.max_blocks, __mm.cur_blocks);
-        __mm.max_alloc  = MRP_MAX(__mm.max_alloc , __mm.cur_alloc);
+            __mm.max_blocks = MRP_MAX(__mm.max_blocks, __mm.cur_blocks);
+            __mm.max_alloc  = MRP_MAX(__mm.max_alloc , __mm.cur_alloc);
+        }
     }
 
     return blk;
@@ -487,7 +491,10 @@ static void *__passthru_alloc(size_t size, const char *file, int line,
     MRP_UNUSED(line);
     MRP_UNUSED(func);
 
-    return malloc(size);
+    if (MRP_UNLIKELY(size == 0))
+        return NULL;
+    else
+        return malloc(size);
 }
 
 
