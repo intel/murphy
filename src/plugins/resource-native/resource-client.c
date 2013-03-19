@@ -1714,8 +1714,9 @@ int main(int argc, char **argv)
 
     mrp_mainloop_run(client->ml);
 
-    printf("%u requests, avarage request processing time %.2lfmsec\n",
-           reqcount, (double)(totaltime / (uint64_t)reqcount) / 1000.0);
+    if (reqcount > 0)
+        printf("%u requests, avarage request processing time %.2lfmsec\n",
+               reqcount, (double)(totaltime / (uint64_t)reqcount) / 1000.0);
 
     printf("exiting now ...\n");
 
