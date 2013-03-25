@@ -81,6 +81,18 @@ else
     m:info("No domain-control plugin found...")
 end
 
+-- load the domain control plugin if it exists
+if m:plugin_exists('domain-control') then
+    m:load_plugin('domain-control', 'wrt-export', {
+        external_address = '',
+        internal_address = '',
+        wrt_address = "wsck:127.0.0.1:5000/murphy",
+        httpdir     = "src/plugins/domain-control"
+    })
+else
+    m:info("No domain-control plugin found...")
+end
+
 
 -- define application classes
 application_class { name="interrupt", priority=99, modal=true , share=false, order="fifo" }
