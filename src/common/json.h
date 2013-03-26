@@ -184,7 +184,7 @@ int mrp_json_array_get_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...);
     mrp_json_array_get_item(a, idx, MRP_JSON_BOOLEAN, bptr)
 
 #define mrp_json_array_get_array(a, idx, aptr) \
-    mrp_json_array_get_item(a, idx, MRP_JSON_BOOLEAN, aptr)
+    mrp_json_array_get_item(a, idx, MRP_JSON_ARRAY, aptr)
 
 #define mrp_json_array_get_object(a, idx, optr) \
     mrp_json_array_get_item(a, idx, MRP_JSON_OBJECT, optr)
