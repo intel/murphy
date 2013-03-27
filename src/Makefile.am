@@ -1221,6 +1221,14 @@ libmurphy_domain_controller_la_LIBADD   = libmurphy-common.la     \
 					  murphy-db/mqi/libmqi.la \
 					  murphy-db/mdb/libmdb.la
 
+if WEBSOCKETS_ENABLED
+EXTRA_DIST          += $(domain_control_DATA)
+domain_controldir    = $(datadir)/murphy/domain-control
+domain_control_DATA  = 						\
+		plugins/domain-control/domain-control-api.js	\
+		plugins/domain-control/domain-control-test.html
+endif
+
 # test domain controller (disabled until we have a readline replacement)
 bin_PROGRAMS += test-domain-controller
 
