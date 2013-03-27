@@ -1,0 +1,224 @@
+<html lang="en">
+<head><title>Domain Controller Webruntime Test</title>
+<script src="domain-control-api.js"></script>
+<script>
+
+var ctx;
+
+
+function controllerDisconnected () {
+    setStatus("disconnected");
+    setStatus("unknown", 'audio_status');
+    setStatus("unknown", 'video_status');
+    setStatus("unknown", 'data_status');
+}
+
+
+function controllerFailed () {
+    console.log("connection failed");
+}
+
+
+function controllerEvent (event) {
+    var tidx, ridx;
+    var table, row;
+
+    setStatus('connected');
+    enableButton('disconnect');
+    enableButton('update');
+    console.log("received '" + event.type + "' event");
+
+    for (name in event.tables) {
+        table = event.tables[name];
+        rows  = table.rows;
+        id    = table.id;
+
+        status = "";
+        t      = "";
+        for (ridx in rows) {
+            row    = rows[ridx];
+            zoneid = row[0];
+            zone   = row[1];
+            appcls = row[2];
+            pid    = row[4];
+
+            status += t + zone + " zone: " + appcls;
+            if (pid)
+                status += " (pid " + pid + ")";
+        }
+
+        switch (name) {
+        case 'audio_playback_owner':
+            setStatus(status, 'audio_status');
+            break;
+        case 'video_playback_owner':
+            setStatus(status, 'video_status');
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+
+function setContent(id, text) {
+    var elem = document.getElementById(id);
+
+    if (elem)
+        elem.textContent = text;
+}
+
+
+function setStatus(status, which) {
+    if (which)
+        setContent(which, status)
+    else
+        setContent('general_status', status);
+}
+
+
+function enableButton(name) {
+    var btn = document.getElementById(name);
+
+    if (btn)
+        btn.disabled = false;
+}
+
+
+function disableButton(name) {
+    var btn = document.getElementById(name);
+
+    if (btn)
+        btn.disabled = true;
+}
+
+
+function initialize() {
+    disableButton("disconnect");
+    disableButton("update");
+    enableButton("connect");
+}
+
+
+function connect() {
+    var ctl;
+
+    setStatus("connecting...");
+
+    domctl_debug_enable([DOMCTL_COMM, DOMCTL_NOTIFY, DOMCTL_MISC]);
+
+    ctx = {};
+    ctl = new DomainController('wrt-test', [
+          {
+              "table":   "wrt_test",
+              "columns": "count integer",
+              "index":   ""
+          }
+        ],
+        [ {
+              "table":   "audio_playback_owner",
+              "columns": "*",
+              "where":   "",
+              "maxrows": 0
+          },
+          {
+              "table":   "video_playback_owner",
+              "columns": "*",
+              "where":   "",
+              "maxrows": 0
+          }
+        ]);
+
+    ctl.ondisconnect = controllerDisconnected;
+    ctl.onerror      = controllerFailed;
+    ctl.onevent      = controllerEvent;
+    ctl.user_data    = ctx;
+
+    ctx.ctl = ctl;
+    ctx.cnt = 0;
+
+    console.log("server URI: " + ctl.socketUri(document.URL));
+    ctl.connect(ctl.socketUri(document.URL));
+}
+
+
+function disconnect() {
+    var ctl = ctx.ctl;
+
+    setStatus("disconnecting...");
+
+    ctl.disconnect();
+}
+
+
+function update_ack(e) {
+    console.log("Data updated successfully.");
+    setStatus(ctx.cnt - 1, "data_status");
+}
+
+
+function update_nak(e) {
+    var msg = e.errmsg ? e.errmsg : "unknown error";
+
+    console.log("Data update failed.");
+
+    setStatus("error (" + msg + ")", "data_status");
+}
+
+
+function update() {
+    var ctl = ctx.ctl;
+    var cnt = ctx.cnt++;
+    var pending;
+
+    try {
+        pending = ctl.set([{table: "wrt_test", rows: [[cnt]]}]);
+        pending.onsuccess = update_ack;
+        pending.onerror   = update_nak;
+    } catch (e) {
+        console.log("Failed to update data on server (" + e.message + ")");
+    }
+}
+
+
+</script>
+
+</head>
+
+<body onload="initialize();">
+
+
+<table>
+    <tr>
+        <th align=left>Actions:</th>
+        <td align=left>
+          <input type=button id=connect value="Connect"
+               onclick="connect();">
+          <input type=button id=disconnect value="Disconnect"
+               onclick="disconnect();" disabled>
+          <input type=button id=update value="Update Data"
+               onclick="update();" disabled>
+
+        </td>
+    </tr>
+    <tr>
+        <th align=left>Status:</th>
+	<td align=left><div id=general_status>disconnected</div></td>
+    </tr>
+    <tr>
+        <th align=left>Audio:</th>
+	<td align=left><div id=audio_status>unknown</div></td>
+    </tr>
+    <tr>
+        <th align=left>Video:</th>
+	<td align=left><div id=video_status>unknown</div></td>
+    </tr>
+    <tr>
+        <th align=left>Data:</th>
+	<td align=left><div id=data_status>unknown</div></td>
+    </tr>
+</table>
+
+
+</body>
+</html>
