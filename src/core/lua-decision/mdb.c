@@ -1199,7 +1199,7 @@ static int select_update_from_resolver(mrp_scriptlet_t *script,
 
     lua_pop(L, 1);
 
-    MRP_LUA_LEAVE(nrow);
+    MRP_LUA_LEAVE(nrow >= 0);
 }
 
 
