@@ -440,6 +440,7 @@ msg_t *msg_decode_set(mrp_msg_t *msg)
     if (set == NULL)
         return NULL;
 
+    values      = NULL;
     set->type   = MSG_TYPE_SET;
     set->seq    = seqno;
     set->tables = mrp_allocz(sizeof(*set->tables) * ntable);
@@ -657,6 +658,7 @@ msg_t *msg_decode_notify(mrp_msg_t *msg)
     if (notify == NULL)
         return NULL;
 
+    values         = NULL;
     notify->type   = MSG_TYPE_NOTIFY;
     notify->seq    = seqno;
     notify->tables = mrp_allocz(sizeof(*notify->tables) * ntable);
@@ -1036,6 +1038,7 @@ msg_t *json_decode_set(mrp_json_t *msg)
     if (set == NULL)
         return NULL;
 
+    values      = NULL;
     set->type   = MSG_TYPE_SET;
     set->seq    = seqno;
     set->tables = mrp_allocz(sizeof(*set->tables) * ntable);
