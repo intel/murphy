@@ -241,6 +241,8 @@ static void lua_debug(lua_State *L, lua_Debug *ar)
                 depth++;
                 return;
             }
+            else
+                type = "???";
 
             name = f.name ? f.name : NULL;
 
