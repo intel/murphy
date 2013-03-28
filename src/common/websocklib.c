@@ -501,9 +501,7 @@ static lws_ctx_t *lws_create_ctx(lws_cci_t *cci)
 {
     lws_ctx_t *ws_ctx;
 
-    MRP_UNUSED(ssl_ca);
-
-    set_pending_userdata(user_data);
+    set_pending_userdata(cci->user);
 
     ws_ctx = libwebsocket_create_context(cci->port, cci->iface,
                                          cci->protocols, cci->extensions,
@@ -513,9 +511,9 @@ static lws_ctx_t *lws_create_ctx(lws_cci_t *cci)
                                          cci->gid, cci->uid, cci->options
                                          /*no user_data*/);
     if (ws_ctx != NULL)
-        set_context_userdata(ws_ctx, user_data);
+        set_context_userdata(ws_ctx, cci->user);
 
-    clear_pending_userdata(user_data);
+    clear_pending_userdata(cci->user);
 
     return ws_ctx;
 }
