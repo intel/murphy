@@ -368,9 +368,9 @@ int mrp_application_class_print(char *buf, int len, bool with_rsets)
 
     e = (p = buf) + len;
     clcnt = rscnt = 0;
+    width = 0;
 
     if (!with_rsets) {
-        width = 0;
         mrp_list_foreach(&class_list, clen, n) {
             class = mrp_list_entry(clen, mrp_application_class_t, list);
             if ((l = strlen(class->name)) > width)
