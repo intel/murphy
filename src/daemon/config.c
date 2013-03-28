@@ -990,9 +990,11 @@ static int get_next_line(input_t *in, char **args, size_t size)
     int   narg, nest, beg;
     int   i, n, l, tot;
 
-    narg = 0;
-    nest = 0;
-    beg  = -1;
+    narg     = 0;
+    nest     = 0;
+    beg      = -1;
+    tot      = 0;
+    block[0] = block[1] = '\0';
     while ((token = get_next_token(in)) != NULL && narg < (int)size) {
         if (in->error)
             return -1;
