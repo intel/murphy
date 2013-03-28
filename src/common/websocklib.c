@@ -1828,11 +1828,11 @@ static void libwebsockets(const char *line)
 
 #ifdef WEBSOCKETS_LOG_WITH_LEVEL
     switch (level) {
-    case LLL_ERR:     lvl = "e"; break;
-    case LLL_WARN:    lvl = "w"; break;
-    case LLL_INFO:    lvl = "i"; break;
-    case LLL_DEBUG:   lvl = "d"; break;
-    case LLL_NOTICE:  lvl = "d"; break;
+    case LLL_ERR:     lvl = "e"; ls = 0; break;
+    case LLL_WARN:    lvl = "w"; ls = 0; break;
+    case LLL_INFO:    lvl = "i"; ls = 0; break;
+    case LLL_DEBUG:   lvl = "d"; ls = 0; break;
+    case LLL_NOTICE:  lvl = "d"; ls = 0; break;
     case LLL_PARSER:  lvl = "parser" ; ls = 6; break;
     case LLL_HEADER:  lvl = "header" ; ls = 6; break;
     case LLL_EXT:     lvl = "ext"    ; ls = 3; break;
@@ -1858,9 +1858,9 @@ static void libwebsockets(const char *line)
             break;
 
         if (lvl != NULL) {
-            switch (*lvl) {
-            case 'd': mrp_debug("%*.*s", l, l, b);                  break;
-            case 'i': mrp_debug("%*.*s", l, l, b);                  break;
+            switch (lvl[0] | (lvl[1] << 8)) {
+            case 'd': mrp_debug("%*.*s", l, l, b);                      break;
+            case 'i': mrp_debug("%*.*s", l, l, b);                      break;
             case 'w': mrp_log_warning("libwebsockets: %*.*s", l, l, b); break;
             case 'e': mrp_log_error("libwebsockets: %*.*s", l, l, b);   break;
             default:  mrp_debug("[%*.*s] %*.*s", ls, ls, lvl, l, l, b);
