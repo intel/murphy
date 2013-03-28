@@ -221,7 +221,7 @@ static int cond_get_data(cond_stack_t     *sp,
 static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
 {
     cond_stack_t *result;
-    cond_stack_t *newsp;
+    cond_stack_t *newsp = sp;
     int value;
     int stack_advance = 0;
 

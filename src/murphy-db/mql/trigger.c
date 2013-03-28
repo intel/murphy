@@ -234,8 +234,10 @@ int mql_create_column_trigger(char              *name,
         MDB_PREREQUISITE(triggers, -1);
     }
 
-    if (!nselcol)
+    if (!nselcol) {
+        nsiz = asiz = dsiz = tsiz = ssiz = 0;
         size = sizeof(column_trigger_t);
+    }
     else {
         nsiz = asiz = sizeof(char *) * nselcol;
 

@@ -1235,7 +1235,7 @@ mql_result_t *mql_result_list_create(mqi_data_type_t type,
     result_list_t *rslt;
     size_t   datalen;
     char   **strs;
-    int     *slen;
+    int     *slen = NULL;
     char    *strpool;
     int      poollen = 0;
     int      i;
