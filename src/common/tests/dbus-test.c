@@ -186,11 +186,10 @@ static void ping_request(context_t *c)
 }
 
 
-static void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
+static void send_cb(mrp_timer_t *t, void *user_data)
 {
     context_t *c = (context_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
     ping_request(c);
@@ -418,13 +417,12 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
 }
 
 
-static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
-                           int signum, void *user_data)
+static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
 {
-    context_t *c = (context_t *)user_data;
+    mrp_mainloop_t *ml = mrp_get_sighandler_mainloop(h);
+    context_t      *c = (context_t *)user_data;
 
     MRP_UNUSED(c);
-    MRP_UNUSED(h);
 
     switch (signum) {
     case SIGINT:

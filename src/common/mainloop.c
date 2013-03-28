@@ -546,6 +546,12 @@ void mrp_del_io_watch(mrp_io_watch_t *w)
 }
 
 
+mrp_mainloop_t *mrp_get_io_watch_mainloop(mrp_io_watch_t *w)
+{
+    return w ? w->ml : NULL;
+}
+
+
 /*
  * timers
  */
@@ -692,6 +698,12 @@ void mrp_del_timer(mrp_timer_t *t)
 }
 
 
+mrp_mainloop_t *mrp_get_timer_mainloop(mrp_timer_t *t)
+{
+    return t ? t->ml : NULL;
+}
+
+
 /*
  * deferred/idle callbacks
  */
@@ -763,19 +775,25 @@ void mrp_enable_deferred(mrp_deferred_t *d)
 }
 
 
+mrp_mainloop_t *mrp_get_deferred_mainloop(mrp_deferred_t *d)
+{
+    return d ? d->ml : NULL;
+}
+
+
 /*
  * signal notifications
  */
 
-static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
+static void dispatch_signals(mrp_io_watch_t *w, int fd,
                              mrp_io_event_t events, void *user_data)
 {
+    mrp_mainloop_t          *ml = mrp_get_io_watch_mainloop(w);
     struct signalfd_siginfo  sig;
     mrp_list_hook_t         *p, *n;
     mrp_sighandler_t        *h;
     int                      signum;
 
-    MRP_UNUSED(w);
     MRP_UNUSED(events);
     MRP_UNUSED(user_data);
 
@@ -787,7 +805,7 @@ static void dispatch_signals(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
 
             if (!is_deleted(h)) {
                 if (h->signum == signum)
-                    h->cb(ml, h, signum, h->user_data);
+                    h->cb(h, signum, h->user_data);
             }
         }
     }
@@ -873,6 +891,13 @@ void mrp_del_sighandler(mrp_sighandler_t *h)
     }
 }
 
+
+mrp_mainloop_t *mrp_get_sighandler_mainloop(mrp_sighandler_t *h)
+{
+    return h ? h->ml : NULL;
+}
+
+
 /*
  * wakeup notifications
  */
@@ -916,6 +941,12 @@ void mrp_del_wakeup(mrp_wakeup_t *w)
 }
 
 
+mrp_mainloop_t *mrp_get_wakeup_mainloop(mrp_wakeup_t *w)
+{
+    return w ? w->ml : NULL;
+}
+
+
 /*
  * external mainloops we pump
  */
@@ -934,12 +965,11 @@ static int free_subloop(void *ptr)
 }
 
 
-static void subloop_event_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                             mrp_io_event_t events, void *user_data)
+static void subloop_event_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                             void *user_data)
 {
     mrp_subloop_t *sl = (mrp_subloop_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(w);
     MRP_UNUSED(fd);
     MRP_UNUSED(events);
@@ -1673,7 +1703,7 @@ static void dispatch_wakeup(mrp_mainloop_t *ml)
 
         if (!is_deleted(w)) {
             mrp_debug("dispatching wakeup cb %p", w);
-            w->cb(ml, w, event, w->user_data);
+            w->cb(w, event, w->user_data);
         }
         else
             mrp_debug("skipping deleted wakeup cb %p", w);
@@ -1694,7 +1724,7 @@ static void dispatch_deferred(mrp_mainloop_t *ml)
 
         if (!is_deleted(d) && !d->inactive) {
             mrp_debug("dispatching active deferred cb %p", d);
-            d->cb(ml, d, d->user_data);
+            d->cb(d, d->user_data);
         }
         else
             mrp_debug("skipping %s deferred cb %p",
@@ -1724,7 +1754,7 @@ static void dispatch_timers(mrp_mainloop_t *ml)
             if (t->expire <= now) {
                 mrp_debug("dispatching expired timer %p", t);
 
-                t->cb(ml, t, t->user_data);
+                t->cb(t, t->user_data);
 
                 if (!is_deleted(t))
                     rearm_timer(t);
@@ -1766,7 +1796,6 @@ static void dispatch_subloops(mrp_mainloop_t *ml)
 
 static void dispatch_slaves(mrp_io_watch_t *w, struct epoll_event *e)
 {
-    mrp_mainloop_t  *ml = w->ml;
     mrp_io_watch_t  *s;
     mrp_list_hook_t *p, *n;
     mrp_io_event_t   events;
@@ -1781,7 +1810,7 @@ static void dispatch_slaves(mrp_io_watch_t *w, struct epoll_event *e)
 
         if (!is_deleted(s)) {
             mrp_debug("dispatching slave I/O watch %p (fd %d)", s, s->fd);
-            s->cb(ml, s, s->fd, events, s->user_data);
+            s->cb(s, s->fd, events, s->user_data);
         }
         else
             mrp_debug("skipping slave I/O watch %p (fd %d)", s, s->fd);
@@ -1808,7 +1837,7 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
 
         if (!is_deleted(w)) {
             mrp_debug("dispatching I/O watch %p (fd %d)", w, fd);
-            w->cb(ml, w, w->fd, e->events, w->user_data);
+            w->cb(w, w->fd, e->events, w->user_data);
         }
         else
             mrp_debug("skipping delete I/O watch %p (fd %d)", w, fd);

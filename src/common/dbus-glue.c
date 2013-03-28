@@ -64,14 +64,13 @@ struct dbus_glue_s {
 
 static dbus_int32_t data_slot = -1;
 
-static void dispatch_watch(mrp_mainloop_t *ml, mrp_io_watch_t *mw, int fd,
-                           mrp_io_event_t events, void *user_data)
+static void dispatch_watch(mrp_io_watch_t *mw, int fd, mrp_io_event_t events,
+                           void *user_data)
 {
     watch_t        *watch = (watch_t *)user_data;
     DBusConnection *conn  = watch->glue->conn;
     unsigned int    mask  = 0;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(mw);
     MRP_UNUSED(fd);
 
@@ -177,12 +176,10 @@ static void toggle_watch(DBusWatch *dw, void *data)
 }
 
 
-static void dispatch_timeout(mrp_mainloop_t *ml, mrp_timer_t *mt,
-                             void *user_data)
+static void dispatch_timeout(mrp_timer_t *mt, void *user_data)
 {
     timeout_t *timer = (timeout_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(mt);
 
     mrp_debug("dispatching D-BUS timeout %p...", timer->dt);
@@ -300,11 +297,9 @@ static void glue_free_cb(void *data)
 }
 
 
-static void pump_cb(mrp_mainloop_t *ml, mrp_deferred_t *d, void *user_data)
+static void pump_cb(mrp_deferred_t *d, void *user_data)
 {
     dbus_glue_t *glue = (dbus_glue_t *)user_data;
-
-    MRP_UNUSED(ml);
 
     mrp_debug("dispatching dbus connection %p...", glue->conn);
 

@@ -61,7 +61,7 @@ typedef enum {
 typedef struct mrp_io_watch_s mrp_io_watch_t;
 
 /** I/O watch notification callback type. */
-typedef void (*mrp_io_watch_cb_t)(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
+typedef void (*mrp_io_watch_cb_t)(mrp_io_watch_t *w, int fd,
                                   mrp_io_event_t events, void *user_data);
 /** Register a new file descriptor to watch. */
 mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
@@ -69,6 +69,9 @@ mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
                                  mrp_io_watch_cb_t cb, void *user_data);
 /** Unregister an I/O watch. */
 void mrp_del_io_watch(mrp_io_watch_t *watch);
+
+/** Get the mainloop of an I/O watch. */
+mrp_mainloop_t *mrp_get_io_watch_mainloop(mrp_io_watch_t *watch);
 
 
 /*
@@ -78,13 +81,16 @@ void mrp_del_io_watch(mrp_io_watch_t *watch);
 typedef struct mrp_timer_s mrp_timer_t;
 
 /** Timer notification callback type. */
-typedef void (*mrp_timer_cb_t)(mrp_mainloop_t *ml, mrp_timer_t *t,
-                              void *user_data);
+typedef void (*mrp_timer_cb_t)(mrp_timer_t *t, void *user_data);
+
 /** Add a new timer. */
 mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
                            mrp_timer_cb_t cb, void *user_data);
 /** Delete a timer. */
 void mrp_del_timer(mrp_timer_t *t);
+
+/** Get the mainloop of a timer. */
+mrp_mainloop_t *mrp_get_timer_mainloop(mrp_timer_t *t);
 
 
 /*
@@ -94,8 +100,8 @@ void mrp_del_timer(mrp_timer_t *t);
 typedef struct mrp_deferred_s mrp_deferred_t;
 
 /** Deferred callback notification callback type. */
-typedef void (*mrp_deferred_cb_t)(mrp_mainloop_t *ml, mrp_deferred_t *d,
-                                  void *user_data);
+typedef void (*mrp_deferred_cb_t)(mrp_deferred_t *d, void *user_data);
+
 /** Add a deferred callback. */
 mrp_deferred_t *mrp_add_deferred(mrp_mainloop_t *ml, mrp_deferred_cb_t cb,
                                  void *user_data);
@@ -108,6 +114,10 @@ void mrp_disable_deferred(mrp_deferred_t *d);
 /** Enable a deferred callback. */
 void mrp_enable_deferred(mrp_deferred_t *d);
 
+/** Get the mainloop of a deferred callback. */
+mrp_mainloop_t *mrp_get_deferred_mainloop(mrp_deferred_t *d);
+
+
 /*
  * signals
  */
@@ -115,13 +125,17 @@ void mrp_enable_deferred(mrp_deferred_t *d);
 typedef struct mrp_sighandler_s mrp_sighandler_t;
 
 /* Signal handler callback type. */
-typedef void (*mrp_sighandler_cb_t)(mrp_mainloop_t *ml, mrp_sighandler_t *h,
-                                    int signum, void *user_data);
+typedef void (*mrp_sighandler_cb_t)(mrp_sighandler_t *h, int signum,
+                                    void *user_data);
 /** Register a signal handler. */
 mrp_sighandler_t *mrp_add_sighandler(mrp_mainloop_t *ml, int signum,
                                      mrp_sighandler_cb_t cb, void *user_data);
 /** Unregister a signal handler. */
 void mrp_del_sighandler(mrp_sighandler_t *h);
+
+/** Get the mainloop of a signal handler. */
+mrp_mainloop_t *mrp_get_sighandler_mainloop(mrp_sighandler_t *h);
+
 
 /*
  * wakeup callbacks
@@ -138,8 +152,8 @@ typedef enum {
 typedef struct mrp_wakeup_s mrp_wakeup_t;
 
 /** Wakeup callback notification type. */
-typedef void (*mrp_wakeup_cb_t)(mrp_mainloop_t *ml, mrp_wakeup_t *w,
-                                mrp_wakeup_event_t event, void *user_data);
+typedef void (*mrp_wakeup_cb_t)(mrp_wakeup_t *w, mrp_wakeup_event_t event,
+                                void *user_data);
 
 /** Add a wakeup callback. */
 mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
@@ -147,6 +161,10 @@ mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
 
 /** Remove a wakeup callback. */
 void mrp_del_wakeup(mrp_wakeup_t *w);
+
+/** Get the mainloop of a wakeup callback. */
+mrp_mainloop_t *mrp_get_wakeup_mainloop(mrp_wakeup_t *w);
+
 
 /*
  * subloops - external mainloops pumped by this mainloop

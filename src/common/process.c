@@ -112,8 +112,8 @@ static int initialize_dir()
 }
 
 
-static void process_change(mrp_mainloop_t *ml, mrp_io_watch_t *wd, int fd,
-        mrp_io_event_t events, void *user_data)
+static void process_change(mrp_io_watch_t *wd, int fd, mrp_io_event_t events,
+                           void *user_data)
 {
     struct inotify_event *is;
     int bufsize = sizeof(struct inotify_event) + PATH_MAX;
@@ -121,7 +121,6 @@ static void process_change(mrp_mainloop_t *ml, mrp_io_watch_t *wd, int fd,
     i_watch_t *w;
     FILE *f;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(wd);
     MRP_UNUSED(user_data);
 

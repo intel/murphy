@@ -1539,8 +1539,8 @@ static void parse_line(client_t *client, char *buf, int len)
     }
 }
 
-static void console_input(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                          mrp_io_event_t events, void *user_data)
+static void console_input(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                          void *user_data)
 {
     static char  buf[512];
     static char *bufend = buf + (sizeof(buf) - 1);
@@ -1550,7 +1550,6 @@ static void console_input(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     int       len;
     char     *eol;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(w);
     MRP_UNUSED(events);
 
@@ -1582,10 +1581,10 @@ static void console_input(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     }
 }
 
-static void sighandler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum,
-                       void *user_data)
+static void sighandler(mrp_sighandler_t *h, int signum, void *user_data)
 {
-    client_t *client = (client_t *)user_data;
+    mrp_mainloop_t *ml     = mrp_get_sighandler_mainloop(h);
+    client_t       *client = (client_t *)user_data;
 
     MRP_UNUSED(h);
 

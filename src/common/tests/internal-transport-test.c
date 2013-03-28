@@ -519,12 +519,11 @@ void send_custom(client_t *client)
 
 
 
-void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
+void send_cb(mrp_timer_t *t, void *user_data)
 {
     client_t *client = (client_t *)user_data;
     context_t *c = client->c;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
     if (c->custom)

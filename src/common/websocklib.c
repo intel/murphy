@@ -307,8 +307,8 @@ static void purge_fds(wsl_ctx_t *wsc)
 }
 
 
-static void epoll_event(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                        mrp_io_event_t mask, void *user_data)
+static void epoll_event(mrp_io_watch_t *w, int fd, mrp_io_event_t mask,
+                        void *user_data)
 {
     wsl_ctx_t          *wsc = (wsl_ctx_t *)user_data;
     pollfd_t           *wfd;
@@ -316,7 +316,6 @@ static void epoll_event(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     int                 nevent, n, i;
     struct pollfd       pollfd;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(w);
     MRP_UNUSED(fd);
 

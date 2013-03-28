@@ -63,8 +63,8 @@ typedef struct {
 } dgrm_t;
 
 
-static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                        mrp_io_event_t events, void *user_data);
+static void dgrm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                         void *user_data);
 static int dgrm_disconnect(mrp_transport_t *mu);
 static int open_socket(dgrm_t *u, int family);
 
@@ -329,8 +329,8 @@ static void dgrm_close(mrp_transport_t *mu)
 }
 
 
-static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                         mrp_io_event_t events, void *user_data)
+static void dgrm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                         void *user_data)
 {
     dgrm_t          *u  = (dgrm_t *)user_data;
     mrp_transport_t *mu = (mrp_transport_t *)u;
@@ -341,7 +341,6 @@ static void dgrm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     void            *data;
     int              old, error;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(w);
 
     if (events & MRP_IO_EVENT_IN) {

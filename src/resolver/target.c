@@ -493,12 +493,9 @@ static int autoupdate_target(mrp_resolver_t *r)
 }
 
 
-static void autoupdate_cb(mrp_mainloop_t *ml, mrp_deferred_t *d,
-                          void *user_data)
+static void autoupdate_cb(mrp_deferred_t *d, void *user_data)
 {
     mrp_resolver_t *r = (mrp_resolver_t *)user_data;
-
-    MRP_UNUSED(ml);
 
     mrp_debug("running scheduled target autoupdate");
     mrp_disable_deferred(d);

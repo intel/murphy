@@ -196,13 +196,12 @@ static void timeval_now(struct timeval *tv)
 }
 
 
-void timer_cb(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
+void timer_cb(mrp_timer_t *timer, void *user_data)
 {
     test_timer_t   *t = (test_timer_t *)user_data;
     struct timeval  now;
     double          diff, error;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(timer);
 
     timeval_now(&now);
@@ -304,13 +303,12 @@ typedef struct {
 static test_io_t *ios;
 
 
-static void send_io(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
+static void send_io(mrp_timer_t *timer, void *user_data)
 {
     test_io_t *w = (test_io_t *)user_data;
     char       buf[1024];
     int        plural, size;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(timer);
 
     plural = (w->target - w->sent) != 1;
@@ -338,14 +336,13 @@ static void send_io(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
 }
 
 
-static void recv_io(mrp_mainloop_t *ml, mrp_io_watch_t *watch, int fd,
-                    mrp_io_event_t events, void *user_data)
+static void recv_io(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
+                    void *user_data)
 {
     test_io_t *w = (test_io_t *)user_data;
     char       buf[1024];
     int        size;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(watch);
 
     if (watch != w->watch)
@@ -477,11 +474,10 @@ typedef struct {
 test_signal_t *signals;
 
 
-static void send_signal(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
+static void send_signal(mrp_timer_t *timer, void *user_data)
 {
     test_signal_t *t = (test_signal_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(timer);
 
     if (t->sent >= t->target)
@@ -500,12 +496,10 @@ static void send_signal(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
 }
 
 
-static void recv_signal(mrp_mainloop_t *ml, mrp_sighandler_t *h, int signum,
-                        void *user_data)
+static void recv_signal(mrp_sighandler_t *h, int signum, void *user_data)
 {
     test_signal_t *t = (test_signal_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(h);
 
     if (h != t->watch)
@@ -587,15 +581,14 @@ static void check_signals(void)
 }
 
 
-static void wakeup_cb(mrp_mainloop_t *ml, mrp_wakeup_t *w,
-                      mrp_wakeup_event_t event, void *user_data)
+static void wakeup_cb(mrp_wakeup_t *w, mrp_wakeup_event_t event,
+                      void *user_data)
 {
     static struct timeval  prev = { 0, 0 };
     const char            *evt;
     struct timeval         now;
     double                 diff;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(w);
     MRP_UNUSED(user_data);
 
@@ -628,10 +621,9 @@ static void cleanup_wakeup(void)
 }
 
 
-static void check_quit(mrp_mainloop_t *ml, mrp_timer_t *timer, void *user_data)
+static void check_quit(mrp_timer_t *timer, void *user_data)
 {
     MRP_UNUSED(user_data);
-    MRP_UNUSED(ml);
 
     if (cfg.nrunning <= 0) {
         mrp_del_timer(timer);
@@ -1077,11 +1069,10 @@ static DBusConnection *connect_to_dbus(char *name)
 }
 
 
-static void client_send_msg(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
+static void client_send_msg(mrp_timer_t *t, void *user_data)
 {
     char buf[1024];
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(user_data);
 
     if (dbus_test.nmethod < cfg.ndbus_method) {
@@ -1239,12 +1230,10 @@ static void fork_dbus_client(mrp_mainloop_t *ml)
 }
 
 
-static void sigchild_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
-                             int signum, void *user_data)
+static void sigchild_handler(mrp_sighandler_t *h, int signum, void *user_data)
 {
     int status;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(user_data);
 
     info("DBUS test: received signal %d (%s)", signum, signames[signum]);

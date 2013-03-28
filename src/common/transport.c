@@ -131,10 +131,8 @@ static int check_event_callbacks(mrp_transport_evt_t *evt)
 }
 
 
-static void sigpipe_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h, int sig,
-                            void *user_data)
+static void sigpipe_handler(mrp_sighandler_t *h, int sig, void *user_data)
 {
-    MRP_UNUSED(ml);
     MRP_UNUSED(h);
     MRP_UNUSED(user_data);
 

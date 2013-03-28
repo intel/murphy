@@ -63,8 +63,8 @@ typedef struct {
 } strm_t;
 
 
-static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                        mrp_io_event_t events, void *user_data);
+static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                         void *user_data);
 static int strm_disconnect(mrp_transport_t *mt);
 static int open_socket(strm_t *t, int family);
 
@@ -381,8 +381,8 @@ static void strm_close(mrp_transport_t *mt)
 }
 
 
-static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
-                         mrp_io_event_t events, void *user_data)
+static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                         void *user_data)
 {
     strm_t          *t  = (strm_t *)user_data;
     mrp_transport_t *mt = (mrp_transport_t *)t;
@@ -392,7 +392,6 @@ static void strm_recv_cb(mrp_mainloop_t *ml, mrp_io_watch_t *w, int fd,
     ssize_t          n;
     int              error;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(w);
 
     if (events & MRP_IO_EVENT_IN) {

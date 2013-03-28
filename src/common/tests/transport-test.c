@@ -561,11 +561,10 @@ void send_raw(context_t *c)
 
 
 
-void send_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
+void send_cb(mrp_timer_t *t, void *user_data)
 {
     context_t *c = (context_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
     switch (c->mode) {

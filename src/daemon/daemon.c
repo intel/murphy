@@ -67,13 +67,12 @@ static int emit_daemon_event(int idx)
 }
 
 
-static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
-                           int signum, void *user_data)
+static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
 {
-    mrp_context_t *ctx = (mrp_context_t *)user_data;
+    mrp_mainloop_t *ml  = mrp_get_sighandler_mainloop(h);
+    mrp_context_t  *ctx = (mrp_context_t *)user_data;
 
     MRP_UNUSED(ctx);
-    MRP_UNUSED(h);
 
     switch (signum) {
     case SIGINT:

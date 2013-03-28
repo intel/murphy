@@ -37,13 +37,12 @@ typedef struct {
 } watch_t;
 
 
-static void io_cb(mrp_mainloop_t *ml, mrp_io_watch_t *watch, int fd,
-                  mrp_io_event_t events, void *user_data)
+static void io_cb(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
+                  void *user_data)
 {
     watch_t *w = (watch_t *)user_data;
     int      e = 0;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(watch);
 
     if (events & MRP_IO_EVENT_IN)

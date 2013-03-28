@@ -104,11 +104,9 @@ void destroy_domain_control(pdp_t *pdp)
 }
 
 
-static void notify_cb(mrp_mainloop_t *ml, mrp_deferred_t *d, void *user_data)
+static void notify_cb(mrp_deferred_t *d, void *user_data)
 {
     pdp_t *pdp = (pdp_t *)user_data;
-
-    MRP_UNUSED(ml);
 
     mrp_disable_deferred(d);
     pdp->notify_scheduled = FALSE;

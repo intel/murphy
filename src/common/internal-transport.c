@@ -72,14 +72,12 @@ static mrp_deferred_t *d;
 static uint32_t cid;
 
 
-static void process_queue(mrp_mainloop_t *ml, mrp_deferred_t *d,
-  void *user_data)
+static void process_queue(mrp_deferred_t *d, void *user_data)
 {
     internal_message_t *msg;
     internal_t *endpoint;
     mrp_list_hook_t *p, *n;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(user_data);
 
     mrp_disable_deferred(d);

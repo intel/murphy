@@ -300,10 +300,10 @@ static void client_cleanup(client_t *c)
 }
 
 
-static void signal_handler(mrp_mainloop_t *ml, mrp_sighandler_t *h,
-                           int signum, void *user_data)
+static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
 {
-    MRP_UNUSED(h);
+    mrp_mainloop_t *ml = mrp_get_sighandler_mainloop(h);
+
     MRP_UNUSED(user_data);
 
     switch (signum) {

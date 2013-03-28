@@ -270,11 +270,10 @@ static void stop_reconnect(mrp_domctl_t *dc)
 }
 
 
-static void reconnect_cb(mrp_mainloop_t *ml, mrp_timer_t *t, void *user_data)
+static void reconnect_cb(mrp_timer_t *t, void *user_data)
 {
     mrp_domctl_t *dc = (mrp_domctl_t *)user_data;
 
-    MRP_UNUSED(ml);
     MRP_UNUSED(t);
 
     if (try_connect(dc))

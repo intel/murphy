@@ -306,15 +306,14 @@ static void resource_callback(mrp_res_context_t *cx,
      */
 }
 
-static void handle_input(mrp_mainloop_t *ml, mrp_io_watch_t *watch, int fd,
-                    mrp_io_event_t events, void *user_data)
+static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
+                         void *user_data)
 {
+    mrp_mainloop_t *ml = mrp_get_io_watch_mainloop(watch);
     char buf[1024];
     int size;
 
     my_app_data *app_data = user_data;
-
-    MRP_UNUSED(ml);
 
     if (events & MRP_IO_EVENT_IN) {
         size = read(fd, buf, sizeof(buf) - 1);
