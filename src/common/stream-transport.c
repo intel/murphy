@@ -425,7 +425,7 @@ static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
             n = read(fd, buf, pending);
 
             if (n >= 0) {
-                if (n < pending)
+                if (n < (ssize_t)pending)
                     mrp_fragbuf_trim(t->buf, buf, pending, n);
             }
 

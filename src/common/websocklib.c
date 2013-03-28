@@ -614,7 +614,7 @@ static int find_device(struct sockaddr *sa, char *buf, size_t size)
         if (ia->sa_family == sa->sa_family) {
             if (((struct sockaddr_in *)sa)->sin_addr.s_addr ==
                 ((struct sockaddr_in *)ia)->sin_addr.s_addr) {
-                snprintf(buf, IFNAMSIZ - 1, ifreq[i].ifr_name);
+                strncpy(buf, ifreq[i].ifr_name, IFNAMSIZ - 1);
                 buf[IFNAMSIZ - 1] = '\0';
                 return 0;
             }
