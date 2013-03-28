@@ -884,6 +884,7 @@ static void extract_symbols(const char *preproc, const char *path,
 
     input_init(&in, fd);
     ringbuf_init(&rb);
+    foreign = 0;
 
     while ((ntoken = collect_tokens(&in, &rb, tokens, MAX_TOKENS)) > 0) {
         if (tokens[0].type == TOKEN_LINEMARKER) {
