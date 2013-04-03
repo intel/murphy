@@ -429,6 +429,7 @@ static void set_call_state(client_t *c, const char *config)
         return;
     }
 
+    changed = FALSE;
     for (call = calls; call->id > 0; call++) {
         if (call->id == id) {
             if (strcmp(call->state, state)) {
@@ -866,7 +867,10 @@ static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
     switch (signum) {
     case SIGINT:
         info_msg("Got SIGINT, stopping...");
-        mrp_mainloop_quit(ml, 0);
+        if (ml != NULL)
+            mrp_mainloop_quit(ml, 0);
+        else
+            exit(0);
         break;
     }
 }

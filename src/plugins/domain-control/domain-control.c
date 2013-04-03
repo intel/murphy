@@ -209,7 +209,7 @@ static void process_set(pep_proxy_t *proxy, set_msg_t *set)
 
 static void process_message(pep_proxy_t *proxy, msg_t *msg)
 {
-    char *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+    char *name  = proxy->name ? proxy->name : "<unknown>";
 
     switch (msg->any.type) {
     case MSG_TYPE_REGISTER:
@@ -342,8 +342,9 @@ static void msg_closed_cb(mrp_transport_t *t, int error, void *user_data)
 static void msg_recv_cb(mrp_transport_t *t, mrp_msg_t *tmsg, void *user_data)
 {
     pep_proxy_t *proxy = (pep_proxy_t *)user_data;
-    char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+    char        *name;
     msg_t       *msg;
+    uint32_t     seqno;
 
     MRP_UNUSED(t);
 
@@ -352,15 +353,20 @@ static void msg_recv_cb(mrp_transport_t *t, mrp_msg_t *tmsg, void *user_data)
       mrp_msg_dump(msg, stdout);
     */
 
-    msg = msg_decode_message(tmsg);
+    if (proxy != NULL) {
+        name = proxy->name ? proxy->name : "<unknown>";
+        msg  = msg_decode_message(tmsg);
 
-    if (msg != NULL) {
-        process_message(proxy, msg);
-        msg_free_message(msg);
-    }
-    else {
-        mrp_log_error("Failed to decode message from %s.", name);
-        msg_send_nak(proxy, msg->any.seq, 1, "failed to decode message");
+        if (msg != NULL) {
+            process_message(proxy, msg);
+            msg_free_message(msg);
+        }
+        else {
+            if (!mrp_msg_get(tmsg, MSG_UINT32(MSGSEQ, &seqno), MSG_END))
+                seqno = 0;
+            mrp_log_error("Failed to decode message from %s.", name);
+            msg_send_nak(proxy, seqno, 1, "failed to decode message");
+        }
     }
 }
 
@@ -496,7 +502,7 @@ static void wrt_closed_cb(mrp_transport_t *t, int error, void *user_data)
 static void wrt_recv_cb(mrp_transport_t *t, void *data, void *user_data)
 {
     pep_proxy_t *proxy = (pep_proxy_t *)user_data;
-    char        *name  = proxy && proxy->name ? proxy->name : "<unknown>";
+    char        *name;
     msg_t       *msg;
     int          seqno;
 
@@ -506,17 +512,20 @@ static void wrt_recv_cb(mrp_transport_t *t, void *data, void *user_data)
       mrp_log_info("Message from WRT client %p:", proxy);
     */
 
-    msg = json_decode_message(data);
+    if (proxy != NULL) {
+        name = proxy->name ? proxy->name : "<unknown>";
+        msg  = json_decode_message(data);
 
-    if (msg != NULL) {
-        process_message(proxy, msg);
-        msg_free_message(msg);
-    }
-    else {
-        if (!mrp_json_get_integer(data, "seq", &seqno))
-            seqno = 0;
-        mrp_log_error("Failed to decode message from %s.", name);
-        msg_send_nak(proxy, seqno, 1, "failed to decode message");
+        if (msg != NULL) {
+            process_message(proxy, msg);
+            msg_free_message(msg);
+        }
+        else {
+            if (!mrp_json_get_integer(data, "seq", &seqno))
+                seqno = 0;
+            mrp_log_error("Failed to decode message from %s.", name);
+            msg_send_nak(proxy, seqno, 1, "failed to decode message");
+        }
     }
 }
 
