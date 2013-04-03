@@ -310,7 +310,7 @@ static int load(lua_State *L, int may_fail)
         mrp_clear(&args);
         lua_pushnil(L);
         while (lua_next(L, t) != 0) {
-            if (narg > (int)MRP_ARRAY_SIZE(args)) {
+            if (narg >= (int)MRP_ARRAY_SIZE(args)) {
                 argerr = "too many plugin arguments";
                 goto arg_error;
             }
