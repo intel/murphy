@@ -30,6 +30,9 @@
 #ifndef __MURPHY_PULSE_H__
 #define __MURPHY_PULSE_H__
 
+#include <murphy/common/mainloop.h>
+#include <pulse/mainloop.h>
+
 /** Register the given murphy mainloop with the given pulse mainloop. */
 int mrp_mainloop_register_with_pulse(mrp_mainloop_t *ml, pa_mainloop_api *pa);
 
