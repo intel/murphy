@@ -199,7 +199,7 @@ int mrp_log_set_target(const char *name)
 
     target = find_target(name);
 
-    if (target == NULL)
+    if (target == NULL || (target == &file_target && path == NULL))
         return FALSE;
 
     /* close files opened by us, if any */

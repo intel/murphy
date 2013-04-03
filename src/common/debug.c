@@ -626,19 +626,8 @@ static void populate_file_table(void)
 
 static void flush_file_table(void)
 {
-    mrp_debug_file_t  *df;
-    mrp_list_hook_t   *p, *n;
-
-    if (files != NULL) {
+    if (files != NULL)
         mrp_htbl_reset(files, FALSE);
-        files = NULL;
-
-        mrp_list_foreach(&debug_files, p, n) {
-            df = mrp_list_entry(p, typeof(*df), hook);
-
-            mrp_htbl_insert(files, (void *)df->file, df->info);
-        }
-    }
 }
 
 

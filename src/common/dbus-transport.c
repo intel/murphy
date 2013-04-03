@@ -690,7 +690,7 @@ static int dbus_sendmsgto(mrp_transport_t *mt, mrp_msg_t *msg,
 
     if (check_address(addrp, addrlen)) {
         if (t->dbus == NULL && !dbus_autobind(mt, addrp))
-            return FALSE;
+                return FALSE;
 
         m = msg_encode(t->local.db_path, msg);
 
@@ -1453,6 +1453,7 @@ static void *data_decode(DBusMessage *m, uint16_t *tagp, const char **sender_id)
     uint16_t           u16;
     int16_t            s16;
 
+    tag  = 0;
     data = NULL;
 
     if (!dbus_message_iter_init(m, &im))

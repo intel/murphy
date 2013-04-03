@@ -534,13 +534,13 @@ int mrp_json_array_get_item(mrp_json_t *a, int idx, mrp_json_type_t type, ...)
 
 int mrp_json_parse_object(char **strp, int *lenp, mrp_json_t **op)
 {
-    char         *str = *strp;
-    int           len = lenp ? *lenp : 0;
+    char         *str;
+    int           len;
     mrp_json_t   *o   = NULL;
     json_tokener *tok = NULL;
     int           res = -1;
 
-    if (*strp == NULL) {
+    if (strp == NULL || *strp == NULL) {
         *op = NULL;
         if (lenp != NULL)
             *lenp = 0;
@@ -549,7 +549,7 @@ int mrp_json_parse_object(char **strp, int *lenp, mrp_json_t **op)
     }
 
     str = *strp;
-    len = *lenp;
+    len = lenp ? *lenp : 0;
 
     if (len <= 0)
         len = strlen(str);

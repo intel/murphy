@@ -2072,6 +2072,9 @@ int mrp_data_free(void *data, uint16_t tag)
     void              *ptr;
     int                i, idx, cnt;
 
+    if (data == NULL)
+        return TRUE;
+
     type = mrp_msg_find_type(tag);
 
     if (type != NULL) {

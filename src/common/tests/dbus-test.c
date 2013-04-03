@@ -427,12 +427,18 @@ static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
     switch (signum) {
     case SIGINT:
         mrp_log_info("Got SIGINT, stopping...");
-        mrp_mainloop_quit(ml, 0);
+        if (ml != NULL)
+            mrp_mainloop_quit(ml, 0);
+        else
+            exit(0);
         break;
 
     case SIGTERM:
         mrp_log_info("Got SIGTERM, stopping...");
-        mrp_mainloop_quit(ml, 0);
+        if (ml != NULL)
+            mrp_mainloop_quit(ml, 0);
+        else
+            exit(0);
         break;
     }
 }
@@ -456,6 +462,12 @@ int main(int argc, char *argv[])
         mrp_log_info("Running as client, using D-BUS '%s'...", c.busaddr);
 
     c.ml = mrp_mainloop_create();
+
+    if (c.ml == NULL) {
+        mrp_log_error("Failed to create mainloop.");
+        exit(1);
+    }
+
     mrp_add_sighandler(c.ml, SIGINT , signal_handler, &c);
 
     if (c.server)

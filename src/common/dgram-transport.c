@@ -213,7 +213,7 @@ static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
     switch (hints.ai_family) {
     case AF_UNIX:
         un  = &addr->unx;
-        len = MRP_OFFSET(typeof(*un), sun_path) + strlen(node);
+        len = MRP_OFFSET(typeof(*un), sun_path) + strlen(node) + 1;
 
         if (size < len)
             errno = ENOMEM;

@@ -41,9 +41,8 @@
 #include <murphy/common/hashtbl.h>
 
 
-#define BACKTRACE_DEPTH  8                    /* backtrace depth to save */
-
-
+#define DEFAULT_DEPTH   8                     /* default backtrace depth */
+#define MAX_DEPTH     128                     /* max. backtrace depth */
 
 /*
  * memory allocator state
@@ -87,9 +86,9 @@ typedef struct {
 
 
 static mm_t __mm = {                          /* allocator state */
-    .hdrsize = MRP_ALIGN(MRP_OFFSET(memblk_t, bt[BACKTRACE_DEPTH]),
+    .hdrsize = MRP_ALIGN(MRP_OFFSET(memblk_t, bt[DEFAULT_DEPTH]),
                          MRP_MM_ALIGN),
-    .depth   = BACKTRACE_DEPTH,
+    .depth   = DEFAULT_DEPTH,
     .poison  = 0xdeadbeef,
 };
 
@@ -220,7 +219,11 @@ static void __attribute__((constructor)) setup(void)
 
     mrp_list_init(&__mm.blocks);
 
-    __mm.depth   = get_config_int32(config, "depth", BACKTRACE_DEPTH);
+    __mm.depth   = get_config_int32(config, "depth", DEFAULT_DEPTH);
+
+    if (__mm.depth > MAX_DEPTH)
+        __mm.depth = MAX_DEPTH;
+
     __mm.hdrsize = MRP_ALIGN(MRP_OFFSET(memblk_t, bt[__mm.depth]),
                              MRP_MM_ALIGN);
 
@@ -943,12 +946,13 @@ static void free_object(void *obj, void *user_data)
 
 void mrp_objpool_destroy(mrp_objpool_t *pool)
 {
+    if (pool != NULL) {
+        if (pool->cleanup != NULL)
+            pool_foreach_object(pool, free_object, pool);
 
-    if (pool->cleanup != NULL)
-        pool_foreach_object(pool, free_object, pool);
-
-    mrp_free(pool->name);
-    mrp_free(pool);
+        mrp_free(pool->name);
+        mrp_free(pool);
+    }
 }
 
 
