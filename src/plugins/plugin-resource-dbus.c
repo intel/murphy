@@ -1317,6 +1317,9 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
             conf = mrp_htbl_create(&map_conf);
 
+            if (!conf)
+                goto error_reply;
+
             if (dbus_message_iter_get_arg_type(&variant_iter)
                         != DBUS_TYPE_ARRAY) {
                 mrp_htbl_destroy(conf, TRUE);
