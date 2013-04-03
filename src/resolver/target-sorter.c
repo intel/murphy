@@ -145,10 +145,12 @@ static inline int node_id(graph_t *g, char *name)
 
 static inline int *edge_markp(graph_t *g, int n1, int n2)
 {
+    static int invalid = 0;
+
     if (n1 >= 0 && n2 >= 0)
         return g->edges + (n1 * g->nnode) + n2;
     else
-        return NULL;
+        return &invalid;
 }
 
 
