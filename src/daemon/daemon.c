@@ -77,7 +77,10 @@ static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
     switch (signum) {
     case SIGINT:
         mrp_log_info("Got SIGINT, stopping...");
-        mrp_mainloop_quit(ml, 0);
+        if (ml != NULL)
+            mrp_mainloop_quit(ml, 0);
+        else
+            exit(0);
         break;
 
     case SIGTERM:
