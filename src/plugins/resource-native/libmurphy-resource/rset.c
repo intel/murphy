@@ -557,6 +557,9 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
     internal_set = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
             u_to_p(rset->priv->internal_id));
 
+    if (!internal_set)
+        goto error;
+
     if (internal_set->state != MRP_RES_RESOURCE_ACQUIRED) {
         return 0;
     }
