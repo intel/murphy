@@ -102,7 +102,9 @@ mrp_domctl_t *mrp_domctl_create(const char *name, mrp_mainloop_t *ml,
         dc->tables  = mrp_allocz_array(typeof(*dc->tables) , ntable);
         dc->watches = mrp_allocz_array(typeof(*dc->watches), nwatch);
 
-        if (dc->name != NULL && dc->tables != NULL && dc->watches != NULL) {
+        if (dc->name != NULL &&
+            (dc->tables  != NULL || ntable == 0) &&
+            (dc->watches != NULL || nwatch == 0)) {
             for (i = 0; i < ntable; i++) {
                 st = tables + i;
                 dt = dc->tables + i;
