@@ -148,6 +148,7 @@ struct wsl_sck_s {
     wsl_sck_t      **sckptr;             /* back pointer from sck to us */
     int              closing : 1;        /* close in progress */
     int              pure_http : 1;      /* pure HTTP socket */
+    int              pending_close : 1;  /* close on next writable callback */
     int              busy;               /* upper-layer callback(s) active */
     mrp_list_hook_t  hook;               /* to pure HTTP list, if such */
 };
@@ -1007,6 +1008,8 @@ void wsl_reject_pending(wsl_ctx_t *ctx)
 }
 
 
+#ifdef WEBSOCKETS_CLOSE_SESSION
+
 /*
  * WTF ? The prototype for this has been moved from libwebsockets.h to
  * the uninstalled private-libwebsockets.h. If this is really going to
@@ -1063,6 +1066,77 @@ void *wsl_close(wsl_sck_t *sck)
 
     return user_data;
 }
+
+
+#else /* !WEBSOCKET_CLOSE_SESSION */
+
+void *wsl_close(wsl_sck_t *sck)
+{
+    /*
+     * With recent libwebsockets libwebsocket_close_and_free_session has
+     * been fully turned into a private library symbol. According to the
+     * docs the official way to trigger closing a websocket from the
+     * 'upper layers' (ie. outside of libwebsocket event callbacks) is to
+     *   1) administer the fact that the websocket should be closed
+     *   2) enable pollouts for the websocket (callback_on_writable)
+     *   3) hope that libwebsockets will not decide to omit delivering a
+     *      LWS_CALLBACK_{CLIENT,SERVER}_WRITEABLE event, and
+     *   4) in the event callback check if the websocket is marked for
+     *      deletion, and if it is reutrn -1 to indicate libwebsockets that
+     *      it should close the socket
+     * Hmm... I guess simple elegance was not one of the design principles.
+     *
+     * Anyway, here's our first attempt to implement this indirect socket
+     * closing scheme. We only mark the socket for pending deletion here.
+     * In the event callback we check if we have marked the socket for
+     * deletion, call sck_close which cleans up our associated data with
+     * socket and return -1 to let libwebsocket close the socket.
+     *
+     * Notes: XXX TODO
+     *     Currently we only check and handle pending deletion when
+     *     dealing with *_WRITEABLE events. Probably we should also do
+     *     it for a few other events as well, for instance for *_RECEIVE
+     *     and *_CALLBACK_HTTP).
+     */
+
+    if (sck != NULL && !sck->pending_close) {
+        sck->closing       = TRUE;
+        sck->pending_close = TRUE;
+
+        mrp_debug("marking websocket %p/%p for pending close", sck, sck->sck);
+
+        libwebsocket_callback_on_writable(sck->ctx->ctx, sck->sck);
+    }
+
+    return sck && sck->ctx ? sck->ctx->user_data : NULL;
+}
+
+
+static void sck_close(wsl_sck_t *sck)
+{
+    if (sck != NULL) {
+        sck->sck = NULL;
+
+        if (sck->sckptr != NULL)         /* genuine websocket */
+            *sck->sckptr = NULL;
+        else                             /* pure http socket */
+            mrp_list_delete(&sck->hook);
+
+        if (sck->ctx != NULL) {
+            wsl_unref_context(sck->ctx);
+            sck->ctx = NULL;
+        }
+
+        mrp_fragbuf_destroy(sck->buf);
+        sck->buf = NULL;
+
+        mrp_debug("freeing websocket %p", sck);
+        mrp_free(sck);
+    }
+}
+
+
+#endif /* !WEBSOCKET_CLOSE_SESSION */
 
 
 static int check_closed(wsl_sck_t *sck)
@@ -1301,10 +1375,28 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
             return LWS_EVENT_ERROR;
 
     case LWS_CALLBACK_SERVER_WRITEABLE:
+#ifndef WEBSOCKETS_CLOSE_SESSION
+        sck = find_pure_http(ctx, ws);
+
+        if (sck != NULL && sck->pending_close) {
+            mrp_debug("calling delayed close for websocket %p", sck);
+            sck_close(sck);
+            return -1;
+        }
+#endif
         mrp_debug("socket server side writeable again");
         return LWS_EVENT_OK;
 
     case LWS_CALLBACK_CLIENT_WRITEABLE:
+#ifndef WEBSOCKETS_CLOSE_SESSION
+        sck = find_pure_http(ctx, ws);
+
+        if (sck != NULL && sck->pending_close) {
+            mrp_debug("calling delayed close for websocket %p", sck);
+            sck_close(sck);
+            return -1;
+        }
+#endif
         mrp_debug("socket client side writeable again");
         return LWS_EVENT_OK;
 
@@ -1406,7 +1498,10 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 #ifndef WEBSOCKETS_OLD
     case LWS_CALLBACK_HTTP_FILE_COMPLETION:
         uri = (const char *)in;
-        mrp_debug("serving '%s' over HTTP completed", uri);
+        if (uri != NULL)
+            mrp_debug("serving '%s' over HTTP completed", uri);
+        else
+            mrp_debug("serving HTTP content completed");
 
         sck = find_pure_http(ctx, ws);
 
@@ -1654,24 +1749,49 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                 mrp_log_error("failed to push data to fragment buffer");
 
                 SOCKET_BUSY_REGION(sck, {
+                        wsl_close(sck);
+#if 0 /*
+       * XXX Hmm... calling wsl_close instead of this now. Should be tested
+       *     if that really works.
+       */
                         sck->closing = TRUE;    /* make sure sck gets closed */
                         up->cbs.closed(sck, ENOBUFS, sck->user_data,
                                        up->proto_data);
                         libwebsocket_close_and_free_session(ctx->ctx, sck->sck,
                                                             LWS_INTERNAL_ERROR);
                         up->cbs.check(sck, sck->user_data, up->proto_data);
+#endif
                     });
 
                 check_closed(sck);
+                return -1;
             }
         }
         return LWS_EVENT_OK;
 
     case LWS_CALLBACK_SERVER_WRITEABLE:
+#ifndef WEBSOCKETS_CLOSE_SESSION
+        sck = *(wsl_sck_t **)user;
+
+        if (sck != NULL && sck->pending_close) {
+            mrp_debug("calling delayed close for websocket %p", sck);
+            sck_close(sck);
+            return -1;
+        }
+#endif
         mrp_debug("socket server side writeable again");
         return LWS_EVENT_OK;
 
     case LWS_CALLBACK_CLIENT_WRITEABLE:
+#ifndef WEBSOCKETS_CLOSE_SESSION
+        sck = *(wsl_sck_t **)user;
+
+        if (sck != NULL && sck->pending_close) {
+            mrp_debug("calling delayed close for websocket %p", sck);
+            sck_close(sck);
+            return -1;
+        }
+#endif
         mrp_debug("socket client side writeable again");
         return LWS_EVENT_OK;
 

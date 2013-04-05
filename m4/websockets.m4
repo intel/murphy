@@ -70,6 +70,17 @@ if test "$enable_websockets" != "no"; then
 
         CFLAGS="$saved_CFLAGS"
         LDFLAGS="$saved_LDFLAGS"
+
+        # Check whether we have libwebsocket_close_and_free_session.
+        AC_MSG_CHECKING([for WEBSOCKETS close_and_free_session API])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[libwebsocket_close_and_free_session(NULL, NULL, 0);]])],
+            [websockets_close_session=yes],
+            [websockets_close_session=no])
+        AC_MSG_RESULT([$websockets_close_session])
     else
         WEBSOCKETS_CFLAGS=""
     fi
@@ -122,6 +133,10 @@ if test "$enable_websockets" != "no"; then
     if test "$websockets_log_with_level" = "yes"; then
         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_LOG_WITH_LEVEL"
     fi
+    if test "$websockets_close_session" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CLOSE_SESSION"
+    fi
+
     LDFLAGS="$saved_LDFLAGS"
 else
     AC_MSG_NOTICE([libwebsockets support is disabled.])
