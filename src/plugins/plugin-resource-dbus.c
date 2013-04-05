@@ -572,6 +572,8 @@ static void destroy_resource(resource_o_t *resource)
     destroy_property(resource->shared_prop);
     destroy_property(resource->name_prop);
     destroy_property(resource->status_prop);
+    destroy_property(resource->arguments_prop);
+    destroy_property(resource->conf_prop);
 
     /* FIXME: resource library doesn't allow destroying resources? */
 
