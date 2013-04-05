@@ -41,6 +41,8 @@ import fcntl
 import os
 from dbus.mainloop.glib import DBusGMainLoop
 
+from itertools import combinations
+from random import choice
 
 USAGE = """
 Available commands:
@@ -62,6 +64,12 @@ changeResource <set> <resource> <attribute> <value>
 showResource <set> <resource>
 
 quit"""
+
+manager = None
+bus = None
+mainloop = None
+interactive = None
+n_iterations = None
 
 # mapping from numbers to object paths
 rsets = {}
@@ -129,8 +137,9 @@ prompt_needed = True
 
 def add_prompt():
     global prompt_needed
+    global interactive
 
-    if prompt_needed:
+    if prompt_needed and interactive:
         print("")
         print("> ", end="")
         sys.stdout.flush()
@@ -139,6 +148,10 @@ def add_prompt():
 
 def add_prompt_later():
     global prompt_needed
+    global interactive
+
+    if not interactive:
+        return
 
     prompt_needed = True
 
@@ -190,7 +203,7 @@ def get_res_path(setId, resId):
 def get_resource_set(set):
     try:
         id = int(set)
-    except ValueERROR:
+    except ValueError:
         print("ERROR: wrong resource set id type")
         return None
 
@@ -234,6 +247,7 @@ def createSet():
         rset = get_rset(set_path)
         rset.connect_to_signal("propertyChanged", rset_handler, path_keyword='path')
         print("(%s) Created resource set" % str(id))
+        return id
     except:
         print("ERROR: failed to create a new resource set")
 
@@ -263,6 +277,7 @@ def createResource(set, rType):
             resource = get_res(res_path)
             resource.connect_to_signal("propertyChanged", resource_handler, path_keyword='path')
             print("(%s/%d) added resource '%s'" % (set, res, rType))
+            return res
         except:
             print("ERROR (%s): failed to add resource to resource set" % set)
 
@@ -422,43 +437,133 @@ def stdin_cb(fd, condition):
     return True
 
 
-# D-Bus initialization
+def fuzz_test():
+    """ randomly create, acquire, release and destroy resource sets """
 
-DBusGMainLoop(set_as_default=True)
-mainloop = gobject.MainLoop()
+    global rsets
+    global n_iterations
 
-bus = dbus.SystemBus()
+    resource_names = [ "audio_playback", "audio_recording" ]
+    operations = [ "create", "delete", "acquire", "release" ]
+    attributes={"pid":range(1, 1000),"role":["music","navigator","game"],"policy":["relaxed","strict"]}
+    coin = [True, False]
 
-if not bus:
-    print("ERROR: failed to get system bus")
-    exit(1)
+    print("fuzz_test, left", n_iterations, "iterations")
 
-# Create the manager for handling resource sets.
+    if n_iterations > 0:
+        n_iterations = n_iterations - 1
 
-manager_obj = None
+        if len(rsets) == 0:
+            # no sets, have to create
+            op = "create"
+        else:
+            op = choice(operations)
 
-# TODO: get service and manager path from command line?
-try:
-    manager_obj = bus.get_object('org.Murphy', '/org/murphy/resource')
-except:
-    pass
+        if op == "create":
+            rset_id = createSet()
 
-if not manager_obj:
-    print("ERROR: failed get Murphy resource manager object")
-    exit(1)
+            if (rset_id != None):
+                n_res = choice(range(1, len(resource_names)))
+                res_choice = choice(list(combinations(resource_names, n_res)))
 
-manager = dbus.Interface(manager_obj, dbus_interface='org.murphy.manager')
+                print("created rset", str(rset_id))
 
-manager.connect_to_signal("propertyChanged", mgr_handler, path_keyword='path')
+                for res in res_choice:
+                    res_id = createResource(str(rset_id), res)
+                    print("resource", res)
 
-# make STDIN non-blocking
-fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+                    # change some resources
 
-# listen for user input
-glib.io_add_watch(sys.stdin, glib.IO_IN, stdin_cb)
+                    # this many attributes
+                    n_attrs = choice(range(1, len(attributes)))
+                    attr_choice = choice(list(combinations(attributes.keys(), n_attrs)))
 
-add_prompt()
+                    for attr in attr_choice:
+                        values = attributes[attr]
+                        value = choice(values)
+                        changeResource(str(rset_id), str(res_id), attr, value)
 
-mainloop.run()
+                    changeResource(str(rset_id), str(res_id), "mandatory", choice(coin));
+                    changeResource(str(rset_id), str(res_id), "shared", choice(coin));
 
-# TODO: cleanup or not?
+
+        elif op == "delete":
+            if len(rsets) > 0:
+                id = choice(rsets.keys())
+                print("deleting rset", id)
+                deleteSet(str(id))
+
+        elif op == "acquire":
+            if len(rsets) > 0:
+                id = choice(rsets.keys())
+                print("acquiring rset", id)
+                acquireSet(str(id))
+
+        elif op == "release":
+            if len(rsets) > 0:
+                id = choice(rsets.keys())
+                print("releasing rset", id)
+                releaseSet(str(id))
+
+        return True
+
+    else:
+        return False # do not call again
+
+
+def main(args):
+    global manager
+    global bus
+    global mainloop
+    global interactive
+    global n_iterations
+
+    # D-Bus initialization
+
+    DBusGMainLoop(set_as_default=True)
+    mainloop = gobject.MainLoop()
+
+    bus = dbus.SystemBus()
+
+    if not bus:
+        print("ERROR: failed to get system bus")
+        exit(1)
+
+    # Create the manager for handling resource sets.
+
+    manager_obj = None
+
+    # TODO: get service and manager path from command line?
+    try:
+        manager_obj = bus.get_object('org.Murphy', '/org/murphy/resource')
+    except:
+        pass
+
+    if not manager_obj:
+        print("ERROR: failed get Murphy resource manager object")
+        exit(1)
+
+    manager = dbus.Interface(manager_obj, dbus_interface='org.murphy.manager')
+
+    if (len(args) > 0 and args[0] == "fuzz"):
+        interactive = False
+        n_iterations = 1000
+        if (len(args) == 2):
+            n_iterations = int(args[1])
+        glib.idle_add(fuzz_test)
+
+    else:
+        # interactive mode
+        interactive = True
+        manager.connect_to_signal("propertyChanged", mgr_handler, path_keyword='path')
+        # make STDIN non-blocking
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+        # listen for user input
+        glib.io_add_watch(sys.stdin, glib.IO_IN, stdin_cb)
+        add_prompt()
+
+    mainloop.run()
+
+    # TODO: cleanup
+
+main(sys.argv[1:])
