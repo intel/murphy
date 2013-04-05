@@ -560,12 +560,13 @@ static void destroy_resource(resource_o_t *resource)
     mrp_log_info("destroy resource %s", resource->path);
 
     mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
-            RSET_IFACE, RSET_DELETE, resource_cb, resource->rset->mgr->ctx);
-    mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
-            RSET_IFACE, RSET_SET_PROPERTY, resource_cb,
+            RESOURCE_IFACE, RESOURCE_GET_PROPERTIES, resource_cb,
             resource->rset->mgr->ctx);
     mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
-            RSET_IFACE, RSET_GET_PROPERTIES, resource_cb,
+            RESOURCE_IFACE, RESOURCE_SET_PROPERTY, resource_cb,
+            resource->rset->mgr->ctx);
+    mrp_dbus_remove_method(resource->rset->mgr->ctx->dbus, resource->path,
+            RESOURCE_IFACE, RESOURCE_DELETE, resource_cb,
             resource->rset->mgr->ctx);
 
     destroy_property(resource->mandatory_prop);
