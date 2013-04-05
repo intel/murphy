@@ -1149,30 +1149,6 @@ void *wsl_close(wsl_sck_t *sck)
 }
 
 
-static void sck_close(wsl_sck_t *sck)
-{
-    if (sck != NULL) {
-        sck->sck = NULL;
-
-        if (sck->sckptr != NULL)         /* genuine websocket */
-            *sck->sckptr = NULL;
-        else                             /* pure http socket */
-            mrp_list_delete(&sck->hook);
-
-        if (sck->ctx != NULL) {
-            wsl_unref_context(sck->ctx);
-            sck->ctx = NULL;
-        }
-
-        mrp_fragbuf_destroy(sck->buf);
-        sck->buf = NULL;
-
-        mrp_debug("freeing websocket %p", sck);
-        mrp_free(sck);
-    }
-}
-
-
 #endif /* !WEBSOCKET_CLOSE_SESSION */
 
 
