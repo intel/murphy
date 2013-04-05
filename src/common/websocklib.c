@@ -45,9 +45,10 @@
 
 #include "websocklib.h"
 
-#define LWS_EVENT_OK    0                /* event handler result: ok */
-#define LWS_EVENT_DENY  1                /* event handler result: deny */
-#define LWS_EVENT_ERROR 1                /* event handler result: error */
+#define LWS_EVENT_OK     0               /* event handler result: ok */
+#define LWS_EVENT_DENY   1               /* event handler result: deny */
+#define LWS_EVENT_ERROR  1               /* event handler result: error */
+#define LWS_EVENT_CLOSE -1               /* event handler result: close */
 
 /* libwebsocket status used to close sockets upon error */
 #ifndef WEBSOCKETS_OLD
@@ -148,7 +149,6 @@ struct wsl_sck_s {
     wsl_sck_t      **sckptr;             /* back pointer from sck to us */
     int              closing : 1;        /* close in progress */
     int              pure_http : 1;      /* pure HTTP socket */
-    int              pending_close : 1;  /* close on next writable callback */
     int              busy;               /* upper-layer callback(s) active */
     mrp_list_hook_t  hook;               /* to pure HTTP list, if such */
 };
@@ -766,6 +766,7 @@ wsl_ctx_t *wsl_ref_context(wsl_ctx_t *ctx)
 int wsl_unref_context(wsl_ctx_t *ctx)
 {
     if (mrp_unref_obj(ctx, refcnt)) {
+        mrp_debug("refcount of context %p dropped to zero", ctx);
         destroy_context(ctx);
 
         return TRUE;
@@ -778,6 +779,8 @@ int wsl_unref_context(wsl_ctx_t *ctx)
 static void destroy_context(wsl_ctx_t *ctx)
 {
     if (ctx != NULL) {
+        mrp_debug("destroying context %p", ctx);
+
         mrp_del_io_watch(ctx->w);
         ctx->w = NULL;
 
@@ -974,6 +977,9 @@ wsl_sck_t *wsl_accept_pending(wsl_ctx_t *ctx, void *user_data)
             ptr            = (wsl_sck_t **)ctx->pending_user;
             sck->sckptr    = ptr;
 
+            mrp_debug("pending connection was a %s websocket",
+                      ptr != NULL ? "real" : "HTTP");
+
             if (ptr != NULL)             /* genuine websocket */
                 *ptr = sck;
             else                         /* pure http socket */
@@ -1072,6 +1078,10 @@ void *wsl_close(wsl_sck_t *sck)
 
 void *wsl_close(wsl_sck_t *sck)
 {
+    lws_ctx_t *ws_ctx;
+    lws_t     *ws;
+    void      *user_data;
+
     /*
      * With recent libwebsockets libwebsocket_close_and_free_session has
      * been fully turned into a private library symbol. According to the
@@ -1086,11 +1096,8 @@ void *wsl_close(wsl_sck_t *sck)
      *      it should close the socket
      * Hmm... I guess simple elegance was not one of the design principles.
      *
-     * Anyway, here's our first attempt to implement this indirect socket
-     * closing scheme. We only mark the socket for pending deletion here.
-     * In the event callback we check if we have marked the socket for
-     * deletion, call sck_close which cleans up our associated data with
-     * socket and return -1 to let libwebsocket close the socket.
+     * Anyway, here's our second attempt to implement this indirect socket
+     * closing scheme without too much memory corruption and leaks... Argh.
      *
      * Notes: XXX TODO
      *     Currently we only check and handle pending deletion when
@@ -1099,16 +1106,46 @@ void *wsl_close(wsl_sck_t *sck)
      *     and *_CALLBACK_HTTP).
      */
 
-    if (sck != NULL && !sck->pending_close) {
-        sck->closing       = TRUE;
-        sck->pending_close = TRUE;
+    user_data = NULL;
 
-        mrp_debug("marking websocket %p/%p for pending close", sck, sck->sck);
+    if (sck != NULL) {
+        if (sck->sck != NULL && sck->busy <= 0) {
+            mrp_debug("closing %s websocket %p/%p",
+                      sck->sckptr ? "real" : "HTTP", sck->sck, sck);
 
-        libwebsocket_callback_on_writable(sck->ctx->ctx, sck->sck);
+            ws       = sck->sck;
+            sck->sck = NULL;
+            sck->closing = TRUE;
+
+            /* clear the back pointer to us */
+            if (sck->sckptr != NULL)
+                *sck->sckptr = NULL;
+            else
+                mrp_list_delete(&sck->hook);
+
+            if (sck->ctx != NULL) {
+                ws_ctx    = sck->ctx->ctx;
+                user_data = sck->ctx->user_data;
+                wsl_unref_context(sck->ctx);
+                sck->ctx = NULL;
+            }
+            else
+                ws_ctx = NULL;
+
+            mrp_fragbuf_destroy(sck->buf);
+            sck->buf = NULL;
+
+            mrp_debug("freeing websocket %p", sck);
+            mrp_free(sck);
+
+            if (ws_ctx != NULL)
+                libwebsocket_callback_on_writable(ws_ctx, ws);
+        }
+        else
+            sck->closing = TRUE;
     }
 
-    return sck && sck->ctx ? sck->ctx->user_data : NULL;
+    return user_data;
 }
 
 
@@ -1141,12 +1178,14 @@ static void sck_close(wsl_sck_t *sck)
 
 static int check_closed(wsl_sck_t *sck)
 {
-    if (sck->closing && sck->busy <= 0) {
-        wsl_close(sck);
-        return TRUE;
+    if (sck != NULL) {
+        if (sck->closing && sck->busy <= 0) {
+            wsl_close(sck);
+            return TRUE;
+        }
     }
-    else
-        return FALSE;
+
+    return FALSE;
 }
 
 
@@ -1160,7 +1199,7 @@ int wsl_set_sendmode(wsl_sck_t *sck, wsl_sendmode_t mode)
     default:                               return FALSE;
     }
 
-    mrp_debug("websocket %p/%p mode changed to %s", sck->sck, sck, name);
+    mrp_debug("websocket %p/%p mode changed to %s", sck, sck->sck, name);
     sck->send_mode = mode;
 
     return TRUE;
@@ -1366,7 +1405,11 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
             return LWS_EVENT_ERROR;
 
     case LWS_CALLBACK_CLEAR_MODE_POLL_FD:
+#ifdef WEBSOCKETS_CONTEXT_INFO           /* just brilliant... */
+        fd   = (ptrdiff_t)in;
+#else
         fd   = (ptrdiff_t)user;
+#endif
         mask = (int)len;
         mrp_debug("disable poll events 0x%x for fd %d", mask, fd);
         if (mod_fd(ctx, fd, mask, TRUE))
@@ -1378,10 +1421,9 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 #ifndef WEBSOCKETS_CLOSE_SESSION
         sck = find_pure_http(ctx, ws);
 
-        if (sck != NULL && sck->pending_close) {
-            mrp_debug("calling delayed close for websocket %p", sck);
-            sck_close(sck);
-            return -1;
+        if (sck == NULL) {
+            mrp_debug("asking to close unassociated websocket %p", ws);
+            return LWS_EVENT_CLOSE;
         }
 #endif
         mrp_debug("socket server side writeable again");
@@ -1391,10 +1433,9 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 #ifndef WEBSOCKETS_CLOSE_SESSION
         sck = find_pure_http(ctx, ws);
 
-        if (sck != NULL && sck->pending_close) {
-            mrp_debug("calling delayed close for websocket %p", sck);
-            sck_close(sck);
-            return -1;
+        if (sck == NULL) {
+            mrp_debug("asking to close unassociated websocket %p", ws);
+            return LWS_EVENT_CLOSE;
         }
 #endif
         mrp_debug("socket client side writeable again");
@@ -1453,6 +1494,8 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                                      up->proto_data);
                         up->cbs.check(sck, sck->user_data, up->proto_data);
                     });
+
+                sck = find_pure_http(ctx, ws);
 
                 if (check_closed(sck))
                     return 0;
@@ -1514,6 +1557,8 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
                                           up->proto_data);
                         up->cbs.check(sck, sck->user_data, up->proto_data);
                     });
+
+                sck = find_pure_http(ctx, ws);
 
                 if (check_closed(sck))
                     return 0;
@@ -1773,10 +1818,10 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 #ifndef WEBSOCKETS_CLOSE_SESSION
         sck = *(wsl_sck_t **)user;
 
-        if (sck != NULL && sck->pending_close) {
-            mrp_debug("calling delayed close for websocket %p", sck);
-            sck_close(sck);
-            return -1;
+        if (sck == NULL) {
+            mrp_debug("asking to close unassociated websocket %p", ws);
+
+            return LWS_EVENT_CLOSE;
         }
 #endif
         mrp_debug("socket server side writeable again");
@@ -1786,10 +1831,10 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 #ifndef WEBSOCKETS_CLOSE_SESSION
         sck = *(wsl_sck_t **)user;
 
-        if (sck != NULL && sck->pending_close) {
-            mrp_debug("calling delayed close for websocket %p", sck);
-            sck_close(sck);
-            return -1;
+        if (sck == NULL) {
+            mrp_debug("asking to close unassociated websocket %p", ws);
+
+            return LWS_EVENT_CLOSE;
         }
 #endif
         mrp_debug("socket client side writeable again");
