@@ -30,6 +30,7 @@
 #ifndef __MURPHY_DBUS_H__
 #define __MURPHY_DBUS_H__
 
+#include <murphy/common/mainloop.h>
 #include <dbus/dbus.h>
 
 #define MRP_AF_DBUS 0xDB
