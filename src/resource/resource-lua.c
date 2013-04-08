@@ -231,6 +231,7 @@ void mrp_resource_lua_unregister_resource_set(mrp_resource_set_t *rset)
     if ((ref = remove_from_id_hash(rset->id))) {
         MRP_ASSERT(rset == ref->rset, "confused with data structures");
         mrp_lua_destroy_object(L, NULL,rset->id, ref);
+        ref->rset = NULL;
     }
 }
 
