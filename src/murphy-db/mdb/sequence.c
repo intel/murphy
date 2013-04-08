@@ -140,7 +140,7 @@ int mdb_sequence_add(mdb_sequence_t *seq, int klen, void *key, void *data)
 {
     sequence_entry_t *entry;
     int               nentry;
-    size_t            old_length;
+    size_t            old_size;
     size_t            length;
     int               cmp;
     int               min, max, i;
@@ -150,17 +150,19 @@ int mdb_sequence_add(mdb_sequence_t *seq, int klen, void *key, void *data)
     nentry = seq->nentry++;
 
     if ((nentry + 1) > seq->size) {
-        old_length = sizeof(sequence_entry_t) * seq->size;
+        old_size = seq->size;
         seq->size += seq->alloc;
         length = sizeof(sequence_entry_t) * seq->size;
 
         if (!(seq->entries = realloc(seq->entries, length))) {
             seq->nentry = 0;
             errno = ENOMEM;
-            return -1;
+            return 0;
         }
 
-        memset(seq->entries + old_length, 0, length - old_length);
+
+        memset(seq->entries + old_size, 0, 
+               length - (old_size * sizeof(sequence_entry_t)));
     }
 
     for (min = 0,  i = (max = nentry)/2;   ;    i = (min+max)/2) {
