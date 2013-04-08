@@ -70,6 +70,7 @@ bus = None
 mainloop = None
 interactive = None
 n_iterations = None
+limit = None
 
 # mapping from numbers to object paths
 rsets = {}
@@ -245,7 +246,8 @@ def createSet():
         id = int(set_path.split("/")[-1]) # the set number
         rsets[id] = set_path
         rset = get_rset(set_path)
-        rset.connect_to_signal("propertyChanged", rset_handler, path_keyword='path')
+        if interactive:
+            rset.connect_to_signal("propertyChanged", rset_handler, path_keyword='path')
         print("(%s) Created resource set" % str(id))
         return id
     except:
@@ -275,7 +277,8 @@ def createResource(set, rType):
             resources[(int(set), res)] = res_path
 
             resource = get_res(res_path)
-            resource.connect_to_signal("propertyChanged", resource_handler, path_keyword='path')
+            if interactive:
+                resource.connect_to_signal("propertyChanged", resource_handler, path_keyword='path')
             print("(%s/%d) added resource '%s'" % (set, res, rType))
             return res
         except:
@@ -456,6 +459,9 @@ def fuzz_test():
         if len(rsets) == 0:
             # no sets, have to create
             op = "create"
+        elif limit and len(rsets) >= limit:
+            # limit was reached
+            op = "delete"
         else:
             op = choice(operations)
 
@@ -483,8 +489,8 @@ def fuzz_test():
                         value = choice(values)
                         changeResource(str(rset_id), str(res_id), attr, value)
 
-                    changeResource(str(rset_id), str(res_id), "mandatory", choice(coin));
-                    changeResource(str(rset_id), str(res_id), "shared", choice(coin));
+                    changeResource(str(rset_id), str(res_id), "mandatory", str(choice(coin)));
+                    changeResource(str(rset_id), str(res_id), "shared", str(choice(coin)));
 
 
         elif op == "delete":
@@ -550,6 +556,8 @@ def main(args):
         n_iterations = 1000
         if (len(args) == 2):
             n_iterations = int(args[1])
+            if (len(args) == 3):
+                limit = int(args[2])
         glib.idle_add(fuzz_test)
 
     else:
