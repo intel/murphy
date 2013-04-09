@@ -1362,6 +1362,44 @@ int mrp_dbus_reply(mrp_dbus_t *dbus, DBusMessage *msg, int type, ...)
 }
 
 
+int mrp_dbus_reply_error(mrp_dbus_t *dbus, DBusMessage *msg,
+                         const char *errname, const char *errmsg, int type, ...)
+{
+    va_list      ap;
+    DBusMessage *rpl;
+    int          success;
+
+    rpl = dbus_message_new_error(msg, errname, errmsg);
+
+    if (rpl == NULL)
+        return FALSE;
+
+    if (type == DBUS_TYPE_INVALID)
+        success = TRUE;
+    else {
+        va_start(ap, type);
+        success = dbus_message_append_args_valist(rpl, type, ap);
+        va_end(ap);
+    }
+
+    if (!success)
+        goto fail;
+
+    if (!dbus_connection_send(dbus->conn, rpl, NULL))
+        goto fail;
+
+    dbus_message_unref(rpl);
+
+    return TRUE;
+
+ fail:
+    if(rpl != NULL)
+        dbus_message_unref(rpl);
+
+    return FALSE;
+}
+
+
 static void call_free(call_t *call)
 {
     if (call != NULL)

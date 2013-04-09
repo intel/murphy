@@ -140,6 +140,10 @@ int mrp_dbus_call_cancel(mrp_dbus_t *dbus, int32_t id);
 
 int mrp_dbus_reply(mrp_dbus_t *dbus, DBusMessage *msg, int type, ...);
 
+int mrp_dbus_reply_error(mrp_dbus_t *dbus, DBusMessage *msg,
+                         const char *errname, const char *errmsg,
+                         int type, ...);
+
 int mrp_dbus_signal(mrp_dbus_t *dbus, const char *dest, const char *path,
                     const char *interface, const char *member, int type, ...);
 
