@@ -939,6 +939,17 @@ resource_api_test_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la libmurphy-resour
 						murphy-db/mdb/libmdb.la \
 						libmurphy-resolver.la
 
+# resource-api-fuzz
+bin_PROGRAMS += resource-api-fuzz
+
+resource_api_fuzz_SOURCES = plugins/resource-native/libmurphy-resource/resource-fuzz.c
+resource_api_fuzz_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
+resource_api_fuzz_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la libmurphy-resource.la \
+						murphy-db/mql/libmql.la	\
+						murphy-db/mqi/libmqi.la	\
+						murphy-db/mdb/libmdb.la \
+						libmurphy-resolver.la
+
 ###################################
 # murphy plugins
 #
