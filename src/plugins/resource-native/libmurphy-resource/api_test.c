@@ -313,7 +313,7 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
     char buf[1024];
     int size;
 
-    my_app_data *app_data = user_data;
+    my_app_data *app_data = (my_app_data *) user_data;
 
     if (events & MRP_IO_EVENT_IN) {
         size = read(fd, buf, sizeof(buf) - 1);
@@ -352,7 +352,7 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
 int main(int argc, char **argv)
 {
     mrp_mainloop_t *ml;
-    mrp_io_event_t mask;
+    int mask;
     mrp_io_watch_t *watch;
 
     my_app_data app_data;
@@ -367,7 +367,8 @@ int main(int argc, char **argv)
     app_data.cx = mrp_res_create(ml, state_callback, &app_data);
 
     mask = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP | MRP_IO_EVENT_ERR;
-    watch = mrp_add_io_watch(ml, fileno(stdin), mask, handle_input, &app_data);
+    watch = mrp_add_io_watch(ml, fileno(stdin), (mrp_io_event_t) mask,
+            handle_input, &app_data);
 
     if (!watch)
         exit(1);
