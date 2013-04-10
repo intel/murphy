@@ -133,8 +133,13 @@ void decrease_ref(mrp_res_context_t *cx,
     rset->priv->internal_ref_count--;
 
     if (rset->priv->internal_ref_count == 0) {
+
         mrp_log_info("delete the server resource set now");
         destroy_resource_set_request(cx, rset);
+
+        /* if a rset is deleted, remove it from the pending sets */
+        mrp_list_delete(&rset->priv->hook);
+
         mrp_htbl_remove(cx->priv->rset_mapping,
                 u_to_p(rset->priv->id), FALSE);
         mrp_htbl_remove(cx->priv->internal_rset_mapping,
