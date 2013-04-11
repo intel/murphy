@@ -375,6 +375,7 @@ static mrp_res_resource_set_t *create_resource_set(
     return rs;
 
 error:
+    mrp_log_error("error creating resource set");
     delete_resource_set(cx, rs);
     return NULL;
 }
@@ -426,6 +427,7 @@ static int update_library_resource_set(mrp_res_context_t *cx,
     return 0;
 
 error:
+    mrp_log_error("error updating library resource set");
     mrp_free(application_class);
     for (i = 0; i < num_resources; i++) {
         free_resource(resources[i]);
@@ -504,7 +506,7 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
     return res;
 
 error:
-    mrp_log_error("mrp_res_create_resource error");
+    mrp_log_error("error creating a resource");
     free_resource(res);
 
     return NULL;
@@ -534,6 +536,7 @@ mrp_res_resource_set_t *mrp_res_copy_resource_set(mrp_res_context_t *cx,
     return copy;
 
 error:
+    mrp_log_error("error copying a resource set");
     free_resource_set(copy);
     return NULL;
 }
@@ -572,8 +575,7 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
     return release_resource_set_request(cx, internal_set);
 
 error:
-    mrp_log_error("mrp_release_resources error");
-
+    mrp_log_error("error releasing a resource set");
     return -1;
 }
 
@@ -713,7 +715,6 @@ mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
 int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
                 const mrp_res_resource_set_t *original)
 {
-    mrp_msg_t *msg = NULL;
     mrp_res_resource_set_t *rset;
 
     if (!cx->priv->connected) {
@@ -734,7 +735,6 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     print_resource_set(rset);
 
     if (rset->priv->id) {
-
         /* the set has been already created on server */
 
         if (rset->state == MRP_RES_RESOURCE_ACQUIRED) {
@@ -751,21 +751,38 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
             return acquire_resource_set_request(cx, rset);
         }
     }
+    else {
+        mrp_list_hook_t *p, *n;
+        mrp_res_resource_set_private_t *pending_rset;
+        bool found = FALSE;
 
-    /* Create the resource set. The acquisition is continued
-     * when the set is created. */
+        /* Create the resource set. The acquisition is continued
+         * when the set is created. */
 
-    if (create_resource_set_request(cx, rset) < 0) {
-        mrp_log_error("creating resource set failed");
-        goto error;
+        /* only append if not already present in the list */
+
+        mrp_list_foreach(&cx->priv->pending_sets, p, n) {
+            pending_rset = mrp_list_entry(p, mrp_res_resource_set_private_t, hook);
+            if (pending_rset == rset->priv) {
+                found = TRUE;
+                break;
+            }
+        }
+
+        if (!found) {
+            mrp_list_append(&cx->priv->pending_sets, &rset->priv->hook);
+        }
+
+        if (create_resource_set_request(cx, rset) < 0) {
+            mrp_log_error("creating resource set failed");
+            mrp_list_delete(&rset->priv->hook);
+            goto error;
+        }
     }
 
-    mrp_list_append(&cx->priv->pending_sets, &rset->priv->hook);
-
-    mrp_msg_unref(msg);
     return 0;
 
 error:
-    mrp_msg_unref(msg);
+    mrp_log_error("error acquiring a resource set");
     return -1;
 }

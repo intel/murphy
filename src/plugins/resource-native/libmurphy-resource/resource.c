@@ -103,7 +103,7 @@ static void resource_event(mrp_msg_t *msg,
     uint32_t i;
     mrp_res_resource_set_t *rset;
 
-    mrp_log_info("Resource event (request no %u):", seqno);
+    printf("Resource event (request no %u):\n", seqno);
 
     if (!fetch_resource_set_id(msg, pcursor, &rset_id) ||
         !fetch_resource_set_state(msg, pcursor, &state) ||
@@ -114,6 +114,7 @@ static void resource_event(mrp_msg_t *msg,
     }
 
     /* Update our "master copy" of the resource set. */
+    printf("rset_id = %d\n", rset_id);
 
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
@@ -193,7 +194,7 @@ static void resource_event(mrp_msg_t *msg,
 #endif
     }
 
-    mrp_log_error("advice = 0x%08x, grant = 0x%08x, mandatory = 0x%08x, all = 0x%08x",
+    mrp_log_info("advice = 0x%08x, grant = 0x%08x, mandatory = 0x%08x, all = 0x%08x",
             advice, grant, mandatory, all);
 
     if (grant) {
@@ -314,7 +315,6 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
                 goto error;
             }
 
-            /* TODO: make new aqcuires fail until seqno == 0 */
             rset->priv->seqno = 0;
 
             /* call the resource set callback */
@@ -429,7 +429,9 @@ static void htbl_free_rset_mapping(void *key, void *object)
 #else
     MRP_UNUSED(key);
 #endif
-    free_resource_set(object);
+
+    mrp_res_resource_set_t *rset = object;
+    free_resource_set(rset);
 }
 
 /* public API */

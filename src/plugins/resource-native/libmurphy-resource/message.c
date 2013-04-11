@@ -445,20 +445,20 @@ int acquire_resource_set_request(mrp_res_context_t *cx,
     mrp_msg_t *msg = NULL;
 
     if (!cx->priv->connected)
-        goto error;
-
-    rset->priv->seqno = cx->priv->next_seqno;
+        return -1;
 
     msg = mrp_msg_create(
-            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno++,
+            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno,
             RESPROTO_REQUEST_TYPE, MRP_MSG_FIELD_UINT16,
                     RESPROTO_ACQUIRE_RESOURCE_SET,
             RESPROTO_RESOURCE_SET_ID, MRP_MSG_FIELD_UINT32, rset->priv->id,
             RESPROTO_MESSAGE_END);
 
     if (!msg)
-        goto error;
+        return -1;
 
+    rset->priv->seqno = cx->priv->next_seqno;
+    cx->priv->next_seqno++;
 
     if (!mrp_transport_send(cx->priv->transp, msg))
         goto error;
@@ -478,19 +478,20 @@ int release_resource_set_request(mrp_res_context_t *cx,
     mrp_msg_t *msg = NULL;
 
     if (!cx->priv->connected)
-        goto error;
-
-    rset->priv->seqno = cx->priv->next_seqno;
+        return -1;
 
     msg = mrp_msg_create(
-            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno++,
+            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno,
             RESPROTO_REQUEST_TYPE, MRP_MSG_FIELD_UINT16,
                     RESPROTO_RELEASE_RESOURCE_SET,
             RESPROTO_RESOURCE_SET_ID, MRP_MSG_FIELD_UINT32, rset->priv->id,
             RESPROTO_MESSAGE_END);
 
     if (!msg)
-        goto error;
+        return -1;
+
+    rset->priv->seqno = cx->priv->next_seqno;
+    cx->priv->next_seqno++;
 
     if (!mrp_transport_send(cx->priv->transp, msg))
         goto error;
@@ -514,13 +515,10 @@ int create_resource_set_request(mrp_res_context_t *cx,
         return -1;
 
     if (!cx->priv->connected)
-        goto error;
-
-    rset->priv->seqno = cx->priv->next_seqno;
-
+        return -1;
 
     msg = mrp_msg_create(
-            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno++,
+            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno,
             RESPROTO_REQUEST_TYPE, MRP_MSG_FIELD_UINT16,
                     RESPROTO_CREATE_RESOURCE_SET,
             RESPROTO_RESOURCE_FLAGS, MRP_MSG_FIELD_UINT32, 0,
@@ -530,7 +528,10 @@ int create_resource_set_request(mrp_res_context_t *cx,
             RESPROTO_MESSAGE_END);
 
     if (!msg)
-        goto error;
+        return -1;
+
+    rset->priv->seqno = cx->priv->next_seqno;
+    cx->priv->next_seqno++;
 
     for (i = 0; i < rset->priv->num_resources; i++) {
         int j;
