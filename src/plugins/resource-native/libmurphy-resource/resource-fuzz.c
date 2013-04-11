@@ -352,7 +352,8 @@ static void state_callback(mrp_res_context_t *context,
 
 error:
     /* TODO (for memory analysis reasons) */
-    exit(1);
+    /* exit(1); */
+    return;
 }
 
 static void usage()
