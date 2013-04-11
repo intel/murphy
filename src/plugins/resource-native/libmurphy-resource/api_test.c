@@ -117,6 +117,8 @@ void giveup_resources(my_app_data *app_data)
     /* release resources */
     if (app_data->rs)
         mrp_res_release_resource_set(app_data->cx, app_data->rs);
+    else
+        printf("No release set acquired!\n");
 }
 
 static void state_callback(mrp_res_context_t *context,
@@ -178,6 +180,9 @@ static void state_callback(mrp_res_context_t *context,
                         system_handles_video = TRUE;
 
                     attributes = mrp_res_list_attribute_names(context, resource);
+
+                    if (!attributes)
+                        continue;
 
                     for (j = 0; j < attributes->num_strings; j++) {
                         attr = mrp_res_get_attribute_by_name(context,
