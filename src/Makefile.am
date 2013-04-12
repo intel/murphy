@@ -910,10 +910,9 @@ libmurphy_resource_la_LDFLAGS =	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resource_la_LIBADD =      \
-        libmurphy-core.la   \
         libmurphy-common.la
 
-libmurphy_resource_la_DEPENDENCIES = libmurphy-core.la      \
+libmurphy_resource_la_DEPENDENCIES =    \
                      libmurphy-common.la \
                      linker-script.resource
 
@@ -932,23 +931,15 @@ generate-linker-scripts: linker-script.resource
 bin_PROGRAMS += resource-api-test
 
 resource_api_test_SOURCES = plugins/resource-native/libmurphy-resource/api_test.c
-resource_api_test_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
-resource_api_test_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la libmurphy-resource.la \
-						murphy-db/mql/libmql.la	\
-						murphy-db/mqi/libmqi.la	\
-						murphy-db/mdb/libmdb.la \
-						libmurphy-resolver.la
+resource_api_test_CFLAGS  = $(AM_CFLAGS)
+resource_api_test_LDADD   = libmurphy-common.la libmurphy-resource.la
 
 # resource-api-fuzz
 bin_PROGRAMS += resource-api-fuzz
 
 resource_api_fuzz_SOURCES = plugins/resource-native/libmurphy-resource/resource-fuzz.c
-resource_api_fuzz_CFLAGS  = $(AM_CFLAGS) $(BUILTIN_CFLAGS)
-resource_api_fuzz_LDADD   = $(BUILTIN_LIBS) libmurphy-common.la libmurphy-resource.la \
-						murphy-db/mql/libmql.la	\
-						murphy-db/mqi/libmqi.la	\
-						murphy-db/mdb/libmdb.la \
-						libmurphy-resolver.la
+resource_api_fuzz_CFLAGS  = $(AM_CFLAGS)
+resource_api_fuzz_LDADD   = libmurphy-common.la libmurphy-resource.la
 
 ###################################
 # murphy plugins
