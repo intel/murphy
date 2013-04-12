@@ -380,6 +380,11 @@ void closed_evt(mrp_transport_t *transp, int error, void *user_data)
 
     mrp_log_error("connection closed for %p", cx);
     cx->priv->connected = FALSE;
+
+    if (cx->state == MRP_RES_CONNECTED) {
+        cx->state = MRP_RES_DISCONNECTED;
+        cx->priv->cb(cx, MRP_RES_ERROR_CONNECTION_LOST, cx->priv->user_data);
+    }
 }
 
 
