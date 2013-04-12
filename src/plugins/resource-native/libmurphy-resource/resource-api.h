@@ -30,6 +30,8 @@
 #ifndef __MURPHY_RESOURCE_API_H__
 #define __MURPHY_RESOURCE_API_H__
 
+#include <stdarg.h>
+
 #include <murphy/common.h>
 
 typedef struct mrp_res_context_private_s mrp_res_context_private_t;
@@ -384,5 +386,33 @@ int mrp_res_set_attribute_double(mrp_res_context_t *cx,
  * @param arr string array to be freed.
  */
 void mrp_res_free_string_array(mrp_res_string_array_t *arr);
+
+
+/**
+ * Prototype for an external logger.
+ *
+ * @param level log level.
+ * @param file source file (__FILE__) he log message originated from.
+ * @param line source line (__LINE__) the log message originated from.
+ * @param func function (__func__) the log message originated from.
+ *
+ * @return none.
+ */
+typedef void (*mrp_res_logger_t) (mrp_log_level_t level, const char *file,
+                                  int line, const char *func,
+                                  const char *format, va_list args);
+
+/**
+ * Set an external logger for the resource library. All log messages
+ * produced by the library will be handed to this function. If you
+ * want to suppress all logs by the library, set the logger to NULL.
+ *
+ * @param logger the logger function to use.
+ *
+ * @return pointer to the previously active logger function.
+ */
+
+mrp_res_logger_t mrp_res_set_logger(mrp_res_logger_t logger);
+
 
 #endif /* __MURPHY_RESOURCE_API_H__ */

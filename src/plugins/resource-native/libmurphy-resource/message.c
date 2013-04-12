@@ -287,7 +287,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
         goto failed;
 
     if (status != 0)
-        mrp_log_error("Resource query failed (%u): %s", status, strerror(status));
+        mrp_res_error("Resource query failed (%u): %s", status, strerror(status));
     else {
         dim = 0;
 
@@ -299,7 +299,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
                 goto failed;
 
             if (!(rdef[dim].attrs = mrp_attribute_array_dup(n_attrs, attrs))) {
-                mrp_log_error("failed to duplicate attributes");
+                mrp_res_error("failed to duplicate attributes");
                 goto failed;
             }
 
@@ -348,7 +348,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
     return arr;
 
  failed:
-    mrp_log_error("malformed reply to resource query");
+    mrp_res_error("malformed reply to resource query");
     free_resource_set(arr);
 
     return NULL;
@@ -363,12 +363,12 @@ mrp_res_string_array_t *class_query_response(mrp_msg_t *msg, void **pcursor)
     if (!fetch_status(msg, pcursor, &status) || (status == 0 &&
         !fetch_mrp_str_array(msg, pcursor, RESPROTO_CLASS_NAME, &arr)))
     {
-        mrp_log_error("ignoring malformed response to class query");
+        mrp_res_error("ignoring malformed response to class query");
         return NULL;
     }
 
     if (status) {
-        mrp_log_error("class query failed with error code %u", status);
+        mrp_res_error("class query failed with error code %u", status);
         mrp_res_free_string_array(arr);
         return NULL;
     }
@@ -386,12 +386,12 @@ bool create_resource_set_response(mrp_msg_t *msg,
     if (!fetch_status(msg, pcursor, &status) || (status == 0 &&
         !fetch_resource_set_id(msg, pcursor, &rset_id)))
     {
-        mrp_log_error("ignoring malformed response to resource set creation");
+        mrp_res_error("ignoring malformed response to resource set creation");
         goto error;
     }
 
     if (status) {
-        mrp_log_error("creation of resource set failed. error code %u",status);
+        mrp_res_error("creation of resource set failed. error code %u",status);
         goto error;
     }
 
@@ -413,12 +413,12 @@ mrp_res_resource_set_t *acquire_resource_set_response(mrp_msg_t *msg,
     if (!fetch_resource_set_id(msg, pcursor, &rset_id) ||
         !fetch_status(msg, pcursor, &status))
     {
-        mrp_log_error("ignoring malformed response to resource set");
+        mrp_res_error("ignoring malformed response to resource set");
         goto error;
     }
 
     if (status) {
-        mrp_log_error("acquiring of resource set failed. error code %u",status);
+        mrp_res_error("acquiring of resource set failed. error code %u",status);
         goto error;
     }
 
@@ -428,7 +428,7 @@ mrp_res_resource_set_t *acquire_resource_set_response(mrp_msg_t *msg,
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
     if (!rset) {
-        mrp_log_error("no rset found!");
+        mrp_res_error("no rset found!");
         goto error;
     }
 

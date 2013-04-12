@@ -912,7 +912,8 @@ libmurphy_resource_la_SOURCES =         \
         plugins/resource-native/libmurphy-resource/attribute.c \
         plugins/resource-native/libmurphy-resource/rset.c \
         plugins/resource-native/libmurphy-resource/string_array.c \
-        plugins/resource-native/libmurphy-resource/message.c
+        plugins/resource-native/libmurphy-resource/message.c \
+	plugins/resource-native/libmurphy-resource/resource-log.c
 
 libmurphy_resource_la_CFLAGS =          \
         $(AM_CFLAGS)

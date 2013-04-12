@@ -57,7 +57,7 @@ static char *state_to_str(mrp_res_resource_state_t st)
 
 void print_resource(mrp_res_resource_t *res)
 {
-    mrp_log_info("   resource '%s' -> '%s' : %smandatory, %sshared",
+    mrp_res_info("   resource '%s' -> '%s' : %smandatory, %sshared",
             res->name, state_to_str(res->state),
             res->priv->mandatory ? " " : "not ",
             res->priv->shared ? "" : "not ");
@@ -69,7 +69,7 @@ void print_resource_set(mrp_res_resource_set_t *rset)
     uint32_t i;
     mrp_res_resource_t *res;
 
-    mrp_log_info("Resource set %i/%i (%s) -> '%s':",
+    mrp_res_info("Resource set %i/%i (%s) -> '%s':",
             rset->priv->id, rset->priv->internal_id,
             rset->application_class, state_to_str(rset->state));
 
@@ -133,7 +133,6 @@ void decrease_ref(mrp_res_context_t *cx,
     rset->priv->internal_ref_count--;
 
     if (rset->priv->internal_ref_count == 0) {
-
         mrp_log_info("delete the server resource set now");
         destroy_resource_set_request(cx, rset);
 
@@ -265,7 +264,7 @@ static mrp_res_resource_t *resource_copy(const mrp_res_resource_t *original,
     return copy;
 
 error:
-    mrp_log_error("failed to copy resource");
+    mrp_res_error("failed to copy resource");
 
     if (copy) {
         mrp_free((void *) copy->name);
@@ -506,7 +505,7 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
     return res;
 
 error:
-    mrp_log_error("error creating a resource");
+    mrp_res_error("mrp_res_create_resource error");
     free_resource(res);
 
     return NULL;
@@ -571,7 +570,8 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
     return release_resource_set_request(cx, internal_set);
 
 error:
-    mrp_log_error("error releasing a resource set");
+    mrp_res_error("mrp_release_resources error");
+
     return -1;
 }
 
@@ -714,7 +714,7 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
     mrp_res_resource_set_t *rset;
 
     if (!cx->priv->connected) {
-        mrp_log_error("not connected to server");
+        mrp_res_error("not connected to server");
         goto error;
     }
 
@@ -722,7 +722,7 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
             u_to_p(original->priv->internal_id));
 
     if (!rset) {
-        mrp_log_error("trying to acquire non-existent resource set");
+        mrp_res_error("trying to acquire non-existent resource set");
         goto error;
     }
 
@@ -735,7 +735,7 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
 
         if (rset->state == MRP_RES_RESOURCE_ACQUIRED) {
             /* already requested, updating is not supported yet */
-            mrp_log_error("trying to re-acquire already acquired set");
+            mrp_res_error("trying to re-acquire already acquired set");
 
             /* TODO: when supported by backend
              * type = RESPROTO_UPDATE_RESOURCE_SET
@@ -770,7 +770,7 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
         }
 
         if (create_resource_set_request(cx, rset) < 0) {
-            mrp_log_error("creating resource set failed");
+            mrp_res_error("creating resource set failed");
             mrp_list_delete(&rset->priv->hook);
             goto error;
         }

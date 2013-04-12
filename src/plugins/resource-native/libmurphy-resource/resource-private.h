@@ -30,6 +30,10 @@
 #ifndef __MURPHY_RESOURCE_API_PRIVATE_H__
 #define __MURPHY_RESOURCE_API_PRIVATE_H__
 
+#include <stdarg.h>
+
+#include <murphy/common/log.h>
+
 #include "resource-api.h"
 
 typedef struct {
@@ -118,5 +122,22 @@ struct mrp_res_context_private_s {
 uint32_t p_to_u(const void *p);
 void *u_to_p(uint32_t u);
 
+/*
+ * logging macros
+ */
+
+#define __LOCATION__ __FILE__,__LINE__,__FUNCTION__
+
+#define mrp_res_info(format, args...) \
+    mrp_res_log_msg(MRP_LOG_INFO, __LOCATION__, format, ## args)
+
+#define mrp_res_warning(format, args...) \
+    mrp_res_log_msg(MRP_LOG_WARNING, __LOCATION__, format, ## args)
+
+#define mrp_res_error(format, args...) \
+    mrp_res_log_msg(MRP_LOG_ERROR, __LOCATION__, format, ## args)
+
+void mrp_res_log_msg(mrp_log_level_t level, const char *file, int line,
+                     const char *func, const char *format, ...);
 
 #endif /* __MURPHY_RESOURCE_API_PRIVATE_H__ */
