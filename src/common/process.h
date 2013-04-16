@@ -35,6 +35,8 @@
 
 MRP_CDECL_BEGIN
 
+/* functions for the murphy family of processes */
+
 typedef enum {
     MRP_PROCESS_STATE_UNKNOWN,
     MRP_PROCESS_STATE_READY,
@@ -52,6 +54,21 @@ int mrp_process_set_watch(const char *id, mrp_mainloop_t *ml,
         mrp_process_watch_handler_t cb, void *userdata);
 
 int mrp_process_remove_watch(const char *id);
+
+/* functions to track external processes by pid */
+
+typedef struct mrp_pid_watch_s mrp_pid_watch_t;
+
+typedef void (*mrp_pid_watch_handler_t)(pid_t,
+        mrp_process_state_t, void *);
+
+mrp_process_state_t mrp_pid_query_state(pid_t pid);
+
+mrp_pid_watch_t *mrp_pid_set_watch(pid_t pid, mrp_mainloop_t *ml,
+        mrp_pid_watch_handler_t cb, void *userdata);
+
+int mrp_pid_remove_watch(mrp_pid_watch_t *w);
+
 
 MRP_CDECL_END
 
