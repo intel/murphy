@@ -30,21 +30,25 @@
 #include <murphy/common.h>
 #include <murphy/common/process.h>
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
 static void process_watch(const char *id, mrp_process_state_t s,
         void *userdata)
 {
-    mrp_mainloop_t *ml = userdata;
+    mrp_mainloop_t *ml = (mrp_mainloop_t *) userdata;
 
-    printf("received event for %s: %s (%p)\n",
+    printf("process watch received event for %s: %s (%p)\n",
         id, s == MRP_PROCESS_STATE_READY ? "ready" : "not ready", userdata);
 
     mrp_mainloop_quit(ml, 0);
 }
 
 
-int main() {
-    mrp_mainloop_t *ml = mrp_mainloop_create();
-
+static void test_process_watch(mrp_mainloop_t *ml)
+{
     mrp_process_state_t s = mrp_process_query_state("foobar");
 
     printf("initial state %s\n",
@@ -85,6 +89,63 @@ int main() {
     if(mrp_process_remove_watch("foobar") < 0) {
         printf("failed to remove watch\n");
     }
+}
+
+static void pid_watch(pid_t pid, mrp_process_state_t s, void *userdata)
+{
+    mrp_mainloop_t *ml = (mrp_mainloop_t *) userdata;
+
+    printf("pid watch received event for %d: %s (%p)\n",
+        pid, s == MRP_PROCESS_STATE_READY ? "ready" : "not ready", userdata);
+
+    mrp_mainloop_quit(ml, 0);
+}
+
+static void test_pid_watch(mrp_mainloop_t *ml)
+{
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        printf("error forking\n");
+    }
+    else if (pid > 0) {
+        mrp_pid_watch_t *w;
+
+        if (mrp_pid_query_state(pid) != MRP_PROCESS_STATE_READY) {
+            printf("failed to query the process READY state\n");
+        }
+
+        printf("setting pid watch\n");
+        w = mrp_pid_set_watch(pid, ml, pid_watch, ml);
+
+        printf("killing the process '%d'\n", pid);
+        kill(pid, 15);
+        waitpid(pid, NULL, 0);
+
+        printf("running main loop\n");
+        mrp_mainloop_run(ml);
+
+        if (mrp_pid_query_state(pid) != MRP_PROCESS_STATE_NOT_READY) {
+            printf("failed to query the process NOT READY state\n");
+        }
+        printf("removing the watch\n");
+        mrp_pid_remove_watch(w);
+    }
+}
+
+int main(int argc, char **argv) {
+    mrp_mainloop_t *ml = mrp_mainloop_create();
+
+    if (argc == 2 && strcmp(argv[1], "pid") == 0) {
+        test_pid_watch(ml);
+    }
+    else if (argc == 2 && strcmp(argv[1], "process") == 0) {
+        test_process_watch(ml);
+    }
+    else {
+        printf("Usage: process-watch-test <process|pid>\n");
+    }
 
     mrp_mainloop_destroy(ml);
 }
+
