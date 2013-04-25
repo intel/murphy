@@ -274,6 +274,8 @@ static void resource_callback(mrp_res_context_t *cx,
         return;
     }
 
+    printf("resource set state: %s\n", state_to_str(rs->state));
+
     printf("resource 0 name '%s' -> '%s'\n", res->name, state_to_str(res->state));
 
     res = mrp_res_get_resource_by_name(cx, rs, "video_playback");
