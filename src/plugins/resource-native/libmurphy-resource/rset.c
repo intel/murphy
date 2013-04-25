@@ -568,10 +568,6 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
     if (!internal_set)
         goto error;
 
-    if (internal_set->state != MRP_RES_RESOURCE_ACQUIRED) {
-        return 0;
-    }
-
     return release_resource_set_request(cx, internal_set);
 
 error:

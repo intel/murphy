@@ -317,13 +317,6 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
 
             rset->priv->seqno = 0;
 
-            /* call the resource set callback */
-
-            if (rset->priv->cb) {
-                increase_ref(cx, rset);
-                rset->priv->cb(cx, rset, rset->priv->user_data);
-                decrease_ref(cx, rset);
-            }
             break;
         }
         case RESPROTO_RELEASE_RESOURCE_SET:
@@ -340,13 +333,6 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             /* TODO: make new aqcuires fail until seqno == 0 */
             rset->priv->seqno = 0;
 
-            /* call the resource set callback */
-
-            if (rset->priv->cb) {
-                increase_ref(cx, rset);
-                rset->priv->cb(cx, rset, rset->priv->user_data);
-                decrease_ref(cx, rset);
-            }
             break;
         }
         case RESPROTO_RESOURCES_EVENT:
