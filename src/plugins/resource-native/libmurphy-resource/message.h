@@ -41,9 +41,9 @@ bool fetch_resource_set_state(mrp_msg_t *msg, void **pcursor,
                                      mrp_resproto_state_t *pstate);
 
 bool fetch_resource_set_mask(mrp_msg_t *msg, void **pcursor,
-                                    int mask_type, mrp_resproto_state_t *pmask);
+                                    int mask_type, uint32_t *pmask);
 
-bool fetch_resource_set_id(mrp_msg_t *msg, void **pcursor,uint32_t *pid);
+bool fetch_resource_set_id(mrp_msg_t *msg, void **pcursor, uint32_t *pid);
 
 bool fetch_mrp_str_array(mrp_msg_t *msg, void **pcursor,
                    uint16_t expected_tag, mrp_res_string_array_t **parr);

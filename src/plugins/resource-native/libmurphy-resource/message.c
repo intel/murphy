@@ -55,7 +55,7 @@ bool fetch_resource_set_state(mrp_msg_t *msg, void **pcursor,
 
 
 bool fetch_resource_set_mask(mrp_msg_t *msg, void **pcursor,
-                                    int mask_type, mrp_resproto_state_t *pmask)
+                                    int mask_type, uint32_t *pmask)
 {
     uint16_t expected_tag;
     uint16_t tag;

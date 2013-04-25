@@ -237,6 +237,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
     void *cursor = NULL;
     uint32_t seqno;
     uint16_t req;
+    mrp_res_error_t err = MRP_RES_ERROR_INTERNAL;
 
     MRP_UNUSED(transp);
     MRP_UNUSED(addr);
@@ -247,6 +248,8 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
         goto error;
 
     mrp_log_info("received message %d for %p", req, cx);
+
+    err = MRP_RES_ERROR_MALFORMED;
 
     switch (req) {
         case RESPROTO_QUERY_RESOURCES:
@@ -330,7 +333,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
                 goto error;
             }
 
-            /* TODO: make new aqcuires fail until seqno == 0 */
+            /* TODO: make new releases fail until seqno == 0 */
             rset->priv->seqno = 0;
 
             break;
@@ -359,7 +362,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
 
 error:
     mrp_log_error("error processing a message from the server");
-    cx->priv->cb(cx, MRP_RES_ERROR_INTERNAL, cx->priv->user_data);
+    cx->priv->cb(cx, err, cx->priv->user_data);
 }
 
 
