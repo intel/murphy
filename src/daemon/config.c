@@ -72,7 +72,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -l, --log-level=LEVELS         logging level to use\n"
            "      LEVELS is a comma separated list of info, error and warning\n"
            "  -v, --verbose                  increase logging verbosity\n"
-           "  -d, --debug                    enable given debug confguration\n"
+           "  -d, --debug                    enable given debug configuration\n"
            "  -D, --list-debug               list known debug sites\n"
            "  -f, --foreground               don't daemonize\n"
            "  -h, --help                     show help on usage\n"
