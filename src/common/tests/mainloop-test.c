@@ -264,7 +264,8 @@ static void setup_timers(mrp_mainloop_t *ml)
         }
     }
     else
-        fatal("could not allocate %d timers", cfg.ntimer);
+        if (cfg.ntimer > 0)
+            fatal("could not allocate %d timers", cfg.ntimer);
 }
 
 
@@ -416,6 +417,7 @@ void setup_io(mrp_mainloop_t *ml)
         }
     }
     else
+        if (cfg.nio > 0)
         fatal("could not allocate %d I/O watches", cfg.nio);
 }
 
@@ -562,7 +564,8 @@ static void setup_signals(mrp_mainloop_t *ml)
         }
     }
     else
-        fatal("could not allocate %d signal watches", cfg.nsignal);
+        if (cfg.nsignal > 0)
+            fatal("could not allocate %d signal watches", cfg.nsignal);
 }
 
 
@@ -721,7 +724,8 @@ static void setup_glib_timers(void)
         }
     }
     else
-        fatal("could not allocate %d GLIB timers", cfg.ngtimer);
+        if (cfg.ntimer > 0)
+            fatal("could not allocate %d GLIB timers", cfg.ngtimer);
 }
 
 
@@ -874,7 +878,8 @@ void setup_glib_io(void)
         }
     }
     else
-        fatal("could not allocate %d glib I/O watches", cfg.ngio);
+        if (cfg.ngio > 0)
+            fatal("could not allocate %d glib I/O watches", cfg.ngio);
 }
 
 
