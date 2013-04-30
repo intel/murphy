@@ -583,7 +583,7 @@ static void insert_timer(mrp_timer_t *t)
 {
     mrp_mainloop_t  *ml = t->ml;
     mrp_list_hook_t *p, *n;
-    mrp_timer_t     *t1;
+    mrp_timer_t     *t1, *next;
     int              inserted;
 
     /*
@@ -594,21 +594,25 @@ static void insert_timer(mrp_timer_t *t)
      */
 
     inserted = FALSE;
+    next     = NULL;
     mrp_list_foreach(&ml->timers, p, n) {
         t1 = mrp_list_entry(p, mrp_timer_t, hook);
 
-        if (!is_deleted(t1) && t->expire <= t1->expire) {
-            mrp_list_prepend(p->prev, &t->hook);
-            inserted = TRUE;
-            break;
+        if (!is_deleted(t1)) {
+            if (t->expire <= t1->expire) {
+                mrp_list_prepend(p->prev, &t->hook);
+                inserted = TRUE;
+                break;
+            }
+            if (next == NULL)
+                next = t1;
         }
     }
 
     if (!inserted)
         mrp_list_append(&ml->timers, &t->hook);
 
-    if (ml->next_timer == NULL || t->expire < ml->next_timer->expire)
-        ml->next_timer = t;
+    ml->next_timer = next ? next : t;
 }
 
 
@@ -1563,6 +1567,41 @@ static int prepare_subloops(mrp_mainloop_t *ml)
 
     return min_timeout;
 }
+
+
+#if 0
+static inline void dump_timers(mrp_mainloop_t *ml)
+{
+    mrp_timer_t     *t;
+    mrp_list_hook_t *p, *n;
+    int              i;
+    mrp_timer_t     *next = NULL;
+
+    mrp_debug("timer dump:");
+    i = 0;
+    mrp_list_foreach(&ml->timers, p, n) {
+        t = mrp_list_entry(p, typeof(*t), hook);
+
+        mrp_debug("  #%d: %p, @%u, next %llu (%s)", i, t, t->msecs, t->expire,
+                  is_deleted(t) ? "DEAD" : "alive");
+
+        if (!is_deleted(t) && next == NULL)
+            next = t;
+
+        i++;
+    }
+
+    mrp_debug("next timer: %p", ml->next_timer);
+    mrp_debug("poll timer: %d", ml->poll_timeout);
+
+    if (next != NULL && ml->next_timer != NULL &&
+        !is_deleted(ml->next_timer) && next != ml->next_timer) {
+        mrp_debug("*** BUG ml->next_timer is not the nearest !!! ***");
+        if (getenv("__MURPHY_TIMER_CHECK_ABORT") != NULL)
+            abort();
+    }
+}
+#endif
 
 
 int mrp_mainloop_prepare(mrp_mainloop_t *ml)
