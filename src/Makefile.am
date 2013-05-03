@@ -979,7 +979,7 @@ endif
 if DBUS_ENABLED
 DBUS_PLUGIN_SOURCES = plugins/plugin-dbus.c
 DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
-DBUS_PLUGIN_LIBS    = libmurphy-dbus.la
+DBUS_PLUGIN_LIBS    = libmurphy-dbus.la $(DBUS_LIBS)
 
 if !DISABLED_PLUGIN_DBUS
 if BUILTIN_PLUGIN_DBUS
@@ -1256,7 +1256,7 @@ generate-linker-scripts: linker-script.domain-control
 # Lua plugin
 LUA_PLUGIN_SOURCES = plugins/plugin-lua.c
 LUA_PLUGIN_CFLAGS  = $(AM_CFLAGS) $(LUA_CFLAGS)
-LUA_PLUGIN_LIBS    =
+LUA_PLUGIN_LIBS    = $(LUA_LIBS)
 
 
 if BUILTIN_PLUGIN_LUA
