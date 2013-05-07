@@ -72,7 +72,7 @@ transport_test_LDADD  += ../../libmurphy-dbus.la
 # DBUS test
 dbus_test_SOURCES = dbus-test.c
 dbus_test_CFLAGS  = $(AM_CFLAGS) $(DBUS_CFLAGS)
-dbus_test_LDADD   = ../../libmurphy-dbus.la ../../libmurphy-common.la
+dbus_test_LDADD   = ../../libmurphy-dbus.la ../../libmurphy-common.la $(DBUS_LIBS)
 endif
 
 ## databuf test
