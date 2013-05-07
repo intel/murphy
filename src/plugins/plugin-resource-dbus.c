@@ -1167,6 +1167,61 @@ static void update_attributes(const char *resource_name,
 }
 
 
+static int update_conf_cb(void *key, void *object, void *user_data)
+{
+    mrp_htbl_t **confs = user_data;
+    mrp_attr_t *old_attr = object;
+
+    mrp_htbl_t *new_conf = confs[0];
+
+    if (mrp_htbl_lookup(new_conf, key) == NULL) {
+        /* copy the attribute */
+        mrp_attr_t *attr = mrp_allocz(sizeof(mrp_attr_t));
+
+        if (!attr) {
+            goto error;
+        }
+        attr->name = mrp_strdup(old_attr->name);
+        if (!attr->name) {
+            mrp_free(attr);
+            goto error;
+        }
+        attr->type = old_attr->type;
+        switch (attr->type) {
+            case mqi_string:
+                attr->value.string = mrp_strdup(old_attr->value.string);
+                if (!attr->value.string) {
+                    mrp_free((void *) attr->name);
+                    mrp_free(attr);
+                    goto error;
+                }
+                break;
+            case mqi_integer:
+                attr->value.integer = old_attr->value.integer;
+                break;
+            case mqi_unsignd:
+                attr->value.unsignd = old_attr->value.unsignd;
+                break;
+            case mqi_floating:
+                attr->value.floating = old_attr->value.floating;
+                break;
+            default:
+                goto error;
+        }
+        /* add the value to the conf */
+        mrp_htbl_insert(new_conf, (void *) attr->name, attr);
+    }
+
+    confs[1] = new_conf; /* indicate success */
+
+    return MRP_HTBL_ITER_MORE;
+
+error:
+    confs[1] = NULL; /* indicate error */
+    return MRP_HTBL_ITER_STOP;
+}
+
+
 
 static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 {
@@ -1478,9 +1533,25 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             mrp_htbl_foreach(resource->conf_prop->value, count_keys_cb,
                     &old_count);
 
-            if (old_count != new_count) {
+            if (old_count > new_count) {
+                /* for every key in old conf, add the key to new conf if it's
+                 * not there already */
+
+                /* the second value is return value for errors */
+                mrp_htbl_t *confs[2] = { conf, NULL };
+
+                mrp_htbl_foreach(resource->conf_prop->value, update_conf_cb,
+                        confs);
+
+                if (confs[1] == NULL) {
+                    mrp_htbl_destroy(conf, TRUE);
+                    error_msg = "attribute merging failed";
+                    goto error_reply;
+                }
+            }
+            else if (old_count < new_count) {
                 mrp_htbl_destroy(conf, TRUE);
-                error_msg = "Value not specified for every attribute";
+                error_msg = "setting too many attributes";
                 goto error_reply;
             }
 
