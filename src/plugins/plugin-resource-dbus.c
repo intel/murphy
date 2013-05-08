@@ -740,7 +740,7 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
 
     ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", rset->path, id);
 
-    if (ret == MAX_PATH_LENGTH)
+    if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error;
 
     mandatory = mrp_allocz(sizeof(dbus_bool_t));
@@ -919,7 +919,7 @@ static void destroy_rset(resource_set_o_t *rset)
 static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
             const char *sender)
 {
-    char buf[64];
+    char buf[MAX_PATH_LENGTH];
     char resbuf[128];
     int ret;
     mrp_htbl_config_t resources_conf;
@@ -935,9 +935,9 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
     if (!rset)
         goto error;
 
-    ret = snprintf(buf, 64, "%s/%u", MURPHY_PATH_BASE, id);
+    ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", MURPHY_PATH_BASE, id);
 
-    if (ret == 64)
+    if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error;
 
     rset->mgr = mgr;
@@ -1231,7 +1231,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     char *error_msg = "Received invalid message";
 
     DBusMessage *reply;
-    char buf[64];
+    char buf[MAX_PATH_LENGTH];
 
     dbus_data_t *ctx = data;
 
@@ -1239,6 +1239,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
     resource_set_o_t *rset;
     resource_o_t *resource;
+
+    int ret;
 
     mrp_log_info("Resource callback called -- member: '%s', path: '%s',"
             " interface: '%s'", member, path, iface);
@@ -1250,7 +1252,9 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         goto error_reply;
     }
 
-    if (snprintf(buf, 64, "%s/%u", MURPHY_PATH_BASE, rset_id) == 64)
+    ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", MURPHY_PATH_BASE, rset_id);
+
+    if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error_reply;
 
     rset = mrp_htbl_lookup(ctx->mgr->rsets, buf);
