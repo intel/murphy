@@ -740,7 +740,7 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
 
     ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", rset->path, id);
 
-    if (ret == MAX_PATH_LENGTH)
+    if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error;
 
     mandatory = mrp_allocz(sizeof(dbus_bool_t));
@@ -919,7 +919,7 @@ static void destroy_rset(resource_set_o_t *rset)
 static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
             const char *sender)
 {
-    char buf[64];
+    char buf[MAX_PATH_LENGTH];
     char resbuf[128];
     int ret;
     mrp_htbl_config_t resources_conf;
@@ -935,9 +935,9 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
     if (!rset)
         goto error;
 
-    ret = snprintf(buf, 64, "%s/%u", MURPHY_PATH_BASE, id);
+    ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", MURPHY_PATH_BASE, id);
 
-    if (ret == 64)
+    if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error;
 
     rset->mgr = mgr;
@@ -1167,6 +1167,61 @@ static void update_attributes(const char *resource_name,
 }
 
 
+static int update_conf_cb(void *key, void *object, void *user_data)
+{
+    mrp_htbl_t **confs = user_data;
+    mrp_attr_t *old_attr = object;
+
+    mrp_htbl_t *new_conf = confs[0];
+
+    if (mrp_htbl_lookup(new_conf, key) == NULL) {
+        /* copy the attribute */
+        mrp_attr_t *attr = mrp_allocz(sizeof(mrp_attr_t));
+
+        if (!attr) {
+            goto error;
+        }
+        attr->name = mrp_strdup(old_attr->name);
+        if (!attr->name) {
+            mrp_free(attr);
+            goto error;
+        }
+        attr->type = old_attr->type;
+        switch (attr->type) {
+            case mqi_string:
+                attr->value.string = mrp_strdup(old_attr->value.string);
+                if (!attr->value.string) {
+                    mrp_free((void *) attr->name);
+                    mrp_free(attr);
+                    goto error;
+                }
+                break;
+            case mqi_integer:
+                attr->value.integer = old_attr->value.integer;
+                break;
+            case mqi_unsignd:
+                attr->value.unsignd = old_attr->value.unsignd;
+                break;
+            case mqi_floating:
+                attr->value.floating = old_attr->value.floating;
+                break;
+            default:
+                goto error;
+        }
+        /* add the value to the conf */
+        mrp_htbl_insert(new_conf, (void *) attr->name, attr);
+    }
+
+    confs[1] = new_conf; /* indicate success */
+
+    return MRP_HTBL_ITER_MORE;
+
+error:
+    confs[1] = NULL; /* indicate error */
+    return MRP_HTBL_ITER_STOP;
+}
+
+
 
 static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 {
@@ -1176,7 +1231,7 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     char *error_msg = "Received invalid message";
 
     DBusMessage *reply;
-    char buf[64];
+    char buf[MAX_PATH_LENGTH];
 
     dbus_data_t *ctx = data;
 
@@ -1184,6 +1239,8 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
     resource_set_o_t *rset;
     resource_o_t *resource;
+
+    int ret;
 
     mrp_log_info("Resource callback called -- member: '%s', path: '%s',"
             " interface: '%s'", member, path, iface);
@@ -1195,7 +1252,9 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         goto error_reply;
     }
 
-    if (snprintf(buf, 64, "%s/%u", MURPHY_PATH_BASE, rset_id) == 64)
+    ret = snprintf(buf, MAX_PATH_LENGTH, "%s/%u", MURPHY_PATH_BASE, rset_id);
+
+    if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error_reply;
 
     rset = mrp_htbl_lookup(ctx->mgr->rsets, buf);
@@ -1478,9 +1537,25 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             mrp_htbl_foreach(resource->conf_prop->value, count_keys_cb,
                     &old_count);
 
-            if (old_count != new_count) {
+            if (old_count > new_count) {
+                /* for every key in old conf, add the key to new conf if it's
+                 * not there already */
+
+                /* the second value is return value for errors */
+                mrp_htbl_t *confs[2] = { conf, NULL };
+
+                mrp_htbl_foreach(resource->conf_prop->value, update_conf_cb,
+                        confs);
+
+                if (confs[1] == NULL) {
+                    mrp_htbl_destroy(conf, TRUE);
+                    error_msg = "attribute merging failed";
+                    goto error_reply;
+                }
+            }
+            else if (old_count < new_count) {
                 mrp_htbl_destroy(conf, TRUE);
-                error_msg = "Value not specified for every attribute";
+                error_msg = "setting too many attributes";
                 goto error_reply;
             }
 
