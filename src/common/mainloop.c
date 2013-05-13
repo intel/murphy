@@ -125,6 +125,9 @@ struct mrp_wakeup_s {
     int                (*free)(void *ptr);       /* cb to free memory */
     mrp_mainloop_t      *ml;                     /* mainloop */
     mrp_wakeup_event_t   events;                 /* wakeup event mask */
+    uint64_t             lpf;                    /* wakeup at most this often */
+    uint64_t             next;                   /* next wakeup time */
+    mrp_timer_t         *timer;                  /* forced interval timer */
     mrp_wakeup_cb_t      cb;                     /* user callback */
     void                *user_data;              /* opaque user data */
 };
@@ -679,6 +682,17 @@ mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
 }
 
 
+void mrp_mod_timer(mrp_timer_t *t, unsigned int msecs)
+{
+    if (t != NULL && !is_deleted(t)) {
+        if (msecs != MRP_TIMER_RESTART)
+            t->msecs = msecs;
+
+        rearm_timer(t);
+    }
+}
+
+
 void mrp_del_timer(mrp_timer_t *t)
 {
     /*
@@ -906,12 +920,48 @@ mrp_mainloop_t *mrp_get_sighandler_mainloop(mrp_sighandler_t *h)
  * wakeup notifications
  */
 
+static void wakeup_cb(mrp_wakeup_t *w, mrp_wakeup_event_t event, uint64_t now)
+{
+    if (w->next > now) {
+        mrp_debug("skipping wakeup %p because of low-pass filter", w);
+        return;
+    }
+
+    w->cb(w, event, w->user_data);
+
+    if (w->lpf != MRP_WAKEUP_NOLIMIT)
+        w->next = now + w->lpf;
+
+    if (w->timer != NULL)
+        mrp_mod_timer(w->timer, MRP_TIMER_RESTART);
+}
+
+
+static void forced_wakeup_cb(mrp_timer_t *t, void *user_data)
+{
+    mrp_wakeup_t *w = (mrp_wakeup_t *)user_data;
+
+    MRP_UNUSED(t);
+
+    if (is_deleted(w))
+        return;
+
+    mrp_debug("dispatching forced wakeup cb %p", w);
+
+    wakeup_cb(w, MRP_WAKEUP_EVENT_LIMIT, time_now());
+}
+
+
 mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
+                             unsigned int lpf_msecs, unsigned int force_msecs,
                              mrp_wakeup_cb_t cb, void *user_data)
 {
     mrp_wakeup_t *w;
 
     if (cb == NULL)
+        return NULL;
+
+    if (lpf_msecs > force_msecs && force_msecs != MRP_WAKEUP_NOLIMIT)
         return NULL;
 
     if ((w = mrp_allocz(sizeof(*w))) != NULL) {
@@ -921,6 +971,20 @@ mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
         w->events    = events;
         w->cb        = cb;
         w->user_data = user_data;
+
+        w->lpf = lpf_msecs * USECS_PER_MSEC;
+
+        if (lpf_msecs != MRP_WAKEUP_NOLIMIT)
+            w->next = time_now() + w->lpf;
+
+        if (force_msecs != MRP_WAKEUP_NOLIMIT) {
+            w->timer = mrp_add_timer(ml, force_msecs, forced_wakeup_cb, w);
+
+            if (w->timer == NULL) {
+                mrp_free(w);
+                return NULL;
+            }
+        }
 
         mrp_list_append(&ml->wakeups, &w->hook);
     }
@@ -1719,6 +1783,7 @@ static void dispatch_wakeup(mrp_mainloop_t *ml)
     mrp_list_hook_t    *p, *n;
     mrp_wakeup_t       *w;
     mrp_wakeup_event_t  event;
+    uint64_t            now;
 
     if (ml->poll_timeout == 0) {
         mrp_debug("skipping wakeup callbacks (poll timeout was 0)");
@@ -1734,6 +1799,8 @@ static void dispatch_wakeup(mrp_mainloop_t *ml)
         event = MRP_WAKEUP_EVENT_IO;
     }
 
+    now = time_now();
+
     mrp_list_foreach(&ml->wakeups, p, n) {
         w = mrp_list_entry(p, typeof(*w), hook);
 
@@ -1742,7 +1809,7 @@ static void dispatch_wakeup(mrp_mainloop_t *ml)
 
         if (!is_deleted(w)) {
             mrp_debug("dispatching wakeup cb %p", w);
-            w->cb(w, event, w->user_data);
+            wakeup_cb(w, event, now);
         }
         else
             mrp_debug("skipping deleted wakeup cb %p", w);

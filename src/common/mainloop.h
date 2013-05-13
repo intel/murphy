@@ -86,6 +86,10 @@ typedef void (*mrp_timer_cb_t)(mrp_timer_t *t, void *user_data);
 /** Add a new timer. */
 mrp_timer_t *mrp_add_timer(mrp_mainloop_t *ml, unsigned int msecs,
                            mrp_timer_cb_t cb, void *user_data);
+/** Modify the timeout or rearm the given timer. */
+#define MRP_TIMER_RESTART (unsigned int)-1
+void mrp_mod_timer(mrp_timer_t *t, unsigned int msecs);
+
 /** Delete a timer. */
 void mrp_del_timer(mrp_timer_t *t);
 
@@ -146,7 +150,8 @@ typedef enum {
     MRP_WAKEUP_EVENT_NONE  = 0x0,        /* no event */
     MRP_WAKEUP_EVENT_TIMER = 0x1,        /* woken up by timeout */
     MRP_WAKEUP_EVENT_IO    = 0x2,        /* woken up by I/O (or signal) */
-    MRP_WAKEUP_EVENT_ANY   = 0x3,        /* mask of all events */
+    MRP_WAKEUP_EVENT_ANY   = 0x3,        /* mask of all selectable events */
+    MRP_WAKEUP_EVENT_LIMIT = 0x4,        /* woken up by forced trigger */
 } mrp_wakeup_event_t;
 
 typedef struct mrp_wakeup_s mrp_wakeup_t;
@@ -155,8 +160,16 @@ typedef struct mrp_wakeup_s mrp_wakeup_t;
 typedef void (*mrp_wakeup_cb_t)(mrp_wakeup_t *w, mrp_wakeup_event_t event,
                                 void *user_data);
 
-/** Add a wakeup callback. */
+/** Add a wakeup callback for the specified events. lpf_msecs and
+ *  force_msecs specifiy two limiting intervals in milliseconds.
+ *  lpf_msecs is a low-pass filtering interval. It is guaranteed that
+ *  the wakeup callback will not be invoked more ofter than this.
+ *  force_msecs is a forced trigger interval. It is guaranteed that
+ *  the wakeup callback will be triggered at least this often. You can
+ *  MRP_WAKEUP_NOLIMIT to omit either or both limiting intervals. */
+#define MRP_WAKEUP_NOLIMIT ((unsigned int)0)
 mrp_wakeup_t *mrp_add_wakeup(mrp_mainloop_t *ml, mrp_wakeup_event_t events,
+                             unsigned int lpf_msecs, unsigned int force_msecs,
                              mrp_wakeup_cb_t cb, void *user_data);
 
 /** Remove a wakeup callback. */

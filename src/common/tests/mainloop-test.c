@@ -139,6 +139,10 @@ typedef struct {
 
     int nrunning;
     int runtime;
+
+    pid_t        child;
+    unsigned int wlpf;
+    unsigned int wfrc;
 } test_config_t;
 
 
@@ -176,6 +180,7 @@ typedef struct {
 static test_timer_t *timers;
 
 static mrp_wakeup_t *wakeup;
+static mrp_wakeup_t *wuplim;
 
 
 
@@ -587,33 +592,46 @@ static void check_signals(void)
 static void wakeup_cb(mrp_wakeup_t *w, mrp_wakeup_event_t event,
                       void *user_data)
 {
-    static struct timeval  prev = { 0, 0 };
+    static struct timeval  prev[2] = { {0, 0}, {0, 0} };
     const char            *evt;
     struct timeval         now;
     double                 diff;
+    int                    id;
 
     MRP_UNUSED(w);
     MRP_UNUSED(user_data);
 
     timeval_now(&now);
 
-    if (event == MRP_WAKEUP_EVENT_TIMER)
-        evt = "timer";
-    else
-        evt = "I/O (or signal)";
-
-    if (MRP_LIKELY(prev.tv_usec != 0)){
-        diff = timeval_diff(&now, &prev) / 1000.0;
-        info("woken up by %s, %.2f msecs since previous", evt, diff);
+    switch (event) {
+    case MRP_WAKEUP_EVENT_TIMER: evt = "timer";           break;
+    case MRP_WAKEUP_EVENT_IO:    evt = "I/O (or signal)"; break;
+    case MRP_WAKEUP_EVENT_LIMIT: evt = "limit";           break;
+    default:                     evt = "???";
     }
 
-    prev = now;
+    id = user_data ? 1 : 0;
+
+    if (MRP_LIKELY(prev[id].tv_usec != 0)) {
+        diff = timeval_diff(&now, &prev[id]) / 1000.0;
+        info("woken up #%d by %s, %.2f msecs since previous", id, evt, diff);
+    }
+
+    prev[id] = now;
 }
 
 
 static void setup_wakeup(mrp_mainloop_t *ml)
 {
-    wakeup = mrp_add_wakeup(ml, MRP_WAKEUP_EVENT_ANY, wakeup_cb, NULL);
+    unsigned int nolim = MRP_WAKEUP_NOLIMIT;
+
+    if (cfg.child == 0)
+        return;
+
+    wakeup = mrp_add_wakeup(ml, MRP_WAKEUP_EVENT_ANY, nolim, nolim,
+                            wakeup_cb, (void *)0);
+    wuplim = mrp_add_wakeup(ml, MRP_WAKEUP_EVENT_ANY, cfg.wlpf, cfg.wfrc,
+                            wakeup_cb, (void *)1);
 }
 
 
@@ -621,6 +639,8 @@ static void cleanup_wakeup(void)
 {
     mrp_del_wakeup(wakeup);
     wakeup = NULL;
+    mrp_del_wakeup(wuplim);
+    wuplim = NULL;
 }
 
 
@@ -1215,7 +1235,7 @@ static void setup_dbus_server(mrp_mainloop_t *ml)
 
 static void fork_dbus_client(mrp_mainloop_t *ml)
 {
-    dbus_test.client = fork();
+    dbus_test.client = cfg.child = fork();
 
     switch (dbus_test.client) {
     case -1:
@@ -1318,6 +1338,9 @@ static void config_set_defaults(test_config_t *cfg)
     cfg->log_mask   = MRP_LOG_UPTO(MRP_LOG_DEBUG);
     cfg->log_target = MRP_LOG_TO_STDERR;
 
+    cfg->wlpf = 1750;
+    cfg->wfrc = 5000;
+
     cfg->runtime = DEFAULT_RUNTIME;
 }
 
@@ -1394,7 +1417,7 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 #endif
 
 
-#   define OPTIONS "r:i:t:s:I:T:S:M:l:o:vd:h" \
+#   define OPTIONS "r:i:t:s:I:T:S:M:l:w:W:o:vd:h" \
         PULSE_OPTION""ECORE_OPTION""GLIB_OPTION""QT_OPTION
     struct option options[] = {
         { "runtime"     , required_argument, NULL, 'r' },
@@ -1417,6 +1440,8 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
 #ifdef QT_ENABLED
         { "qt"          , no_argument      , NULL, 'q' },
 #endif
+        { "wakeup-lpf"  , required_argument, NULL, 'w' },
+        { "wakeup-force", required_argument, NULL, 'W' },
         { "log-level"   , required_argument, NULL, 'l' },
         { "log-target"  , required_argument, NULL, 'o' },
         { "verbose"     , optional_argument, NULL, 'v' },
@@ -1510,6 +1535,22 @@ int parse_cmdline(test_config_t *cfg, int argc, char **argv)
             cfg->mainloop_type = MAINLOOP_QT;
             break;
 #endif
+
+        case 'w':
+            cfg->wlpf = (int)strtoul(optarg, &end, 10);
+            if (end && *end)
+                print_usage(argv[0], EINVAL,
+                            "invalid wakeup low-pass filter limit '%s'.",
+                            optarg);
+            break;
+
+        case 'W':
+            cfg->wfrc = (int)strtoul(optarg, &end, 10);
+            if (end && *end)
+                print_usage(argv[0], EINVAL,
+                            "invalid wakeup force trigger limit '%s'.",
+                            optarg);
+            break;
 
         case 'v':
             cfg->log_mask <<= 1;
