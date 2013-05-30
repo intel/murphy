@@ -68,6 +68,7 @@ struct mrp_context_s {
     mrp_list_hook_t  consoles;             /* active consoles */
     mrp_resolver_t  *r;                    /* resolver context */
     void            *lua_state;            /* state for Lua bindings */
+    mrp_list_hook_t  auth;                 /* authenticator backends */
 };
 
 /** Create a new murphy context. */

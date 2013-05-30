@@ -284,7 +284,8 @@ libmurphy_core_la_HEADERS =		\
 		core/console.h		\
 		core/scripting.h	\
 		core/method.h		\
-		core/event.h
+		core/event.h		\
+		core/auth.h
 
 libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
@@ -293,7 +294,14 @@ libmurphy_core_la_REGULAR_SOURCES =	\
 		core/scripting.c	\
 		core/method.c		\
 		core/event.c		\
+		core/auth.c		\
+		core/auth-deny.c	\
 		$(LUA_BINDINGS_SOURCES)
+
+if SMACK_ENABLED
+libmurphy_core_la_REGULAR_SOURCES +=	\
+		core/auth-smack.c
+endif
 
 libmurphy_core_la_SOURCES =		\
 		$(libmurphy_core_la_REGULAR_SOURCES) \
@@ -301,7 +309,8 @@ libmurphy_core_la_SOURCES =		\
 
 libmurphy_core_la_CFLAGS  =		\
 		$(AM_CFLAGS)		\
-		$(LUA_CFLAGS)
+		$(LUA_CFLAGS)		\
+		$(SMACK_CFLAGS)
 
 libmurphy_core_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.core \
@@ -312,6 +321,7 @@ libmurphy_core_la_LIBADD  =			\
 		libmurphy-lua-decision.la	\
 		libmurphy-lua-utils.la		\
 		$(LUA_LIBS) 			\
+		$(SMACK_LIBS)			\
 		-ldl
 
 libmurphy_core_la_DEPENDENCIES = linker-script.core        \

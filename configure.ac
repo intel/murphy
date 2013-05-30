@@ -310,6 +310,29 @@ fi
 # Check if websocket support was/can be enabled.
 CHECK_WEBSOCKETS()
 
+# Check if SMACK support should be enabled.
+AC_ARG_ENABLE(smack,
+              [  --enable-smack          enable SMACK support],
+	      [enable_smack=$enableval], [enable_smack=auto])
+
+if test "$enable_smack" != "no"; then
+    PKG_CHECK_MODULES(SMACK, libsmack, [have_smack=yes], [have_smack=no])
+    if test "$have_smack" = "no" -a "$enable_smack" = "yes"; then
+        AC_MSG_ERROR([SMACK development libraries not found.])
+    fi
+
+    enable_smack="$have_smack"
+else
+    AC_MSG_NOTICE([SMACK support is disabled.])
+fi
+
+if test "$enable_smack" = "yes"; then
+    AC_DEFINE([SMACK_ENABLED], 1, [Enable SMACK support ?])
+fi
+AM_CONDITIONAL(SMACK_ENABLED, [test "$enable_smack" = "yes"])
+AC_SUBST(SMACK_ENABLED)
+AC_SUBST(SMACK_CFLAGS)
+AC_SUBST(SMACK_LIBS)
 
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
