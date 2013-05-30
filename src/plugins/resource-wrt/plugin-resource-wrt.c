@@ -711,7 +711,7 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
     mrp_json_t *reply;
     errbuf_t    e;
     mrp_json_t *jf, *jra, *jr;
-    uint32_t    flags, priority, rsid;
+    uint32_t    flags = 0, priority, rsid;
     bool        autorelease;
     const char *appclass, *zone;
     char        attr[1024], *p;
