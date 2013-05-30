@@ -46,7 +46,7 @@ static inline void *_mrp_ref_obj(void *obj, off_t offs)
     mrp_refcnt_t *refcnt;
 
     if (obj != NULL) {
-        refcnt = (mrp_refcnt_t *) (obj + offs);
+        refcnt = (mrp_refcnt_t *) ((char *) obj + offs);
         (*refcnt)++;
     }
 
@@ -59,7 +59,7 @@ static inline int _mrp_unref_obj(void *obj, off_t offs)
     mrp_refcnt_t *refcnt;
 
     if (obj != NULL) {
-        refcnt = (mrp_refcnt_t *) (obj + offs);
+        refcnt = (mrp_refcnt_t *) ((char *) obj + offs);
         --(*refcnt);
 
         if (*refcnt <= 0)
