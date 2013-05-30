@@ -443,7 +443,7 @@ column_type:
   varchar       { coldef->type = mqi_varchar;   coldef->length = $1; }
 | TKN_INTEGER   { coldef->type = mqi_integer;   coldef->length = 0;  }
 | TKN_UNSIGNED  { coldef->type = mqi_unsignd;   coldef->length = 0;  }
-| TKN_FLOATING  { coldef->type = mqi_floating;  coldef->length = 0;  }
+| TKN_REAL      { coldef->type = mqi_floating;  coldef->length = 0;  }
 | blob          { coldef->type = mqi_blob;      coldef->length = $1; }
 ;
 
