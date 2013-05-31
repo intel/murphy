@@ -34,6 +34,7 @@
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
+#include <murphy/core/auth.h>
 
 
 typedef struct {
@@ -61,7 +62,7 @@ void two_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
-
+void auth_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("one"  , one_cb  , TRUE,
@@ -73,7 +74,10 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("four" , four_cb , TRUE,
                           "four [args]", "command 4", "description 4"),
         MRP_TOKENIZED_CMD("update" , resolve_cb , TRUE,
-                          "update <target>", "update target", "update target")
+                          "update <target>", "update target", "update target"),
+        MRP_TOKENIZED_CMD("auth-test", auth_cb, TRUE,
+                          "auth-test [@backend] target mode id [token]",
+                          "test authentication", "test authentication")
 });
 
 
@@ -152,6 +156,69 @@ void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     else {
         printf("Usage: %s %s <target-name>\n", argv[0], argv[1]);
     }
+}
+
+
+void auth_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    mrp_context_t  *ctx = c->ctx;
+    const char     *backend, *target, *id, *token, *p;
+    int             idx, mode, status;
+
+    MRP_UNUSED(user_data);
+
+    if (argc < 4) {
+    error:
+        printf("Usage: %s %s [@backend] target mode id [token]\n", argv[0],
+               argv[1]);
+        return;
+    }
+
+    if (argv[2][0] == '@') {
+        if (argc < 5)
+            goto error;
+
+        backend = argv[2] + 1;
+        idx     = 3;
+    }
+    else {
+        backend = NULL;
+        idx     = 2;
+    }
+
+    target = argv[idx++];
+
+    p = argv[idx++];
+
+    for (mode = 0; *p; p++) {
+        switch(*p) {
+        case 'r': mode |= MRP_AUTH_MODE_READ;  break;
+        case 'w': mode |= MRP_AUTH_MODE_WRITE; break;
+        case 'x': mode |= MRP_AUTH_MODE_EXEC;  break;
+        case '-':                              break;
+        default:
+            printf("Invalid character '%c' in mode.\n", *p);
+            goto error;
+        }
+    }
+
+    if (mode == 0)
+        mode = MRP_AUTH_MODE_READ;
+
+    id = argv[idx++];
+
+    if (idx >= argc - 1)
+        token = NULL;
+    else {
+        if (idx == argc - 1)
+            token = argv[idx];
+        else
+            goto error;
+    }
+
+    status = mrp_authenticate(ctx, backend, target, mode, id, token);
+
+    printf("authentication status: %d\n", status);
 }
 
 
