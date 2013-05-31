@@ -140,7 +140,7 @@ int mrp_register_authenticator(mrp_context_t *ctx, const char *name,
 }
 
 
-void mrp_unregster_authenticator(mrp_context_t *ctx, const char *name)
+void mrp_unregister_authenticator(mrp_context_t *ctx, const char *name)
 {
     mrp_list_hook_t *backends = ctx ? &ctx->auth : &pending;
 
