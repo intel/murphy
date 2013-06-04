@@ -83,7 +83,7 @@ end
 
 -- load the domain control plugin if it exists
 if m:plugin_exists('domain-control') then
-    m:load_plugin('domain-control', 'wrt-export', {
+    m:try_load_plugin('domain-control', 'wrt-export', {
         external_address = '',
         internal_address = '',
         wrt_address = "wsck:127.0.0.1:5000/murphy",
