@@ -82,7 +82,7 @@ int mrp_authenticate(mrp_context_t *ctx, const char *backend,
     MRP_INIT static void register_authenticator(void)                   \
     {                                                                   \
         int  (*initfn)(void **) = init_cb;                              \
-        void  *user_data;                                               \
+        void  *user_data        = NULL;                                 \
                                                                         \
         if (initfn == NULL || initfn(&user_data))                       \
             mrp_register_authenticator(NULL, name, auth_cb, user_data); \
