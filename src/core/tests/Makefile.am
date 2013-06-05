@@ -1,1 +1,1 @@
-AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
+AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir) $(JSON_CFLAGS)

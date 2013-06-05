@@ -1,5 +1,5 @@
 noinst_PROGRAMS = parser-test
-AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir)
+AM_CFLAGS       = $(WARNING_CFLAGS) -I$(top_builddir) $(JSON_CFLAGS)
 
 # parser test
 parser_test_SOURCES = parser-test.c

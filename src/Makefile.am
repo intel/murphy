@@ -310,6 +310,7 @@ libmurphy_core_la_SOURCES =		\
 libmurphy_core_la_CFLAGS  =		\
 		$(AM_CFLAGS)		\
 		$(LUA_CFLAGS)		\
+		$(JSON_CFLAGS)		\
 		$(SMACK_CFLAGS)
 
 libmurphy_core_la_LDFLAGS =		\
@@ -636,7 +637,8 @@ libmurphy_resolver_la_SOURCES =			\
 		resolver-func-info.c
 
 libmurphy_resolver_la_CFLAGS =			\
-		$(AM_CFLAGS)
+		$(AM_CFLAGS)			\
+		$(JSON_CFLAGS)
 
 libmurphy_resolver_la_LDFLAGS =			\
 		-Wl,-version-script=linker-script.resolver \
@@ -1137,7 +1139,8 @@ PLUGIN_RESOURCE_NATIVE_LIBS =       					\
 
 plugin_resource_native_la_SOURCES = $(PLUGIN_RESOURCE_NATIVE_SOURCES)
 plugin_resource_native_la_CFLAGS  = $(PLUGIN_RESOURCE_NATIVE_CFLAGS)	\
-				    $(MURPHY_CFLAGS) $(AM_CFLAGS)
+				    $(MURPHY_CFLAGS) $(AM_CFLAGS)	\
+				    $(JSON_CFLAGS)
 plugin_resource_native_la_LDFLAGS = -module -avoid-version
 plugin_resource_native_la_LIBADD  = $(PLUGIN_RESOURCE_NATIVE_LIBS)
 
@@ -1187,7 +1190,8 @@ libmurphy_plugin_domain_control_la_SOURCES =			 \
 
 libmurphy_plugin_domain_control_la_CFLAGS =			 \
 		$(DOMAIN_CONTROL_PLUGIN_CFLAGS)			 \
-		$(AM_CFLAGS)
+		$(AM_CFLAGS)					 \
+		$(JSON_CFLAGS)
 
 libmurphy_plugin_domain_control_la_LDFLAGS =			 \
 		-Wl,-version-script=linker-script.domain-control \
@@ -1227,7 +1231,8 @@ libmurphy_domain_controller_la_HEADERS =		\
 libmurphy_domain_controller_la_SOURCES = 		\
 		plugins/domain-control/client.c		\
 		plugins/domain-control/message.c
-libmurphy_domain_controller_la_CFLAGS   =
+libmurphy_domain_controller_la_CFLAGS   =		\
+		$(JSON_CFLAGS)
 libmurphy_domain_controller_la_LIBADD   = libmurphy-common.la     \
 					  murphy-db/mql/libmql.la \
 					  murphy-db/mqi/libmqi.la \
@@ -1301,7 +1306,8 @@ murphyd_SOURCES =			\
 
 murphyd_CFLAGS  =			\
 		$(AM_CFLAGS)		\
-		$(BUILTIN_CFLAGS)
+		$(BUILTIN_CFLAGS)	\
+		$(JSON_CFLAGS)
 
 murphyd_LDADD  =				\
 		$(BUILTIN_LIBS)         	\

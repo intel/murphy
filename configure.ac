@@ -282,13 +282,17 @@ AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_LIBS)
 
 # Check for json(-c).
-PKG_CHECK_MODULES(JSON, [json])
+PKG_CHECK_MODULES(JSON, [json], [have_json=yes], [have_json=no])
+
+if test "$have_json" = "no"; then
+    PKG_CHECK_MODULES(JSON, [json-c >= 0.11])
+fi
 
 AC_MSG_CHECKING([for json_tokener_get_error()])
 saved_CFLAGS="$CFLAGS"
-saved_LDFLAGS="$LDFLAGS"
-CFLAGS="$(pkg-config --cflags json)"
-LDFLAGS="$(pkg-config --libs json)"
+saved_LIBS="$LIBS"
+CFLAGS="${JSON_CFLAGS}"
+LIBS="${JSON_LIBS}"
 AC_LINK_IFELSE(
    [AC_LANG_PROGRAM(
          [[#include <json.h>]],
@@ -301,7 +305,7 @@ AC_LINK_IFELSE(
     [have_json_tokener_get_error=no])
 AC_MSG_RESULT([$have_json_tokener_get_error])
 CFLAGS="$saved_CFLAGS"
-LDFLAGS="$saved_LDFLAGS"
+LIBS="$saved_LIBS"
 
 if test "$have_json_tokener_get_error" = "yes"; then
     AC_DEFINE([HAVE_JSON_TOKENER_GET_ERROR], 1, [json_tokener_get_error ?])
