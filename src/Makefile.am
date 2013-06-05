@@ -895,8 +895,8 @@ generate-linker-scripts: linker-script.breedline-glib
 # TODO: put this under conditional compilation
 
 lib_LTLIBRARIES += libmurphy-resource.la
-# EXTRA_DIST      += resource/murphy-resource.pc
-# pkgconfig_DATA  += resource/murphy-resource.pc
+EXTRA_DIST      += plugins/resource-native/libmurphy-resource/murphy-resource.pc
+pkgconfig_DATA  += plugins/resource-native/libmurphy-resource/murphy-resource.pc
 
 libmurphy_resource_ladir =          \
         $(includedir)/murphy/plugins/resource-native/libmurphy-resource
