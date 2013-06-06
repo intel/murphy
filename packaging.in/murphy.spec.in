@@ -390,6 +390,7 @@ ldconfig
 %{_libdir}/pkgconfig/murphy-common.pc
 %{_libdir}/pkgconfig/murphy-core.pc
 %{_libdir}/pkgconfig/murphy-resolver.pc
+%{_libdir}/pkgconfig/murphy-resource.pc
 %if %{?_with_lua:1}%{!?_with_lua:0}
 %{_libdir}/pkgconfig/murphy-lua-utils.pc
 %{_libdir}/pkgconfig/murphy-lua-decision.pc
