@@ -1131,11 +1131,8 @@ PLUGIN_RESOURCE_NATIVE_CFLAGS =						\
 		$(LUA_CFLAGS)
 
 PLUGIN_RESOURCE_NATIVE_LIBS =       					\
-		libmurphy-core.la					\
 		libmurphy-common.la					\
-		murphy-db/mqi/libmqi.la					\
-		murphy-db/mdb/libmdb.la					\
-		$(RESOURCE_LIBRARY)                   \
+		$(RESOURCE_LIBRARY)                   			\
 		$(LUA_LIBS)
 
 plugin_resource_native_la_SOURCES = $(PLUGIN_RESOURCE_NATIVE_SOURCES)
