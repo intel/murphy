@@ -297,10 +297,7 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_libdir}/murphy/plugins
 
 # Get rid of any *.la files installed by libtool.
-rm -f $RPM_BUILD_ROOT%{_libdir}/*.la
-
-# Clean up also the murphy DB installation.
-rm -f $RPM_BUILD_ROOT%{_libdir}/murphy/*.la
+find $RPM_BUILD_ROOT%{_libdir} -name \*.la -exec rm -f {} \;
 
 # Generate list of linkedin plugins (depends on the configuration).
 outdir="`pwd`"
