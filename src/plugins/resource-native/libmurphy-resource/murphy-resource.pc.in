@@ -5,7 +5,7 @@ includedir=@includedir@
 
 Name: murphy-resource
 Description: Murphy policy framework, resource library.
-Requires: murphy-core murphy-common = @PACKAGE_VERSION@
+Requires: murphy-common = @PACKAGE_VERSION@
 Version: @PACKAGE_VERSION@
-Libs: -L${libdir} -lmurphy-core -lmurphy-common -lmurphy-resource
+Libs: -L${libdir} -lmurphy-common -lmurphy-resource
 Cflags: -I${includedir}
