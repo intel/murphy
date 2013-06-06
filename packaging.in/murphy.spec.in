@@ -462,6 +462,7 @@ ldconfig
 %{_bindir}/test-domain-controller
 %{_bindir}/murphy-console
 %{_bindir}/resource-api-test
+%{_bindir}/resource-api-fuzz
 
 %changelog
 * Tue Nov 27 2012 Krisztian Litkey <krisztian.litkey@intel.com> -
