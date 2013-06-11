@@ -178,6 +178,21 @@ mrp_res_resource_set_t * mrp_res_create_resource_set(mrp_res_context_t *cx,
         const char *app_class, mrp_res_resource_callback_t cb, void *userdata);
 
 /**
+ * Set automatic release mode to the resource set. This means that if an
+ * application loses the resource set, it doesn't automatically get it back
+ * when the resource becomes available again. By default the automatic
+ * release mode is off.
+ *
+ * @param cx murphy connection context.
+ * @param status automatic release status: TRUE means on, FALSE means off
+ * @param rs resource set that is being updated.
+ *
+ * @return true if successful, false otherwise.
+ */
+bool mrp_res_set_autorelease(mrp_res_context_t *cx, bool status,
+        mrp_res_resource_set_t *rs);
+
+/**
  * Delete resource set created with mrp_res_create_resource_set
  * or mrp_res_copy_resource_set.
  *
@@ -220,7 +235,7 @@ bool mrp_res_equal_resource_set(const mrp_res_resource_set_t *a,
  * set in the resource callback.
  *
  * @param cx connnection to Murphy resource engine.
- * @param set resource set you want to acquire.
+ * @param rs resource set you want to acquire.
  *
  * @return murphy error code.
  */
@@ -233,7 +248,7 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
  * set available status are still delivered.
  *
  * @param cx connnection to Murphy resource engine.
- * @param set resource set you want to release.
+ * @param rs resource set you want to release.
  *
  * @return murphy error code.
  */

@@ -510,6 +510,7 @@ int create_resource_set_request(mrp_res_context_t *cx,
 {
     mrp_msg_t *msg = NULL;
     uint32_t i;
+    uint32_t flags = 0;
 
     if (!cx || !rset)
         return -1;
@@ -517,11 +518,14 @@ int create_resource_set_request(mrp_res_context_t *cx,
     if (!cx->priv->connected)
         return -1;
 
+    if (rset->priv->autorelease)
+        flags |= RESPROTO_RSETFLAG_AUTORELEASE;
+
     msg = mrp_msg_create(
             RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno,
             RESPROTO_REQUEST_TYPE, MRP_MSG_FIELD_UINT16,
                     RESPROTO_CREATE_RESOURCE_SET,
-            RESPROTO_RESOURCE_FLAGS, MRP_MSG_FIELD_UINT32, 0,
+            RESPROTO_RESOURCE_FLAGS, MRP_MSG_FIELD_UINT32, flags,
             RESPROTO_RESOURCE_PRIORITY, MRP_MSG_FIELD_UINT32, 0,
             RESPROTO_CLASS_NAME, MRP_MSG_FIELD_STRING, rset->application_class,
             RESPROTO_ZONE_NAME, MRP_MSG_FIELD_STRING, cx->zone,

@@ -354,6 +354,7 @@ static mrp_res_resource_set_t *create_resource_set(
     rs->priv->cb = cb;
     rs->priv->user_data = userdata;
     rs->state = MRP_RES_RESOURCE_PENDING;
+    rs->priv->autorelease = FALSE;
 
     rs->priv->resources = mrp_allocz_array(mrp_res_resource_t *,
             cx->priv->master_resource_set->priv->num_resources);
@@ -705,6 +706,21 @@ mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
     }
 
     return NULL;
+}
+
+bool mrp_res_set_autorelease(mrp_res_context_t *cx, bool status,
+        mrp_res_resource_set_t *rs)
+{
+    if (!cx || !rs)
+        return FALSE;
+
+     /* the resource library doesn't allow updating already  used sets */
+    if (rs->state != MRP_RES_RESOURCE_PENDING)
+        return FALSE;
+
+    rs->priv->autorelease = status;
+
+    return TRUE;
 }
 
 

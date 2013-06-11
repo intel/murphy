@@ -81,6 +81,8 @@ struct mrp_res_resource_set_private_s {
     uint32_t internal_ref_count;
     uint32_t seqno;
 
+    bool autorelease;
+
     mrp_res_resource_callback_t cb;
     void *user_data;
 
