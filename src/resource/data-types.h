@@ -52,6 +52,7 @@
 typedef enum   mrp_resource_state_e     mrp_resource_state_t;
 typedef enum   mrp_resource_order_e     mrp_resource_order_t;
 typedef enum   mrp_resource_access_e    mrp_resource_access_t;
+typedef enum   mrp_resource_event_e     mrp_resource_event_t;
 
 typedef struct mrp_resource_client_s    mrp_resource_client_t;
 typedef union  mrp_attr_value_u         mrp_attr_value_t;
@@ -117,6 +118,17 @@ struct mrp_attr_s {
 
 typedef void (*mrp_resource_event_cb_t)(uint32_t, mrp_resource_set_t *, void*);
 
+enum mrp_resource_event_e {
+    MRP_RESOURCE_EVENT_UNKNOWN = 0,
+    MRP_RESOURCE_EVENT_CREATED,
+    MRP_RESOURCE_EVENT_DESTROYED,
+    MRP_RESOURCE_EVENT_ACQUIRE,
+    MRP_RESOURCE_EVENT_RELEASE
+};
+
+typedef void (*mrp_manager_notify_func_t)(mrp_resource_event_t, mrp_zone_t *,
+                                          mrp_application_class_t *,
+                                          mrp_resource_t *, void *);
 typedef void (*mrp_manager_init_func_t)(mrp_zone_t *, void *);
 typedef bool (*mrp_manager_alloc_func_t)(mrp_zone_t *,mrp_resource_t *,void*);
 typedef void (*mrp_manager_free_func_t)(mrp_zone_t *,mrp_resource_t *,void *);
@@ -124,6 +136,7 @@ typedef bool (*mrp_manager_advice_func_t)(mrp_zone_t *,mrp_resource_t*,void *);
 typedef void (*mrp_manager_commit_func_t)(mrp_zone_t *, void *);
 
 struct mrp_resource_mgr_ftbl_s  {
+    mrp_manager_notify_func_t   notify;
     mrp_manager_init_func_t     init;
     mrp_manager_alloc_func_t    allocate;
     mrp_manager_free_func_t     free;

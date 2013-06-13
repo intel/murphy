@@ -49,6 +49,7 @@
 #include "application-class.h"
 #include "resource.h"
 #include "resource-set.h"
+#include "attribute.h"
 
 #define ZONE_CLASS             MRP_LUA_CLASS_SIMPLE(zone)
 #define APPCLASS_CLASS         MRP_LUA_CLASS_SIMPLE(application_class)
@@ -343,6 +344,49 @@ uint32_t mrp_lua_to_resource_id(lua_State *L, int t)
     resclass_t *rc = to_resclass(L, t);
 
     return rc ? rc->id : MRP_RESOURCE_ID_INVALID;
+}
+
+void mrp_lua_resclass_create_from_c(uint32_t id)
+{
+    lua_State *L;
+    mrp_resource_def_t *rdef;
+    resclass_t *resclass;
+    attr_def_t *adef;
+    mrp_attr_def_t *attrs;
+    int nattr;
+
+    if ((L = mrp_lua_get_lua_state())) {
+
+        if (!(rdef = mrp_resource_definition_find_by_id(id)))
+            luaL_error(L, "invalid resource definition ID %d", id);
+
+        resclass = (resclass_t *)mrp_lua_create_object(L, RESCLASS_CLASS,
+                                                       rdef->name,0);
+        adef = mrp_allocz(sizeof(attr_def_t));
+        nattr = rdef->nattr;
+        attrs = mrp_allocz(sizeof(mrp_attr_def_t) * (nattr + 1));
+
+        if (!nattr)
+            mrp_attribute_copy_definitions(rdef->attrdefs, attrs);
+
+        if (!resclass)
+            luaL_error(L, "invalid or duplicate name '%s'", rdef->name);
+        if (!adef)
+            luaL_error(L,"can't to allocate memory for attribute definitions");
+
+        resclass->id = id;
+        resclass->name = mrp_strdup(rdef->name);
+        resclass->attrs = attrs;
+
+        adef->nattr = nattr;
+        adef->attrs = attrs;
+
+        resource_attr_defs[id] = adef;
+
+        lua_pop(L, 1);
+
+        mrp_log_info("resource class '%s' created", rdef->name);
+    }
 }
 
 int mrp_lua_resource_create(lua_State *L, mrp_resource_t *res)

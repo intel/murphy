@@ -42,6 +42,9 @@
 
 #include "resource.h"
 #include "resource-owner.h"
+#include "resource-set.h"
+#include "application-class.h"
+#include "zone.h"
 
 
 #define RESOURCE_MAX        (sizeof(mrp_resource_mask_t) * 8)
@@ -437,7 +440,46 @@ int mrp_resource_write_attributes(mrp_resource_t *res, mrp_attr_t *values)
     return sts;
 }
 
+const char *mrp_resource_get_application_class(mrp_resource_t *res)
+{
+    mrp_resource_set_t *rset;
+    mrp_application_class_t *class;
 
+    MRP_ASSERT(res, "invalid argument");
+
+    if (!(rset = mrp_resource_set_find_by_id(res->rsetid)))
+        return NULL;
+
+    if (!(class = rset->class.ptr))
+        return NULL;
+
+    return class->name;
+}
+
+void mrp_resource_notify(mrp_resource_t *res,
+                         mrp_resource_set_t *rset,
+                         mrp_resource_event_t event)
+{
+    mrp_resource_def_t *rdef;
+    mrp_resource_mgr_ftbl_t *ftbl;
+    mrp_manager_notify_func_t notify;
+    mrp_application_class_t *class;
+    mrp_zone_t *zone;
+
+    MRP_ASSERT(res && rset, "inavlid argument");
+
+    rdef = res->def;
+
+    MRP_ASSERT(rdef, "confused with data structures");
+
+    if ((ftbl = rdef->manager.ftbl) &&
+        (notify = ftbl->notify) &&
+        (zone = mrp_zone_find_by_id(rset->zone)) &&
+        (class = rset->class.ptr))
+    {
+        notify(event, zone, class, res, rdef->manager.userdata);
+    }
+}
 
 int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
                        size_t indent, char *buf, int len)

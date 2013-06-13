@@ -184,6 +184,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     bool force_release;
     bool changed;
     bool shuffle;
+    mrp_resource_event_t notify;
     uint32_t replyid;
     uint32_t nevent, maxev;
     event_t *events, *ev, *lastev;
@@ -286,11 +287,13 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
             changed = false;
             shuffle = false;
+            notify  = 0;
             replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
 
             if (force_release) {
                 shuffle = (rset->state != mrp_resource_release);
+                notify  = shuffle ? MRP_RESOURCE_EVENT_RELEASE : 0;
                 changed = shuffle || rset->resource.mask.grant;
                 rset->state = mrp_resource_release;
                 rset->resource.mask.grant = 0;
@@ -301,10 +304,16 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     changed = true;
 
                     if (!grant && rset->auto_release) {
+                        if (rset->state != mrp_resource_release)
+                            notify = MRP_RESOURCE_EVENT_RELEASE;
                         rset->state = mrp_resource_release;
                         shuffle = true;
                     }
                 }
+            }
+
+            if (notify) {
+                mrp_resource_set_notify(rset, notify);
             }
 
             if (advice != rset->resource.mask.advice) {

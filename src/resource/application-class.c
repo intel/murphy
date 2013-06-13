@@ -216,6 +216,15 @@ mrp_application_class_iterate_rsets(mrp_application_class_t *class,
     return mrp_list_entry(entry, mrp_resource_set_t, class.list);
 }
 
+const char *mrp_application_class_get_name(mrp_application_class_t *class)
+{
+    if (!class | !class->name)
+        return "<unknown class>";
+
+    return class->name;
+}
+
+
 const char **mrp_application_class_get_all_names(uint32_t buflen,
                                                  const char **buf)
 {
@@ -284,6 +293,9 @@ int mrp_application_class_add_resource_set(const char *class_name,
             rset->state = mrp_resource_release;
 
         mrp_application_class_move_resource_set(rset);
+
+        mrp_resource_set_notify(rset, MRP_RESOURCE_EVENT_CREATED);
+
         mrp_resource_owner_update_zone(rset->zone, rset, reqid);
     }
     

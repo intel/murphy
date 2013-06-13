@@ -137,6 +137,7 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
 
         mrp_list_foreach(&rset->resource.list, entry, n) {
             res = mrp_list_entry(entry, mrp_resource_t, list);
+            mrp_resource_notify(res, rset, MRP_RESOURCE_EVENT_DESTROYED);
             mrp_resource_destroy(res);
         }
 
@@ -312,10 +313,12 @@ int mrp_resource_set_write_attributes(mrp_resource_set_t *rset,
 
 void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 {
+    mrp_resource_state_t old_state;
     mqi_handle_t trh;
 
     MRP_ASSERT(rset, "invalid argument");
 
+    old_state = rset->state;
     rset->state = mrp_resource_acquire;
 
     if (rset->class.ptr) {
@@ -323,6 +326,9 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
         rset->request.stamp = get_request_stamp();
 
         mrp_application_class_move_resource_set(rset);
+
+        if (old_state != mrp_resource_acquire)
+            mrp_resource_set_notify(rset, MRP_RESOURCE_EVENT_ACQUIRE);
 
         trh = mqi_begin_transaction();
         mrp_resource_owner_update_zone(rset->zone, rset, reqid);
@@ -350,6 +356,8 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
 
             mrp_application_class_move_resource_set(rset);
 
+            mrp_resource_set_notify(rset, MRP_RESOURCE_EVENT_RELEASE);
+
             trh = mqi_begin_transaction();
             mrp_resource_owner_update_zone(rset->zone, rset, reqid);
             mqi_commit_transaction(trh);
@@ -376,6 +384,17 @@ void mrp_resource_set_updated(mrp_resource_set_t *rset)
 
         mrp_resource_user_update(res, rset->state, grant);
     }
+}
+
+void mrp_resource_set_notify(mrp_resource_set_t *rset, mrp_resource_event_t ev)
+{
+    mrp_resource_t *res;
+    void *cursor = NULL;
+
+    MRP_ASSERT(rset, "invalid argument");
+
+    while ((res = mrp_resource_set_iterate_resources(rset, &cursor)))
+        mrp_resource_notify(res, rset, ev);
 }
 
 int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,

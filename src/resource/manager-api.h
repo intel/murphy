@@ -42,12 +42,18 @@ mrp_attr_t *mrp_zone_read_all_attributes(mrp_zone_t *zone,
                                          mrp_attr_t *buf);
 
 
+const char *mrp_application_class_get_name(mrp_application_class_t *class);
+
+
 uint32_t mrp_resource_definition_create(const char *name,
                                         bool shareable,
                                         mrp_attr_def_t *attrdefs,
                                         mrp_resource_mgr_ftbl_t *manager,
                                         void *manager_data);
+void mrp_lua_resclass_create_from_c(uint32_t id);
 
+
+const char *mrp_resource_get_application_class(mrp_resource_t *resource);
 
 
 #endif  /* __MURPHY_RESOURCE_MANAGER_API_H__ */

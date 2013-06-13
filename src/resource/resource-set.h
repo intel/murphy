@@ -75,6 +75,8 @@ mrp_resource_set_t *mrp_resource_set_find_by_id(uint32_t);
 mrp_resource_t     *mrp_resource_set_find_resource(uint32_t, const char *);
 uint32_t            mrp_get_resource_set_count(void);
 void                mrp_resource_set_updated(mrp_resource_set_t *);
+void                mrp_resource_set_notify(mrp_resource_set_t *,
+                                            mrp_resource_event_t);
 int                 mrp_resource_set_print(mrp_resource_set_t *, size_t,
                                            char *, int);
 
