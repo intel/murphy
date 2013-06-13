@@ -195,7 +195,9 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
     MRP_ASSERT(zone, "zone is not defined");
 
-    maxev  = mrp_get_resource_set_count();
+    if (!(maxev = mrp_get_resource_set_count()))
+        return;
+
     nevent = 0;
     events = mrp_alloc(sizeof(event_t) * maxev);
 

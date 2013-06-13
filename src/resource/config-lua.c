@@ -49,6 +49,7 @@
 #include "application-class.h"
 #include "resource.h"
 #include "resource-set.h"
+#include "resource-owner.h"
 #include "attribute.h"
 
 #define ZONE_CLASS             MRP_LUA_CLASS_SIMPLE(zone)
@@ -85,6 +86,7 @@ enum field_e {
     SHARED,
     METHOD,
     OWNERS,
+    RECALC,
     VETO,
     ID
 };
@@ -203,6 +205,8 @@ static mrp_resource_order_t check_order(lua_State *, int);
 static int push_order(lua_State *, mrp_resource_order_t);
 static field_t field_check(lua_State *, int, const char **);
 static field_t field_name_to_type(const char *, size_t);
+
+static int method_recalc(lua_State *);
 
 
 MRP_LUA_METHOD_LIST_TABLE (
@@ -467,8 +471,26 @@ static void resource_class_create(lua_State *L)
 
 static void resource_methods_create(lua_State *L)
 {
+    typedef struct {
+        const char *name;
+        lua_CFunction func;
+    } method_def_t;
+
+    static method_def_t method_defs[] = {
+        { "recalc",  method_recalc },
+        {   NULL  ,      NULL      }
+    };
+
+    method_def_t *md;
+
     mrp_lua_create_object_class(L, RESMETHOD_CLASS);
     resource_methods = resmethod_create_from_c(L);
+
+    for (md = method_defs;  md->name;   md++) {
+        lua_pushstring(L, md->name);
+        lua_pushcfunction(L, md->func);
+        lua_rawset(L, -3);
+    }
 }
 
 
@@ -1268,6 +1290,7 @@ static int resmethod_getfield(lua_State *L)
         else {
             switch (fld) {
             case VETO:
+            case RECALC:
                 lua_pushstring(L, name);
                 lua_rawget(L, 1);
                 break;
@@ -1656,6 +1679,8 @@ static field_t field_name_to_type(const char *name, size_t len)
             return OWNERS;
         if (!strcmp(name, "shared"))
             return SHARED;
+        if (!strcmp(name, "recalc"))
+            return RECALC;
         break;
 
     case 8:
@@ -1677,6 +1702,24 @@ static field_t field_name_to_type(const char *name, size_t len)
 
     default:
         break;
+    }
+
+    return 0;
+}
+
+static int method_recalc(lua_State *L)
+{
+    const char *zone_name;
+    mrp_zone_t *zone;
+
+    if (lua_type(L, 1) == LUA_TSTRING && (zone_name = lua_tostring(L, 1))) {
+
+        if (!(zone = mrp_zone_find_by_name(zone_name))) {
+            luaL_error(L, "can't recalculate resources in zone '%s': "
+                       "no such zone", zone_name);
+        }
+
+        mrp_resource_owner_update_zone(zone->id, NULL, 0);
     }
 
     return 0;
