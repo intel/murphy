@@ -162,7 +162,37 @@ static void resource_event(mrp_msg_t *msg,
             goto malformed;
         }
 
-        /* TODO: attributes */
+        /* copy the attributes */
+        for (i = 0; i < n_attrs; i++) {
+            mrp_res_attribute_t *src = &attrs[i];
+            mrp_res_attribute_t *dst = mrp_res_get_attribute_by_name(cx, res, src->name);
+
+            if (!dst) {
+                mrp_log_error("unknown attribute '%s'!", src->name);
+                continue;
+            }
+
+            if (src->type != dst->type) {
+                mrp_log_error("attribute types don't match for '%s'!", src->name);
+            }
+
+            switch (src->type) {
+                case mrp_int32:
+                    mrp_res_set_attribute_int(cx, dst, src->integer);
+                    break;
+                case mrp_uint32:
+                    mrp_res_set_attribute_uint(cx, dst, src->unsignd);
+                    break;
+                case mrp_double:
+                    mrp_res_set_attribute_double(cx, dst, src->floating);
+                    break;
+                case mrp_string:
+                    mrp_res_set_attribute_string(cx, dst, src->string);
+                    break;
+                default: /* mrp_invalid */
+                    break;
+            }
+        }
     }
 
     /* go through all resources and see if they have been modified */
@@ -171,7 +201,7 @@ static void resource_event(mrp_msg_t *msg,
     {
         mrp_res_resource_t *res = rset->priv->resources[i];
 
-        mask  = (1UL <<  res->priv->server_id);
+        mask  = (1UL << res->priv->server_id);
         all  |= mask;
 
         if (res->priv->mandatory)
@@ -180,18 +210,9 @@ static void resource_event(mrp_msg_t *msg,
         if (grant & mask) {
             res->state = MRP_RES_RESOURCE_ACQUIRED;
         }
-#if 1
         else {
             res->state = MRP_RES_RESOURCE_LOST;
         }
-#else
-        else if (advice & mask) {
-            res->state = MRP_RES_RESOURCE_AVAILABLE;
-        }
-        else {
-            res->state = MRP_RES_RESOURCE_LOST;
-        }
-#endif
     }
 
     mrp_res_info("advice = 0x%08x, grant = 0x%08x, mandatory = 0x%08x, all = 0x%08x",
@@ -212,7 +233,7 @@ static void resource_event(mrp_msg_t *msg,
      * before that. Otherwise, if this is a real event, call the
      * callback right away. */
 
-     print_resource_set(rset);
+    print_resource_set(rset);
 
     if (!rset->priv->seqno) {
         if (rset->priv->cb) {
