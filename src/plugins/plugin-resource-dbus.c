@@ -1002,7 +1002,7 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
     if (mgr->ctx->tracking)
         mrp_dbus_follow_name(mgr->ctx->dbus, rset->owner, dbus_name_cb, rset);
 
-    rset->set = mrp_resource_set_create(mgr->client, 0, 0, event_cb,
+    rset->set = mrp_resource_set_create(mgr->client, 0, 0, 0, event_cb,
                 rset);
 
     if (!rset->set) {

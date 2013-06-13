@@ -713,6 +713,7 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
     mrp_json_t *jf, *jra, *jr;
     uint32_t    flags = 0, priority, rsid;
     bool        autorelease;
+    bool        dontwait;
     const char *appclass, *zone;
     char        attr[1024], *p;
     resdef_t    r;
@@ -733,6 +734,7 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
     }
 
     autorelease = (flags != 0);
+    dontwait    = false;
     mrp_debug("autorelease: %s", autorelease ? "true" : "false");
 
     /* dig out priority, class, and zone */
@@ -765,7 +767,8 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
     }
 
     /* create a new resource set */
-    rset = mrp_resource_set_create(c->rsc, autorelease, priority, event_cb, c);
+    rset = mrp_resource_set_create(c->rsc, autorelease, dontwait,
+                                   priority, event_cb, c);
 
     if (rset != NULL) {
         rsid = mrp_get_resource_set_id(rset);

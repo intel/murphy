@@ -162,7 +162,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     typedef struct {
         uint32_t replyid;
         mrp_resource_set_t *rset;
-        bool shuffle;
+        bool move;
     } event_t;
 
     mrp_resource_owner_t oldowners[MRP_RESOURCE_MAX];
@@ -183,7 +183,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     uint32_t rcnt;
     bool force_release;
     bool changed;
-    bool shuffle;
+    bool move;
     mrp_resource_event_t notify;
     uint32_t replyid;
     uint32_t nevent, maxev;
@@ -286,20 +286,29 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             }
 
             changed = false;
-            shuffle = false;
+            move    = false;
             notify  = 0;
             replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
 
             if (force_release) {
-                shuffle = (rset->state != mrp_resource_release);
-                notify  = shuffle ? MRP_RESOURCE_EVENT_RELEASE : 0;
-                changed = shuffle || rset->resource.mask.grant;
+                move = (rset->state != mrp_resource_release);
+                notify = move ? MRP_RESOURCE_EVENT_RELEASE : 0;
+                changed = move || rset->resource.mask.grant;
                 rset->state = mrp_resource_release;
                 rset->resource.mask.grant = 0;
             }
             else {
-                if (grant != rset->resource.mask.grant) {
+                if (grant == rset->resource.mask.grant) {
+                    if (rset->state == mrp_resource_acquire &&
+                        !grant && rset->dont_wait)
+                    {
+                        notify = MRP_RESOURCE_EVENT_RELEASE;
+                        rset->state = mrp_resource_release;
+                        move = true;
+                    }
+                }
+                else {
                     rset->resource.mask.grant = grant;
                     changed = true;
 
@@ -307,7 +316,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                         if (rset->state != mrp_resource_release)
                             notify = MRP_RESOURCE_EVENT_RELEASE;
                         rset->state = mrp_resource_release;
-                        shuffle = true;
+                        move = true;
                     }
                 }
             }
@@ -326,7 +335,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
                 ev->replyid = replyid;
                 ev->rset    = rset;
-                ev->shuffle = shuffle;
+                ev->move    = move;
             }
         } /* while rset */
     } /* while class */
@@ -336,7 +345,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
         rset = ev->rset;
 
-        if (ev->shuffle)
+        if (ev->move)
             mrp_application_class_move_resource_set(rset);
 
         mrp_resource_set_updated(rset);

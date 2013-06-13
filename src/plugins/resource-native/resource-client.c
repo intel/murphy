@@ -1605,11 +1605,13 @@ static void sighandler(mrp_sighandler_t *h, int signum, void *user_data)
 
 static void usage(client_t *client, int exit_code)
 {
-    printf("Usage: %s [-h] [-v] [-r] [-a] [-p pri] [class zone resources]\n"
+    printf("Usage: "
+           "%s [-h] [-v] [-r] [-a] [-w] [-p pri] [class zone resources]\n"
            "\nwhere\n"
            "\t-h\t\tprints this help\n"
            "\t-v\t\tverbose mode (dumps the transport messages)\n"
            "\t-a\t\tautoacquire mode\n"
+           "\t-w\t\tdont wait for resources if they were not available\n"
            "\t-r\t\tautorelease mode\n"
            "\t-p priority\t\tresource set priority (priority is 0-7)\n"
            "\tclass\t\tapplication class of the resource set\n"
@@ -1643,7 +1645,7 @@ static void parse_arguments(client_t *client, int argc, char **argv)
     char *e;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hvrap:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvrawp:")) != -1) {
         switch (opt) {
         case 'h':
             usage(client, 0);
@@ -1655,6 +1657,9 @@ static void parse_arguments(client_t *client, int argc, char **argv)
             break;
         case 'r':
             client->rsetf |= RESPROTO_RSETFLAG_AUTORELEASE;
+            break;
+        case 'w':
+            client->rsetf |= RESPROTO_RSETFLAG_DONTWAIT;
             break;
         case 'p':
             pri = strtoul(optarg, &e, 10);

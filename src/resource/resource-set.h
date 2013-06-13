@@ -41,6 +41,7 @@ struct mrp_resource_set_s {
     uint32_t                        id;
     mrp_resource_state_t            state;
     bool                            auto_release;
+    bool                            dont_wait;
     struct {
         struct {
             mrp_resource_mask_t all;

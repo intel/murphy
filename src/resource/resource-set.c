@@ -75,6 +75,7 @@ uint32_t mrp_get_resource_set_count(void)
 
 mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
                                             bool auto_release,
+                                            bool dont_wait,
                                             uint32_t priority,
                                             mrp_resource_event_cb_t event_cb,
                                             void *user_data)
@@ -93,6 +94,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
     else {
         rset->id = ++our_id;
         rset->auto_release = auto_release;
+        rset->dont_wait = dont_wait;
 
         mrp_list_init(&rset->resource.list);
         rset->resource.share = false;
@@ -417,12 +419,14 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
 
     mandatory = rset->resource.mask.mandatory;
 
-    PRINT("%s%3u - 0x%02x/0x%02x 0x%02x/0x%02x 0x%08x %d %s %s\n",
+    PRINT("%s%3u - 0x%02x/0x%02x 0x%02x/0x%02x 0x%08x %d %s%s%s %s\n",
           gap, rset->id,
           rset->resource.mask.all, mandatory,
           rset->resource.mask.grant, rset->resource.mask.advice,
           mrp_application_class_get_sorting_key(rset), rset->class.priority,
           rset->resource.share ? "shared   ":"exclusive",
+          rset->auto_release ? ",autorelease" : "",
+          rset->dont_wait ? ",dontwait" : "",
           state_str(rset->state));
 
     mrp_list_foreach(&rset->resource.list, resen, n) {

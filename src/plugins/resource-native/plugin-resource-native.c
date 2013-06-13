@@ -607,6 +607,7 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
     int32_t                 status;
     bool                    auto_release;
     bool                    auto_acquire;
+    bool                    dont_wait;
     mrp_resource_event_cb_t event_cb;
 
     MRP_ASSERT(client, "invalid argument");
@@ -645,14 +646,15 @@ static void create_resource_set_request(client_t *client, mrp_msg_t *req,
 
     auto_release = (flags & RESPROTO_RSETFLAG_AUTORELEASE);
     auto_acquire = (flags & RESPROTO_RSETFLAG_AUTOACQUIRE);
+    dont_wait    = (flags & RESPROTO_RSETFLAG_DONTWAIT);
 
     if (flags & RESPROTO_RSETFLAG_NOEVENTS)
         event_cb = NULL;
     else
         event_cb = resource_event_handler;
 
-    rset = mrp_resource_set_create(client->rscli, auto_release, priority,
-                                   event_cb, client);
+    rset = mrp_resource_set_create(client->rscli, auto_release, dont_wait,
+                                   priority, event_cb, client);
     if (!rset)
         goto reply;
 
