@@ -74,6 +74,11 @@ void acquire_resources(my_app_data *app_data)
         return;
     }
 
+    if (!mrp_res_set_autorelease(app_data->cx, TRUE, app_data->rs)) {
+        printf("Could not set autorelease flag!\n");
+        return;
+    }
+
     resource = mrp_res_create_resource(app_data->cx,
                       app_data->rs,
                       "audio_playback",

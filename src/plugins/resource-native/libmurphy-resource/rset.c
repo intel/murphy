@@ -398,17 +398,22 @@ static int update_library_resource_set(mrp_res_context_t *cx,
      * can be many. */
 
      application_class = mrp_strdup(original->application_class);
-     if (!application_class)
+     if (!application_class) {
+        mrp_log_error("error with memory allocation");
         goto error;
+    }
 
      resources = mrp_allocz_array(mrp_res_resource_t *,
             original->priv->num_resources);
-     if (!resources)
+     if (!resources) {
+        mrp_log_error("error allocating %d resources", original->priv->num_resources);
         goto error;
+    }
 
     for (i = 0; i < original->priv->num_resources; i++) {
         resources[i] = resource_copy(original->priv->resources[i], rset);
         if (!resources[i]) {
+            mrp_log_error("error copying resources to library resource set");
             goto error;
         }
         num_resources++;
@@ -423,6 +428,7 @@ static int update_library_resource_set(mrp_res_context_t *cx,
     rset->application_class = application_class;
     rset->priv->resources = resources;
     rset->priv->num_resources = num_resources;
+    rset->priv->autorelease = original->priv->autorelease;
 
     return 0;
 
