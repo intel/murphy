@@ -35,7 +35,12 @@
 
 #include <murphy-db/mqi-types.h>
 
+/*
+ * Remember: this should be smaller than
+ * sizeof(mrp_zone_mask_t) * 8
+ */
 #define MRP_ZONE_MAX            8
+#define MRP_ZONE_MASK           (((mrp_zone_mask_t)1 << MRP_ZONE_MAX) - 1)
 
 #define MRP_KEY_STAMP_BITS      27
 #define MRP_KEY_STATE_BITS      1
@@ -73,6 +78,7 @@ typedef struct mrp_resource_setref_s    mrp_resource_setref_t;
 
 typedef uint32_t                        mrp_resource_mask_t;
 typedef uint32_t                        mrp_attribute_mask_t;
+typedef uint32_t                        mrp_zone_mask_t;
 
 
 enum mrp_resource_state_e {
