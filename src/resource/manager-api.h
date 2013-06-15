@@ -55,6 +55,7 @@ void mrp_lua_resclass_create_from_c(uint32_t id);
 
 const char *mrp_resource_get_application_class(mrp_resource_t *resource);
 
+void mrp_resource_owner_recalc(uint32_t zoneid);
 
 #endif  /* __MURPHY_RESOURCE_MANAGER_API_H__ */
 

@@ -154,6 +154,10 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
     return 0;
 }
 
+void mrp_resource_owner_recalc(uint32_t zoneid)
+{
+    mrp_resource_owner_update_zone(zoneid, NULL, 0);
+}
 
 void mrp_resource_owner_update_zone(uint32_t zoneid,
                                     mrp_resource_set_t *reqset,

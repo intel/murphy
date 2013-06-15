@@ -1719,7 +1719,7 @@ static int method_recalc(lua_State *L)
                        "no such zone", zone_name);
         }
 
-        mrp_resource_owner_update_zone(zone->id, NULL, 0);
+        mrp_resource_owner_recalc(zone->id);
     }
 
     return 0;
