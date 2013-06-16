@@ -261,6 +261,10 @@ const char **mrp_application_class_get_all_names(uint32_t buflen,
     return buf;
 }
 
+uint32_t mrp_application_class_get_priority(mrp_application_class_t *class)
+{
+    return class ? class->priority : 0;
+}
 
 int mrp_application_class_add_resource_set(const char *class_name,
                                            const char *zone_name,

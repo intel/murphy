@@ -43,6 +43,7 @@ mrp_attr_t *mrp_zone_read_all_attributes(mrp_zone_t *zone,
 
 
 const char *mrp_application_class_get_name(mrp_application_class_t *class);
+uint32_t mrp_application_class_get_priority(mrp_application_class_t *class);
 
 
 uint32_t mrp_resource_definition_create(const char *name,
