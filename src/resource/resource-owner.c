@@ -356,7 +356,17 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
         mrp_resource_set_updated(rset);
 
-        if (rset->event)
+        /* first we send out the revoke/deny events
+         * followed by the grants (in the next for loop)
+         */
+        if (rset->event && !rset->resource.mask.grant)
+            rset->event(ev->replyid, rset, rset->user_data);
+    }
+
+    for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
+        rset = ev->rset;
+
+        if (rset->event && rset->resource.mask.grant)
             rset->event(ev->replyid, rset, rset->user_data);
     }
 
