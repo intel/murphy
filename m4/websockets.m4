@@ -21,6 +21,18 @@ if test "$enable_websockets" != "no"; then
         # Check for a couple of recent features we need to adopt to.
         saved_CFLAGS="$CFLAGS"
         saved_LDFLAGS="$LDFLAGS"
+        # Note that (at least with autoconf 2.69 and gcc 4.7.2), setting
+        # LD_AS_NEEDED to 1 breaks AC_LINK_IFELSE. That macro generates
+        # the compilation command so that the libraries are specified
+        # before the generated C source so all referenced/tested symbols
+        # from any of the libraries end up being undefined. This fools
+        # AC_LINK_IFELSE to consider the test a failure and select the
+        # else branch.
+        # rpmbuild always sets LD_AS_NEEDED to 1. To work around this save
+        # and restore LD_AS_NEEDED for the duration of the AC_LINK_IFELSE
+        # tests.
+        saved_LD_AS_NEEDED="$LD_AS_NEEDED"
+        unset LD_AS_NEEDED
         CFLAGS="`pkg-config --cflags libwebsockets`"
         LDFLAGS="`pkg-config --libs libwebsockets`"
 
@@ -70,6 +82,9 @@ if test "$enable_websockets" != "no"; then
 
         CFLAGS="$saved_CFLAGS"
         LDFLAGS="$saved_LDFLAGS"
+        if test -n "$saved_LD_AS_NEEDED"; then
+            export LD_AS_NEEDED="$saved_LD_AS_NEEDED"
+        fi
 
         # Check whether we have libwebsocket_close_and_free_session.
         AC_MSG_CHECKING([for WEBSOCKETS close_and_free_session API])
