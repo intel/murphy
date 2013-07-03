@@ -534,7 +534,7 @@ row_trigger: TKN_ROWS TKN_IN table_name callback trigger_select {
     sts = set_select_variables(&rowsize, coltypes,colsizes,
                                errbuf, sizeof(errbuf));
     if (sts < 0)
-        MQL_ERROR(errno, errbuf);
+        MQL_ERROR(errno, "%s", errbuf);
 
     sts = mql_create_row_trigger(trigger_name, table, callback,
                                  ncolnam,colnams,
@@ -567,7 +567,7 @@ column_trigger: TKN_COLUMN TKN_IDENTIFIER TKN_IN table_name callback
         sts = set_select_variables(&rowsize, coltypes,colsizes,
                                    errbuf, sizeof(errbuf));
         if (sts < 0)
-            MQL_ERROR(errno, errbuf);
+            MQL_ERROR(errno, "%s", errbuf);
 
         sts = mql_create_column_trigger(trigger_name,
                                         table, colidx,coltype, callback,
@@ -970,7 +970,7 @@ select_statement: select columns TKN_FROM table_name where_clause {
     sts = set_select_variables(&rowsize, coltypes,colsizes,
                                errbuf, sizeof(errbuf));
     if (sts < 0)
-        MQL_ERROR(errno, errbuf);
+        MQL_ERROR(errno, "%s", errbuf);
 
 
     if (mode != mql_mode_precompile && mode != mql_mode_exec && !tsiz) {
