@@ -1,0 +1,11 @@
+[Unit]
+Description=Murphy Resource Policy Service
+
+[Service]
+Type=simple
+ExecStartPre=mkdir -p /tmp/murphy
+ExecStart=/usr/bin/murphyd -f -t systemd -vvv
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

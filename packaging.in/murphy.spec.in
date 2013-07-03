@@ -17,6 +17,8 @@
 %{!?_with_telephony:%{!?_without_telephony:%define _without_telephony 1}}
 %{!?_with_squashpkg:%{!?_without_squashpkg:%define _with_squashpkg 1}}
 
+%define systemddir /lib/systemd
+
 Summary: Murphy policy framework
 Name: murphy
 Version: @VERSION@
@@ -27,6 +29,8 @@ URL: http://01.org/murphy/
 Source0: %{name}-%{version}.tar.gz
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+
+Requires: /bin/systemctl
 %if %{?_with_squashpkg:0}%{!?_with_squashpkg:1}
 Requires: %{name}-core = %{version}
 %endif
@@ -59,6 +63,9 @@ BuildRequires: pkgconfig(dbus-1)
 %if %{?_with_telephony:1}%{!?_with_telephony:0}
 #BuildRequires: pkgconfig(ofono)
 %endif
+
+BuildRequires: pkgconfig(libsystemd-daemon)
+BuildRequires: pkgconfig(libsystemd-journal)
 
 %if %{?_with_squashpkg:0}%{!?_with_squashpkg:1}
 %package core
@@ -318,19 +325,27 @@ popd >& /dev/null
 cp packaging.in/murphy-lua.conf $RPM_BUILD_ROOT%{_sysconfdir}/murphy/murphy.conf
 cp packaging.in/murphy.lua      $RPM_BUILD_ROOT%{_sysconfdir}/murphy/murphy.lua
 
+# Copy the systemd service file in place.
+mkdir -p $RPM_BUILD_ROOT%{systemddir}/system
+cp packaging.in/murphyd.service $RPM_BUILD_ROOT%{systemddir}/system
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%if %{?_with_squashpkg:1}%{!?_with_squashpkg:0}
 %post
-%else
+/bin/systemctl enable murphyd.service
+
+%if %{?_with_squashpkg:0}%{!?_with_squashpkg:1}
 %post core
 %endif
 ldconfig
 
-%if %{?_with_squashpkg:1}%{!?_with_squashpkg:0}
 %postun
-%else
+if [ "$1" = "0" ]; then
+    /bin/systemctl disable murphyd.service
+fi
+
+%if %{?_with_squashpkg:0}%{!?_with_squashpkg:1}
 %postun core
 %endif
 ldconfig
@@ -343,6 +358,7 @@ ldconfig
 %defattr(-,root,root,-)
 %{_bindir}/murphyd
 %{_sysconfdir}/murphy
+%{systemddir}/system/murphyd.service
 
 %if %{?_with_squashpkg:0}%{!?_with_squashpkg:1}
 %files core
