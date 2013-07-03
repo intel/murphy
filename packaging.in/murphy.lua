@@ -3,6 +3,9 @@ m = murphy.get()
 -- try loading console plugin
 m:try_load_plugin('console')
 
+-- try loading the systemd (logging) plugin
+m:try_load_plugin('systemd')
+
 -- load the dbus plugin if it exists
 if m:plugin_exists('dbus') then
     m:load_plugin('dbus')
