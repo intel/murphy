@@ -11,9 +11,6 @@ if m:plugin_exists('dbus') then
     m:load_plugin('dbus')
 end
 
--- try loading the signalling plugin
-m:try_load_plugin('signalling', { address = 'internal:signalling' })
-
 -- load the native resource plugin
 if m:plugin_exists('resource-native') then
     m:load_plugin('resource-native')
