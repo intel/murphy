@@ -1898,6 +1898,9 @@ static void libwebsockets(const char *line)
      *
      */
 
+    lvl = "???";
+    ls  = 3;
+
     ts = strchr(line, '[');
     ll = ts != NULL ? strchr(ts, ']') : NULL;
 
