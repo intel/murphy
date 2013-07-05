@@ -338,6 +338,31 @@ AC_SUBST(SMACK_ENABLED)
 AC_SUBST(SMACK_CFLAGS)
 AC_SUBST(SMACK_LIBS)
 
+# Check if systemd support should be enabled.
+AC_ARG_ENABLE(systemd,
+              [  --enable-systmed          enable systemd support],
+	      [enable_systemd=$enableval], [enable_systemd=auto])
+
+if test "$enable_systemd" != "no"; then
+    PKG_CHECK_MODULES(SYSTEMD, libsystemd-journal libsystemd-daemon,
+                      [have_systemd=yes], [have_systemd=no])
+    if test "$have_systemd" = "no" -a "$enable_systemd" = "yes"; then
+        AC_MSG_ERROR([systemd development libraries not found.])
+    fi
+
+    enable_systemd="$have_systemd"
+else
+    AC_MSG_NOTICE([systemd support is disabled.])
+fi
+
+if test "$enable_systemd" = "yes"; then
+    AC_DEFINE([SYSTEMD_ENABLED], 1, [Enable systemd support ?])
+fi
+AM_CONDITIONAL(SYSTEMD_ENABLED, [test "$enable_systemd" = "yes"])
+AC_SUBST(SYSTEMD_ENABLED)
+AC_SUBST(SYSTEMD_CFLAGS)
+AC_SUBST(SYSTEMD_LIBS)
+
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
 MURPHY_LIBS=""
@@ -435,6 +460,7 @@ AM_CONDITIONAL(DISABLED_PLUGIN_RESOURCE_DBUS, [check_if_disabled resource-dbus])
 AM_CONDITIONAL(DISABLED_PLUGIN_RESOURCE_WRT, [check_if_disabled resource-wrt])
 AM_CONDITIONAL(DISABLED_PLUGIN_DOMAIN_CONTROL,
                [check_if_disabled domain-control])
+AM_CONDITIONAL(DISABLED_PLUGIN_SYSTEMD,  [check_if_disabled systemd])
 
 AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,     [check_if_internal test])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,     [check_if_internal dbus])
@@ -445,6 +471,7 @@ AM_CONDITIONAL(BUILTIN_PLUGIN_RESOURCE_WRT, [check_if_internal resource-wrt])
 AM_CONDITIONAL(BUILTIN_PLUGIN_DOMAIN_CONTROL,
                [check_if_internal domain-control])
 AM_CONDITIONAL(BUILTIN_PLUGIN_LUA,      [check_if_internal lua])
+AM_CONDITIONAL(BUILTIN_PLUGIN_SYSTEMD,  [check_if_internal systemd])
 
 # Check for Check (unit test framework).
 PKG_CHECK_MODULES(CHECK, 
@@ -576,6 +603,7 @@ echo "Qt mainloop support: $enable_qt"
 echo "Murphy console plugin and client: $enable_console"
 echo "Resource management support: $with_resources"
 echo "Websockets support: $enable_websockets"
+echo "systemd support: $enable_systemd"
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do

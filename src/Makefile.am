@@ -1286,6 +1286,30 @@ plugin_lua_la_LIBADD  = $(LUA_PLUGIN_LIBS) $(LUA_LIBS)
 plugin_LTLIBRARIES    += plugin-lua.la
 endif
 
+# systemd (logging) plugin
+if SYSTEMD_ENABLED
+SYSTEMD_PLUGIN_SOURCES = plugins/plugin-systemd.c
+SYSTEMD_PLUGIN_CFLAGS  = $(SYSTEMD_CFLAGS)
+SYSTEMD_PLUGIN_LIBS    = $(SYSTEMD_LIBS)
+
+if !DISABLED_PLUGIN_SYSTEMD
+if BUILTIN_PLUGIN_SYSTEMD
+BUILTIN_PLUGINS += $(SYSTEMD_PLUGIN_SOURCES)
+BUILTIN_CFLAGS  += $(SYSTEMD_PLUGIN_CFLAGS)
+BUILTIN_LIBS    += $(SYSTEMD_PLUGIN_LIBS)
+else
+plugin_systemd_la_SOURCES = $(SYSTEMD_PLUGIN_SOURCES)
+plugin_systemd_la_CFLAGS  = $(SYSTEMD_PLUGIN_CFLAGS) \
+                            $(MURPHY_CFLAGS) \
+                            $(AM_CFLAGS)
+plugin_systemd_la_LDFLAGS = -module -avoid-version
+plugin_systemd_la_LIBADD  = $(SYSTEMD_PLUGIN_LIBS)
+
+plugin_LTLIBRARIES += plugin-systemd.la
+endif
+endif
+endif
+
 
 ###################################
 # murphy daemon
