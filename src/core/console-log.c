@@ -72,7 +72,7 @@ static void log_target(mrp_console_t *c, void *user_data,
         target = argv[2];
 
         if (!mrp_log_set_target(target))
-            printf("failed to change logging target to %s", target);
+            printf("failed to change logging target to %s\n", target);
         else {
             printf("changed log target to %s\n", target);
             mrp_log_info("changed log target to %s", target);
