@@ -10,6 +10,8 @@ m:try_load_plugin('console', 'webconsole', {
 --                              sslpkey = 'src/plugins/console/console.key'
          })
 
+m:try_load_plugin('systemd')
+
 -- load a test plugin
 if m:plugin_exists('test.disabled') then
     m:load_plugin('test', {
