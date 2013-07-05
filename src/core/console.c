@@ -532,6 +532,7 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
     c->in.next  = c->in.buf;
     c->in.in    = c->in.buf + len;
     c->in.line  = 1;
+    c->in.error = 0;
     *c->in.in   = '\0';
 
     argv = args + 2;
@@ -544,9 +545,11 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
      *        decent input processing.
      */
 
-    if (argc < 0)
+    if (argc < 0) {
         fprintf(c->stderr, "failed to parse command: '%.*s'\n",
                 (int)size, (char *)buf);
+        return -1;
+    }
     else if (argc == 0)
         goto prompt;
 
