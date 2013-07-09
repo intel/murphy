@@ -59,6 +59,10 @@ while [ -n "$1" -a "${1#-}" != "$1" ]; do
             echo "$0 [--git <git-version>]"
             exit 0
             ;;
+        --debug|-d)
+            shift
+            debug="--with debug"
+            ;;
     esac
 done
 
@@ -76,5 +80,5 @@ sed "s/@VERSION@/$VERSION/g" $PKG.spec.in > $PKG.spec
 mv $PKG-$VERSION.tar.gz ~/rpmbuild/SOURCES
 mv $PKG.spec ~/rpmbuild/SPECS
 
-rpmbuild $* -bb ~/rpmbuild/SPECS/$PKG.spec
+rpmbuild $debug -bb ~/rpmbuild/SPECS/$PKG.spec
 mv -v ~/rpmbuild/RPMS/*/$PKG*$VERSION* .
