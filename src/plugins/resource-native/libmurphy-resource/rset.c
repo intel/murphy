@@ -335,8 +335,13 @@ static mrp_res_resource_set_t *create_resource_set(
         mrp_res_resource_callback_t cb,
         void *userdata)
 {
-    mrp_res_resource_set_t *rs = mrp_allocz(sizeof(mrp_res_resource_set_t));
+    mrp_res_resource_set_t *rs;
     mrp_res_resource_set_t *internal;
+
+    if (cx->priv->master_resource_set == NULL)
+        return NULL;
+
+    rs = mrp_allocz(sizeof(mrp_res_resource_set_t));
 
     if (!rs)
         goto error;
