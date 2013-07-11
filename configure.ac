@@ -340,7 +340,7 @@ AC_SUBST(SMACK_LIBS)
 
 # Check if systemd support should be enabled.
 AC_ARG_ENABLE(systemd,
-              [  --enable-systmed          enable systemd support],
+              [  --enable-systemd          enable systemd support],
 	      [enable_systemd=$enableval], [enable_systemd=auto])
 
 if test "$enable_systemd" != "no"; then
