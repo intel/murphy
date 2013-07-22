@@ -163,7 +163,7 @@ static void resource_event(mrp_msg_t *msg,
         }
 
         /* copy the attributes */
-        for (i = 0; i < n_attrs; i++) {
+        for (i = 0; (int) i < n_attrs; i++) {
             mrp_res_attribute_t *src = &attrs[i];
             mrp_res_attribute_t *dst = mrp_res_get_attribute_by_name(cx, res, src->name);
 
