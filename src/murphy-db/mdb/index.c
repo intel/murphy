@@ -100,7 +100,7 @@ int mdb_index_create(mdb_table_t *tbl, char **index_columns)
             }
         }
 
-        if (!(idxcols = realloc(idxcols, sizeof(int *) * (i+1)))) {
+        if (!(idxcols = realloc(idxcols, sizeof(int) * (i+1)))) {
             errno = ENOMEM;
             return -1;
         }
