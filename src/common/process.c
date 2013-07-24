@@ -215,6 +215,9 @@ static void process_change(mrp_io_watch_t *wd, int fd, mrp_io_event_t events,
 
             filename = path_from_id(is->name);
 
+            if (!filename)
+                continue;
+
             w = (i_watch_t *) mrp_htbl_lookup(i_watches, filename);
 
             if (w) {
