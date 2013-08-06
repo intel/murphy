@@ -460,16 +460,17 @@ static void ringbuf_reset_search(ringbuf_t *rb)
 {
     rb->srch = 0;
     rb->plen = 0;
+    memset(rb->pattern, 0, rb->psize);
 }
 
 
 static char *ringbuf_search(ringbuf_t *rb, int dir, unsigned char c,
-                            char *current)
+                            brl_mode_t mode, char *current)
 {
     int    i;
     char **e;
 
-    if (!c) {
+    if (!c && mode == BRL_MODE_NORMAL) {
         i = rb->srch + (dir < 0 ? -1 : +1);
 
         if (i > 0)
@@ -489,10 +490,71 @@ static char *ringbuf_search(ringbuf_t *rb, int dir, unsigned char c,
         else
             return NULL;
     }
-    else {
-        errno = EOPNOTSUPP;
+    else if (mode == BRL_MODE_SEARCH_BACK) {
+        int total = rb->plen + 1;
+        int found = 0;
+
+        if (c) {
+            if (rb->psize == 0) {
+                rb->psize = 32;
+                if (!(rb->pattern = brl_allocz(rb->psize))) {
+                    errno = ENOMEM;
+                    return NULL;
+                }
+            }
+
+            if (rb->psize < total) {
+                if (rb->psize * 2 > total)
+                    total = rb->psize * 2;
+                if (!brl_reallocz(rb->pattern, rb->psize, total)) {
+                    errno = ENOMEM;
+                    return NULL;
+                }
+                rb->psize = total;
+            }
+
+            rb->pattern[rb->plen++] = c;
+
+            i = rb->srch;
+        }
+        else {
+            /* keep searching backwards */
+            i = rb->srch - 1;
+        }
+
+        if (!rb->pattern) {
+            errno = EINVAL;
+            return NULL;
+        }
+
+        /* start searching backwards from current search point */
+
+        do {
+            e = ringbuf_entry(rb, i);
+
+            if (e != NULL && *e != NULL) {
+                /* pattern matching */
+                if (strstr(*e, rb->pattern)) {
+                    found = 1;
+                    break;
+                }
+            }
+
+            i--;
+        } while (e != NULL && !found);
+
+        if (found) {
+            /* set the search position while we're in search mode */
+           rb->srch = i;
+           return *e;
+        }
+
+        errno = ENOENT;
         return NULL;
     }
+
+    errno = EOPNOTSUPP;
+    return NULL;
 }
 
 
@@ -714,8 +776,17 @@ static void redraw_prompt(brl_t *brl)
     char *prompt, *buf, *p;
     int   plen, dlen, space, start, trunc;
     int   l, n, o;
+    char  search_buf[256];
 
-    prompt = brl->prompt ? brl->prompt : "";
+    if (brl->mode == BRL_MODE_SEARCH_BACK) {
+        snprintf(search_buf, 256, "search backwards: '%s'",
+                brl->h.pattern ? brl->h.pattern : "");
+        prompt = search_buf;
+    }
+    else {
+        prompt = brl->prompt ? brl->prompt : "";
+    }
+
     plen   = strlen(prompt) + 2;            /* '> ' or '><' */
 
     if (brl->dbg_len > 0)
@@ -1070,17 +1141,39 @@ static void process_input(brl_t *brl)
 
         switch (type) {
         case BRL_TYPE_SELF:
-            out = (char)(in & 0xff);
-            insert_input(brl, &out, 1);
-            redraw_prompt(brl);
+            switch (brl->mode) {
+                case BRL_MODE_NORMAL:
+                    out = (char)(in & 0xff);
+                    insert_input(brl, &out, 1);
+                    redraw_prompt(brl);
+                    break;
+                case BRL_MODE_SEARCH_BACK:
+                    out = (char)(in & 0xff);
+                    hentry = ringbuf_search(&brl->h, 0, out, BRL_MODE_SEARCH_BACK, NULL);
+                    if (hentry != NULL) {
+                        reset_input(brl);
+                        insert_input(brl, hentry, strlen(hentry));
+                    }
+                    else
+                        bell(brl);
+                    redraw_prompt(brl);
+                    break;
+                case BRL_MODE_SEARCH_FORW:
+                    /* TODO */
+                    break;
+            }
             break;
 
         case BRL_TYPE_COMMAND:
             switch (in) {
             case BRL_CMD_PREV_LINE:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 if (brl->h.srch == 0)
                     save_input(brl);
-                hentry = ringbuf_search(&brl->h, -1, 0, (char *)brl->saved);
+                hentry = ringbuf_search(&brl->h, -1, 0, BRL_MODE_NORMAL, (char *)brl->saved);
                 debug(brl, "s:%d,'%s'", brl->h.srch,
                       brl->saved ? brl->saved : "-");
                 if (hentry != NULL) {
@@ -1093,7 +1186,11 @@ static void process_input(brl_t *brl)
                 break;
 
             case BRL_CMD_NEXT_LINE:
-                hentry = ringbuf_search(&brl->h, +1, 0, (char *)brl->saved);
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
+                hentry = ringbuf_search(&brl->h, +1, 0, BRL_MODE_NORMAL, (char *)brl->saved);
                 debug(brl, "s:%d,'%s'", brl->h.srch,
                       brl->saved ? brl->saved : "-");
                 if (hentry != NULL) {
@@ -1109,57 +1206,132 @@ static void process_input(brl_t *brl)
                     bell(brl);
                 break;
 
+            case BRL_CMD_SEARCH_BACK:
+                if (brl->mode == BRL_MODE_SEARCH_BACK) {
+                    /* already in search mode, continue */
+                    hentry = ringbuf_search(&brl->h, 0, 0, BRL_MODE_SEARCH_BACK, NULL);
+                    if (hentry != NULL) {
+                        reset_input(brl);
+                        insert_input(brl, hentry, strlen(hentry));
+                    }
+                    else
+                        bell(brl);
+                }
+                else {
+                    if (brl->h.srch == 0)
+                        save_input(brl);
+                    brl->mode = BRL_MODE_SEARCH_BACK;
+                }
+                redraw_prompt(brl);
+                break;
+
             case BRL_CMD_BACKWARD:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 move_cursor(brl, -1);
                 redraw_prompt(brl);
                 break;
             case BRL_CMD_FORWARD:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 move_cursor(brl, +1);
                 redraw_prompt(brl);
                 break;
 
             case BRL_CMD_LINE_START:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 move_cursor(brl, -brl->offs);
                 redraw_prompt(brl);
                 break;
             case BRL_CMD_LINE_END:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 move_cursor(brl, brl->data - brl->offs);
                 redraw_prompt(brl);
                 break;
 
             case BRL_CMD_ERASE_BEFORE:
-                erase_input(brl, -1);
-                if (brl->offs < brl->data)
-                    move_cursor(brl, -1);
-                redraw_prompt(brl);
+                switch(brl->mode) {
+                case BRL_MODE_NORMAL:
+                    erase_input(brl, -1);
+                    if (brl->offs < brl->data)
+                        move_cursor(brl, -1);
+                    redraw_prompt(brl);
+                    break;
+                case BRL_MODE_SEARCH_BACK:
+                case BRL_MODE_SEARCH_FORW:
+                    if (brl->h.plen > 0) {
+                        brl->h.pattern[--brl->h.plen] = '\0';
+                    }
+                    else {
+                        ringbuf_reset_search(&brl->h);
+                        brl->mode = BRL_MODE_NORMAL;
+                        restore_input(brl);
+                    }
+                    redraw_prompt(brl);
+                    break;
+                }
                 break;
             case BRL_CMD_ERASE_AT:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 erase_input(brl, 1);
                 redraw_prompt(brl);
                 break;
 
             case BRL_CMD_ERASE_REST:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 save_yank(brl, brl->offs, brl->data);
                 erase_input(brl, brl->data - brl->offs);
                 redraw_prompt(brl);
                 break;
             case BRL_CMD_ERASE_ALL:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 save_yank(brl, 0, brl->data);
                 reset_input(brl);
                 redraw_prompt(brl);
                 break;
             case BRL_CMD_YANK:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 insert_input(brl, (char *)brl->yank, brl->yank_data);
                 redraw_prompt(brl);
                 break;
 
             case BRL_CMD_PREV_WORD:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 diff = input_delimiter(brl, -1);
                 move_cursor(brl, diff);
                 redraw_prompt(brl);
                 break;
 
             case BRL_CMD_NEXT_WORD:
+                if (brl->mode != BRL_MODE_NORMAL) {
+                    ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
+                }
                 diff = input_delimiter(brl, +1);
                 move_cursor(brl, diff);
                 redraw_prompt(brl);
@@ -1180,6 +1352,7 @@ static void process_input(brl_t *brl)
                     brl->line_cb(brl, line, brl->user_data);
                     enable_rawmode(brl);
                     ringbuf_reset_search(&brl->h);
+                    brl->mode = BRL_MODE_NORMAL;
                     debug(brl, "");
                     redraw_prompt(brl);
                 }
@@ -1212,7 +1385,7 @@ static void process_input(brl_t *brl)
 
 static void dump_input(brl_t *brl)
 {
-    unsigned char c, seq[64], s[4] = "   \0";
+    unsigned char c, seq[64], s[4] = "  \0";
     int           i = 0;
 
     printf("got input:");
