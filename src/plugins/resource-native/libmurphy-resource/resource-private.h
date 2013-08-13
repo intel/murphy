@@ -36,6 +36,8 @@
 
 #include "resource-api.h"
 
+MRP_CDECL_BEGIN
+
 typedef struct {
     const char *name;
     mrp_res_attribute_type_t type; /* s:char *, i:int32_t, u:uint32_t, f:double */
@@ -141,5 +143,7 @@ void *u_to_p(uint32_t u);
 
 void mrp_res_log_msg(mrp_log_level_t level, const char *file, int line,
                      const char *func, const char *format, ...);
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_RESOURCE_API_PRIVATE_H__ */
