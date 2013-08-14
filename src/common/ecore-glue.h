@@ -30,6 +30,8 @@
 #ifndef __MURPHY_ECORE_H__
 #define __MURPHY_ECORE_H__
 
+MRP_CDECL_BEGIN
+
 /** Register the given murphy mainloop with the ecore mainloop. */
 int mrp_mainloop_register_with_ecore(mrp_mainloop_t *ml);
 
@@ -38,5 +40,7 @@ int mrp_mainloop_unregister_from_ecore(mrp_mainloop_t *ml);
 
 /** Create a murphy mainloop and set it up with the ecore mainloop. */
 mrp_mainloop_t *mrp_mainloop_ecore_get(void);
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_ECORE_H__ */
