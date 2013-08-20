@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: murphy-sd-bus
+Description: Murphy policy framework, systemd-bus based dbus library.
+Requires: murphy-common
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lmurphy-sd-bus @SDBUS_LIBS@
+Cflags: -I${includedir} @SDBUS_CFLAGS@

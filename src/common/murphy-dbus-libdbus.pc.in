@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: murphy-dbus
+Description: Murphy policy framework, libdbus based dbus library.
+Requires: murphy-common
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lmurphy-dbus-libdbus @LIBDBUS_LIBS@
+Cflags: -I${includedir} @LIBDBUS_CFLAGS@

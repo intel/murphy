@@ -35,7 +35,7 @@
 #include <murphy/common/refcnt.h>
 #include <murphy/common/utils.h>
 #include <murphy/common/mainloop.h>
-#include <murphy/common/dbus.h>
+#include <murphy/common/dbus-libdbus.h>
 
 
 #define DBUS_ADMIN_SERVICE   "org.freedesktop.DBus"
@@ -60,6 +60,27 @@ struct mrp_dbus_s {
     mrp_refcnt_t     refcnt;             /* reference count */
 };
 
+
+struct mrp_dbus_msg_s {
+    DBusMessage     *msg;                /* actual D-BUS message */
+    mrp_refcnt_t     refcnt;             /* reference count */
+    mrp_list_hook_t  iterators;          /* iterator stack */
+    mrp_list_hook_t  arrays;             /* implicitly freed related arrays */
+};
+
+
+typedef struct {
+    DBusMessageIter  it;                 /* actual iterator */
+    char            *peeked;             /* peeked contents, or NULL */
+    mrp_list_hook_t  hook;               /* hook to iterator stack */
+} msg_iter_t;
+
+
+typedef struct {
+    mrp_list_hook_t   hook;
+    char            **items;
+    size_t            nitem;
+} msg_array_t;
 
 /*
  * Notes:
@@ -138,9 +159,10 @@ static void purge_name_trackers(mrp_dbus_t *dbus);
 static void purge_calls(mrp_dbus_t *dbus);
 static void handler_list_free_cb(void *key, void *entry);
 static void handler_free(handler_t *h);
-static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
+static int name_owner_change_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *m,
+                                void *data);
 static void call_free(call_t *call);
-
+static void free_msg_array(msg_array_t *a);
 
 
 
@@ -256,7 +278,7 @@ static mrp_dbus_t *dbus_get(mrp_mainloop_t *ml, const char *address)
 
 
 mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
-                             DBusError *errp)
+                             mrp_dbus_err_t *errp)
 {
     static struct DBusObjectPathVTable vtable = {
         .message_function = dispatch_method
@@ -393,7 +415,8 @@ int mrp_dbus_unref(mrp_dbus_t *dbus)
 }
 
 
-int mrp_dbus_acquire_name(mrp_dbus_t *dbus, const char *name, DBusError *error)
+int mrp_dbus_acquire_name(mrp_dbus_t *dbus, const char *name,
+                          mrp_dbus_err_t *error)
 {
     int flags, status;
 
@@ -415,7 +438,8 @@ int mrp_dbus_acquire_name(mrp_dbus_t *dbus, const char *name, DBusError *error)
 }
 
 
-int mrp_dbus_release_name(mrp_dbus_t *dbus, const char *name, DBusError *error)
+int mrp_dbus_release_name(mrp_dbus_t *dbus, const char *name,
+                          mrp_dbus_err_t *error)
 {
     mrp_dbus_error_init(error);
 
@@ -431,9 +455,11 @@ const char *mrp_dbus_get_unique_name(mrp_dbus_t *dbus)
     return dbus->unique_name;
 }
 
-static void name_owner_query_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
+
+static void name_owner_query_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *m, void *data)
 {
-    name_tracker_t *t = (name_tracker_t *)data;
+    name_tracker_t *t   = (name_tracker_t *)data;
+    DBusMessage    *msg = m->msg;
     const char     *owner;
     int             state;
 
@@ -453,13 +479,16 @@ static void name_owner_query_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 }
 
 
-static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
+static int name_owner_change_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *m, void *data)
 {
     const char      *name, *prev, *next;
     mrp_list_hook_t *p, *n;
     name_tracker_t  *t;
+    DBusMessage     *msg;
 
     MRP_UNUSED(data);
+
+    msg = m->msg;
 
     if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
         return FALSE;
@@ -471,6 +500,7 @@ static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                                DBUS_TYPE_INVALID))
         return FALSE;
 
+#if 0
     /*
      * Notes: XXX TODO
      *    In principle t->cb could call mrp_dbus_forget for some other D-BUS
@@ -479,13 +509,14 @@ static int name_owner_change_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
      *    of this loop (when handling n). We can easily get around this
      *    problem by
      *
-     *     1) adminstering in mrp_dbus_t that we're handing a NameOwnerChange
-     *     2) checking for this in mrp_dbus_forget_name and if it is the case
+     *     1. administering in mrp_dbus_t that we're handing a NameOwnerChange
+     *     2. checking for this in mrp_dbus_forget_name and if it is the case
      *        only marking the affected entry for deletion
-     *     3) removing entries marked for deletion in this loop (or just
+     *     3. removing entries marked for deletion in this loop (or just
      *        ignoring them and making another pass in the end removing any
      *        such entry).
      */
+#endif
 
     mrp_list_foreach(&dbus->name_trackers, p, n) {
         t = mrp_list_entry(p, name_tracker_t, hook);
@@ -518,7 +549,7 @@ int mrp_dbus_follow_name(mrp_dbus_t *dbus, const char *name,
                                        DBUS_ADMIN_SERVICE, DBUS_ADMIN_PATH,
                                        DBUS_ADMIN_SERVICE, "GetNameOwner", 5000,
                                        name_owner_query_cb, t,
-                                       DBUS_TYPE_STRING, &t->name,
+                                       DBUS_TYPE_STRING, t->name,
                                        DBUS_TYPE_INVALID);
                 return TRUE;
             }
@@ -1016,6 +1047,73 @@ int mrp_dbus_remove_filter(mrp_dbus_t *dbus, const char *sender,
 }
 
 
+static inline mrp_dbus_msg_t *create_message(DBusMessage *msg)
+{
+    mrp_dbus_msg_t *m;
+
+    if (msg != NULL) {
+        if ((m = mrp_allocz(sizeof(*m))) != NULL) {
+            mrp_refcnt_init(&m->refcnt);
+            mrp_list_init(&m->iterators);
+            mrp_list_init(&m->arrays);
+            m->msg = dbus_message_ref(msg);
+        }
+    }
+    else
+        m = NULL;
+
+    return m;
+}
+
+
+mrp_dbus_msg_t *mrp_dbus_msg_ref(mrp_dbus_msg_t *m)
+{
+    return mrp_ref_obj(m, refcnt);
+}
+
+
+static void free_message(mrp_dbus_msg_t *m)
+{
+    mrp_list_hook_t *p, *n;
+    msg_iter_t      *it;
+    msg_array_t     *a;
+
+    mrp_list_foreach(&m->iterators, p, n) {
+        it = mrp_list_entry(p, typeof(*it), hook);
+
+        mrp_list_delete(&it->hook);
+        mrp_free(it->peeked);
+        mrp_free(it);
+    }
+
+    mrp_list_foreach(&m->arrays, p, n) {
+        a = mrp_list_entry(p, typeof(*a), hook);
+
+        free_msg_array(a);
+    }
+
+    mrp_free(m);
+}
+
+
+int mrp_dbus_msg_unref(mrp_dbus_msg_t *m)
+{
+    DBusMessage *msg;
+
+    if (mrp_unref_obj(m, refcnt)) {
+        msg = m->msg;
+
+        free_message(m);
+
+        if (msg != NULL)
+            dbus_message_unref(msg);
+
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
 
 static DBusHandlerResult dispatch_method(DBusConnection *c,
                                          DBusMessage *msg, void *data)
@@ -1026,6 +1124,8 @@ static DBusHandlerResult dispatch_method(DBusConnection *c,
     const char *member    = dbus_message_get_member(msg);
 
     mrp_dbus_t     *dbus = (mrp_dbus_t *)data;
+    mrp_dbus_msg_t *m    = NULL;
+    int             r    = DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
     handler_list_t *l;
     handler_t      *h;
 
@@ -1040,10 +1140,13 @@ static DBusHandlerResult dispatch_method(DBusConnection *c,
     if ((l = mrp_htbl_lookup(dbus->methods, (void *)member)) != NULL) {
     retry:
         if ((h = handler_list_find(l, path, interface, member)) != NULL) {
-            if (h->handler(dbus, msg, h->user_data))
-                return DBUS_HANDLER_RESULT_HANDLED;
-            else
-                return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+            if (m == NULL)
+                m = create_message(msg);
+
+            if (m != NULL && h->handler(dbus, m, h->user_data))
+                r = DBUS_HANDLER_RESULT_HANDLED;
+
+            goto out;
         }
     }
     else {
@@ -1051,10 +1154,14 @@ static DBusHandlerResult dispatch_method(DBusConnection *c,
             goto retry;
     }
 
-    mrp_debug("Unhandled method path=%s, %s.%s.", SAFESTR(path),
-              SAFESTR(interface), SAFESTR(member));
+ out:
+    mrp_dbus_msg_unref(m);
 
-    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    if (r == DBUS_HANDLER_RESULT_NOT_YET_HANDLED)
+        mrp_debug("Unhandled method path=%s, %s.%s.", SAFESTR(path),
+                  SAFESTR(interface), SAFESTR(member));
+
+    return r;
 }
 
 
@@ -1069,6 +1176,7 @@ static DBusHandlerResult dispatch_signal(DBusConnection *c,
     const char *member    = dbus_message_get_member(msg);
 
     mrp_dbus_t      *dbus = (mrp_dbus_t *)data;
+    mrp_dbus_msg_t  *m    = NULL;
     mrp_list_hook_t *p, *n;
     handler_list_t  *l;
     handler_t       *h;
@@ -1090,7 +1198,13 @@ static DBusHandlerResult dispatch_signal(DBusConnection *c,
             h = mrp_list_entry(p, handler_t, hook);
 
             if (MATCHES(h,path) && MATCHES(h,interface) && MATCHES(h,member)) {
-                h->handler(dbus, msg, h->user_data);
+                if (m == NULL)
+                    m = create_message(msg);
+
+                if (m == NULL)
+                    goto out;
+
+                h->handler(dbus, m, h->user_data);
                 handled = TRUE;
             }
         }
@@ -1107,24 +1221,79 @@ static DBusHandlerResult dispatch_signal(DBusConnection *c,
         mrp_debug("Unhandled signal path=%s, %s.%s.", SAFESTR(path),
                   SAFESTR(interface), SAFESTR(member));
 
+ out:
+    mrp_dbus_msg_unref(m);
+
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 #undef MATCHES
 #undef SAFESTR
 }
 
 
+static int append_args_inttype(DBusMessage *msg, int type, va_list ap)
+{
+    void  *vptr;
+    void **aptr;
+    int    atype, alen;
+    int    r = TRUE;
+
+    while (type != MRP_DBUS_TYPE_INVALID && r) {
+        switch (type) {
+        case MRP_DBUS_TYPE_BYTE:
+        case MRP_DBUS_TYPE_BOOLEAN:
+        case MRP_DBUS_TYPE_INT16:
+        case MRP_DBUS_TYPE_UINT16:
+        case MRP_DBUS_TYPE_INT32:
+        case MRP_DBUS_TYPE_UINT32:
+        case MRP_DBUS_TYPE_INT64:
+        case MRP_DBUS_TYPE_UINT64:
+        case MRP_DBUS_TYPE_DOUBLE:
+        case MRP_DBUS_TYPE_UNIX_FD:
+            vptr = va_arg(ap, void *);
+            r = dbus_message_append_args(msg, type, vptr, DBUS_TYPE_INVALID);
+            break;
+
+        case MRP_DBUS_TYPE_STRING:
+        case MRP_DBUS_TYPE_OBJECT_PATH:
+        case MRP_DBUS_TYPE_SIGNATURE:
+            vptr = va_arg(ap, void *);
+            r = dbus_message_append_args(msg, type, &vptr, DBUS_TYPE_INVALID);
+            break;
+
+        case MRP_DBUS_TYPE_ARRAY:
+            atype = va_arg(ap, int);
+            aptr  = va_arg(ap, void **);
+            alen  = va_arg(ap, int);
+            r = dbus_message_append_args(msg, DBUS_TYPE_ARRAY,
+                                         atype, &aptr, alen, DBUS_TYPE_INVALID);
+            break;
+
+        default:
+            return FALSE;
+        }
+
+        type = va_arg(ap, int);
+    }
+
+    return r;
+}
+
+
 static void call_reply_cb(DBusPendingCall *pend, void *user_data)
 {
-    call_t      *call = (call_t *)user_data;
-    DBusMessage *reply;
+    call_t         *call = (call_t *)user_data;
+    DBusMessage    *reply;
+    mrp_dbus_msg_t *m;
 
     reply = dbus_pending_call_steal_reply(pend);
+    m     = create_message(reply);
 
     call->pend = NULL;
     mrp_list_delete(&call->hook);
 
-    call->cb(call->dbus, reply, call->user_data);
+    call->cb(call->dbus, m, call->user_data);
 
+    mrp_dbus_msg_unref(m);
     dbus_message_unref(reply);
     dbus_pending_call_unref(pend);
 
@@ -1172,7 +1341,7 @@ int32_t mrp_dbus_call(mrp_dbus_t *dbus, const char *dest, const char *path,
         success = TRUE;
     else {
         va_start(ap, type);
-        success = dbus_message_append_args_valist(msg, type, ap);
+        success = append_args_inttype(msg, type, ap);
         va_end(ap);
     }
 
@@ -1216,15 +1385,18 @@ int32_t mrp_dbus_call(mrp_dbus_t *dbus, const char *dest, const char *path,
 
 int32_t mrp_dbus_send(mrp_dbus_t *dbus, const char *dest, const char *path,
                       const char *interface, const char *member, int timeout,
-                      mrp_dbus_reply_cb_t cb, void *user_data, DBusMessage *msg)
+                      mrp_dbus_reply_cb_t cb, void *user_data,
+                      mrp_dbus_msg_t *m)
 {
     int32_t          id;
     call_t          *call;
     DBusPendingCall *pend;
+    DBusMessage     *msg;
     int              method;
 
     call = NULL;
     pend = NULL;
+    msg  = m->msg;
 
     if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL) {
         if (cb != NULL)
@@ -1286,18 +1458,15 @@ int32_t mrp_dbus_send(mrp_dbus_t *dbus, const char *dest, const char *path,
     if (pend != NULL)
         dbus_pending_call_unref(pend);
 
-    if(msg != NULL)
-        dbus_message_unref(msg);
-
     call_free(call);
 
     return 0;
 }
 
 
-int mrp_dbus_send_msg(mrp_dbus_t *dbus, DBusMessage *msg)
+int mrp_dbus_send_msg(mrp_dbus_t *dbus, mrp_dbus_msg_t *m)
 {
-    return dbus_connection_send(dbus->conn, msg, NULL);
+    return dbus_connection_send(dbus->conn, m->msg, NULL);
 }
 
 
@@ -1325,12 +1494,13 @@ int mrp_dbus_call_cancel(mrp_dbus_t *dbus, int32_t id)
 }
 
 
-int mrp_dbus_reply(mrp_dbus_t *dbus, DBusMessage *msg, int type, ...)
+int mrp_dbus_reply(mrp_dbus_t *dbus, mrp_dbus_msg_t *m, int type, ...)
 {
     va_list      ap;
-    DBusMessage *rpl;
+    DBusMessage *msg, *rpl;
     int          success;
 
+    msg = m->msg;
     rpl = dbus_message_new_method_return(msg);
 
     if (rpl == NULL)
@@ -1340,7 +1510,7 @@ int mrp_dbus_reply(mrp_dbus_t *dbus, DBusMessage *msg, int type, ...)
         success = TRUE;
     else {
         va_start(ap, type);
-        success = dbus_message_append_args_valist(rpl, type, ap);
+        success = append_args_inttype(rpl, type, ap);
         va_end(ap);
     }
 
@@ -1362,13 +1532,14 @@ int mrp_dbus_reply(mrp_dbus_t *dbus, DBusMessage *msg, int type, ...)
 }
 
 
-int mrp_dbus_reply_error(mrp_dbus_t *dbus, DBusMessage *msg,
+int mrp_dbus_reply_error(mrp_dbus_t *dbus, mrp_dbus_msg_t *m,
                          const char *errname, const char *errmsg, int type, ...)
 {
     va_list      ap;
-    DBusMessage *rpl;
+    DBusMessage *msg, *rpl;
     int          success;
 
+    msg = m->msg;
     rpl = dbus_message_new_error(msg, errname, errmsg);
 
     if (rpl == NULL)
@@ -1378,7 +1549,7 @@ int mrp_dbus_reply_error(mrp_dbus_t *dbus, DBusMessage *msg,
         success = TRUE;
     else {
         va_start(ap, type);
-        success = dbus_message_append_args_valist(rpl, type, ap);
+        success = append_args_inttype(rpl, type, ap);
         va_end(ap);
     }
 
@@ -1441,7 +1612,7 @@ int mrp_dbus_signal(mrp_dbus_t *dbus, const char *dest, const char *path,
         success = TRUE;
     else {
         va_start(ap, type);
-        success = dbus_message_append_args_valist(msg, type, ap);
+        success = append_args_inttype(msg, type, ap);
         va_end(ap);
     }
 
@@ -1468,4 +1639,416 @@ int mrp_dbus_signal(mrp_dbus_t *dbus, const char *dest, const char *path,
         dbus_message_unref(msg);
 
     return 0;
+}
+
+
+mrp_dbus_msg_t *mrp_dbus_msg_method_call(mrp_dbus_t *bus,
+                                         const char *destination,
+                                         const char *path,
+                                         const char *interface,
+                                         const char *member)
+{
+    mrp_dbus_msg_t *m;
+    DBusMessage    *msg;
+
+    MRP_UNUSED(bus);
+
+    msg = dbus_message_new_method_call(destination, path, interface, member);
+
+    if (msg != NULL) {
+        m = create_message(msg);
+        dbus_message_unref(msg);
+    }
+    else
+        m = NULL;
+
+    return m;
+}
+
+
+mrp_dbus_msg_t *mrp_dbus_msg_method_return(mrp_dbus_t *bus,
+                                           mrp_dbus_msg_t *m)
+{
+    mrp_dbus_msg_t *mr;
+    DBusMessage    *msg;
+
+    MRP_UNUSED(bus);
+
+    msg = dbus_message_new_method_return(m->msg);
+
+    if (msg != NULL) {
+        mr = create_message(msg);
+        dbus_message_unref(msg);
+    }
+    else
+        mr = NULL;
+
+    return mr;
+}
+
+
+mrp_dbus_msg_t *mrp_dbus_msg_error(mrp_dbus_t *bus, mrp_dbus_msg_t *m,
+                                   mrp_dbus_err_t *err)
+{
+    mrp_dbus_msg_t *me;
+    DBusMessage    *msg;
+
+    MRP_UNUSED(bus);
+
+    msg = dbus_message_new_error(m->msg, err->name, err->message);
+
+    if (msg != NULL) {
+        me = create_message(msg);
+        dbus_message_unref(msg);
+    }
+    else
+        me = NULL;
+
+    return me;
+}
+
+
+mrp_dbus_msg_t *mrp_dbus_msg_signal(mrp_dbus_t *bus,
+                                    const char *destination,
+                                    const char *path,
+                                    const char *interface,
+                                    const char *member)
+{
+    mrp_dbus_msg_t *m;
+    DBusMessage    *msg;
+
+    MRP_UNUSED(bus);
+
+    msg = dbus_message_new_signal(path, interface, member);
+
+    if (msg != NULL) {
+        if (!destination || dbus_message_set_destination(msg, destination)) {
+            m = create_message(msg);
+            dbus_message_unref(msg);
+        }
+        else {
+            dbus_message_unref(msg);
+            m = NULL;
+        }
+    }
+    else
+        m = NULL;
+
+    return m;
+}
+
+
+mrp_dbus_msg_type_t mrp_dbus_msg_type(mrp_dbus_msg_t *m)
+{
+    return (mrp_dbus_msg_type_t)dbus_message_get_type(m->msg);
+}
+
+#define WRAP_GETTER(type, what)                         \
+    type mrp_dbus_msg_##what(mrp_dbus_msg_t *m)         \
+    {                                                   \
+        return dbus_message_get_##what(m->msg);         \
+    }                                                   \
+    struct __mrp_dbus_allow_trailing_semicolon
+
+WRAP_GETTER(const char *, path);
+WRAP_GETTER(const char *, interface);
+WRAP_GETTER(const char *, member);
+WRAP_GETTER(const char *, destination);
+WRAP_GETTER(const char *, sender);
+
+#undef WRAP_GETTER
+
+
+static msg_iter_t *message_iterator(mrp_dbus_msg_t *m, int append)
+{
+    msg_iter_t *it;
+
+    if (mrp_list_empty(&m->iterators)) {
+        if ((it = mrp_allocz(sizeof(*it))) != NULL) {
+            mrp_list_init(&it->hook);
+            mrp_list_append(&m->iterators, &it->hook);
+
+            if (append)
+                dbus_message_iter_init_append(m->msg, &it->it);
+            else
+                dbus_message_iter_init(m->msg, &it->it);
+        }
+    }
+    else
+        it = mrp_list_entry(&m->iterators.next, typeof(*it), hook);
+
+    return it;
+}
+
+
+msg_iter_t *current_iterator(mrp_dbus_msg_t *m)
+{
+    msg_iter_t *it;
+
+    if (!mrp_list_empty(&m->iterators))
+        it = mrp_list_entry(m->iterators.prev, typeof(*it), hook);
+    else
+        it = NULL;
+
+    return it;
+}
+
+
+int mrp_dbus_msg_open_container(mrp_dbus_msg_t *m, char type,
+                                const char *contents)
+{
+    msg_iter_t *it, *parent;
+
+    if ((parent = current_iterator(m))       == NULL &&
+        (parent = message_iterator(m, TRUE)) == NULL)
+        return FALSE;
+
+    if ((it = mrp_allocz(sizeof(*it))) != NULL) {
+        mrp_list_init(&it->hook);
+
+        if (dbus_message_iter_open_container(&parent->it, type, contents,
+                                             &it->it)) {
+            mrp_list_append(&m->iterators, &it->hook);
+
+            return TRUE;
+        }
+
+        mrp_free(it);
+    }
+
+    return FALSE;
+}
+
+
+int mrp_dbus_msg_close_container(mrp_dbus_msg_t *m)
+{
+    msg_iter_t *it, *parent;
+    int         r;
+
+    it = current_iterator(m);
+
+    if (it == NULL || it == message_iterator(m, FALSE))
+        return FALSE;
+
+    mrp_list_delete(&it->hook);
+
+    if ((parent = current_iterator(m)) != NULL)
+        r = dbus_message_iter_close_container(&parent->it, &it->it);
+    else
+        r = FALSE;
+
+    mrp_free(it);
+
+    return r;
+}
+
+
+int mrp_dbus_msg_append_basic(mrp_dbus_msg_t *m, char type, void *valuep)
+{
+    msg_iter_t *it;
+
+    if (!dbus_type_is_basic(type))
+        return FALSE;
+
+    if ((it = current_iterator(m))       != NULL ||
+        (it = message_iterator(m, TRUE)) != NULL) {
+        if (type != MRP_DBUS_TYPE_STRING &&
+            type != MRP_DBUS_TYPE_OBJECT_PATH &&
+            type != MRP_DBUS_TYPE_SIGNATURE)
+            return dbus_message_iter_append_basic(&it->it, type, valuep);
+        else
+            return dbus_message_iter_append_basic(&it->it, type, &valuep);
+    }
+    else
+        return FALSE;
+}
+
+
+int mrp_dbus_msg_enter_container(mrp_dbus_msg_t *m, char type,
+                                 const char *contents)
+{
+    msg_iter_t *it, *parent;
+    char       *signature;
+
+    if ((parent = current_iterator(m))        == NULL &&
+        (parent = message_iterator(m, FALSE)) == NULL)
+        return FALSE;
+
+    if (dbus_message_iter_get_arg_type(&parent->it) != type)
+        return FALSE;
+
+    if ((it = mrp_allocz(sizeof(*it))) != NULL) {
+        mrp_list_init(&it->hook);
+        mrp_list_append(&m->iterators, &it->hook);
+
+        dbus_message_iter_recurse(&parent->it, &it->it);
+
+        if (contents != NULL) {
+            /* XXX TODO: proper signature checking */
+            signature = dbus_message_iter_get_signature(&it->it);
+            if (strcmp(contents, signature))
+                mrp_log_error("*** %s(): signature mismath ('%s' != '%s')",
+                              __FUNCTION__, contents, signature);
+            mrp_free(signature);
+        }
+
+        dbus_message_iter_next(&parent->it);
+
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+
+int mrp_dbus_msg_exit_container(mrp_dbus_msg_t *m)
+{
+    msg_iter_t *it;
+
+    if ((it = current_iterator(m)) == NULL || it == message_iterator(m, FALSE))
+        return FALSE;
+
+    mrp_list_delete(&it->hook);
+
+    mrp_free(it->peeked);
+    mrp_free(it);
+
+    return TRUE;
+}
+
+
+int mrp_dbus_msg_read_basic(mrp_dbus_msg_t *m, char type, void *valuep)
+{
+    msg_iter_t *it;
+
+    if (!dbus_type_is_basic(type))
+        return FALSE;
+
+    if ((it = current_iterator(m))        != NULL ||
+        (it = message_iterator(m, FALSE)) != NULL) {
+        if (dbus_message_iter_get_arg_type(&it->it) == type) {
+            dbus_message_iter_get_basic(&it->it, valuep);
+            dbus_message_iter_next(&it->it);
+
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+
+static void free_msg_array(msg_array_t *a)
+{
+    if (a == NULL)
+        return;
+
+    mrp_list_delete(&a->hook);
+    mrp_free(a->items);
+    mrp_free(a);
+}
+
+
+int mrp_dbus_msg_read_array(mrp_dbus_msg_t *m, char type,
+                            void **itemsp, size_t *nitemp)
+{
+    msg_iter_t      *it;
+    msg_array_t     *a;
+    DBusMessageIter  sub;
+    void            *items;
+    int              nitem, atype;
+
+    if (!dbus_type_is_basic(type))
+        return FALSE;
+
+    if ((it = current_iterator(m))        == NULL &&
+        (it = message_iterator(m, FALSE)) == NULL)
+        return FALSE;
+
+    if (dbus_message_iter_get_arg_type(&it->it) != DBUS_TYPE_ARRAY)
+        return FALSE;
+
+    dbus_message_iter_recurse(&it->it, &sub);
+    atype = dbus_message_iter_get_arg_type(&sub);
+
+    if (atype == MRP_DBUS_TYPE_INVALID) {
+        items = NULL;
+        nitem = 0;
+
+        goto out;
+    }
+
+    if (atype != type)
+        return FALSE;
+
+    /* for fixed types, just use the libdbus function */
+    if (type != MRP_DBUS_TYPE_STRING && type != MRP_DBUS_TYPE_OBJECT_PATH) {
+        nitem = -1;
+        items = NULL;
+        dbus_message_iter_get_fixed_array(&sub, (void *)&items, &nitem);
+
+        if (nitem == -1)
+            return FALSE;
+    }
+    /* for string-like types, collect items into an implicitly freed array */
+    else {
+        a = mrp_allocz(sizeof(*a));
+
+        if (a == NULL)
+            return FALSE;
+
+        mrp_list_init(&a->hook);
+
+        while (dbus_message_iter_get_arg_type(&sub) != DBUS_TYPE_INVALID) {
+            if (mrp_reallocz(a->items, a->nitem, a->nitem + 1) != NULL) {
+                dbus_message_iter_get_basic(&sub, a->items + a->nitem);
+                a->nitem++;
+                dbus_message_iter_next(&sub);
+            }
+            else {
+                free_msg_array(a);
+                return FALSE;
+            }
+        }
+
+        mrp_list_append(&m->arrays, &a->hook);
+
+        items = a->items;
+        nitem = a->nitem;
+    }
+
+ out:
+    dbus_message_iter_next(&it->it);
+
+    *itemsp = items;
+    *nitemp = (size_t)nitem;
+
+    return TRUE;
+}
+
+
+mrp_dbus_type_t mrp_dbus_msg_arg_type(mrp_dbus_msg_t *m, const char **contents)
+{
+    msg_iter_t      *it;
+    DBusMessageIter  sub;
+    char             type;
+
+    if ((it = current_iterator(m))        != NULL ||
+        (it = message_iterator(m, FALSE)) != NULL) {
+        type = dbus_message_iter_get_arg_type(&it->it);
+
+        if (dbus_type_is_container(type)) {
+            mrp_free(it->peeked);
+
+            if (contents != NULL) {
+                dbus_message_iter_recurse(&it->it, &sub);
+                it->peeked = dbus_message_iter_get_signature(&sub);
+                *contents = it->peeked;
+            }
+        }
+
+        return type;
+    }
+
+    return MRP_DBUS_TYPE_INVALID;
 }

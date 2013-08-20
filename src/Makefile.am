@@ -364,64 +364,212 @@ clean-func-infos::
 ###################################
 # murphy dbus library
 #
+# Right now we have three variants of the murphy D-Bus library. The
+# original with leaky libdbus abstraction, a revised one that plugs
+# the most gaping abstraction holes, and one which uses systemd-bus,
+# the licensing-wise much easier/liberal D-Bus implementation from
+# systemd.
+#
+# All original code uses/used to use the libdbus-based one with leaky
+# abstraction. This would make it very difficult to move away from
+# the license-troubled libdbus even if/when a viable alternative (eg.
+# from the kdbus effort) became available. To get rid of this problem,
+# we need to get rid of the direct dependency on libdbus. Once that is
+# done, we can (hopefully) switch easily and transparently between
+# D-Bus libraries, if needed by touching only one component, the
+# murphy-dbus library.
+#
+# To recap these are the different library variants:
+#
+# 1) murphy-libdbus
+#    This is the original murphy-dbus library. It uses libdbus as the
+#    underlying D-Bus client library implementation. It does not provide
+#    a proper abstraction on top of libdbus. Messages, message building,
+#    and parsing used DBusMessage.
+#
+# 2) murphy-dbus-libdbus
+#    This is a modified version of murphy-libdbus which provides an
+#    additional abstraction for messages, message building and parsing.
+#
+# 3) murphy-dbus-systemdbus
+#    This library provides an identical API to murphy-dbus-libdbus but
+#    it uses the systemd dbus library implementation (systemd-bus) as
+#    the underlying D-Bus client library implementation.
+#
+# So all current code still using libdbus for message building/parsing
+# needs to get rid of it and changed to use murphy-dbus-libdbus.
+#
 
-murphy_dbus_headers = 			\
-		common/dbus.h		\
-		common/dbus-transport.h
+# original libdbus-based library
+murphy_libdbus_headers =		\
+		common/libdbus.h
 
-if DBUS_ENABLED
-lib_LTLIBRARIES += libmurphy-dbus.la
-EXTRA_DIST      += common/murphy-dbus.pc
-pkgconfig_DATA  += common/murphy-dbus.pc
+if LIBDBUS_ENABLED
+lib_LTLIBRARIES += libmurphy-libdbus.la
+EXTRA_DIST      += common/murphy-libdbus.pc
+pkgconfig_DATA  += common/murphy-libdbus.pc
 
-libmurphy_dbus_ladir      =		\
+libmurphy_libdbus_ladir =		\
 		$(includedir)/murphy/common
 
-libmurphy_dbus_la_HEADERS = $(murphy_dbus_headers)
+libmurphy_libdbus_la_HEADERS = $(murphy_libdbus_headers)
 
+libmurphy_libdbus_la_REGULAR_SOURCES =		\
+		common/libdbus.c		\
+		common/libdbus-glue.c
 
-libmurphy_dbus_la_REGULAR_SOURCES =	\
-		common/dbus.c		\
-		common/dbus-glue.c	\
-		common/dbus-transport.c
+libmurphy_libdbus_la_SOURCES =		\
+		$(libmurphy_libdbus_la_REGULAR_SOURCES) \
+		libdbus-func-info.c
 
-libmurphy_dbus_la_SOURCES =		\
-		$(libmurphy_dbus_la_REGULAR_SOURCES) \
-		dbus-func-info.c
-
-libmurphy_dbus_la_CFLAGS  =		\
+libmurphy_libdbus_la_CFLAGS = 		\
 		$(AM_CFLAGS)		\
-		$(DBUS_CFLAGS)
+		$(LIBDBUS_CFLAGS)
 
-libmurphy_dbus_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.dbus \
+libmurphy_libdbus_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.libdbus \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_dbus_la_LIBADD  = 		\
-		-lrt $(DBUS_LIBS)
+libmurphy_libdbus_la_LIBADD  = 		\
+		-lrt $(LIBDBUS_LIBS)
 
-libmurphy_dbus_la_DEPENDENCIES = linker-script.dbus
+libmurphy_libdbus_la_DEPENDENCIES = linker-script.libdbus
 
-libdbusincludedir      = $(includedir)/murphy/dbus
-libdbusinclude_HEADERS = $(libmurphy_dbus_la_HEADERS)
+libmurphy_libdbusdir      = $(includedir)/murphy/dbus
+libmurphy_libdbus_HEADERS = $(libmurphy_libdbus_la_HEADERS)
 
 # debug file:line-function mapping generation
-dbus-func-info.c: $(libmurphy_dbus_la_REGULAR_SOURCES)
+libdbus-func-info.c: $(libmurphy_libdbus_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
 
 clean-func-infos::
-	-rm dbus-func-info.c
+	-rm libdbus-func-info.c
 endif
 
 # linker script generation
-linker-script.dbus: $(murphy_dbus_headers)
+linker-script.libdbus: $(murphy_libdbus_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-		-c "$(libmurphy_dbus_la_CFLAGS)" -o $@ $^
+		-c "$(libmurphy_libdbus_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.dbus
+	-rm -f linker-script.libdbus
 
-generate-linker-scripts: linker-script.dbus
+generate-linker-scripts: linker-script.libdbus
+
+
+# libdbus-based library with full abstraction
+murphy_dbus_libdbus_headers =		\
+		common/dbus-libdbus.h
+
+if LIBDBUS_ENABLED
+lib_LTLIBRARIES += libmurphy-dbus-libdbus.la
+EXTRA_DIST      += common/murphy-dbus-libdbus.pc
+pkgconfig_DATA  += common/murphy-dbus-libdbus.pc
+
+libmurphy_dbus_libdbus_ladir =		\
+		$(includedir)/murphy/common
+
+libmurphy_dbus_libdbus_la_HEADERS = $(murphy_dbus_libdbus_headers)
+
+libmurphy_dbus_libdbus_la_REGULAR_SOURCES =	\
+		common/dbus-libdbus.c		\
+		common/dbus-libdbus-glue.c	\
+		common/dbus-libdbus-transport.c
+
+libmurphy_dbus_libdbus_la_SOURCES =		\
+		$(libmurphy_dbus_libdbus_la_REGULAR_SOURCES) \
+		dbus-libdbus-func-info.c
+
+libmurphy_dbus_libdbus_la_CFLAGS = 	\
+		$(AM_CFLAGS)		\
+		$(LIBDBUS_CFLAGS)
+
+libmurphy_dbus_libdbus_la_LDFLAGS =	\
+		-Wl,-version-script=linker-script.dbus-libdbus \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_dbus_libdbus_la_LIBADD  = 	\
+		-lrt $(LIBDBUS_LIBS)
+
+libmurphy_dbus_libdbus_la_DEPENDENCIES = linker-script.dbus-libdbus
+
+libmurphy_dbus_libdbusdir      = $(includedir)/murphy/dbus
+libmurphy_dbus_libdbus_HEADERS = $(libmurphy_dbus_libdbus_la_HEADERS)
+
+# debug file:line-function mapping generation
+dbus-libdbus-func-info.c: $(libmurphy_dbus_libdbus_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm dbus-libdbus-func-info.c
+endif
+
+# linker script generation
+linker-script.dbus-libdbus: $(murphy_dbus_libdbus_headers)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_dbus_libdbus_la_CFLAGS)" -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.dbus-libdbus
+
+generate-linker-scripts: linker-script.dbus-libdbus
+
+# systemd-bus based library
+murphy_dbus_sdbus_headers = 			\
+		common/dbus-sdbus.h
+
+if SDBUS_ENABLED
+lib_LTLIBRARIES += libmurphy-dbus-sdbus.la
+EXTRA_DIST      += common/murphy-dbus-sdbus.pc
+pkgconfig_DATA  += common/murphy-dbus-sdbus.pc
+
+libmurphy_dbus_sdbus_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_dbus_sdbus_la_HEADERS = $(murphy_dbus_sdbus_headers)
+
+libmurphy_dbus_sdbus_la_REGULAR_SOURCES =	\
+		common/dbus-sdbus.c		\
+		common/dbus-sdbus-glue.c	\
+		common/dbus-sdbus-transport.c
+
+libmurphy_dbus_sdbus_la_SOURCES =		\
+		$(libmurphy_dbus_sdbus_la_REGULAR_SOURCES) \
+		dbus-sdbus-func-info.c
+
+libmurphy_dbus_sdbus_la_CFLAGS  =	\
+		$(AM_CFLAGS)		\
+		$(SDBUS_CFLAGS)
+
+libmurphy_dbus_sdbus_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.dbus-sdbus \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_dbus_sdbus_la_LIBADD  = 		\
+		-lrt $(SDBUS_LIBS)
+
+libmurphy_dbus_sdbus_la_DEPENDENCIES = linker-script.dbus-sdbus
+
+libmurphy_dbus_sdbusdir      = $(includedir)/murphy/dbus
+libmurphy_dbus_sdbus_HEADERS = $(libmurphy_dbus_sdbus_la_HEADERS)
+
+# debug file:line-function mapping generation
+dbus-sdbus-func-info.c: $(libmurphy_dbus_sdbus_la_REGULAR_SOURCES)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
+
+clean-func-infos::
+	-rm dbus-sdbus-func-info.c
+endif
+
+# linker script generation
+linker-script.dbus-sdbus: $(murphy_dbus_sdbus_headers)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_dbus_sdbus_la_CFLAGS)" -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.sd-bus
+
+generate-linker-scripts: linker-script.sd-bus
 
 
 ###################################
@@ -1005,10 +1153,10 @@ endif
 endif
 
 # dbus plugin
-if DBUS_ENABLED
+if LIBDBUS_ENABLED
 DBUS_PLUGIN_SOURCES = plugins/plugin-dbus.c
-DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
-DBUS_PLUGIN_LIBS    = libmurphy-dbus.la $(DBUS_LIBS)
+DBUS_PLUGIN_CFLAGS  = $(LIBDBUS_CFLAGS)
+DBUS_PLUGIN_LIBS    = libmurphy-dbus-libdbus.la $(LIBDBUS_LIBS)
 
 if !DISABLED_PLUGIN_DBUS
 if BUILTIN_PLUGIN_DBUS
@@ -1050,13 +1198,14 @@ endif
 
 # resource-dbus plugin
 if BUILD_RESOURCES
-if DBUS_ENABLED
+if LIBDBUS_ENABLED
 RESOURCE_DBUS_PLUGIN_SOURCES = plugins/plugin-resource-dbus.c
-RESOURCE_DBUS_PLUGIN_CFLAGS  = $(DBUS_CFLAGS)
-RESOURCE_DBUS_PLUGIN_LIBS    = libmurphy-dbus.la                   \
-					libmurphy-core.la					\
-					libmurphy-common.la                 \
-					$(RESOURCE_LIBRARY)
+RESOURCE_DBUS_PLUGIN_CFLAGS  = $(LIBDBUS_CFLAGS)
+RESOURCE_DBUS_PLUGIN_LIBS    =					\
+				libmurphy-libdbus.la		\
+				libmurphy-core.la		\
+				libmurphy-common.la		\
+				$(RESOURCE_LIBRARY)
 
 if !DISABLED_PLUGIN_RESOURCE_DBUS
 if BUILTIN_PLUGIN_RESOURCE_DBUS
@@ -1401,8 +1550,8 @@ murphy_console_LDADD  =			\
 		libbreedline.la		\
 		libmurphy-common.la
 
-if DBUS_ENABLED
-murphy_console_LDADD +=	libmurphy-dbus.la
+if LIBDBUS_ENABLED
+murphy_console_LDADD +=	libmurphy-dbus-libdbus.la
 endif
 
 murphy_console_LDFLAGS = -rdynamic

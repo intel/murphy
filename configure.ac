@@ -124,31 +124,56 @@ AC_ARG_ENABLE(gpl,
               [  --enable-gpl            enable linking against GPL code],
 	      [enable_gpl=$enableval], [enable_gpl=no])
 
-# Check if DBUS was enabled.
-AC_ARG_ENABLE(dbus,
-              [  --enable-dbus           enable D-BUS support],
-	      [enable_dbus=$enableval], [enable_dbus=no])
+# Check if original libdbus-based DBUS support was enabled.
+AC_ARG_ENABLE(libdbus,
+              [  --enable-libdbus        enable libdbus-based D-BUS support],
+	      [enable_libdbus=$enableval], [enable_libdbus=no])
 
-if test "$enable_dbus" = "yes"; then
+if test "$enable_libdbus" = "yes"; then
     if test "$enable_gpl" = "no"; then
-        AC_MSG_ERROR([D-Bus support requires the --enable-gpl option.])
+        AC_MSG_ERROR([libdbus D-Bus support requires the --enable-gpl option.])
     fi
-    PKG_CHECK_MODULES(DBUS, dbus-1 >= 0.70)
+    PKG_CHECK_MODULES(LIBDBUS, dbus-1 >= 0.70)
 
     DBUS_SESSION_DIR="`pkg-config --variable session_bus_services_dir dbus-1`"
     AC_SUBST(DBUS_SESSION_DIR)
+
+    AC_DEFINE([LIBDBUS_ENABLED], 1, [Enable libdbus D-Bus support ?])
 else
-    AC_MSG_NOTICE([D-Bus support is disabled.])
+    AC_MSG_NOTICE([libdbus-based D-Bus support is disabled.])
 fi
 
-if test "$enable_dbus" = "yes"; then
-    AC_DEFINE([DBUS_ENABLED], 1, [Enable D-BUS support ?])
+AM_CONDITIONAL(LIBDBUS_ENABLED, [test "$enable_libdbus" = "yes"])
+AC_SUBST(LIBDBUS_ENABLED)
+AC_SUBST(LIBDBUS_CFLAGS)
+AC_SUBST(LIBDBUS_LIBS)
+
+# Check if systemd-bus-based D-Bus support was enabled.
+AC_ARG_ENABLE(sdbus,
+              [  --enable-sdbus         enable systemd-based D-BUS support],
+	      [enable_sdbus=$enableval], [enable_sdbus=no])
+
+if test "$enable_sdbus" = "yes"; then
+    PKG_CHECK_MODULES(SDBUS, libsystemd-bus)
+    AC_DEFINE([SDBUS_ENABLED], 1, [Enable systemd-bus support ?])
+
+    if test -z "$DBUS_SESSION_DIR"; then
+        # Try to determine the session bus service directory.
+        DBUS_SESSION_DIR="`pkg-config --variable \
+                               session_bus_services_dir dbus-1`"
+        if test "$?" != "0" -o -z "$DBUS_SESSION_DIR"; then
+            DBUS_SESSION_DIR="/usr/share/dbus-1/services"
+        fi
+        AC_SUBST(DBUS_SESSION_DIR)
+    fi
+else
+    AC_MSG_NOTICE([libsystemd-bus based D-Bus support is disabled.])
 fi
 
-AM_CONDITIONAL(DBUS_ENABLED, [test "$enable_dbus" = "yes"])
-AC_SUBST(DBUS_ENABLED)
-AC_SUBST(DBUS_CFLAGS)
-AC_SUBST(DBUS_LIBS)
+AM_CONDITIONAL(SDBUS_ENABLED, [test "$enable_sdbus" = "yes"])
+AC_SUBST(SDBUS_ENABLED)
+AC_SUBST(SDBUS_CFLAGS)
+AC_SUBST(SDBUS_LIBS)
 
 # Check if PulseAudio mainloop support was enabled.
 AC_ARG_ENABLE(pulse,
@@ -562,14 +587,16 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/daemon/tests/Makefile
 		 src/plugins/tests/Makefile
 		 src/common/murphy-common.pc
-		 src/common/murphy-dbus.pc
+		 src/common/murphy-libdbus.pc
+		 src/common/murphy-dbus-libdbus.pc
+		 src/common/murphy-dbus-sdbus.pc
 		 src/common/murphy-pulse.pc
 		 src/common/murphy-ecore.pc
 		 src/common/murphy-glib.pc
-         src/common/murphy-qt.pc
+                 src/common/murphy-qt.pc
 		 src/core/murphy-core.pc
-         src/core/lua-utils/murphy-lua-utils.pc
-         src/core/lua-decision/murphy-lua-decision.pc
+                 src/core/lua-utils/murphy-lua-utils.pc
+                 src/core/lua-decision/murphy-lua-decision.pc
 		 src/breedline/breedline.pc
 		 src/breedline/breedline-murphy.pc
 		 src/breedline/breedline-glib.pc
@@ -595,7 +622,8 @@ AC_OUTPUT
 # Display the configuration.
 echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
-echo "D-Bus support: $enable_dbus"
+echo "D-Bus (libdbus) support: $enable_libdbus"
+echo "D-Bus (systemd-bus) support: $enable_sdbus"
 echo "PulseAudio mainloop support: $enable_pulse"
 echo "EFL/ecore mainloop support: $enable_ecore"
 echo "glib mainloop support: $enable_glib"
