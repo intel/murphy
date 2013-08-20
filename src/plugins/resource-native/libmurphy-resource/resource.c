@@ -114,7 +114,6 @@ static void resource_event(mrp_msg_t *msg,
     }
 
     /* Update our "master copy" of the resource set. */
-    printf("rset_id = %d\n", rset_id);
 
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
