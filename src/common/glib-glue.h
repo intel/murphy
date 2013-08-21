@@ -30,6 +30,7 @@
 #ifndef __MURPHY_GLIB_H__
 #define __MURPHY_GLIB_H__
 
+#include <murphy/common/mainloop.h>
 #include <glib.h>
 
 MRP_CDECL_BEGIN
