@@ -75,7 +75,7 @@ MRP_CDECL_BEGIN
             else                                                          \
                 _o = 0;                                                   \
                                                                           \
-            _ptr = mrp_mm_realloc(ptr, _size, __LOC__);                   \
+            _ptr = (typeof(ptr))mrp_mm_realloc(ptr, _size, __LOC__);      \
             if (_ptr != NULL || _n == 0) {                                \
                 if ((unsigned)(_n) > (unsigned)(_o))                      \
                     memset(_ptr + (_o), 0,                                \
@@ -88,7 +88,7 @@ MRP_CDECL_BEGIN
             typeof(ptr) _ptr;                                             \
             size_t      _size = size;                                     \
                                                                           \
-            _ptr = mrp_mm_realloc(ptr, _size, __LOC__);                   \
+            _ptr = (typeof(ptr))mrp_mm_realloc(ptr, _size, __LOC__);      \
             if (_ptr != NULL || _size == 0)                               \
                 ptr = _ptr;                                               \
                                                                           \
