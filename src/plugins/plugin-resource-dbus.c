@@ -765,7 +765,6 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
 
     resource->mandatory_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", PROP_MANDATORY, mandatory, free_value);
-    resource->mandatory_prop->writable = TRUE;
 
     if (!resource->mandatory_prop) {
         mrp_free(mandatory);
@@ -774,15 +773,18 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
         goto error;
     }
 
+    resource->mandatory_prop->writable = TRUE;
+
     resource->shared_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "b", PROP_SHARED, shared, free_value);
-    resource->shared_prop->writable = TRUE;
 
     if (!resource->shared_prop) {
         mrp_free(shared);
         mrp_free(name);
         goto error;
     }
+
+    resource->shared_prop->writable = TRUE;
 
     resource->name_prop = create_property(rset->mgr->ctx, buf,
             RESOURCE_IFACE, "s", PROP_NAME, name, free_value);
@@ -971,10 +973,11 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
     rset->class_prop = create_property(mgr->ctx, rset->path,
             RSET_IFACE, "s", PROP_CLASS,
             mrp_strdup(rset->mgr->ctx->default_class), free_value);
-    rset->class_prop->writable = TRUE;
 
     if (!rset->class_prop)
         goto error;
+
+    rset->class_prop->writable = TRUE;
 
     rset->status_prop = create_property(mgr->ctx, rset->path,
             RSET_IFACE, "s", PROP_STATUS, "pending", NULL);

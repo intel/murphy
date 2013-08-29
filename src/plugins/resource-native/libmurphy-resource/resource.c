@@ -114,7 +114,6 @@ static void resource_event(mrp_msg_t *msg,
     }
 
     /* Update our "master copy" of the resource set. */
-    printf("rset_id = %d\n", rset_id);
 
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
@@ -163,7 +162,7 @@ static void resource_event(mrp_msg_t *msg,
         }
 
         /* copy the attributes */
-        for (i = 0; i < n_attrs; i++) {
+        for (i = 0; (int) i < n_attrs; i++) {
             mrp_res_attribute_t *src = &attrs[i];
             mrp_res_attribute_t *dst = mrp_res_get_attribute_by_name(cx, res, src->name);
 

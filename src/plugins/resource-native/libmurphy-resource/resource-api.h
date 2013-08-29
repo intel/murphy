@@ -34,6 +34,8 @@
 
 #include <murphy/common.h>
 
+MRP_CDECL_BEGIN
+
 typedef struct mrp_res_context_private_s mrp_res_context_private_t;
 typedef struct mrp_res_resource_private_s mrp_res_resource_private_t;
 typedef struct mrp_res_resource_set_private_s mrp_res_resource_set_private_t;
@@ -429,5 +431,6 @@ typedef void (*mrp_res_logger_t) (mrp_log_level_t level, const char *file,
 
 mrp_res_logger_t mrp_res_set_logger(mrp_res_logger_t logger);
 
+MRP_CDECL_END
 
 #endif /* __MURPHY_RESOURCE_API_H__ */

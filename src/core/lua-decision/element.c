@@ -555,9 +555,10 @@ static int element_update_cb(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
     mrp_debug("'%s'", el->name);
 
     if (el->update) {
+        memset(&ret, 0, sizeof(ret));
         if (!mrp_funcbridge_call_from_c(L, el->update, "o", args, &t, &ret)) {
             mrp_log_error("failed to call element.lua.%s:update method (%s)",
-                          el->name, ret.string);
+                          el->name, ret.string ? ret.string : "NULL");
             mrp_free((void *)ret.string);
             return FALSE;
         }

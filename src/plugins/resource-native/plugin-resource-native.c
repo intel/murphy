@@ -906,8 +906,8 @@ static void resource_event_handler(uint32_t reqid, mrp_resource_set_t *rset,
     mrp_msg_append(m, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
 
     client_t           *client = (client_t *)userdata;
-    resource_data_t    *data   = client->data;
-    mrp_plugin_t       *plugin = data->plugin;
+    resource_data_t    *data;
+    mrp_plugin_t       *plugin;
     uint16_t            reqtyp;
     uint16_t            state;
     mrp_resource_mask_t grant;
@@ -922,6 +922,9 @@ static void resource_event_handler(uint32_t reqid, mrp_resource_set_t *rset,
     mrp_attr_t          attrs[ATTRIBUTE_MAX + 1];
 
     MRP_ASSERT(rset && client, "invalid argument");
+
+    data   = client->data;
+    plugin = data->plugin;
 
     reqtyp = RESPROTO_RESOURCES_EVENT;
     id     = mrp_get_resource_set_id(rset);

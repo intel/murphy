@@ -300,7 +300,7 @@ static attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr)
     uint32_t i;
     attribute_t *sattr, *dattr;
     attribute_array_t *dup;
-    int err;
+    int err = ENOMEM;
 
     MRP_ASSERT(dim < ARRAY_MAX && arr, "invalid argument");
 
@@ -312,7 +312,6 @@ static attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr)
     size = sizeof(attribute_array_t) + (sizeof(attribute_t) * (dim + 1));
 
     if (!(dup = mrp_allocz(size))) {
-        err = ENOMEM;
         goto failed;
     }
 
@@ -323,14 +322,12 @@ static attribute_array_t *attribute_array_dup(uint32_t dim, attribute_t *arr)
         dattr = dup->elems + i;
 
         if (!(dattr->name = mrp_strdup(sattr->name))) {
-            err = ENOMEM;
             goto failed;
         }
 
         switch ((dattr->type = sattr->type)) {
         case 's':
             if (!(dattr->v.string = mrp_strdup(sattr->v.string))) {
-                err = ENOMEM;
                 goto failed;
             }
             break;
@@ -1595,7 +1592,8 @@ static void sighandler(mrp_sighandler_t *h, int signum, void *user_data)
     case SIGHUP:
     case SIGTERM:
     case SIGINT:
-        mrp_mainloop_quit(ml, 0);
+        if (ml)
+            mrp_mainloop_quit(ml, 0);
         break;
 
     default:
@@ -1697,6 +1695,9 @@ int main(int argc, char **argv)
     client->seqno   = 1;
     client->prompt  = false;
     client->rset_id = INVALID_ID;
+
+    if (!client->ml || !client->name)
+        exit(1);
 
     parse_arguments(client, argc, argv);
 
