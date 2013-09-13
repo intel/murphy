@@ -50,7 +50,7 @@ static int destroy_row(mdb_table_t *, mdb_row_t *);
 static int remove_row(mdb_table_t *, mdb_row_t *);
 static int add_row(mdb_table_t *, mdb_row_t *);
 static int copy_row(mdb_table_t *, mdb_row_t *, mdb_row_t *);
-static int restore_stamp(mdb_table_t *, uint32_t);
+static int check_stamp(mdb_log_entry_t *);
 
 
 uint32_t mdb_transaction_begin(void)
@@ -61,6 +61,18 @@ uint32_t mdb_transaction_begin(void)
 int mdb_transaction_commit(uint32_t depth)
 {
 #define DATA_MAX  (MQI_COLUMN_MAX * MQI_QUERY_RESULT_MAX)
+#define CHECK_TRIGGER_START(en) do {                    \
+        if (!start_triggered) {                         \
+            start_triggered = true;                     \
+            mdb_trigger_transaction_start();            \
+        }                                               \
+    } while (0)
+#define CHECK_TRIGGER_END() do {                        \
+        if (start_triggered) {                          \
+            mdb_trigger_transaction_end();              \
+        }                                               \
+    } while (0)
+
 
     static uint8_t    blank[sizeof(mdb_row_t) + DATA_MAX];
 
@@ -75,11 +87,6 @@ int mdb_transaction_commit(uint32_t depth)
 
     MDB_TRANSACTION_LOG_FOR_EACH_DELETE(depth, en, MDB_BACKWARD, cursor) {
 
-        if (!start_triggered) {
-            start_triggered = true;
-            mdb_trigger_transaction_start();
-        }
-
         if (!(before = en->before))
             before = (mdb_row_t *)blank;
 
@@ -89,23 +96,27 @@ int mdb_transaction_commit(uint32_t depth)
         switch (en->change) {
 
         case mdb_log_insert:
+            CHECK_TRIGGER_START(en);
             mdb_trigger_row_insert(en->table, after);
             mdb_trigger_column_change(en->table, en->colmask, before, after);
             s = 0;
             break;
 
         case mdb_log_update:
+            CHECK_TRIGGER_START(en);
             mdb_trigger_column_change(en->table, en->colmask, before, after);
             s = destroy_row(en->table, en->before);
             break;
 
         case mdb_log_delete:
+            CHECK_TRIGGER_START(en);
             mdb_trigger_row_delete(en->table, before);
             s = destroy_row(en->table, en->before);
             break;
 
-        case mdb_log_stamp:
-            s = 0;
+        case mdb_log_start:
+            check_stamp(en);
+            free(en->cnt);
             break;
 
         default:
@@ -117,8 +128,7 @@ int mdb_transaction_commit(uint32_t depth)
             sts = s;
     }
 
-    if (start_triggered)
-        mdb_trigger_transaction_end();
+    CHECK_TRIGGER_END();
 
     txdepth--;
 
@@ -145,7 +155,7 @@ int mdb_transaction_rollback(uint32_t depth)
         case mdb_log_insert:  s = remove_row(tbl, en->after);            break;
         case mdb_log_delete:  s = add_row(tbl, en->before);              break;
         case mdb_log_update:  s = copy_row(tbl, en->after, en->before);  break;
-        case mdb_log_stamp:   s = restore_stamp(tbl, en->stamp);         break;
+        case mdb_log_start:   s = check_stamp(en);                       break;
         default:              s = -1;                                    break;
         }
 
@@ -173,7 +183,7 @@ int mdb_transaction_drop_table(mdb_table_t *tbl)
         case mdb_log_insert:  s = 0;                                     break;
         case mdb_log_delete:
         case mdb_log_update:  s = destroy_row(en->table, en->before);    break;
-        case mdb_log_stamp:   s = 0;                                     break;
+        case mdb_log_start:   s = 0;                                     break;
         default:              s = -1;                                    break;
         }
 
@@ -206,6 +216,8 @@ static int remove_row(mdb_table_t *tbl, mdb_row_t *row)
         return -1;
     }
 
+    tbl->cnt.inserts--;
+
     return 0;
 }
 
@@ -214,6 +226,8 @@ static int add_row(mdb_table_t *tbl, mdb_row_t *row)
     MDB_CHECKARG(tbl && row, -1);
 
     MDB_DLIST_APPEND(mdb_row_t, link, row, &tbl->rows);
+
+    tbl->cnt.deletes--;
 
     return mdb_index_insert(tbl, row, 0, 0);
 }
@@ -229,13 +243,25 @@ static int copy_row(mdb_table_t *tbl, mdb_row_t *dst, mdb_row_t *src)
     if (mdb_row_copy_over(tbl,dst,src) < 0 || mdb_row_delete(tbl,src,0,1) < 0)
         return -1;
 
+    tbl->cnt.updates--;
+
     return 0;
 }
 
 
-static int restore_stamp(mdb_table_t *tbl, uint32_t stamp)
+static int check_stamp(mdb_log_entry_t *en)
 {
-    tbl->stamp = stamp;
+    mdb_table_t *tbl;
+
+    if (en->change != mdb_log_start)
+        return -1;
+
+    tbl = en->table;
+
+    if (tbl->cnt.inserts == en->cnt->inserts &&
+        tbl->cnt.deletes == en->cnt->deletes &&
+        tbl->cnt.updates == en->cnt->updates)
+        tbl->cnt.stamp = en->cnt->stamp;
 
     return 0;
 }

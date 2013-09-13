@@ -43,7 +43,6 @@
 struct mdb_table_s {
     mqi_handle_t  handle;
     char         *name;
-    uint32_t      stamp;
     mdb_index_t   index;
     mdb_hash_t   *chash;         /* hash table for column names */
     int           ncolumn;
@@ -52,6 +51,7 @@ struct mdb_table_s {
     int           nrow;
     mdb_dlist_t   rows;
     mdb_dlist_t   logs;         /* transaction logs */
+    mdb_opcnt_t   cnt;
     mdb_trigger_t trigger;      /* must be the last: it has a array[0] @end  */
 };
 

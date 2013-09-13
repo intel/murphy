@@ -34,6 +34,12 @@
 #include <murphy-db/mdb.h>
 #include "row.h"
 
+typedef struct {
+    uint32_t stamp;
+    uint32_t inserts;
+    uint32_t deletes;
+    uint32_t updates;
+} mdb_opcnt_t;
 
 #define MDB_FORWARD  true
 #define MDB_BACKWARD false
@@ -55,7 +61,7 @@ typedef enum {
     mdb_log_insert,
     mdb_log_delete,
     mdb_log_update,
-    mdb_log_stamp
+    mdb_log_start
 } mdb_log_type_t;
 
 typedef struct {
@@ -63,8 +69,8 @@ typedef struct {
     mdb_log_type_t  change;
     mqi_bitfld_t    colmask;
     union {
-        mdb_row_t  *before;
-        uint32_t    stamp;
+        mdb_row_t   *before;
+        mdb_opcnt_t *cnt;
     };
     mdb_row_t      *after;
 } mdb_log_entry_t;

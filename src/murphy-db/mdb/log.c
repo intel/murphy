@@ -71,8 +71,8 @@ typedef struct {
     mdb_log_type_t  type;
     mqi_bitfld_t    colmask;
     union {
-        mdb_row_t  *before;
-        uint32_t    stamp;
+        mdb_row_t   *before;
+        mdb_opcnt_t *cnt;
     };
     mdb_row_t      *after;
 } change_t;
@@ -130,6 +130,13 @@ int mdb_log_change(mdb_table_t    *tbl,
     change->colmask = colmask;
     change->before  = before;
     change->after   = after;
+
+    switch (type) {
+    case mdb_log_insert: tbl->cnt.inserts++; break;
+    case mdb_log_delete: tbl->cnt.deletes++; break;
+    case mdb_log_update: tbl->cnt.updates++; break;
+    default:                                 break;
+    }
 
     MDB_DLIST_PREPEND(change_t, link, change, &tblog->changes);
 
@@ -431,8 +438,15 @@ static tbl_log_t *get_tbl_log(mdb_dlist_t *vhead,
                 return NULL;
             }
 
-            change->type  = mdb_log_stamp;
-            change->stamp = tbl->stamp++;
+            if (!(change->cnt = calloc(1, sizeof(*change->cnt)))) {
+                free(change);
+                errno = ENOMEM;
+                return NULL;
+            }
+
+            change->type = mdb_log_start;
+            *change->cnt = tbl->cnt;
+            tbl->cnt.stamp++;
 
             MDB_DLIST_PREPEND(change_t, link, change, &log->changes);
         }

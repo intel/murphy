@@ -46,8 +46,8 @@
 
 static int print_blob(uint8_t *, int data, char *, int);
 
-void mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
-                      mqi_column_desc_t *src_desc, void *src_data)
+int mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
+                     mqi_column_desc_t *src_desc, void *src_data)
 {
     int lgh;
     void *dst, *src;
@@ -63,32 +63,56 @@ void mdb_column_write(mdb_column_t      *dst_desc, void *dst_data,
         case mqi_varchar:
             if(__builtin_expect(*((char**)src) == NULL, 0))
                 src = &empty;
+
+            if (!**(char **)src && !*(char *)dst)
+                goto identical;
+
+            if (!strncmp(*(char **)src, dst, strlen(*(char **)src) + 1))
+                goto identical;
+
             memset(dst, 0, lgh);
             strncpy((char *)dst, *(const char **)src, lgh-1);
             break;
 
         case mqi_integer:
-            *(int32_t *)dst = *(int32_t *)src;
+            if (*(int32_t *)dst == *(int32_t *)src)
+                goto identical;
+            else
+                *(int32_t *)dst = *(int32_t *)src;
             break;
 
         case mqi_unsignd:
-            *(uint32_t *)dst = *(uint32_t *)src;
+            if (*(uint32_t *)dst == *(uint32_t *)src)
+                goto identical;
+            else
+                *(uint32_t *)dst = *(uint32_t *)src;
             break;
 
         case mqi_floating:
-            *(double *)dst = *(double *)src;
+            if (*(double *)dst == *(double *)src)
+                goto identical;
+            else
+                *(double *)dst = *(double *)src;
             break;
 
         case mqi_blob:
-            memcpy(dst, src, lgh);
+            if (!memcmp(dst, src, lgh))
+                goto identical;
+            else
+                memcpy(dst, src, lgh);
             break;
 
         default:
             /* we do not knopw what this is,
                so we silently ignore it */
-            break;
+            goto identical;
         }
     }
+
+    return 1;
+
+ identical:
+    return 0;
 }
 
 

@@ -169,13 +169,13 @@ mdb_table_t *mdb_table_create(char *name,
 
     dlgh = (dlgh + 3) & ~3;
 
-    tbl->handle  = MQI_HANDLE_INVALID;
-    tbl->name    = strdup(name);
-    tbl->stamp   = 1;
-    tbl->chash   = chash;
-    tbl->ncolumn = ncolumn;
-    tbl->columns = columns;
-    tbl->dlgh   = dlgh;
+    tbl->handle    = MQI_HANDLE_INVALID;
+    tbl->name      = strdup(name);
+    tbl->cnt.stamp = 1;
+    tbl->chash     = chash;
+    tbl->ncolumn   = ncolumn;
+    tbl->columns   = columns;
+    tbl->dlgh      = dlgh;
 
     MDB_DLIST_INIT(tbl->rows);
     mdb_log_create(tbl);
@@ -484,7 +484,7 @@ int mdb_table_get_column_size(mdb_table_t *tbl, int colidx)
 
 uint32_t mdb_table_get_stamp(mdb_table_t *tbl)
 {
-    return tbl->stamp;
+    return tbl->cnt.stamp;
 }
 
 int mdb_table_print_rows(mdb_table_t *tbl, char *buf, int len)
@@ -707,15 +707,17 @@ static int update_conditional(mdb_table_t       *tbl,
     mdb_row_t        *row;
     mqi_cond_entry_t *ce;
     table_iterator_t  it;
-    int               nupdate;
+    int               nupdate, changed;
 
     for (it.cursor = NULL, nupdate = 0;  (row = table_iterator(tbl, &it)); ) {
         ce = cond;
         if (mdb_cond_evaluate(tbl, &ce, row->data)) {
-            if (update_single_row(tbl, row, cds, data, index_update) < 0)
+            changed = update_single_row(tbl, row, cds, data, index_update);
+
+            if (changed < 0)
                 nupdate = -1;
             else
-                nupdate += (nupdate >= 0) ? 1 : 0;
+                nupdate += (nupdate >= 0) ? changed : 0;
         }
     }
 
@@ -729,14 +731,16 @@ static int update_all(mdb_table_t       *tbl,
 {
     mdb_row_t        *row;
     table_iterator_t  it;
-    int               nupdate;
+    int               nupdate, changed;
 
     for (it.cursor = NULL, nupdate = 0; (row = table_iterator(tbl, &it)); )
     {
-        if (update_single_row(tbl, row, cds, data, index_update) < 0)
+        changed = update_single_row(tbl, row, cds, data, index_update);
+
+        if (changed < 0)
             nupdate = -1;
         else
-            nupdate += (nupdate >= 0) ? 1 : 0;
+            nupdate += (nupdate >= 0) ? changed : 0;
     }
 
     if (nupdate < 0)
@@ -754,18 +758,20 @@ static int update_single_row(mdb_table_t       *tbl,
     mdb_row_t   *before  = NULL;
     uint32_t     txdepth = mdb_transaction_get_depth();
     mqi_bitfld_t cmask;
-
+    int          changed;
 
     if (txdepth > 0 && !(before = mdb_row_duplicate(tbl, row)))
         return -1;
 
-    if (mdb_row_update(tbl, row, cds, data, index_update, &cmask) < 0)
-        return -1;
+    changed = mdb_row_update(tbl, row, cds, data, index_update, &cmask);
+
+    if (changed <= 0)
+        return changed;
 
     if (mdb_log_change(tbl, txdepth, mdb_log_update, cmask, before, row) < 0)
         return -1;
 
-    return 0;
+    return 1;
 }
 
 static int delete_conditional(mdb_table_t *tbl, mqi_cond_entry_t *cond)

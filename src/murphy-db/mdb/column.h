@@ -45,7 +45,7 @@ typedef struct {
     uint32_t         flags;
 } mdb_column_t;
 
-void mdb_column_write(mdb_column_t *, void *, mqi_column_desc_t *, void *);
+int mdb_column_write(mdb_column_t *, void *, mqi_column_desc_t *, void *);
 void mdb_column_read(mqi_column_desc_t *, void *, mdb_column_t *, void *);
 int  mdb_column_print_header(mdb_column_t *, char *, int);
 int  mdb_column_print(mdb_column_t *, void *, char *, int);
