@@ -45,6 +45,7 @@
 #include "target.h"
 
 
+
 int create_targets(mrp_resolver_t *r, yy_res_parser_t *parser)
 {
     mrp_list_hook_t *lp, *ln;
@@ -90,6 +91,7 @@ static void purge_target(target_t *t)
     mrp_free(t->update_facts);
     mrp_free(t->update_targets);
     mrp_free(t->fact_stamps);
+    mrp_free(t->directs);
 
     for (i = 0; i < t->ndepend; i++)
         mrp_free(t->depends[i]);
@@ -291,10 +293,21 @@ static int older_than_facts(mrp_resolver_t *r, target_t *t)
     if (t->update_facts == NULL)
         return TRUE;
     else {
+#ifdef CHECK_TRANSITIVE_CLOSURE_OF_FACTS
         for (i = 0; (id = t->update_facts[i]) >= 0; i++) {
             if (fact_stamp(r, id) > t->fact_stamps[i])
                 return TRUE;
         }
+#else
+        for (i = 0; i < t->ndirect; i++) {
+            id = t->directs[i];
+
+            if (id < r->nfact) {
+                if (fact_stamp(r, id) > t->fact_stamps[i])
+                    return TRUE;
+            }
+        }
+#endif
     }
 
     return FALSE;
@@ -383,6 +396,8 @@ static void update_target_stamps(mrp_resolver_t *r, target_t *t)
     if (t->update_facts != NULL)
         for (i = 0; (id = t->update_facts[i]) >= 0; i++)
             t->fact_stamps[i] = fact_stamp(r, id);
+
+    t->stamp = r->stamp;
 }
 
 
@@ -401,6 +416,8 @@ static int update_target(mrp_resolver_t *r, target_t *t)
         else
             return -EINVAL;
     }
+
+    r->stamp = r->stamp + 1;
 
     level = r->level++;
     emit_resolver_event(RESOLVER_UPDATE_STARTED, t->name, level);
@@ -461,17 +478,28 @@ static int update_target(mrp_resolver_t *r, target_t *t)
 }
 
 
-int update_target_by_name(mrp_resolver_t *r, const char *name)
+target_t *lookup_target(mrp_resolver_t *r, const char *name)
 {
-    target_t *t;
+   target_t *t;
     int       i;
 
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
         if (!strcmp(t->name, name))
-            return update_target(r, t);
+            return t;
     }
 
-    return FALSE;
+    return NULL;
+}
+
+
+int update_target_by_name(mrp_resolver_t *r, const char *name)
+{
+    target_t *t = lookup_target(r, name);
+
+    if (t != NULL)
+        return update_target(r, t);
+    else
+        return FALSE;
 }
 
 
@@ -526,10 +554,9 @@ void dump_targets(mrp_resolver_t *r, FILE *fp)
     int       i, j, idx;
     target_t *t;
 
-    fprintf(fp, "%d targets\n", r->ntarget);
     for (i = 0; i < r->ntarget; i++) {
         t = r->targets + i;
-        fprintf(fp, "#%d: %s\n", i, t->name);
+        fprintf(fp, "#%d: %s (@%u)\n", i, t->name, t->stamp);
 
         fprintf(fp, "  dependencies:");
         if (t->depends != NULL) {
@@ -540,7 +567,8 @@ void dump_targets(mrp_resolver_t *r, FILE *fp)
             fprintf(fp, "  facts to check:");
             if (t->update_facts != NULL) {
                 for (j = 0; (idx = t->update_facts[j]) >= 0; j++)
-                    fprintf(fp, " %s", r->facts[idx].name);
+                    fprintf(fp, " %s (@%u)", r->facts[idx].name,
+                            t->fact_stamps[j]);
                 fprintf(fp, "\n");
             }
             else
@@ -549,7 +577,22 @@ void dump_targets(mrp_resolver_t *r, FILE *fp)
             fprintf(fp, "  target update order:");
             if (t->update_targets != NULL) {
                 for (j = 0; (idx = t->update_targets[j]) >= 0; j++)
-                    fprintf(fp, " %s", r->targets[idx].name);
+                    fprintf(fp, " %s (@%u)", r->targets[idx].name,
+                            r->targets[idx].stamp);
+                fprintf(fp, "\n");
+            }
+            else
+                fprintf(fp, "<none>\n");
+
+            fprintf(fp, "  direct dependencies:");
+            if (t->ndirect > 0) {
+                for (j = 0; j < t->ndirect; j++) {
+                    idx = t->directs[j];
+                    if (idx < r->nfact)
+                        fprintf(fp, " %s", r->facts[idx].name);
+                    else
+                        fprintf(fp, " %s", r->targets[idx-r->nfact].name);
+                }
                 fprintf(fp, "\n");
             }
             else
@@ -559,10 +602,18 @@ void dump_targets(mrp_resolver_t *r, FILE *fp)
             fprintf(fp, " <none>\n");
 
         if (t->script != NULL) {
-            fprintf(fp, "  update script (%s):\n",
-                    t->script->interpreter->name);
-            fprintf(fp, "%s", t->script->source);
-            fprintf(fp, "  end script\n");
+            if (t->script->source != NULL) {
+                fprintf(fp, "  update script (%s):\n",
+                        t->script->interpreter->name);
+                fprintf(fp, "%s", t->script->source);
+                fprintf(fp, "  end script\n");
+            }
+            else if (t->script->data != NULL) {
+                fprintf(fp, "  precompiled update (%s):\n",
+                        t->script->interpreter->name);
+                fprintf(fp, "    %p\n", t->script->data);
+                fprintf(fp, "  end script\n");
+            }
         }
         else
             fprintf(fp, "  no update script\n");

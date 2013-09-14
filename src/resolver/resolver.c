@@ -279,6 +279,7 @@ int mrp_resolver_update_targetv(mrp_resolver_t *r, const char *target,
 
 void mrp_resolver_dump_targets(mrp_resolver_t *r, FILE *fp)
 {
+    fprintf(fp, "%d target%s\n", r->ntarget, r->ntarget != 1 ? "s" : "");
     dump_targets(r, fp);
 }
 
@@ -288,10 +289,10 @@ void mrp_resolver_dump_facts(mrp_resolver_t *r, FILE *fp)
     int     i;
     fact_t *f;
 
-    fprintf(fp, "%d facts\n", r->nfact);
+    fprintf(fp, "%d fact%s\n", r->nfact, r->nfact != 1 ? "s" : "");
     for (i = 0; i < r->nfact; i++) {
         f = r->facts + i;
-        fprintf(fp, "  #%d: %s\n", i, f->name);
+        fprintf(fp, "  #%d: %s (@%u)\n", i, f->name, fact_stamp(r, i));
     }
 }
 

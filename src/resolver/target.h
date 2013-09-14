@@ -47,6 +47,7 @@ int update_target_by_name(mrp_resolver_t *r, const char *name);
 int update_target_by_id(mrp_resolver_t *r, int id);
 int schedule_target_autoupdate(mrp_resolver_t *r);
 
+target_t *lookup_target(mrp_resolver_t *s, const char *name);
 void dump_targets(mrp_resolver_t *r, FILE *fp);
 
 #endif /* __MURPHY_RESOLVER_TARGET_H__ */

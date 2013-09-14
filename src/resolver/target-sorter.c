@@ -36,6 +36,8 @@
 #include "scanner.h"
 #include "resolver.h"
 #include "resolver-types.h"
+#include "fact.h"
+#include "target.h"
 #include "target-sorter.h"
 
 
@@ -74,9 +76,11 @@ int sort_targets(mrp_resolver_t *r)
             mrp_free(t->update_targets);
             mrp_free(t->update_facts);
             mrp_free(t->fact_stamps);
+            mrp_free(t->directs);
             t->update_targets = NULL;
             t->update_facts   = NULL;
             t->fact_stamps    = NULL;
+            t->ndirect        = 0;
         }
 
         for (i = 0; i < r->ntarget; i++) {
@@ -462,6 +466,41 @@ static int sort_graph(graph_t *g, int target_idx)
             else
                 goto fail;
         }
+
+        target->ndirect = 0;
+        target->directs = mrp_allocz_array(int, target->ndepend);
+
+        if (target->ndepend == 0 || target->directs != NULL) {
+            fact_t   *f;
+            target_t *t;
+
+            for (i = 0; i < target->ndepend; i++) {
+                if (*target->depends[i] != '$')
+                    continue;
+
+                f = lookup_fact(g->r, target->depends[i]);
+
+                if (f != NULL)
+                    target->directs[target->ndirect++] = f - g->r->facts;
+                else
+                    target->directs[target->ndirect++] = -1;
+            }
+
+            for (i = 0; i < target->ndepend; i++) {
+                if (*target->depends[i] == '$')
+                    continue;
+
+                t = lookup_target(g->r, target->depends[i]);
+
+                if (t != NULL)
+                    target->directs[target->ndirect++] = g->r->nfact +
+                        t - g->r->targets;
+                else
+                    target->directs[target->ndirect++] = -1;
+            }
+        }
+        else
+            goto fail;
     }
 
     que_cleanup(&L);

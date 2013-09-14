@@ -52,6 +52,8 @@ struct target_s {
     int              ndepend;            /* number of dependencies */
     int             *update_facts;       /* facts to check when updating */
     int             *update_targets;     /* targets to check when updating */
+    int             *directs;            /* direct dependencies */
+    int              ndirect;            /* number of direct dependencies */
     uint32_t        *fact_stamps;        /* stamps of facts at last update */
     mrp_scriptlet_t *script;             /* update script if any, or NULL */
     int              prepared : 1;       /* ready for resolution */
