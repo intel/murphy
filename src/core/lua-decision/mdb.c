@@ -1242,8 +1242,11 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
     if (!mrp_resolver_add_prepared_target(ctx->r, target, &depends, 1,
                                           &select_updater, NULL, sel))
     {
-        printf("Failed to install resolver target for element '%s'.\n",
-               sel->name);
+        mrp_log_error("Failed to install resolver target for element '%s'.",
+                      sel->name);
+        MRP_LUA_LEAVE_ERROR(L,
+                            "Failed to install resolver target for "
+                            "element '%s'.", sel->name);
     }
 
     if (mrp_lua_dependency_add(L, table+1) == 1) {
@@ -1254,8 +1257,11 @@ static void select_install(lua_State *L, mrp_lua_mdb_select_t *sel)
         if (!mrp_resolver_add_prepared_target(ctx->r, table, &table_depends, 1,
                                               NULL, NULL, NULL))
         {
-            printf("Failed to install table fact dependency for table '%s'.\n",
-                   sel->table_name);
+            mrp_log_error("Failed to install table fact dependency "
+                          "for table '%s'.", sel->table_name);
+            MRP_LUA_LEAVE_ERROR(L,
+                                "Failed to install resolver target for "
+                                "element '%s'.", sel->name);
         }
 
         printf("\n%s: %s\n\tupdate(%s)\n", table, table_depends, sel->name);

@@ -45,6 +45,8 @@
 #define MRP_LUA_LEAVE_NOARG                     \
     mrp_debug("leave")
 
+#define MRP_LUA_LEAVE_ERROR(L, fmt, args...)    \
+    luaL_error(L, fmt , ## args)
 
 #define MRP_LUA_CLASSID_ROOT              "LuaBook."
 

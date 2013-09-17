@@ -627,8 +627,11 @@ static void element_install(lua_State *L, void *void_el)
 
         if (!mrp_resolver_add_prepared_target(ctx->r, target, depends, ndepend,
                                               &element_updater, NULL, el)) {
-            printf("Failed to install resolver target for element '%s'.\n",
-                   el->name);
+            mrp_log_error("Failed to install resolver target for element '%s'.",
+                          el->name);
+            MRP_LUA_LEAVE_ERROR(L,
+                                "Failed to install resolver target for "
+                                "element '%s'.", el->name);
         }
     }
 
@@ -895,8 +898,11 @@ static void sink_install(lua_State *L, void *void_sink)
     if (!mrp_resolver_add_prepared_target(ctx->r, target, depends, ndepend,
                                           &sink_updater, NULL, sink))
     {
-        printf("Failed to install resolver target for element '%s'.\n",
-               sink->name);
+        mrp_log_error("Failed to install resolver target for element '%s'.",
+                      sink->name);
+
+        MRP_LUA_LEAVE_ERROR(L, "Failed to install resolver target for "
+                            "element '%s'.", sink->name);
     }
 
     MRP_LUA_LEAVE_NOARG;
