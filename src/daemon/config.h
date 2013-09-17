@@ -46,7 +46,7 @@
  */
 
 /** Parse the command line and update context accordingly. */
-void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv);
+void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp);
 
 
 /*

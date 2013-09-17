@@ -113,9 +113,9 @@ static void setup_signals(mrp_context_t *ctx)
 }
 
 
-static void parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
+static void parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **env)
 {
-    mrp_parse_cmdline(ctx, argc, argv);
+    mrp_parse_cmdline(ctx, argc, argv, env);
 }
 
 
@@ -243,7 +243,7 @@ static void cleanup_context(mrp_context_t *ctx)
 }
 
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[], char *envp[])
 {
     mrp_context_t *ctx;
 
@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
 
     setup_signals(ctx);
     create_ruleset(ctx);
-    parse_cmdline(ctx, argc, argv);
+    parse_cmdline(ctx, argc, argv, envp);
     load_configuration(ctx);
     start_plugins(ctx);
     load_ruleset(ctx);

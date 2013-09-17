@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -44,12 +45,20 @@
 #include <murphy/core/plugin.h>
 #include <murphy/daemon/config.h>
 
+#ifndef PATH_MAX
+#    define PATH_MAX 1024
+#endif
+#define MAX_ARGS 64
+
+static void valgrind(const char *vg_path, int argc, char **argv, int vg_offs,
+                     int saved_argc, char **saved_argv, char **envp);
 
 /*
  * command line processing
  */
 
-static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
+static void print_usage(mrp_context_t *ctx, const char *argv0, int exit_code,
+                        const char *fmt, ...)
 {
     va_list ap;
 
@@ -59,7 +68,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
         va_end(ap);
     }
 
-    printf("usage: %s [options]\n\n"
+    printf("usage: %s [options] [-V [valgrind-path] [valgrind-options]]\n\n"
            "The possible options are:\n"
            "  -c, --config-file=PATH         main configuration file to use\n"
            "      The default configuration file is '%s'.\n"
@@ -77,9 +86,9 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -f, --foreground               don't daemonize\n"
            "  -h, --help                     show help on usage\n"
            "  -q, --query-plugins            show detailed information about\n"
-           "                                 all the available plugins\n",
-           argv0, MRP_DEFAULT_CONFIG_FILE, MRP_DEFAULT_CONFIG_DIR,
-           MRP_DEFAULT_PLUGIN_DIR);
+           "                                 all the available plugins\n"
+           "  -V, --valgrind                 run through valgrind\n",
+           argv0, ctx->config_file, ctx->config_dir, ctx->plugin_dir);
 
     if (exit_code < 0)
         return;
@@ -171,19 +180,47 @@ static void print_plugin_help(mrp_context_t *ctx, int detailed)
 }
 
 
-static void config_set_defaults(mrp_context_t *ctx)
+static void config_set_defaults(mrp_context_t *ctx, char *argv0)
 {
-    ctx->config_file = MRP_DEFAULT_CONFIG_FILE;
-    ctx->config_dir  = MRP_DEFAULT_CONFIG_DIR;
-    ctx->plugin_dir  = MRP_DEFAULT_PLUGIN_DIR;
-    ctx->log_mask    = MRP_LOG_MASK_ERROR;
-    ctx->log_target  = MRP_LOG_TO_STDERR;
+    static char cfg_file[PATH_MAX], cfg_dir[PATH_MAX], plugin_dir[PATH_MAX];
+    char *e;
+    int   l;
+
+    if ((e = strstr(argv0, "/src/murphyd")) != NULL ||
+        (e = strstr(argv0, "/src/.libs/lt-murphyd")) != NULL) {
+        mrp_log_mask_t saved = mrp_log_set_mask(MRP_LOG_MASK_WARNING);
+        mrp_log_warning("***");
+        mrp_log_warning("*** Looks like we are run from the source tree.");
+        mrp_log_warning("*** Runtime defaults will be set accordingly...");
+        mrp_log_warning("***");
+        mrp_log_set_mask(saved);
+
+        l = e - argv0;
+        snprintf(cfg_dir, sizeof(cfg_dir), "%*.*s/src/daemon", l, l, argv0);
+        snprintf(cfg_file, sizeof(cfg_file), "%s/murphy-lua.conf", cfg_dir);
+        snprintf(plugin_dir, sizeof(plugin_dir), "%*.*s/src/.libs",
+                 l, l, argv0);
+
+        ctx->config_file = cfg_file;
+        ctx->config_dir  = cfg_dir;
+        ctx->plugin_dir  = plugin_dir;
+        ctx->log_mask    = MRP_LOG_UPTO(MRP_LOG_INFO);
+        ctx->log_target  = MRP_LOG_TO_STDERR;
+        ctx->foreground  = TRUE;
+    }
+    else {
+        ctx->config_file = MRP_DEFAULT_CONFIG_FILE;
+        ctx->config_dir  = MRP_DEFAULT_CONFIG_DIR;
+        ctx->plugin_dir  = MRP_DEFAULT_PLUGIN_DIR;
+        ctx->log_mask    = MRP_LOG_MASK_ERROR;
+        ctx->log_target  = MRP_LOG_TO_STDERR;
+    }
 }
 
 
-void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
+void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
 {
-#   define OPTIONS "c:C:l:t:fP:a:vd:DhHq"
+#   define OPTIONS "c:C:l:t:fP:a:vd:DhHqV"
     struct option options[] = {
         { "config-file"  , required_argument, NULL, 'c' },
         { "config-dir"   , required_argument, NULL, 'C' },
@@ -197,90 +234,124 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv)
         { "help"         , no_argument      , NULL, 'h' },
         { "more-help"    , no_argument      , NULL, 'H' },
         { "query-plugins", no_argument      , NULL, 'q' },
+        { "valgrind"     , optional_argument, NULL, 'V' },
         { NULL, 0, NULL, 0 }
     };
 
+#   define SAVE_ARG(a) do {                                     \
+        if (saved_argc >= MAX_ARGS)                             \
+            print_usage(ctx, argv[0], EINVAL,                   \
+                        "too many command line arguments");     \
+        else                                                    \
+            saved_argv[saved_argc++] = a;                       \
+    } while (0)
+#   define SAVE_OPT(o)       SAVE_ARG(o)
+#   define SAVE_OPTARG(o, a) SAVE_ARG(o); SAVE_ARG(a)
+    char *saved_argv[MAX_ARGS];
+    int   saved_argc;
+
     int opt, help;
 
-    config_set_defaults(ctx);
+    config_set_defaults(ctx, argv[0]);
     mrp_log_set_mask(ctx->log_mask);
     mrp_log_set_target(ctx->log_target);
+
+    saved_argc = 0;
+    saved_argv[saved_argc++] = argv[0];
 
     help = FALSE;
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
         switch (opt) {
         case 'c':
+            SAVE_OPTARG("-c", optarg);
             ctx->config_file = optarg;
             break;
 
         case 'C':
+            SAVE_OPTARG("-C", optarg);
             ctx->config_dir = optarg;
             break;
 
         case 'P':
+            SAVE_OPTARG("-P", optarg);
             ctx->plugin_dir = optarg;
             break;
 
         case 'v':
+            SAVE_OPT("-v");
             ctx->log_mask <<= 1;
             ctx->log_mask  |= 1;
             mrp_log_set_mask(ctx->log_mask);
             break;
 
         case 'l':
+            SAVE_OPTARG("-l", optarg);
             ctx->log_mask = mrp_log_parse_levels(optarg);
             if (ctx->log_mask < 0)
-                print_usage(argv[0], EINVAL, "invalid log level '%s'", optarg);
+                print_usage(ctx, argv[0], EINVAL,
+                            "invalid log level '%s'", optarg);
             else
                 mrp_log_set_mask(ctx->log_mask);
             break;
 
         case 't':
+            SAVE_OPTARG("-t", optarg);
             ctx->log_target = optarg;
             break;
 
         case 'd':
+            SAVE_OPTARG("-d", optarg);
             ctx->log_mask |= MRP_LOG_MASK_DEBUG;
             mrp_debug_set_config(optarg);
             mrp_debug_enable(TRUE);
             break;
 
         case 'D':
+            SAVE_OPT("-D");
             printf("Known debug sites:\n");
             mrp_debug_dump_sites(stdout, 4);
             exit(0);
             break;
 
         case 'f':
+            SAVE_OPT("-f");
             ctx->foreground = TRUE;
             break;
 
         case 'h':
+            SAVE_OPT("-h");
             help++;
             break;
 
         case 'H':
+            SAVE_OPT("-H");
             help += 2;
             break;
 
         case 'q':
+            SAVE_OPT("-q");
             print_plugin_help(ctx, TRUE);
             break;
 
+        case 'V':
+            valgrind(optarg, argc, argv, optind, saved_argc, saved_argv, envp);
+            break;
+
         default:
-            print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
+            print_usage(ctx, argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
 
     if (help) {
-        print_usage(argv[0], -1, "");
+        print_usage(ctx, argv[0], -1, "");
         if (help > 1)
             print_plugin_help(ctx, FALSE);
         exit(0);
     }
 
 }
+
 
 
 /*
@@ -1367,4 +1438,50 @@ static char *get_next_token(input_t *in)
                       in->line, in->file);
         return NULL;
     }
+}
+
+
+/*
+ * bridging to valgrind
+ */
+
+static void valgrind(const char *vg_path, int argc, char **argv, int vg_offs,
+                     int saved_argc, char **saved_argv, char **envp)
+{
+#define VG_ARG(a) vg_argv[vg_argc++] = a
+    char *vg_argv[MAX_ARGS + 1];
+    int   vg_argc, normal_offs, i;
+
+    vg_argc = 0;
+
+    /* set valgrind binary */
+    VG_ARG(vg_path ? (char *)vg_path : "/usr/bin/valgrind");
+
+    /* add valgrind arguments */
+    for (i = vg_offs; i < argc; i++)
+        VG_ARG(argv[i]);
+
+    /* save offset to normal argument list for fallback */
+    normal_offs = vg_argc;
+
+    /* add our binary and our arguments */
+    for (i = 0; i < saved_argc; i++)
+        vg_argv[vg_argc++] = saved_argv[i];
+
+    /* terminate argument list */
+    VG_ARG(NULL);
+
+    /* try executing through valgrind */
+    mrp_log_warning("Executing through valgrind (%s)...", vg_argv[0]);
+    execve(vg_argv[0], vg_argv, envp);
+
+    /* try falling back to normal execution */
+    mrp_log_error("Executing through valgrind failed (error %d: %s), "
+                  "retrying without...", errno, strerror(errno));
+    execve(vg_argv[normal_offs], vg_argv + normal_offs, envp);
+
+    /* can't do either, so just give up */
+    mrp_log_error("Fallback to normal execution failed (error %d: %s).",
+                  errno, strerror(errno));
+    exit(1);
 }
