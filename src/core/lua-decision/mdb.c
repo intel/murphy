@@ -50,7 +50,6 @@
 
 #define TABLE_CLASS         MRP_LUA_CLASS(mdb, table)
 #define SELECT_CLASS        MRP_LUA_CLASS(mdb, select)
-#define DEPENDENCY_CLASS    MRP_LUA_CLASS(mdb, dependency)
 
 #define TABLE_ROW_CLASSID   MRP_LUA_CLASSID_ROOT "table_row"
 #define SELECT_ROW_CLASSID  MRP_LUA_CLASSID_ROOT "select_row"
@@ -97,10 +96,6 @@ struct mrp_lua_mdb_select_s {
     } statement;
     mql_result_t *result;
     size_t nrow;
-};
-
-struct mrp_lua_mdb_dependency_s {
-    int refcnt;
 };
 
 struct row_s {
@@ -159,10 +154,6 @@ static int  select_row_setfield(lua_State *);
 static int  select_row_getlength(lua_State *);
 static mrp_lua_mdb_select_t *select_row_check(lua_State *, int, int *);
 
-static int  dependency_getfield(lua_State *);
-static int  dependency_setfield(lua_State *);
-static void dependency_destroy(void *);
-
 static bool define_constants(lua_State *);
 
 static field_t field_check(lua_State *, int, const char **);
@@ -202,10 +193,6 @@ MRP_LUA_METHOD_LIST_TABLE (
 );
 
 MRP_LUA_METHOD_LIST_TABLE (
-    dependency_methods,      /* methodlist name */
-);
-
-MRP_LUA_METHOD_LIST_TABLE (
     table_overrides,         /* methodlist name */
     MRP_LUA_OVERRIDE_CALL       (table_create_from_lua)
     MRP_LUA_OVERRIDE_GETFIELD   (table_getfield)
@@ -235,12 +222,6 @@ MRP_LUA_METHOD_LIST_TABLE (
     MRP_LUA_OVERRIDE_GETLENGTH  (select_row_getlength)
 );
 
-MRP_LUA_METHOD_LIST_TABLE (
-    dependency_overrides,    /* methodlist name */
-    MRP_LUA_OVERRIDE_GETFIELD   (dependency_getfield)
-    MRP_LUA_OVERRIDE_SETFIELD   (dependency_setfield)
-);
-
 MRP_LUA_CLASS_DEF (
    mdb,                      /* class name */
    table,                    /* constructor name */
@@ -259,20 +240,10 @@ MRP_LUA_CLASS_DEF (
    select_overrides          /* override methods */
 );
 
-MRP_LUA_CLASS_DEF (
-   mdb,                      /* class name */
-   dependency,               /* constructor name */
-   mrp_lua_mdb_dependency_t, /* userdata type */
-   dependency_destroy,       /* userdata destructor */
-   dependency_methods,       /* class methods */
-   dependency_overrides      /* override methods */
-);
-
 void mrp_lua_create_mdb_class(lua_State *L)
 {
     mrp_lua_create_object_class(L, TABLE_CLASS);
     mrp_lua_create_object_class(L, SELECT_CLASS);
-    mrp_lua_create_object_class(L, DEPENDENCY_CLASS);
 
     table_row_class_create(L);
     select_row_class_create(L);
@@ -420,37 +391,6 @@ double mrp_lua_select_get_floating(mrp_lua_mdb_select_t *sel,
     return sel ? mql_result_rows_get_floating(sel->result,colidx,rowidx) : 0.0;
 }
 
-
-int mrp_lua_dependency_add(lua_State *L, const char *name)
-{
-    mrp_lua_mdb_dependency_t *dep;
-    int refcnt = 0;
-
-    MRP_LUA_ENTER;
-
-    if (name) {
-        mrp_lua_find_object(L, DEPENDENCY_CLASS, name);
-
-        if (lua_isnil(L, -1)) {
-            lua_pop(L, 1);
-
-            if ((dep = mrp_lua_create_object(L, DEPENDENCY_CLASS, name,0)))
-                refcnt = dep->refcnt = 1;
-            else
-                luaL_error(L, "failed to create MDB dependency '%s'", name);
-        }
-        else {
-            if ((dep = mrp_lua_to_object(L, DEPENDENCY_CLASS, -1)))
-                refcnt = ++(dep->refcnt);
-            else
-                luaL_error(L, "MDB dependency '%s' has invalid type", name);
-        }
-
-        lua_pop(L, 1);
-    }
-
-    MRP_LUA_LEAVE(refcnt);
-}
 
 static int table_create_from_lua(lua_State *L)
 {
@@ -1381,34 +1321,6 @@ static mrp_lua_mdb_select_t *select_row_check(lua_State *L,
         *ret_rowidx = row->index;
 
     return (mrp_lua_mdb_select_t *)row->data;
-}
-
-static int dependency_getfield(lua_State *L)
-{
-    MRP_LUA_ENTER;
-
-    luaL_error(L, "dependencies have no fields");
-
-    MRP_LUA_LEAVE(0);
-}
-
-static int dependency_setfield(lua_State *L)
-{
-    MRP_LUA_ENTER;
-
-    luaL_error(L, "dependencies are read-only");
-
-    MRP_LUA_LEAVE(0);
-}
-
-static void dependency_destroy(void *data)
-{
-    /* mrp_lua_mdb_dependency_t *sel = (mrp_lua_mdb_dependency_t *)data; */
-    MRP_UNUSED(data);
-
-    MRP_LUA_ENTER;
-
-    MRP_LUA_LEAVE_NOARG;
 }
 
 static bool define_constants(lua_State *L)
