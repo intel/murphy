@@ -35,9 +35,9 @@ if m:plugin_exists('test.disabled') then
 end
 
 -- load the dbus plugin if it exists
-if m:plugin_exists('dbus') then
-    m:load_plugin('dbus')
-end
+-- if m:plugin_exists('dbus') then
+--     m:load_plugin('dbus')
+-- end
 
 -- load glib plugin, ignoring any errors
 m:try_load_plugin('glib')
