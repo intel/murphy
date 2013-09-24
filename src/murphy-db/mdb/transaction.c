@@ -117,6 +117,7 @@ int mdb_transaction_commit(uint32_t depth)
         case mdb_log_start:
             check_stamp(en);
             free(en->cnt);
+            s = 0;
             break;
 
         default:
