@@ -126,6 +126,19 @@ resource.class {
      shareable = false
 }
 
+resource.class {
+     name = "speech_synthesis",
+     shareable = true,
+     attributes = {
+         role = { mdb.string, "speech", "rw" }
+     }
+}
+
+resource.class {
+     name = "speech_recognition",
+     shareable = true,
+}
+
 -- test for creating selections
 mdb.select {
            name = "audio_owner",
