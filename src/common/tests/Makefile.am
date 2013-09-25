@@ -1,7 +1,9 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
 noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
-            internal-transport-test process-watch-test native-test
+                 internal-transport-test process-watch-test native-test \
+                 sdbus-error-message
+
 if DBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
@@ -109,6 +111,12 @@ dbus_sdbus_test_LDADD   = 				\
 sdbus_transport_test_SOURCES = libdbus-transport-test.c
 sdbus_transport_test_CFLAGS  = $(AM_CFLAGS)
 sdbus_transport_test_LDADD   =				\
+			../../libmurphy-common.la	\
+			../../libmurphy-dbus-sdbus.la
+
+sdbus_error_message_SOURCES = sdbus-error-message.c
+sdbus_error_message_CFLAGS  = $(AM_CFLAGS) $(SDBUS_CFLAGS)
+sdbus_error_message_LDADD   =				\
 			../../libmurphy-common.la	\
 			../../libmurphy-dbus-sdbus.la
 endif
