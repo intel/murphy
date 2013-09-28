@@ -243,6 +243,20 @@ static void cleanup_context(mrp_context_t *ctx)
 }
 
 
+static void set_linebuffered(FILE *stream)
+{
+    fflush(stream);
+    setvbuf(stream, NULL, _IOLBF, 0);
+}
+
+
+static void set_nonbuffered(FILE *stream)
+{
+    fflush(stream);
+    setvbuf(stream, NULL, _IONBF, 0);
+}
+
+
 int main(int argc, char *argv[], char *envp[])
 {
     mrp_context_t *ctx;
@@ -258,6 +272,8 @@ int main(int argc, char *argv[], char *envp[])
     prepare_ruleset(ctx);
     setup_logging(ctx);
     daemonize(ctx);
+    set_linebuffered(stdout);
+    set_nonbuffered(stderr);
     run_mainloop(ctx);
     stop_plugins(ctx);
 
