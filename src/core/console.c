@@ -92,6 +92,7 @@ typedef struct {
     input_t              in;                 /* input buffer */
     mrp_list_hook_t      hook;               /* to list of active consoles */
     int                  pout[2];            /* pipe for output proxying */
+    mrp_io_watch_t      *wout;               /* output watch */
     int                  ofd;                /* saved fileno(stdout) */
     int                  oblk;               /* saved O_NONBLOCK for ofd */
     int                  efd;                /* saved fileno(stderr) */
@@ -102,6 +103,8 @@ typedef struct {
 static int check_destroy(mrp_console_t *mc);
 static int purge_destroyed(mrp_console_t *mc);
 static FILE *console_fopen(mrp_console_t *mc);
+static int console_read_output(console_t *c, void *buf, size_t size);
+static void console_flush_output(console_t *c, int copy_orig);
 static void console_release_output(console_t *c);
 
 static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size);
@@ -134,6 +137,20 @@ void console_cleanup(mrp_context_t *ctx)
     mrp_list_init(&ctx->cmd_groups);
 
     unregister_commands(ctx);
+}
+
+
+static void output_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
+                      void *user_data)
+{
+    mrp_console_t *mc = (mrp_console_t *)user_data;
+    console_t     *c  = (console_t *)mc;
+
+    MRP_UNUSED(w);
+    MRP_UNUSED(fd);
+
+    if (events & MRP_IO_EVENT_IN)
+        console_flush_output(c, TRUE);
 }
 
 
@@ -172,6 +189,11 @@ mrp_console_t *mrp_create_console(mrp_context_t *ctx, mrp_console_req_t *req,
 
         if (pipe(c->pout) < 0)
             mrp_log_warning("Failed to create console redirection pipe.");
+        else {
+            fcntl(c->pout[WFD], F_SETPIPE_SZ, 32 * 1024);
+            c->wout = mrp_add_io_watch(ctx->ml, c->pout[RFD],
+                                       MRP_IO_EVENT_IN, output_cb, c);
+        }
         c->ofd = c->efd = -1;
 
         mrp_list_append(&ctx->consoles, &c->hook);
@@ -205,6 +227,8 @@ static int purge_destroyed(mrp_console_t *mc)
         fclose(c->stdout);
         fclose(c->stderr);
 
+        mrp_del_io_watch(c->wout);
+        c->wout = NULL;
         console_release_output(c);
         close(c->pout[0]);
         close(c->pout[1]);
@@ -480,6 +504,22 @@ static int console_read_output(console_t *c, void *buf, size_t size)
 }
 
 
+static void console_flush_output(console_t *c, int copy_orig)
+{
+    char data[1024];
+    int  size;
+
+    fflush(stdout);
+    fflush(stderr);
+
+    while ((size = console_read_output(c, data, sizeof(data))) > 0) {
+        if (copy_orig && c->ofd >= 0)
+            dprintf(c->ofd, "%*.*s", size, size, data);
+        mrp_console_printf((mrp_console_t *)c, "%*.*s", size, size, data);
+    }
+}
+
+
 static char *raw_argument(char *raw, const char *grp, const char *cmd)
 {
 #define SKIP_WHITESPACE(_p)            \
@@ -663,18 +703,13 @@ static ssize_t input_evt(mrp_console_t *mc, void *buf, size_t size)
                     cmd->tok(mc, grp->user_data, argc, argv);
             });
 
-        {
-            char data[1024];
-            int  size;
-
-            while ((size = console_read_output(c, data, sizeof(data))) > 0) {
-                dprintf(c->ofd, "%*.*s", size, size, data);
-                mrp_console_printf(mc, "%*.*s", size, size, data);
-            }
-
-            if (ferror(stdout) || ferror(stderr))
-                mrp_console_printf(mc, "[console output truncated...]\n");
-        }
+        /*
+         * Although our watch for c->pout[RFD]/output_cb should take
+         * care of flushing any output over to the console, since we
+         * know there is very probably pending output we might as well
+         * take care of proxying it right away...
+         */
+        console_flush_output(c, TRUE);
 
         console_release_output(c);
     }
