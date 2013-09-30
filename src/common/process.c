@@ -78,6 +78,8 @@ typedef struct {
 
     mrp_list_hook_t clients;
     int n_clients;
+    int busy : 1;
+    int dead : 1;
 } nl_pid_watch_t;
 
 /* murphy pid file directory notify */
@@ -144,7 +146,10 @@ static void htbl_free_nl_watch(void *key, void *object)
 
     MRP_UNUSED(key);
 
-    mrp_free(w);
+    if (!w->busy)
+        mrp_free(w);
+    else
+        w->dead = TRUE;
 }
 
 
@@ -386,6 +391,7 @@ static void nl_watch(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
                         break;
                     }
 
+                    nl_w->busy = TRUE;
                     mrp_list_foreach(&nl_w->clients, p, n) {
                         nl_pid_client_t *client;
 
@@ -393,6 +399,10 @@ static void nl_watch(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
                         client->cb(nl_w->pid, MRP_PROCESS_STATE_NOT_READY,
                                 client->user_data);
                     }
+                    if (nl_w->dead)
+                        mrp_free(nl_w);
+                    else
+                        nl_w->busy = FALSE;
 
                     /* TODO: should we automatically free the wathces? Or let
                      * client do that to preserver symmetricity? */
