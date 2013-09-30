@@ -124,7 +124,7 @@ target_t *create_target(mrp_resolver_t *r, const char *target,
 {
     target_t *t;
     size_t    old_size, new_size;
-    int       i;
+    int       i, j, found, nduplicate;
 
     for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
         if (!strcmp(t->name, target)) {
@@ -149,14 +149,30 @@ target_t *create_target(mrp_resolver_t *r, const char *target,
         t->depends = mrp_allocz_array(char *, ndepend);
 
         if (t->depends != NULL) {
+            nduplicate = 0;
             for (i = 0; i < ndepend; i++) {
-                t->depends[i] = mrp_strdup(depends[i]);
+                found = FALSE;
+                for (j = 0; j < i; j++)
+                    if (!strcmp(depends[i], depends[j]))
+                        found = TRUE;
+                if (!found) {
+                    t->depends[i - nduplicate] = mrp_strdup(depends[i]);
 
-                if (t->depends[i] == NULL)
-                    goto undo_and_fail;
+                    if (t->depends[i] == NULL)
+                        goto undo_and_fail;
+                }
+                else
+                    nduplicate++;
             }
 
-            t->ndepend = ndepend;
+            t->ndepend = ndepend - nduplicate;
+
+            if (nduplicate > 0) {
+                mrp_reallocz(t->depends, ndepend, t->ndepend);
+                mrp_log_warning("Filtered out %d duplicate%s dependencies "
+                                "from target '%s'.", nduplicate,
+                                nduplicate == 1 ? "" : "s", t->name);
+            }
         }
         else
             goto undo_and_fail;
