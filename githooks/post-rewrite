@@ -1,0 +1,10 @@
+#!/bin/sh
+
+gittop=$(while [ ! -d .git -a $(pwd) != "/" ]; do cd ..; done; echo $(pwd))
+
+if [ -f $gittop/.rebase-branch-name ]; then
+    rm -f $gittop/.rebase-branch-name
+    echo "Removed saved branch name file..."
+fi
+
+exit 0

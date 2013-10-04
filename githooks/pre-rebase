@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# This hook is called with the following parameters:
+#
+# $1 -- the upstream the series was forked from.
+# $2 -- the branch being rebased (or empty when rebasing the current branch).
+
+# Dig out and save the name of the branch being rebased for commit-msg hook.
+# There the branch name is used to add gerrit Change-Id footers to branches
+# matching .*tizen.* and remove from any other branches.
+
+branch=$(git branch -l | grep '^\*' | cut -d ' ' -f 2)
+gittop=$(while [ ! -d .git -a $(pwd) != "/" ]; do cd ..; done; echo $(pwd))
+
+case $branch in
+    \(*)
+        echo "-" > $gittop/.rebase-branch-name
+        ;;
+      *)
+        echo "$branch"   > $gittop/.rebase-branch-name
+        echo "Saved branch name \"$branch\" for commit-msg hook..."
+        ;;
+esac
+
+exit 0
