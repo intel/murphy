@@ -2098,6 +2098,7 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
 error:
     if (ctx) {
         destroy_manager(ctx->mgr);
+        mrp_free(ctx);
     }
 
     return FALSE;
