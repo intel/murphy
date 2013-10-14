@@ -42,6 +42,10 @@
 #define MRP_FUNCBRIDGE_POINTER     'p'
 #define MRP_FUNCBRIDGE_OBJECT      'o'
 
+enum mrp_funcbridge_type_e {
+    MRP_C_FUNCTION = 1,
+    MRP_LUA_FUNCTION
+};
 
 typedef union  mrp_funcbridge_value_u  mrp_funcbridge_value_t;
 typedef enum   mrp_funcbridge_type_e   mrp_funcbridge_type_t;
@@ -58,11 +62,6 @@ union mrp_funcbridge_value_u {
     double      floating;
     bool        boolean;
     void       *pointer;
-};
-
-enum mrp_funcbridge_type_e {
-    MRP_C_FUNCTION = 1,
-    MRP_LUA_FUNCTION
 };
 
 struct mrp_funcbridge_s {
