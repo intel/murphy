@@ -373,6 +373,8 @@ static uint32_t epoll_event_mask(mrp_io_watch_t *master, mrp_io_watch_t *ignore)
             mask |= w->events;
     }
 
+    mrp_debug("epoll event mask for I/O watch %p: %d", master, mask);
+
     return mask;
 }
 
@@ -523,6 +525,8 @@ mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
             mrp_free(w);
             w = NULL;
         }
+        else
+            mrp_debug("added I/O watch %p (fd %d, events 0x%x)", w, w->fd, w->events);
     }
 
     return w;
@@ -539,7 +543,7 @@ void mrp_del_io_watch(mrp_io_watch_t *w)
      */
 
     if (w != NULL) {
-        mrp_debug("marking I/O watch %p deleted", w);
+        mrp_debug("marking I/O watch %p (fd %d) deleted", w, w->fd);
 
         mark_deleted(w);
         w->events = 0;
@@ -1946,7 +1950,7 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
             w->cb(w, w->fd, e->events, w->user_data);
         }
         else
-            mrp_debug("skipping delete I/O watch %p (fd %d)", w, fd);
+            mrp_debug("skipping deleted I/O watch %p (fd %d)", w, fd);
 
         if (!mrp_list_empty(&w->slave))
             dispatch_slaves(w, e);
@@ -1987,6 +1991,8 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
         return;
 
     dispatch_subloops(ml);
+
+    mrp_debug("done dispatching poll events");
 }
 
 
