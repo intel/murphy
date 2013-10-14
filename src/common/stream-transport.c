@@ -294,10 +294,13 @@ static int strm_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     strm_t *t = (strm_t *)mt;
 
     if (t->sock != -1 || open_socket(t, addr->any.sa_family)) {
-        if (bind(t->sock, &addr->any, addrlen) == 0)
+        if (bind(t->sock, &addr->any, addrlen) == 0) {
+            mrp_debug("transport %p bound", mt);
             return TRUE;
+        }
     }
 
+    mrp_debug("failed to bind transport %p", mt);
     return FALSE;
 }
 
@@ -308,11 +311,13 @@ static int strm_listen(mrp_transport_t *mt, int backlog)
 
     if (t->sock != -1 && t->iow != NULL && t->evt.connection != NULL) {
         if (listen(t->sock, backlog) == 0) {
+            mrp_debug("transport %p listening", mt);
             t->listened = TRUE;
             return TRUE;
         }
     }
 
+    mrp_debug("transport %p failed to listen", mt);
     return FALSE;
 }
 
@@ -350,8 +355,10 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
         events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
         t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
 
-        if (t->iow != NULL)
+        if (t->iow != NULL) {
+            mrp_debug("accepted connection on transport %p/%p", mlt, mt);
             return TRUE;
+        }
         else {
             close(t->sock);
             t->sock = -1;
@@ -360,6 +367,7 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
     else
         mrp_fragbuf_destroy(t->buf);
 
+    mrp_debug("failed to accept connection on transport %p/%p", mlt, mt);
     return FALSE;
 }
 
@@ -367,6 +375,8 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 static void strm_close(mrp_transport_t *mt)
 {
     strm_t *t = (strm_t *)mt;
+
+    mrp_debug("closing transport %p", mt);
 
     mrp_del_io_watch(t->iow);
     t->iow = NULL;
@@ -394,9 +404,12 @@ static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
 
     MRP_UNUSED(w);
 
+    mrp_debug("event 0x%x for transport %p", events, t);
+
     if (events & MRP_IO_EVENT_IN) {
         if (MRP_UNLIKELY(mt->listened != 0)) {
             MRP_TRANSPORT_BUSY(mt, {
+                    mrp_debug("connection event on transport %p", mt);
                     mt->evt.connection(mt, mt->user_data);
                 });
 
@@ -410,6 +423,7 @@ static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
             if (buf == NULL) {
                 error = ENOMEM;
             fatal_error:
+                mrp_debug("transport %p closed with error %d", mt, error);
             closed:
                 strm_disconnect(mt);
 
@@ -449,6 +463,7 @@ static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
     }
 
     if (events & MRP_IO_EVENT_HUP) {
+        mrp_debug("transport %p closed by peer", mt);
         error = 0;
         goto closed;
     }
@@ -503,7 +518,7 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     t->sock = socket(addr->any.sa_family, SOCK_STREAM, 0);
 
     if (t->sock < 0)
-        return FALSE;
+        goto fail;
 
     if (connect(t->sock, &addr->any, addrlen) == 0) {
         t->buf = mrp_fragbuf_create(TRUE, 0);
@@ -518,6 +533,8 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                 nb = 1;
                 fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
 
+                mrp_debug("connected transport %p", mt);
+
                 return TRUE;
             }
 
@@ -530,6 +547,9 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         close(t->sock);
         t->sock = -1;
     }
+
+ fail:
+    mrp_debug("failed to connect transport %p", mt);
 
     return FALSE;
 }
@@ -547,6 +567,8 @@ static int strm_disconnect(mrp_transport_t *mt)
 
         mrp_fragbuf_destroy(t->buf);
         t->buf = NULL;
+
+        mrp_debug("disconnected transport %p", mt);
 
         return TRUE;
     }
