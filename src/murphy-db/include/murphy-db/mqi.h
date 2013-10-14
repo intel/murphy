@@ -63,7 +63,7 @@
     {.type=mqi_variable, .u.variable=MQI_VALUE(typ, val)}
 
 #define MQI_OPERATOR(op) \
-    {.type=mqi_operator, .u.operator=mqi_##op}
+    {.type=mqi_operator, .u.operator_=mqi_##op}
 
 
 #define MQI_EXPRESSION(seq)        MQI_OPERATOR(begin), seq, MQI_OPERATOR(end),

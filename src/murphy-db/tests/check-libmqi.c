@@ -1154,7 +1154,7 @@ static void column_event_cb(mqi_event_t *evt, void *user_data)
 
 #define PRINT_VALUE(fmt,t) \
     snprintf(trig->col.value, MQI_DIMENSION(trig->col.value) - 1, \
-             fmt " => " fmt, ce->value.old.t, ce->value.new.t)
+             fmt " => " fmt, ce->value.old.t, ce->value.new_.t)
 #define PRINT_INVALID \
     snprintf(trig->col.value, MQI_DIMENSION(trig->col.value) - 1, \
              "<invalid> => <invalid>")

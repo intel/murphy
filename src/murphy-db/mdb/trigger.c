@@ -473,7 +473,7 @@ void mdb_trigger_column_change(mdb_table_t  *tbl,
                 cd.offset = 0;
 
                 mdb_column_read(&cd, &ce->value.old, col, before->data);
-                mdb_column_read(&cd, &ce->value.new, col, after->data );
+                mdb_column_read(&cd, &ce->value.new_, col, after->data );
 
                 if (tr->select.length > 0) {
                     for (k = 0; (sx = tr->select.column[k].cindex) >= 0;  k++){
