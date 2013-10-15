@@ -542,7 +542,7 @@ void mrp_del_io_watch(mrp_io_watch_t *w)
      *        the actual deletion in the dispatching loop.
      */
 
-    if (w != NULL) {
+    if (w != NULL && !is_deleted(w)) {
         mrp_debug("marking I/O watch %p (fd %d) deleted", w, w->fd);
 
         mark_deleted(w);
@@ -1933,7 +1933,7 @@ static void dispatch_slaves(mrp_io_watch_t *w, struct epoll_event *e)
 static void dispatch_poll_events(mrp_mainloop_t *ml)
 {
     struct epoll_event *e;
-    mrp_io_watch_t     *w;
+    mrp_io_watch_t     *w, *tblw;
     int                 i, fd;
 
     for (i = 0, e = ml->events; i < ml->poll_result; i++, e++) {
@@ -1956,11 +1956,15 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
             dispatch_slaves(w, e);
 
         if (e->events & EPOLLRDHUP) {
-            if (epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e) < 0 &&
-                (errno != EBADF && errno != ENOENT))
-                mrp_log_error("Failed to delete fd %d from epoll "
-                              "(%d: %s).", w->fd, errno, strerror(errno));
-            fdtbl_remove(ml->fdtbl, w->fd);
+            tblw = fdtbl_lookup(ml->fdtbl, w->fd);
+
+            if (tblw == w) {
+                mrp_debug("forcibly stop polling fd %d for watch %p", w->fd, w);
+                epoll_del(w);
+            }
+            else if (tblw != NULL)
+                mrp_debug("don't stop polling reused fd %d of watch %p",
+                          w->fd, w);
         }
         else {
             if ((e->events & EPOLLHUP) && !is_deleted(w)) {
@@ -1974,11 +1978,16 @@ static void dispatch_poll_events(mrp_mainloop_t *ml)
                  */
 
                 if (w->wrhup++ > 5) {
-                    if (epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, e) < 0 &&
-                        (errno != EBADF && errno != ENOENT))
-                        mrp_log_error("Failed to EPOLL_CTL_DEL fd %d (%d: %s).",
-                                      w->fd, errno,strerror(errno));
-                    fdtbl_remove(ml->fdtbl, w->fd);
+                    tblw = fdtbl_lookup(ml->fdtbl, w->fd);
+
+                    if (tblw == w) {
+                        mrp_debug("forcibly stop polling fd %d for watch %p",
+                                  w->fd, w);
+                        epoll_del(w);
+                    }
+                    else if (tblw != NULL)
+                        mrp_debug("don't stop polling reused fd %d of watch %p",
+                                  w->fd, w);
                 }
             }
         }
