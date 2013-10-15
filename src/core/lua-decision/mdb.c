@@ -1666,7 +1666,7 @@ static mqi_cond_entry_t *condition_check(lua_State *L,
         if (ncond > 0) {
             cond = conds + ncond++;
             cond->type = mqi_operator;
-            cond->u.operator = mqi_and;
+            cond->u.operator_ = mqi_and;
         }
 
         cond = conds + ncond++;
@@ -1675,7 +1675,7 @@ static mqi_cond_entry_t *condition_check(lua_State *L,
 
         cond = conds + ncond++;
         cond->type = mqi_operator;
-        cond->u.operator = mqi_eq;
+        cond->u.operator_ = mqi_eq;
 
         cond = conds + ncond++;
         cond->type = mqi_variable;
@@ -1717,7 +1717,7 @@ static mqi_cond_entry_t *condition_check(lua_State *L,
 
     cond = conds + ncond++;
     cond->type = mqi_operator;
-    cond->u.operator = mqi_end;
+    cond->u.operator_ = mqi_end;
 
 
     return conds;

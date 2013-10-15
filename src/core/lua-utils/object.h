@@ -108,12 +108,12 @@
                                                                         \
          lua_pop(_L, 1))
 
-typedef struct mrp_lua_classdef_s     mrp_lua_classdef_t;
-typedef enum   mrp_lua_event_type_e   mrp_lua_event_type_t;
-
 enum mrp_lua_event_type_e {
     MRP_LUA_OBJECT_DESTRUCTION = 1,
 };
+
+typedef struct mrp_lua_classdef_s     mrp_lua_classdef_t;
+typedef enum   mrp_lua_event_type_e   mrp_lua_event_type_t;
 
 struct mrp_lua_classdef_s {
     const char   *class_name;
@@ -126,10 +126,10 @@ struct mrp_lua_classdef_s {
     luaL_reg     *overrides;
 };
 
-void  mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *class);
+void  mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def);
 void  mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def);
 
-void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *class,
+void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
                             const char *name, int);
 void  mrp_lua_set_object_name(lua_State  *L, mrp_lua_classdef_t *def,
                               const char *name);

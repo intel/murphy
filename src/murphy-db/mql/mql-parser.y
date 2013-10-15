@@ -1136,7 +1136,7 @@ where_clause:
   }
 | TKN_WHERE conditional_expression {
     cond->type = mqi_operator;
-    cond->u.operator = mqi_end;
+    cond->u.operator_ = mqi_end;
     cond++;
   };
 
@@ -1248,7 +1248,7 @@ expression_value:
     if (cond - conds >= MQI_COND_MAX)
         MQL_ERROR(EOVERFLOW, "too complex condition");
     cond->type = mqi_operator;
-    cond->u.operator = mqi_begin;
+    cond->u.operator_ = mqi_begin;
     cond++;
   }
   conditional_expression
@@ -1256,7 +1256,7 @@ expression_value:
     if (cond - conds >= MQI_COND_MAX)
         MQL_ERROR(EOVERFLOW, "too complex condition");
     cond->type = mqi_operator;
-    cond->u.operator = mqi_end;
+    cond->u.operator_ = mqi_end;
     cond++;
   }
 ;
@@ -1271,7 +1271,7 @@ sign:
 unary_operator:
   TKN_NOT {
       cond->type = mqi_operator;
-      cond->u.operator = mqi_not;
+      cond->u.operator_ = mqi_not;
       cond++;
   }
 ;
@@ -1279,27 +1279,27 @@ unary_operator:
 relational_operator:
   TKN_LESS {
       cond->type = mqi_operator;
-      cond->u.operator = mqi_less;
+      cond->u.operator_ = mqi_less;
       cond++;
   }
 | TKN_LESS_OR_EQUAL {
     cond->type = mqi_operator;
-    cond->u.operator = mqi_leq;
+    cond->u.operator_ = mqi_leq;
     cond++;
   }
 | TKN_EQUAL {
     cond->type = mqi_operator;
-    cond->u.operator = mqi_eq;
+    cond->u.operator_ = mqi_eq;
     cond++;
   }
 | TKN_GREATER_OR_EQUAL {
     cond->type = mqi_operator;
-    cond->u.operator = mqi_geq;
+    cond->u.operator_ = mqi_geq;
     cond++;
   }
 | TKN_GREATER {
     cond->type = mqi_operator;
-    cond->u.operator = mqi_gt;
+    cond->u.operator_ = mqi_gt;
     cond++;
   }
 ;
@@ -1307,12 +1307,12 @@ relational_operator:
 logical_operator:
   TKN_LOGICAL_AND {
       cond->type = mqi_operator;
-      cond->u.operator = mqi_and;
+      cond->u.operator_ = mqi_and;
       cond++;
   }
 | TKN_LOGICAL_OR {
     cond->type = mqi_operator;
-    cond->u.operator = mqi_or;
+    cond->u.operator_ = mqi_or;
     cond++;
   }
 ;

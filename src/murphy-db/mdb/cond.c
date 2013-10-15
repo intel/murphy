@@ -106,10 +106,10 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
         switch (cond->type) {
 
         case mqi_operator:
-            pr  = precedence[cond->u.operator];
+            pr  = precedence[cond->u.operator_];
             sp += cond_eval(sp, lastop, pr);
 
-            switch (cond->u.operator) {
+            switch (cond->u.operator_) {
 
             case mqi_begin:
                 cond++;
@@ -143,7 +143,7 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
             case mqi_not:
                 lastop = sp++;
                 lastop->precedence = pr;
-                lastop->operator = cond->u.operator;
+                lastop->operator = cond->u.operator_;
                 cond++;
                 break;
 

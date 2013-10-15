@@ -181,7 +181,7 @@ struct mqi_variable_s {
 struct mqi_cond_entry_s {
     mqi_cond_entry_type_t  type;
     union {
-        mqi_operator_t     operator;
+        mqi_operator_t     operator_;
         mqi_variable_t     variable;
         int                column;     /* column index actually */
     } u;
@@ -215,7 +215,7 @@ union mqi_change_data_u {
 struct mqi_change_value_s {
     mqi_data_type_t   type;
     mqi_change_data_t old;
-    mqi_change_data_t new;
+    mqi_change_data_t new_;
 };
 
 

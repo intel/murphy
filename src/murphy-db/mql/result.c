@@ -240,7 +240,7 @@ mql_result_t *mql_result_event_column_change_create(mqi_handle_t        table,
 
     case mqi_varchar:
         osiz = strlen(value->old.varchar) + 1;
-        nsiz = strlen(value->new.varchar) + 1;
+        nsiz = strlen(value->new_.varchar) + 1;
         break;
 
     case mqi_blob:
@@ -277,8 +277,8 @@ mql_result_t *mql_result_event_column_change_create(mqi_handle_t        table,
     }
 
     if (nsiz > 0) {
-        rslt->value.new.generic = poolptr;
-        memcpy(poolptr, value->new.generic, nsiz);
+        rslt->value.new_.generic = poolptr;
+        memcpy(poolptr, value->new_.generic, nsiz);
         poolptr += nsiz;
     }
 
@@ -756,7 +756,7 @@ mql_result_t *mql_result_string_create_column_change(const char         *table,
         len[i] = strlen(cstr[i]);
 
 #define PRINT_VALUE(fmt,t) \
-    snprintf(buf, sizeof(buf), fmt " => " fmt, value->old.t, value->new.t)
+    snprintf(buf, sizeof(buf), fmt " => " fmt, value->old.t, value->new_.t)
 #define PRINT_UNKNOWN \
     snprintf(buf, sizeof(buf), "<unknown> => <unknown>");
 
