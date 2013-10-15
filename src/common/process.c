@@ -917,12 +917,18 @@ mrp_pid_watch_t *mrp_pid_set_watch(pid_t pid, mrp_mainloop_t *ml,
         goto error;
     }
 
-    mrp_list_init(&client->hook);
     client->cb = cb;
     client->user_data = userdata;
     client->w = (mrp_pid_watch_t *) mrp_allocz(sizeof(mrp_pid_watch_t));
+
+    if (!client->w) {
+        mrp_free(nl_w);
+        goto error;
+    }
+
     client->w->pid = pid;
 
+    mrp_list_init(&client->hook);
     mrp_list_append(&nl_w->clients, &client->hook);
     nl_w->n_clients++;
 
