@@ -38,6 +38,12 @@
 
 MRP_CDECL_BEGIN
 
+typedef enum {
+    MRP_RES_PENDING_OPERATION_NONE = 0,
+    MRP_RES_PENDING_OPERATION_ACQUIRE,
+    MRP_RES_PENDING_OPERATION_RELEASE,
+} pending_operation_t;
+
 typedef struct {
     const char *name;
     mrp_res_attribute_type_t type; /* s:char *, i:int32_t, u:uint32_t, f:double */
@@ -90,6 +96,8 @@ struct mrp_res_resource_set_private_s {
 
     uint32_t num_resources;
     mrp_res_resource_t **resources;
+
+    pending_operation_t waiting_for;
 
     mrp_list_hook_t hook;
 };

@@ -257,6 +257,31 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
 int mrp_res_release_resource_set(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rs);
 
+
+/**
+ * Get a resource set unique server-side id. The id information is
+ * normally available only after mrp_res_acquire_resource_set or
+ * mrp_res_release_resource_set function callback has been called.
+ *
+ * The id is the resource set internal id, available on the resource
+ * manager side. The client can use this information to associate other
+ * properties with the resource set. The resource manager can then use
+ * this extra information to process system events.
+ *
+ * An example would be to set an audio stream property to contain the
+ * resource set id. The resource manager can use the data associated
+ * with audio streams to find out which streams belong to which resource
+ * set in the audio domain controller.
+ *
+ * @param cx connnection to Murphy resource engine.
+ * @param rs resource set whose id is queried.
+ *
+ * @return resource set id.
+ **/
+int mrp_res_get_resource_set_id(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rs);
+
+
 /**
  * Create new resource by name and init all other fields.
  * Created resource will be automatically added to

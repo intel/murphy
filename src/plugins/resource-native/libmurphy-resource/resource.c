@@ -228,8 +228,8 @@ static void resource_event(mrp_msg_t *msg,
     }
 
     /* Check the resource set state. If the set is under construction
-     * (we are waiting for "acquire" message), do not do the callback
-     * before that. Otherwise, if this is a real event, call the
+     * (we are waiting for "acquire" or "release" message), do not do the
+     * callback before that. Otherwise, if this is a real event, call the
      * callback right away. */
 
     print_resource_set(rset);
@@ -321,7 +321,22 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             mrp_htbl_insert(cx->priv->rset_mapping,
                     u_to_p(rset->priv->id), rset);
 
-            if (acquire_resource_set_request(cx, rset) < 0) {
+            /* TODO: if the operation was "acquire", do that. Otherwise
+             * release. */
+
+            if (rset->priv->waiting_for == MRP_RES_PENDING_OPERATION_ACQUIRE) {
+                rset->priv->waiting_for = MRP_RES_PENDING_OPERATION_NONE;
+                if (acquire_resource_set_request(cx, rset) < 0) {
+                    goto error;
+                }
+            }
+            else if (rset->priv->waiting_for == MRP_RES_PENDING_OPERATION_RELEASE) {
+                rset->priv->waiting_for = MRP_RES_PENDING_OPERATION_NONE;
+                if (release_resource_set_request(cx, rset) < 0) {
+                    goto error;
+                }
+            }
+            else {
                 goto error;
             }
             break;
