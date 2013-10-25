@@ -1,7 +1,7 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
 noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
-            internal-transport-test process-watch-test
+            internal-transport-test process-watch-test native-test
 if DBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
@@ -51,6 +51,11 @@ msg_test_SOURCES = msg-test.c
 msg_test_CFLAGS  = $(AM_CFLAGS)
 msg_test_LDADD   = ../../libmurphy-common.la
 
+# native type test
+native_test_SOURCES = native-test.c
+native_test_CFLAGS  = $(AM_CFLAGS)
+native_test_LDADD   = ../../libmurphy-common.la
+
 # transport test
 transport_test_SOURCES = transport-test.c
 transport_test_CFLAGS  = $(AM_CFLAGS)
@@ -74,11 +79,6 @@ dbus_test_SOURCES = dbus-test.c
 dbus_test_CFLAGS  = $(AM_CFLAGS) $(DBUS_CFLAGS)
 dbus_test_LDADD   = ../../libmurphy-dbus.la ../../libmurphy-common.la $(DBUS_LIBS)
 endif
-
-## databuf test
-#databuf_test_SOURCES = databuf-test.c
-#databuf_test_CFLAGS  = $(AM_CFLAGS)
-#databuf_test_LDADD   = ../../libmurphy-common.la
 
 # fragbuf test
 fragbuf_test_SOURCES = fragbuf-test.c

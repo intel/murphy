@@ -59,7 +59,9 @@ libmurphy_common_la_HEADERS =		\
 		common/refcnt.h		\
 		common/fragbuf.h	\
 		common/json.h		\
-		common/transport.h
+		common/transport.h	\
+		common/tlv.h		\
+		common/native-types.h
 
 libmurphy_common_la_REGULAR_SOURCES =		\
 		common/log.c			\
@@ -77,7 +79,9 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/transport.c		\
 		common/stream-transport.c	\
 		common/internal-transport.c	\
-		common/dgram-transport.c
+		common/dgram-transport.c	\
+		common/tlv.c			\
+		common/native-types.c
 
 libmurphy_common_la_SOURCES =				\
 		$(libmurphy_common_la_REGULAR_SOURCES)	\
