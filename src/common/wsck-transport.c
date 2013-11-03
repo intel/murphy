@@ -71,6 +71,8 @@ typedef struct {
     const char         *ssl_pkey;        /* path to SSL private key */
     const char         *ssl_ca;          /* path to SSL CA */
     wsl_ssl_t           ssl;             /* SSL mode (wsl_ssl_t) */
+    char               *protocol;        /* websocket protocol name */
+    wsl_proto_t         proto[2];        /* protocol setup */
     mrp_list_hook_t     http_clients;    /* pure HTTP clients */
 } wsck_t;
 
@@ -172,6 +174,8 @@ static void wsck_close(mrp_transport_t *mt)
 
     t->sck = NULL;
     t->ctx = NULL;
+    mrp_free(t->protocol);
+    t->protocol = NULL;
 
     user_data = wsl_close(sck);
 
@@ -225,7 +229,8 @@ static int wsck_setopt(mrp_transport_t *mt, const char *opt, const void *val)
 static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                      socklen_t addrlen)
 {
-    static wsl_proto_t proto[] = {
+    wsck_t      *t       = (wsck_t *)mt;
+    wsl_proto_t  proto[] = {
         {
             .name       = "http",
             .cbs        = { .connection = http_connection_cb,
@@ -249,8 +254,6 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
             .proto_data = NULL
         }
     };
-
-    wsck_t          *t  = (wsck_t *)mt;
     wsl_ctx_cfg_t    cfg;
     mrp_wsckaddr_t  *wa;
     struct sockaddr *sa;
@@ -271,10 +274,18 @@ static int wsck_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
     }
 
+    if ((t->protocol = mrp_strdup(wa->wsck_proto)) == NULL)
+        return FALSE;
+
+    t->proto[0] = proto[0];
+    t->proto[1] = proto[1];
+
+    t->proto[1].name = t->protocol;
+
     mrp_clear(&cfg);
     cfg.addr      = sa;
-    cfg.protos    = &proto[0];
-    cfg.nproto    = MRP_ARRAY_SIZE(proto);
+    cfg.protos    = &t->proto[0];
+    cfg.nproto    = MRP_ARRAY_SIZE(t->proto);
     cfg.ssl_cert  = t->ssl_cert;
     cfg.ssl_pkey  = t->ssl_pkey;
     cfg.ssl_ca    = t->ssl_ca;
@@ -334,7 +345,8 @@ static int wsck_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                         socklen_t addrlen)
 {
-    static wsl_proto_t proto = {
+    wsck_t      *t     = (wsck_t *)mt;
+    wsl_proto_t  proto = {
         .name       = "murphy",
         .cbs        = { .connection = connection_cb,
                         .closed     = closed_cb,
@@ -344,7 +356,6 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         .proto_data = NULL
     };
 
-    wsck_t          *t = (wsck_t *)mt;
     wsl_ctx_cfg_t    cfg;
     mrp_wsckaddr_t  *wa;
     struct sockaddr *sa;
@@ -364,9 +375,15 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         return FALSE;
     }
 
+    if ((t->protocol = mrp_strdup(wa->wsck_proto)) == NULL)
+        return FALSE;
+
+    proto.name  = t->protocol;
+    t->proto[0] = proto;
+
     mrp_clear(&cfg);
     cfg.addr      = NULL;
-    cfg.protos    = &proto;
+    cfg.protos    = &t->proto[0];
     cfg.nproto    = 1;
     cfg.ssl_cert  = t->ssl_cert;
     cfg.ssl_pkey  = t->ssl_pkey;
@@ -380,7 +397,7 @@ static int wsck_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     if (t->ctx == NULL)
         return FALSE;
 
-    t->sck = wsl_connect(t->ctx, sa, "murphy", t->ssl, t);
+    t->sck = wsl_connect(t->ctx, sa, t->protocol, t->ssl, t);
 
     if (t->sck != NULL) {
         t->connected = TRUE;
