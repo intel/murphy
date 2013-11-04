@@ -364,6 +364,8 @@ static mrp_res_resource_set_t *create_resource_set(
     rs->priv->resources = mrp_allocz_array(mrp_res_resource_t *,
             cx->priv->master_resource_set->priv->num_resources);
 
+    rs->priv->waiting_for = MRP_RES_PENDING_OPERATION_NONE;
+
     mrp_list_init(&rs->priv->hook);
 
     /* ok, create an library-side resource set that we can compare this one to */
@@ -563,23 +565,60 @@ const mrp_res_resource_set_t * mrp_res_list_resources(
 
 
 int mrp_res_release_resource_set(mrp_res_context_t *cx,
-                mrp_res_resource_set_t *rset)
+                mrp_res_resource_set_t *original)
 {
     mrp_res_resource_set_t *internal_set = NULL;
 
     if (!cx->priv->connected)
         goto error;
 
-    if (!rset->priv->internal_id)
+    if (!original->priv->internal_id)
         goto error;
 
     internal_set = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
-            u_to_p(rset->priv->internal_id));
+            u_to_p(original->priv->internal_id));
 
     if (!internal_set)
         goto error;
 
-    return release_resource_set_request(cx, internal_set);
+    update_library_resource_set(cx, original, internal_set);
+
+    if (internal_set->priv->id) {
+        return release_resource_set_request(cx, internal_set);
+    }
+    else {
+        mrp_list_hook_t *p, *n;
+        mrp_res_resource_set_private_t *pending_rset;
+        bool found = FALSE;
+
+        /* Create the resource set if it doesn't already exist on the
+         * server. The releasing is continued when the set is created.
+         */
+
+        /* only append if not already present in the list */
+
+        mrp_list_foreach(&cx->priv->pending_sets, p, n) {
+            pending_rset = mrp_list_entry(p, mrp_res_resource_set_private_t, hook);
+            if (pending_rset == internal_set->priv) {
+                found = TRUE;
+                break;
+            }
+        }
+
+        if (!found) {
+            mrp_list_append(&cx->priv->pending_sets, &internal_set->priv->hook);
+        }
+
+        internal_set->priv->waiting_for = MRP_RES_PENDING_OPERATION_RELEASE;
+
+        if (create_resource_set_request(cx, internal_set) < 0) {
+            mrp_res_error("creating resource set failed");
+            mrp_list_delete(&internal_set->priv->hook);
+            goto error;
+        }
+
+        return 0;
+    }
 
 error:
     mrp_res_error("mrp_release_resources error");
@@ -796,6 +835,8 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
             mrp_list_append(&cx->priv->pending_sets, &rset->priv->hook);
         }
 
+        rset->priv->waiting_for = MRP_RES_PENDING_OPERATION_ACQUIRE;
+
         if (create_resource_set_request(cx, rset) < 0) {
             mrp_res_error("creating resource set failed");
             mrp_list_delete(&rset->priv->hook);
@@ -808,4 +849,22 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
 error:
     mrp_log_error("error acquiring a resource set");
     return -1;
+}
+
+
+int mrp_res_get_resource_set_id(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rs)
+{
+    mrp_res_resource_set_t *internal_set;
+
+    if (!rs || !rs->priv)
+        return 0;
+
+    internal_set = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
+            u_to_p(rs->priv->internal_id));
+
+    if (!internal_set || !internal_set->priv)
+        return 0;
+
+    return internal_set->priv->id;
 }

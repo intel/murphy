@@ -52,7 +52,7 @@ static void resource_callback(mrp_res_context_t *cx,
                   const mrp_res_resource_set_t *rs,
                   void *userdata);
 
-void acquire_resources(my_app_data *app_data)
+void create_resources(my_app_data *app_data)
 {
     mrp_res_resource_t *resource = NULL;
     mrp_res_attribute_t *attr;
@@ -111,10 +111,16 @@ void acquire_resources(my_app_data *app_data)
         return;
     }
 
-    printf("created the resource set, acquiring now!\n");
+    printf("created the resource set!\n");
+}
 
+void acquire_resources(my_app_data *app_data)
+{
     /* acquire the resources */
-    mrp_res_acquire_resource_set(app_data->cx, app_data->rs);
+    if (app_data->rs)
+        mrp_res_acquire_resource_set(app_data->cx, app_data->rs);
+    else
+        printf("No release set created!\n");
 }
 
 void giveup_resources(my_app_data *app_data)
@@ -192,7 +198,7 @@ static void state_callback(mrp_res_context_t *context,
                     for (j = 0; j < attributes->num_strings; j++) {
                         attr = mrp_res_get_attribute_by_name(context,
                                 resource,
-                                attributes->strings[i]);
+                                attributes->strings[j]);
                         printf("attr %s has ", attr->name);
                         switch(attr->type) {
                             case mrp_string:
@@ -200,15 +206,15 @@ static void state_callback(mrp_res_context_t *context,
                                         attr->string);
                                 break;
                             case mrp_int32:
-                                printf("type string and value %d\n",
+                                printf("type int32 and value %d\n",
                                         attr->integer);
                                 break;
                             case mrp_uint32:
-                                printf("type string and value %u\n",
+                                printf("type uint32 and value %u\n",
                                         attr->unsignd);
                                 break;
                             case mrp_double:
-                                printf("type string and value %f\n",
+                                printf("type double and value %f\n",
                                         attr->floating);
                                 break;
                             default:
@@ -343,6 +349,9 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
     if (accept_input) {
         switch (buf[0]) {
             case 'C':
+                create_resources(app_data);
+                break;
+            case 'A':
                 acquire_resources(app_data);
                 break;
             case 'D':
@@ -353,6 +362,7 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
                     mrp_res_delete_resource_set(app_data->cx, app_data->rs);
                 mrp_mainloop_quit(ml, 0);
             default:
+                printf("'C' to create resource set\n'A' to acquire\n'D' to release\n'Q' to quit\n");
                 break;
        }
    }
