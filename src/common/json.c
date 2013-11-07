@@ -109,7 +109,10 @@ mrp_json_t *mrp_json_string_to_object(const char *s, int len)
 
 const char *mrp_json_object_to_string(mrp_json_t *o)
 {
-    return json_object_to_json_string(o);
+    if (o != NULL)
+        return json_object_to_json_string(o);
+    else
+        return "{}";
 }
 
 
