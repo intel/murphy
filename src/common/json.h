@@ -88,8 +88,8 @@ int mrp_json_is_type(mrp_json_t *o, mrp_json_type_t type);
 /** Convenience macros to get values of JSON objects of basic types. */
 #define mrp_json_string_value(o)  json_object_get_string(o)
 #define mrp_json_integer_value(o) json_object_get_int(o)
-#define mrp_json_double_value(o)  json_object_get_double(o);
-#define mrp_json_boolean_value(o) json_object_get_boolean(o);
+#define mrp_json_double_value(o)  json_object_get_double(o)
+#define mrp_json_boolean_value(o) json_object_get_boolean(o)
 
 /** Set a member of a JSON object. */
 void mrp_json_add(mrp_json_t *o, const char *key, mrp_json_t *m);
