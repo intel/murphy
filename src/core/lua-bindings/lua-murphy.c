@@ -40,6 +40,7 @@
 
 static mrp_context_t *context;
 static MRP_LIST_HOOK(bindings);
+static MRP_LIST_HOOK(pending);
 static int debug_level;
 
 static void setup_allocator(lua_State *L);
@@ -92,6 +93,9 @@ static int register_bindings(mrp_lua_bindings_t *b)
         lua_rawset(L, -3);
     }
 
+    if (b->classdef != NULL)
+        mrp_lua_create_object_class(L, b->classdef);
+
     return TRUE;
 }
 
@@ -101,6 +105,7 @@ int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b)
     mrp_context_t   *ctx;
     lua_State       *L;
 
+    mrp_list_init(&b->hook);
     mrp_list_append(&bindings, &b->hook);
 
     if ((ctx = context) != NULL && (L = ctx->lua_state) != NULL)

@@ -403,7 +403,7 @@ static int try_load_plugin(lua_State *L)
 }
 
 
-MURPHY_REGISTER_LUA_BINDINGS(murphy,
+MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
                              { "plugin_exists"  , plugin_exists   },
                              { "load_plugin"    , load_plugin     },
                              { "try_load_plugin", try_load_plugin });

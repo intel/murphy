@@ -136,7 +136,7 @@ static int log_error(lua_State *L)
 }
 
 
-MURPHY_REGISTER_LUA_BINDINGS(murphy,
+MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
                              { "info"   , log_info    },
                              { "warning", log_warning },
                              { "error"  , log_error   });

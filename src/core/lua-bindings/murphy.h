@@ -35,12 +35,14 @@
 
 #include <murphy/common/list.h>
 #include <murphy/core/context.h>
+#include <murphy/core/lua-utils/object.h>
 
 
 typedef struct {
-    const char      *meta;               /* add method to this metatable */
-    luaL_reg        *methods;            /* Lua method table to register */
-    mrp_list_hook_t  hook;               /* to list of registered bindings */
+    const char         *meta;            /* add method to this metatable */
+    luaL_reg           *methods;         /* Lua method table to register */
+    mrp_lua_classdef_t *classdef;        /* class definition or NULL */
+    mrp_list_hook_t     hook;            /* to list of registered bindings */
 } mrp_lua_bindings_t;
 
 
@@ -50,7 +52,7 @@ typedef struct {
 
 
 /** Macro to automatically register murphy Lua bindings on startup. */
-#define MURPHY_REGISTER_LUA_BINDINGS(_metatbl, ...)            \
+#define MURPHY_REGISTER_LUA_BINDINGS(_metatbl, _classdef, ...) \
     static void register_##_metatbl##_bindings(void) MRP_INIT; \
                                                                \
     static void register_##_metatbl##_bindings(void) {         \
@@ -59,9 +61,11 @@ typedef struct {
             { NULL, NULL }                                     \
         };                                                     \
         static mrp_lua_bindings_t b = {                        \
-            .meta    = #_metatbl,                              \
-            .methods = methods,                                \
+            .meta     = #_metatbl,                             \
+            .methods  = methods,                               \
+            .classdef = _classdef,                             \
         };                                                     \
+        lua_State *L;                                          \
                                                                \
         mrp_list_init(&b.hook);                                \
         mrp_lua_register_murphy_bindings(&b);                  \

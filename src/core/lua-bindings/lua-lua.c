@@ -87,4 +87,4 @@ static int open_lualib(lua_State *L)
 }
 
 
-MURPHY_REGISTER_LUA_BINDINGS(murphy, { "open_lualib", open_lualib });
+MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL, { "open_lualib", open_lualib });
