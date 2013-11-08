@@ -260,13 +260,15 @@ LUA_BINDINGS_SOURCES = 				\
 		core/lua-bindings/lua-lua.c	\
 		core/lua-bindings/lua-plugin.c	\
 		core/lua-bindings/lua-log.c	\
-		core/lua-bindings/lua-console.c
+		core/lua-bindings/lua-console.c \
+		core/lua-bindings/lua-json.c
 
 libmurphy_core_lua_bindings_ladir =			\
 		$(includedir)/murphy/core/lua-bindings
 
 libmurphy_core_lua_bindings_la_HEADERS =		\
-		core/lua-bindings/murphy.h
+		core/lua-bindings/murphy.h 		\
+		core/lua-bindings/lua-json.h
 
 libmurphy_coreh_ladir      =		\
 		$(includedir)/murphy
