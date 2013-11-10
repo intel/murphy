@@ -212,6 +212,32 @@ lua_State *mrp_lua_get_lua_state(void)
  * runtime debugging
  */
 
+void mrp_lua_dump_stack(lua_State *L, const char *prefix)
+{
+    char prebuf[256];
+    int  i, n;
+
+    n = lua_gettop(L);
+
+    if (prefix != NULL && *prefix) {
+        snprintf(prebuf, sizeof(prebuf), "%s: ", prefix);
+        prefix = prebuf;
+    }
+    else
+        prefix = "";
+
+    if (n > 0) {
+        mrp_debug("%sLua stack dump (%d items):", prefix, n);
+
+        for (i = 1; i <= n; i++)
+            mrp_debug("%s#%d(%d): %s", prefix, -i, (n - i) + 1,
+                      lua_typename(L, lua_type(L, -i)));
+    }
+    else
+        mrp_debug("%sLua stack is empty");
+}
+
+
 static void lua_debug(lua_State *L, lua_Debug *ar)
 {
 #define RUNNING(_ar, _what) ((_ar)->what != NULL && !strcmp((_ar)->what, _what))

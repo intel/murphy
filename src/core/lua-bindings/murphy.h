@@ -87,6 +87,9 @@ int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b);
 /** Check and get murphy context for the bindings. */
 mrp_context_t *mrp_lua_check_murphy_context(lua_State *L, int index);
 
+/** Produce a debugging dump of the Lua stack (using mrp_debug). */
+void mrp_lua_dump_stack(lua_State *L, const char *prefix);
+
 /*
  * level of debugging detail
  */
