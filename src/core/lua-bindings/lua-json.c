@@ -82,6 +82,7 @@ int mrp_json_lua_create(lua_State *L)
     int         t;
 
     switch (lua_gettop(L)) {
+    noargs:
     case 0:
         lson = (json_lua_t *)mrp_lua_create_object(L, JSON_LUA_CLASS, NULL, 0);
         lson->json = mrp_json_create(MRP_JSON_OBJECT);
@@ -95,6 +96,8 @@ int mrp_json_lua_create(lua_State *L)
          *     and redirect them to case 0.
          */
     case 1:
+        if (lua_type(L, 1) == LUA_TUSERDATA)
+            goto noargs;
         t = 1;
     init:
         if (lua_type(L, t) != LUA_TTABLE)
