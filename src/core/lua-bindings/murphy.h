@@ -65,7 +65,6 @@ typedef struct {
             .methods  = methods,                               \
             .classdef = _classdef,                             \
         };                                                     \
-        lua_State *L;                                          \
                                                                \
         mrp_list_init(&b.hook);                                \
         mrp_lua_register_murphy_bindings(&b);                  \
