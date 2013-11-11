@@ -263,7 +263,8 @@ LUA_BINDINGS_SOURCES = 					\
 		core/lua-bindings/lua-console.c 	\
 		core/lua-bindings/lua-json.c		\
 		core/lua-bindings/lua-timer.c   	\
-		core/lua-bindings/lua-deferred.c
+		core/lua-bindings/lua-deferred.c	\
+		core/lua-bindings/lua-sighandler.c
 
 libmurphy_core_lua_bindings_ladir =			\
 		$(includedir)/murphy/core/lua-bindings
