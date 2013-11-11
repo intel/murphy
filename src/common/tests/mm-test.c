@@ -151,7 +151,7 @@ static int obj_check(obj_t *obj, int alloced)
         char check[sizeof(obj_t)];
 
         memset(check, POISON, sizeof(check));
-        if (memcmp(check, obj, sizeof(obj)))
+        if (memcmp(check, obj, sizeof(*obj)))
             error("Object %p not properly poisoned.", obj);
     }
 
