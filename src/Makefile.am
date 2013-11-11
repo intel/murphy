@@ -255,14 +255,15 @@ lib_LTLIBRARIES += libmurphy-core.la
 EXTRA_DIST      += core/murphy-core.pc
 pkgconfig_DATA  += core/murphy-core.pc
 
-LUA_BINDINGS_SOURCES = 				\
-		core/lua-bindings/lua-murphy.c	\
-		core/lua-bindings/lua-lua.c	\
-		core/lua-bindings/lua-plugin.c	\
-		core/lua-bindings/lua-log.c	\
-		core/lua-bindings/lua-console.c \
-		core/lua-bindings/lua-json.c	\
-		core/lua-bindings/lua-timer.c
+LUA_BINDINGS_SOURCES = 					\
+		core/lua-bindings/lua-murphy.c		\
+		core/lua-bindings/lua-lua.c		\
+		core/lua-bindings/lua-plugin.c		\
+		core/lua-bindings/lua-log.c		\
+		core/lua-bindings/lua-console.c 	\
+		core/lua-bindings/lua-json.c		\
+		core/lua-bindings/lua-timer.c   	\
+		core/lua-bindings/lua-deferred.c
 
 libmurphy_core_lua_bindings_ladir =			\
 		$(includedir)/murphy/core/lua-bindings
