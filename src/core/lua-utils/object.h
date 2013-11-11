@@ -80,7 +80,13 @@
         .userdata_id   = MRP_LUA_CLASSID_ROOT #_name "." #_constr ".userdata",\
         .userdata_size = sizeof(_type),                                       \
         .methods       = _methods,                                            \
-        .overrides     = _overrides                                           \
+        .overrides     = _overrides,                                          \
+        .members       = NULL,                                                \
+        .nmember       = 0,                                                   \
+        .natives       = NULL,                                                \
+        .nnative       = 0,                                                   \
+        .notify        = NULL,                                                \
+        .flags         = 0,                                                   \
     }
 
 #define MRP_LUA_CLASS_DEF_SIMPLE(_name, _type, _destr, _methods, _overrides) \
@@ -95,8 +101,16 @@
         .userdata_id   = MRP_LUA_CLASSID_ROOT # _name ".userdata",      \
         .userdata_size = sizeof(_type),                                 \
         .methods       = _name ## _class_methods,                       \
-        .overrides     = _name ## _class_overrides                      \
+        .overrides     = _name ## _class_overrides,                     \
+        .members       = NULL,                                          \
+        .nmember       = 0,                                             \
+        .natives       = NULL,                                          \
+        .nnative       = 0,                                             \
+        .notify        = NULL,                                          \
+        .flags         = 0,                                             \
     }
+
+
 
 #define MRP_LUA_FOREACH_FIELD(_L, _i, _n, _l)                           \
     for (lua_pushnil(_L);                                               \
@@ -112,8 +126,246 @@ enum mrp_lua_event_type_e {
     MRP_LUA_OBJECT_DESTRUCTION = 1,
 };
 
+
+/*
+ * pre-declared class members
+ */
+
+typedef struct mrp_lua_class_member_s mrp_lua_class_member_t;
+typedef union  mrp_lua_value_u        mrp_lua_value_t;
+typedef int  (*mrp_lua_setter_t)(void *data, lua_State *L, int member,
+                                 mrp_lua_value_t *v);
+typedef int  (*mrp_lua_getter_t)(void *data, lua_State *L, int member,
+                                 mrp_lua_value_t *v);
+
+/*
+ * class member/extension flags
+ */
+
+typedef enum {
+    MRP_LUA_CLASS_NOFLAGS    = 0x0,      /* empty flags */
+    MRP_LUA_CLASS_EXTENSIBLE = 0x1,      /* class is user-extensible from Lua */
+    MRP_LUA_CLASS_READONLY   = 0x2,      /* class or member is readonly */
+    MRP_LUA_CLASS_NOTIFY     = 0x4,      /* notify when member is changed */
+    MRP_LUA_CLASS_NOOVERRIDE = 0x8,      /* don't override setters, getters */
+} mrp_lua_class_flag_t;
+
+
+/*
+ * supported class member types
+ */
+
+typedef enum {
+    MRP_LUA_STRING = 1,                  /* string member */
+    MRP_LUA_BOOLEAN,                     /* boolean member */
+    MRP_LUA_INTEGER,                     /* integer member */
+    MRP_LUA_DOUBLE,                      /* double member */
+    MRP_LUA_LFUNC,                       /* Lua function member */
+    MRP_LUA_CFUNC,                       /* C-function member */
+    MRP_LUA_ANY                          /* member of any type */
+} mrp_lua_type_t;
+
+
+/*
+ * a generic class member value
+ */
+
+union mrp_lua_value_u {
+    const char *str;                     /* string value */
+    bool        bln;                     /* boolean value */
+    int32_t     s32;                     /* integer value */
+    double      dbl;                     /* double value */
+    int         lfn;                     /* Lua function (ref) value */
+    void       *cfn;                     /* C function (bridge) value */
+    int         any;                     /* Lua reference */
+};
+
+
+/*
+ * a class member descriptor
+ */
+
+struct mrp_lua_class_member_s {
+    char             *name;              /* member name */
+    mrp_lua_type_t    type;              /* memebr type */
+    size_t            offs;              /* offset within type buffer */
+    mrp_lua_setter_t  setter;            /* setter if any */
+    mrp_lua_getter_t  getter;            /* getter if any */
+    int               flags;             /* member flags */
+};
+
+
+
+/**
+ * Macro to declare the C implementation of a Lua class, along with
+ * a set of explicitly defined class members. The object infrastructure
+ * can assist you in taking care of the setting and retrieval of the
+ * class members.
+ *
+ * You can select how much assistance you want on a per-member basis and
+ * you can relatively freely choose between fully automatic handling,
+ * where you practically do not need to do almost anything yourself, and
+ * fully manual handling where you need to take care of almost all details
+ * of setting and retrieval (setfield/getfield).
+ *
+ * Occasionally the infra has technical limitations and if you hit any of
+ * these you have no choice but take care of the details yourself. Usually
+ * such limitations should not exist, however, and the chosen level of
+ * detail is mostly dictated by how complex rules or constrains a class
+ * member needs to obey. For instance, scalar members (strings, numbers,
+ * booleans, etc.) and functions without much restrictions you can let be
+ * handled automatically. Members with semantic restrictions, such as a
+ * restricted range of acceptable values, or with contextual dependencies,
+ * for instance dependencies on the values of other class members, you need
+ * to handle with a varying level of detail yourself.
+ *
+ * Even in the more complex cases, there are a few facilities offered by
+ * the infrastructure which were designed to let you get along in as many
+ * of the cases as possibly without having to write much extra code.
+ *
+ * Automatic Members (perhaps should be called automatic explicit members):
+ *
+ * 1. Automatic (maybe we should call them explicit) class members
+ *    You can declare a member with its name, type, storage offset,
+ *    and let the infra take care of setting and retrieving it.
+ *
+ * 2. Read-only Members
+ *    You can mark members (or a full class) read-only. Read-only members
+ *    can only be set from C. Trying to set a read-only member from Lua
+ *    will raise a runtime exception.
+ *
+ * 3. Change Notifications
+ *    You can request change notifications on a per-member basis. Whenever
+ *    a member with notifications on is changed from Lua, a class-wide
+ *    notification callback is invoked. You can check the newly set value
+ *    of the member and take any actions necessary to reflect the updated
+ *    value of the member. For instance, when setting a 'disabled' member
+ *    to true, you might disable the normal actions you class instance is
+ *    performing. Note that currently the notification is called back only
+ *    after the member has been updated and the callback has no return
+ *    value. IOW, there is no straightforward way to reject a change from
+ *    the notification callback (although, you can restore the old value
+ *    from a saved copy if the new one is not kosher and then raise a Lua
+ *    exception). However, this is still subject to change and probably
+ *    we'll change notification callbacks to receive both the old and new
+ *    values and to return a accepted/rejected/I-ve-taken-care-of-it type
+ *    of verdict.
+ *
+ * 4. Optional Getters and Setters
+ *    You can set on a per-members basis a getter, a setter, or both. If
+ *    a member has a getter it will be invoked instead of the common default
+ *    getter when the member is read/retrieved. Similary, when a member has
+ *    a setter this will be called instead of the default setter when the
+ *    value of the member is set.
+ *
+ * 5. Native (Fully Manual) Members
+ *    You can declare a set of members native (perhaps manual members would
+ *    be a bit more descriptive term). These will always be handed to your
+ *    getfield/setfield class methods so you need to take care of every
+ *    detail of setting and retrieving these variables.
+ *
+ * 6. Extended Members
+ *    You can mark your class extensible at will. If you do so, your users
+ *    will be able to extend your class from Lua by simply setting other
+ *    members than the ones you have declared for the class. This allows
+ *    easy duck-typing and extensions to your class be implemented in a
+ *    straightforward manner usually without complex layers of wrappers.
+ *
+ * Classes with Mixed Members
+ *
+ * You can quite freely mix and match automatic (both with and without
+ * getters and/or setters), fully manual, and extended class members,
+ * although the dominant usage tends to be to mix only automatic and
+ * extended members and keep manual classes strictly as such.
+ */
+
+#define MRP_LUA_CLASS_DEF_MEMBERS(_name, _constr, _type, _destr, _methods,    \
+                                  _overrides, _members, _natives,             \
+                                  _notify, _flags)                            \
+    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
+        .class_name    = # _name ,                                            \
+        .class_id      = MRP_LUA_CLASSID_ROOT # _name "_" # _constr,          \
+        .constructor   = # _name "." # _constr,                               \
+        .destructor    = _destr,                                              \
+        .userdata_id   = MRP_LUA_CLASSID_ROOT #_name "." #_constr ".userdata",\
+        .userdata_size = sizeof(_type),                                       \
+        .methods       = _methods,                                            \
+        .overrides     = _overrides,                                          \
+        .members       = _members,                                            \
+        .nmember       = _members == NULL ? 0 : MRP_ARRAY_SIZE(_members),     \
+        .natives       = _natives,                                            \
+        .nnative       = _natives == NULL ? 0 : MRP_ARRAY_SIZE(_natives),     \
+        .notify        = _notify,                                             \
+        .flags         = _flags,                                              \
+    }
+
+
+
+
+
+/** Macro to declare the list of class members. */
+#define MRP_LUA_MEMBER_LIST_TABLE(_name, ...) \
+    static mrp_lua_class_member_t _name[] = { __VA_ARGS__ }
+
+/**
+ * Generic generic macro to declare an automatic member for a class.
+ *
+ * @param _type    member type
+ * @param _name    member name in Lua
+ * @param _offs    member offset with visible part of userdata (if relevant)
+ * @param _set     optional member-specific setter
+ * @param _get     optional member-specific getter
+ * @param _flags   member flags, bitwise or of MRP_LUA_CLASS_READONLY and
+ *                 MRP_LUA_CLASS_NOTIFY. MRP_LUA_CLASS_NOFLAGS is available
+ *                 to denote no specific flag set.
+ */
+#define MRP_LUA_CLASS_MEMBER(_type, _name, _offs, _set, _get, _flags)   \
+    {                                                                   \
+        .name = _name,                                                  \
+        .type = _type,                                                  \
+        .offs = _offs,                                                  \
+        .setter = _set,                                                 \
+        .getter = _get,                                                 \
+        .flags  = _flags,                                               \
+    },
+
+/*
+ * type-specific convenience macros
+ */
+
+/** Declare an automatic string member. */
+#define MRP_LUA_CLASS_STRING(_name, _offs, _set, _get, _flags)          \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_STRING, _name, _offs, _set, _get, _flags)
+
+/** Declare an automatic (signed 32-bit) integer member. */
+#define MRP_LUA_CLASS_INTEGER(_name, _offs, _set, _get, _flags)          \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_INTEGER, _name, _offs, _set, _get, _flags)
+
+/** Declare an automatic double-precision floating point member. */
+#define MRP_LUA_CLASS_DOUBLE(_name, _offs, _set, _get, _flags)          \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_DOUBLE, _name, _offs, _set, _get, _flags),
+
+/** Declare an automatic boolean member. */
+#define MRP_LUA_CLASS_BOOLEAN(_name, _offs, _set, _get, _flags)          \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_BOOLEAN, _name, _offs, _set, _get, _flags)
+
+/** Declare an automatic Lua function member. */
+#define MRP_LUA_CLASS_LFUNC(_name, _offs, _set, _get, _flags)           \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_LFUNC, _name, _offs, _set, _get, _flags)
+
+/** Declare an automatic C function member. */
+#define MRP_LUA_CLASS_CFUNC(_name, _offs, _set, _get, _flags)           \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_CFUNC, _name, _offs, _set, _get, _flags)
+
+/** Declare an automatic member with a value of any acceptable type. */
+#define MRP_LUA_CLASS_ANY(_name, _offs, _set, _get, _flags)           \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_ANY, _name, _offs, _set, _get, _flags)
+
+
 typedef struct mrp_lua_classdef_s     mrp_lua_classdef_t;
 typedef enum   mrp_lua_event_type_e   mrp_lua_event_type_t;
+
+typedef void (*mrp_lua_class_notify_t)(void *data, lua_State *L, int member);
 
 struct mrp_lua_classdef_s {
     const char   *class_name;
@@ -124,11 +376,19 @@ struct mrp_lua_classdef_s {
     size_t        userdata_size;
     luaL_reg     *methods;
     luaL_reg     *overrides;
+    /* pre-declared members */
+    mrp_lua_class_member_t  *members;    /* pre-declared members */
+    int                      nmember;    /* number of pre-declared members */
+    char                   **natives;    /* 'native' member names */
+    int                      nnative;    /* number of native member names */
+    mrp_lua_class_flag_t     flags;      /* class member flags */
+    mrp_lua_class_notify_t   notify;     /* member change notify callback */
+    lua_CFunction            setfield;   /* overridden setfield, if any */
+    lua_CFunction            getfield;   /* overridden getfield, if any */
 };
 
 void  mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def);
 void  mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def);
-
 void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
                             const char *name, int);
 void  mrp_lua_set_object_name(lua_State  *L, mrp_lua_classdef_t *def,
@@ -145,6 +405,35 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx);
 int   mrp_lua_push_object(lua_State *L, void *object);
 
 mrp_lua_classdef_t *mrp_lua_get_object_classdef(void *);
+
+/** Specify pre-declared object members. */
+int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
+                            mrp_lua_class_member_t *members, int nmember,
+                            char **natives, int nnative,
+                            mrp_lua_class_notify_t notify);
+/** Store and return a reference the value at the given stack location. */
+int mrp_lua_object_ref_value(void *object, lua_State *L, int idx);
+/** Remove the given stored reference. */
+void mrp_lua_object_unref_value(void *object, lua_State *L, int ref);
+/** Retrieve and push to the stack the value for the fiven reference. */
+int mrp_lua_object_deref_value(void *object, lua_State *L, int ref,
+                               int pushnil);
+/** Set a user-specified field for an extensible object to the value at vidx. */
+int mrp_lua_object_setext(void *object, lua_State *L, const char *name,
+                          int vidx, char *err, size_t esize);
+/** Get and push the user-specified field of an extensible object. */
+void mrp_lua_object_getext(void *data, lua_State *L, const char *name);
+/** Set a user-specified index of an extensible object to the value at vidx. */
+void mrp_lua_object_setiext(void *data, lua_State *L, int idx, int val);
+/** Get and push the user-specified index of an extensible object. */
+void mrp_lua_object_getiext(void *data, lua_State *L, int idx);
+/** Set a pre-declared object member. */
+int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize);
+/** Get and push a pre-declared object member. */
+int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize);
+/** Initialize pre-declared object members from table at the given index. */
+int mrp_lua_init_members(void *data, lua_State *L, int idx,
+                         char *err, size_t esize);
 
 
 #endif  /* __MURPHY_LUA_OBJECT_H__ */
