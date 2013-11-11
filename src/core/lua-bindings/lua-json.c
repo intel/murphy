@@ -101,7 +101,7 @@ int mrp_json_lua_create(lua_State *L)
         t = 1;
     init:
         if (lua_type(L, t) != LUA_TTABLE)
-            luaL_error(L, "invalid argument to JSON constructor");
+            return luaL_error(L, "invalid argument to JSON constructor");
         json = json_lua_table_to_object(L, t);
         lson = (json_lua_t *)mrp_lua_create_object(L, JSON_LUA_CLASS, NULL, 0);
         lson->json = json;
@@ -119,8 +119,8 @@ int mrp_json_lua_create(lua_State *L)
         goto init;
 
     default:
-        luaL_error(L, "invalid arguments to JSON constructor (%d)",
-                   lua_gettop(L));
+        return luaL_error(L, "invalid arguments to JSON constructor (%d)",
+                          lua_gettop(L));
     }
 
     mrp_lua_push_object(L, lson);
@@ -214,15 +214,15 @@ static int json_lua_getfield(lua_State *L)
 
     case LUA_TNUMBER:
         if (mrp_json_get_type(lson->json) != MRP_JSON_ARRAY)
-            luaL_error(L, "trying to index non-array JSON object");
+            return luaL_error(L, "trying to index non-array JSON object");
 
         idx = lua_tointeger(L, 2);
         val = mrp_json_array_get(lson->json, idx - 1);
         break;
 
     default:
-        luaL_error(L, "invalid JSON field/index type (%s).",
-                   lua_typename(L, lua_type(L, 2)));
+        return luaL_error(L, "invalid JSON field/index type (%s).",
+                          lua_typename(L, lua_type(L, 2)));
     }
 
     lua_pop(L, 2);
@@ -270,6 +270,7 @@ static mrp_json_t *json_lua_table_to_object(lua_State *L, int t)
         return lson->json;
 
     json = NULL;
+    val  = NULL;
 
     lua_pushnil(L);
     while (lua_next(L, t) != 0) {
@@ -295,6 +296,8 @@ static mrp_json_t *json_lua_table_to_object(lua_State *L, int t)
 
         default:
             luaL_error(L, "invalid member (key) for JSON object");
+            idx = 0;
+            key = NULL;
         }
 
         switch (lua_type(L, -1)) {
@@ -362,7 +365,7 @@ static int json_lua_setfield(lua_State *L)
     switch (lua_type(L, 2)) {
     case LUA_TSTRING:
         if (mrp_json_get_type(json) != MRP_JSON_OBJECT)
-            luaL_error(L, "trying to set member on a JSON array");
+            return luaL_error(L, "trying to set member on a JSON array");
 
         key = lua_tostring(L, 2);
         idx = 0;
@@ -370,17 +373,17 @@ static int json_lua_setfield(lua_State *L)
 
     case LUA_TNUMBER:
         if (mrp_json_get_type(json) != MRP_JSON_ARRAY)
-            luaL_error(L, "trying to set array element on a JSON object");
+            return luaL_error(L, "trying to set array element on JSON object");
 
         if ((idx = lua_tointeger(L, 2)) < 1)
-            luaL_error(L, "invalid index (%d) for JSON array", idx);
+            return luaL_error(L, "invalid index (%d) for JSON array", idx);
 
         idx--;
         key = NULL;
         break;
 
     default:
-        luaL_error(L, "invalid member (key) for JSON object");
+        return luaL_error(L, "invalid member (key) for JSON object");
     }
 
     switch (lua_type(L, 3)) {
@@ -401,28 +404,30 @@ static int json_lua_setfield(lua_State *L)
 
     case LUA_TTABLE:
         if ((val = json_lua_table_to_object(L, 3)) == json)
-            luaL_error(L, "can't set JSON object as a member of itself");
+            return luaL_error(L, "can't set JSON object as a member of itself");
         break;
 
     case LUA_TNIL:
         if (key != NULL)
             mrp_json_del_member(json, key);
         else
-            luaL_error(L, "can't delete JSON array element by setting to nil");
+            return luaL_error(L, "can't delete JSON array element by "
+                              "setting to nil");
         goto out;
 
     default:
-        luaL_error(L, "invalid value for JSON member");
+        return luaL_error(L, "invalid value for JSON member");
     }
 
     if (val == NULL)
-        luaL_error(L, "failed convert Lua value to JSON object");
+        return luaL_error(L, "failed convert Lua value to JSON object");
 
     if (key != NULL)
         mrp_json_add(json, key, val);
     else
         if (!mrp_json_array_set(json, idx, val))
-            luaL_error(L, "failed to set set JSON array element [%d]", idx);
+            return luaL_error(L, "failed to set set JSON array element [%d]",
+                              idx);
 
  out:
     lua_pop(L, 3);
