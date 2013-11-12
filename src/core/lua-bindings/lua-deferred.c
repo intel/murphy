@@ -134,7 +134,7 @@ static void deferred_lua_changed(void *data, lua_State *L, int member)
         else
             mrp_enable_deferred(d->d);
         mrp_debug("deferred %p(%p) is now %sabled", d, d->d,
-                  d->disabled ? "en" : "dis");
+                  d->disabled ? "dis" : "en");
         break;
 
     case DEFERRED_MEMBER_CALLBACK:
@@ -144,7 +144,7 @@ static void deferred_lua_changed(void *data, lua_State *L, int member)
             else
                 mrp_enable_deferred(d->d);
             mrp_debug("deferred %p(%p) is now %sabled", d, d->d,
-                      d->disabled ? "en" : "dis");
+                      d->disabled ? "dis" : "en");
         }
         break;
 
