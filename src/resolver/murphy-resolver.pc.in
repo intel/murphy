@@ -5,7 +5,7 @@ includedir=@includedir@
 
 Name: murphy-resolver
 Description: Murphy policy framework, resolver library.
-Requires: murphy-core murphy-common @PACKAGE_VERSION@
+Requires: murphy-core murphy-common
 Version: @PACKAGE_VERSION@
-Libs: -L${libdir} -lmurphy-core -lmurphy-common
+Libs: -L${libdir} -lmurphy-resolver -lmurphy-core -lmurphy-common
 Cflags: -I${includedir}
