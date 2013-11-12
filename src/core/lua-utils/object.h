@@ -122,10 +122,32 @@
                                                                         \
          lua_pop(_L, 1))
 
+
+/** _i=loopcount, _t=table idx, _type=key type, _n=field, _l=len or idx */
+#define MRP_LUA_FOREACH_ALL(_L, _i, _t, _type, _n, _l)          \
+    for (lua_pushnil(_L), _i = 0;                               \
+                                                                \
+    (lua_next(_L, _t) &&                                        \
+    (((_type = lua_type(_L, -2)) == LUA_TSTRING ?               \
+      (_n = lua_tolstring(_L, -2, &_l)) : (_n = NULL)) ||       \
+     ((_type                     == LUA_TNIL    ?               \
+        !(_n = NULL, _l = 0) :                                  \
+       (_type                    == LUA_TNUMBER ?               \
+        (_n = NULL, _l = lua_tointeger(_L, -2)) :               \
+        !(_n = NULL, _l = 0))                           ||      \
+       _type != LUA_TSTRING))));                                \
+                                                                \
+         lua_pop(_L, 1), _i++)
+
+
 enum mrp_lua_event_type_e {
     MRP_LUA_OBJECT_DESTRUCTION = 1,
 };
 
+
+static inline int mrp_lua_absidx(lua_State *L, int idx) {
+    return ((idx < 0) ? lua_gettop(L) + idx + 1 : idx);
+}
 
 /*
  * pre-declared class members
@@ -156,12 +178,17 @@ typedef enum {
  */
 
 typedef enum {
+    MRP_LUA_NONE   = 0,
     MRP_LUA_STRING = 1,                  /* string member */
     MRP_LUA_BOOLEAN,                     /* boolean member */
     MRP_LUA_INTEGER,                     /* integer member */
     MRP_LUA_DOUBLE,                      /* double member */
     MRP_LUA_LFUNC,                       /* Lua function member */
     MRP_LUA_CFUNC,                       /* C-function member */
+    MRP_LUA_STRING_ARRAY,                /* string array member */
+    MRP_LUA_BOOLEAN_ARRAY,               /* boolean array member */
+    MRP_LUA_INTEGER_ARRAY,               /* integer array member */
+    MRP_LUA_DOUBLE_ARRAY,                /* double array member */
     MRP_LUA_ANY                          /* member of any type */
 } mrp_lua_type_t;
 
@@ -177,6 +204,10 @@ union mrp_lua_value_u {
     double      dbl;                     /* double value */
     int         lfn;                     /* Lua function (ref) value */
     void       *cfn;                     /* C function (bridge) value */
+    struct {                             /* array value */
+        void    **items;                 /* array items */
+        size_t   *nitem;                 /* number of items */
+    } array;
     int         any;                     /* Lua reference */
 };
 
@@ -189,6 +220,7 @@ struct mrp_lua_class_member_s {
     char             *name;              /* member name */
     mrp_lua_type_t    type;              /* memebr type */
     size_t            offs;              /* offset within type buffer */
+    size_t            size;              /* offset to size within type buffer */
     mrp_lua_setter_t  setter;            /* setter if any */
     mrp_lua_getter_t  getter;            /* getter if any */
     int               flags;             /* member flags */
@@ -319,11 +351,12 @@ struct mrp_lua_class_member_s {
  *                 MRP_LUA_CLASS_NOTIFY. MRP_LUA_CLASS_NOFLAGS is available
  *                 to denote no specific flag set.
  */
-#define MRP_LUA_CLASS_MEMBER(_type, _name, _offs, _set, _get, _flags)   \
+#define MRP_LUA_CLASS_MEMBER(_type, _name, _offs, _size, _set, _get, _flags) \
     {                                                                   \
         .name = _name,                                                  \
         .type = _type,                                                  \
         .offs = _offs,                                                  \
+        .size = _size,                                                  \
         .setter = _set,                                                 \
         .getter = _get,                                                 \
         .flags  = _flags,                                               \
@@ -334,38 +367,44 @@ struct mrp_lua_class_member_s {
  */
 
 /** Declare an automatic string member. */
-#define MRP_LUA_CLASS_STRING(_name, _offs, _set, _get, _flags)          \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_STRING, _name, _offs, _set, _get, _flags)
+#define MRP_LUA_CLASS_STRING(_name, _offs, _set, _get, _flags)        \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_STRING, _name, _offs, 0, _set, _get, _flags)
 
 /** Declare an automatic (signed 32-bit) integer member. */
-#define MRP_LUA_CLASS_INTEGER(_name, _offs, _set, _get, _flags)          \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_INTEGER, _name, _offs, _set, _get, _flags)
+#define MRP_LUA_CLASS_INTEGER(_name, _offs, _set, _get, _flags)       \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_INTEGER, _name, _offs, 0, _set, _get, _flags)
 
 /** Declare an automatic double-precision floating point member. */
-#define MRP_LUA_CLASS_DOUBLE(_name, _offs, _set, _get, _flags)          \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_DOUBLE, _name, _offs, _set, _get, _flags),
+#define MRP_LUA_CLASS_DOUBLE(_name, _offs, _set, _get, _flags)        \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_DOUBLE, _name, _offs, 0, _set, _get, _flags),
 
 /** Declare an automatic boolean member. */
-#define MRP_LUA_CLASS_BOOLEAN(_name, _offs, _set, _get, _flags)          \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_BOOLEAN, _name, _offs, _set, _get, _flags)
+#define MRP_LUA_CLASS_BOOLEAN(_name, _offs, _set, _get, _flags)       \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_BOOLEAN, _name, _offs, 0, _set, _get, _flags)
 
 /** Declare an automatic Lua function member. */
-#define MRP_LUA_CLASS_LFUNC(_name, _offs, _set, _get, _flags)           \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_LFUNC, _name, _offs, _set, _get, _flags)
+#define MRP_LUA_CLASS_LFUNC(_name, _offs, _set, _get, _flags)         \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_LFUNC, _name, _offs, 0, _set, _get, _flags)
 
 /** Declare an automatic C function member. */
-#define MRP_LUA_CLASS_CFUNC(_name, _offs, _set, _get, _flags)           \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_CFUNC, _name, _offs, _set, _get, _flags)
+#define MRP_LUA_CLASS_CFUNC(_name, _offs, _set, _get, _flags)         \
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_CFUNC, _name, _offs, 0, _set, _get, _flags)
 
 /** Declare an automatic member with a value of any acceptable type. */
 #define MRP_LUA_CLASS_ANY(_name, _offs, _set, _get, _flags)           \
-    MRP_LUA_CLASS_MEMBER(MRP_LUA_ANY, _name, _offs, _set, _get, _flags)
+    MRP_LUA_CLASS_MEMBER(MRP_LUA_ANY, _name, _offs, 0, _set, _get, _flags)
+
+/** Declare an automatic array and size member of the given type. */
+#define MRP_LUA_CLASS_ARRAY(_name, _type, _poffs, _noffs, _set, _get, _flags) \
+        MRP_LUA_CLASS_MEMBER(MRP_LUA_##_type##_ARRAY, _name,                  \
+                             _poffs, _noffs, _set, _get, _flags)
 
 
 typedef struct mrp_lua_classdef_s     mrp_lua_classdef_t;
 typedef enum   mrp_lua_event_type_e   mrp_lua_event_type_t;
 
 typedef void (*mrp_lua_class_notify_t)(void *data, lua_State *L, int member);
+
 
 struct mrp_lua_classdef_s {
     const char   *class_name;
@@ -435,6 +474,10 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize);
 int mrp_lua_init_members(void *data, lua_State *L, int idx,
                          char *err, size_t esize);
 
+int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
+                                 size_t *nitemp, int expected, int copy,
+                                 char *e, size_t esize);
+void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type);
 
 #endif  /* __MURPHY_LUA_OBJECT_H__ */
 

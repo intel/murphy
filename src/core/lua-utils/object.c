@@ -434,6 +434,8 @@ static int default_setter(void *data, lua_State *L, int member,
     userdata_t             *u = (userdata_t *)data - 1;
     mrp_lua_class_member_t *m;
     mrp_lua_value_t        *vptr;
+    void                  **itemsp;
+    size_t                 *nitemp;
 
     m    = u->def->members + member;
     vptr = data + m->offs;
@@ -447,6 +449,15 @@ static int default_setter(void *data, lua_State *L, int member,
         case MRP_LUA_CFUNC:
         case MRP_LUA_ANY:
             vptr->any = LUA_NOREF;
+            goto ok;
+        case MRP_LUA_STRING_ARRAY:
+        case MRP_LUA_BOOLEAN_ARRAY:
+        case MRP_LUA_INTEGER_ARRAY:
+        case MRP_LUA_DOUBLE_ARRAY:
+            itemsp = data + m->offs;
+            nitemp = data + m->size;
+            *itemsp = NULL;
+            *nitemp = 0;
             goto ok;
         default:
             goto error;
@@ -486,6 +497,17 @@ static int default_setter(void *data, lua_State *L, int member,
     case MRP_LUA_ANY:
         mrp_lua_object_unref_value(data, L, vptr->any);
         vptr->any = v->any;
+        goto ok;
+
+    case MRP_LUA_STRING_ARRAY:
+    case MRP_LUA_BOOLEAN_ARRAY:
+    case MRP_LUA_INTEGER_ARRAY:
+    case MRP_LUA_DOUBLE_ARRAY:
+        itemsp = data + m->offs;
+        nitemp = data + m->size;
+        mrp_lua_object_free_array(itemsp, nitemp, m->type);
+        *itemsp = *v->array.items;
+        *nitemp = *v->array.nitem;
         goto ok;
 
     default:
@@ -539,6 +561,16 @@ static int default_getter(void *data, lua_State *L, int member,
     case MRP_LUA_ANY:
         v->any = vptr->any;
         goto ok;
+
+    case MRP_LUA_STRING_ARRAY:
+    case MRP_LUA_BOOLEAN_ARRAY:
+    case MRP_LUA_INTEGER_ARRAY:
+    case MRP_LUA_DOUBLE_ARRAY:
+        v->array = vptr->array;
+        goto ok;
+
+    default:
+        goto error;
     }
 
  ok:
@@ -658,11 +690,20 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
         if ((m->name = mrp_strdup(members[i].name)) == NULL)
             goto fail;
 
+        *m = members[i];
+        if (m->setter == NULL)
+            m->setter = default_setter;
+        if (m->getter == NULL)
+            m->getter = default_getter;
+        m->flags |= (flags & MRP_LUA_CLASS_READONLY);
+
+#if 0
         m->type   = members[i].type;
         m->offs   = members[i].offs;
         m->setter = members[i].setter ? members[i].setter : default_setter;
         m->getter = members[i].getter ? members[i].getter : default_getter;
         m->flags  = members[i].flags | (flags & MRP_LUA_CLASS_READONLY);
+#endif
 
         def->nmember++;
     }
@@ -723,7 +764,6 @@ static void init_members(userdata_t *u)
         mrp_debug("initializing %s.%s of Lua object %p(%p)", u->def->class_name,
                   m->name, data, u);
         m->setter(data, NULL, i, NULL);
-
     }
     u->initializing = false;
 }
@@ -750,14 +790,18 @@ static int class_member(userdata_t *u, lua_State *L, int index)
 }
 
 
-static int seterr(char *err, size_t esize, const char *format, ...)
+static int seterr(lua_State *L, char *e, size_t size, const char *format, ...)
 {
     va_list ap;
+    char    msg[256];
 
-    if (err != NULL) {
-        va_start(ap, format);
-        vsnprintf(err, esize, format, ap);
-        va_end(ap);
+    va_start(ap, format);
+    vsnprintf(e ? e : msg, e ? size : sizeof(msg), format, ap);
+    va_end(ap);
+
+    if (!e && L) {
+        lua_pushstring(L, msg);
+        lua_error(L);
     }
 
     return -1;
@@ -884,7 +928,7 @@ int mrp_lua_object_setext(void *data, lua_State *L, const char *name,
 
     if (u->exttbl == LUA_NOREF) {
         if (err)
-            return seterr(err, esize, "trying to set user-defined field %s "
+            return seterr(L, err, esize, "trying to set user-defined field %s "
                           "for non-extensible object %s", name,
                           u->def->class_name);
         else
@@ -938,13 +982,218 @@ void mrp_lua_object_getiext(void *data, lua_State *L, int idx)
 }
 
 
+static inline int array_lua_type(int type)
+{
+    switch (type) {
+    case MRP_LUA_STRING_ARRAY:  return LUA_TSTRING;
+    case MRP_LUA_BOOLEAN_ARRAY: return LUA_TBOOLEAN;
+    case MRP_LUA_INTEGER_ARRAY: return LUA_TNUMBER;
+    case MRP_LUA_DOUBLE_ARRAY:  return LUA_TNUMBER;
+    default:                    return LUA_TNONE;
+    }
+}
+
+
+static inline int array_murphy_type(int type)
+{
+    switch (type) {
+    case LUA_TSTRING:  return MRP_LUA_STRING_ARRAY;
+    case LUA_TBOOLEAN: return MRP_LUA_BOOLEAN_ARRAY;
+    case LUA_TNUMBER:  return MRP_LUA_INTEGER_ARRAY;
+    default:           return MRP_LUA_NONE;
+    }
+}
+
+
+static inline int array_item_size(int type)
+{
+    switch (type) {
+    case MRP_LUA_STRING_ARRAY:  return sizeof(char *);
+    case MRP_LUA_BOOLEAN_ARRAY: return sizeof(bool);
+    case MRP_LUA_INTEGER_ARRAY: return sizeof(int32_t);
+    case MRP_LUA_DOUBLE_ARRAY:  return sizeof(double);
+    default:                    return 0;
+    }
+}
+
+
+static inline const char *array_type_name(int type)
+{
+    switch (type) {
+    case MRP_LUA_STRING_ARRAY:  return "string";
+    case MRP_LUA_BOOLEAN_ARRAY: return "boolean";
+    case MRP_LUA_INTEGER_ARRAY: return "integer";
+    case MRP_LUA_DOUBLE_ARRAY:  return "double";
+    case MRP_LUA_ANY:           return "any";
+    default:                    return "<invalid array type>";
+    }
+}
+
+
+int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
+                                 size_t *nitemp, int expected, int copy,
+                                 char *e, size_t esize)
+{
+    const char *name, *str;
+    int         ktype, vtype, ltype, i;
+    size_t      max, idx, isize;
+    void       *items;
+
+    max   = *nitemp;
+    tidx  = mrp_lua_absidx(L, tidx);
+    items = NULL;
+
+    if (expected != MRP_LUA_ANY) {
+        ltype = array_lua_type(expected);
+        isize = array_item_size(expected);
+
+        if (ltype == LUA_TNONE || !isize)
+            goto type_error;
+    }
+
+    lua_pushnil(L);
+    MRP_LUA_FOREACH_ALL(L, i, tidx, ktype, name, idx) {
+        vtype = lua_type(L, -1);
+
+        mrp_debug("collecting <%s>:<%s> element for %s array",
+                  lua_typename(L, ktype), lua_typename(L, vtype),
+                  array_type_name(expected));
+
+        if (ktype != LUA_TNUMBER)
+            goto not_pure;
+
+        if (expected == MRP_LUA_ANY) {
+            expected = array_murphy_type(vtype);
+
+            if (!expected)
+                goto type_error;
+
+            ltype = array_lua_type(expected);
+            isize = array_item_size(expected);
+        }
+        else
+            if (vtype != ltype &&
+                !(expected && MRP_LUA_STRING_ARRAY && vtype == LUA_TNIL))
+                goto type_error;
+
+        if (max != (size_t)-1 && i >= (int)max)
+            goto overflow;
+
+        if (mrp_realloc(items, (i + 1) * isize) == NULL)
+            goto nomem;
+
+        switch (expected) {
+        case MRP_LUA_STRING_ARRAY:
+            str = (vtype != LUA_TNIL ? lua_tostring(L, -1) : NULL);
+            if (copy) {
+                ((char **)items)[i] = str ? mrp_strdup(str) : NULL;
+                if (!((char **)items)[i] && str)
+                    goto nomem;
+            }
+            else
+                ((char **)items)[i] = (char *)str;
+            break;
+        case MRP_LUA_BOOLEAN_ARRAY:
+            ((bool *)items)[i] = lua_toboolean(L, -1);
+            break;
+        case MRP_LUA_INTEGER_ARRAY:
+            ((int32_t *)items)[i] = lua_tointeger(L, -1);
+            break;
+        case MRP_LUA_DOUBLE_ARRAY:
+            ((double *)items)[i] = lua_tonumber(L, -1);
+            break;
+        default:
+            goto type_error;
+        }
+    }
+
+    *itemsp = items;
+    *nitemp = i;
+
+    return 0;
+
+
+#define CLEANUP() do {                                                  \
+        mrp_lua_object_free_array(itemsp, nitemp, expected);            \
+    } while (0)
+
+ type_error:
+    CLEANUP(); return seterr(L, e, esize, "array or element of wrong type");
+ not_pure:
+    CLEANUP(); return seterr(L, e, esize, "not a pure array");
+ nomem:
+    CLEANUP(); return seterr(L, e, esize, "could not allocate array");
+ overflow:
+    CLEANUP(); return seterr(L, e, esize, "array too large");
+#undef CLEANUP
+}
+
+
+void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type)
+{
+    size_t   nitem = *nitemp;
+    char   **saptr;
+    size_t   i;
+
+    switch (type) {
+    case MRP_LUA_STRING_ARRAY:
+        saptr = *itemsp;
+        for (i = 0; i < nitem; i++)
+            mrp_free(saptr[i]);
+    case MRP_LUA_BOOLEAN_ARRAY:
+    case MRP_LUA_INTEGER_ARRAY:
+    case MRP_LUA_DOUBLE_ARRAY:
+        mrp_free(*itemsp);
+        *itemsp = NULL;
+        *nitemp = 0;
+        break;
+    default:
+        break;
+    }
+}
+
+
+int mrp_lua_object_push_array(lua_State *L, int type, void *items, size_t nitem)
+{
+    int i;
+
+    lua_createtable(L, nitem, 0);
+
+    for (i = 0; i < (int)nitem; i++) {
+        switch (type) {
+        case MRP_LUA_STRING_ARRAY:
+            lua_pushstring(L, ((char **)items)[i]);
+            break;
+        case MRP_LUA_BOOLEAN_ARRAY:
+            lua_pushboolean(L, ((bool *)items)[i]);
+            break;
+        case MRP_LUA_INTEGER_ARRAY:
+            lua_pushinteger(L, ((int32_t *)items)[i]);
+            break;
+        case MRP_LUA_DOUBLE_ARRAY:
+            lua_pushnumber(L, ((double *)items)[i]);
+            break;
+        default:
+            lua_pop(L, 1);
+            return -1;
+        }
+
+        lua_rawseti(L, -2, i + 1);
+    }
+
+    return 1;
+}
+
+
 int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 {
     userdata_t             *u = (userdata_t *)data - 1;
     int                     midx = class_member(u, L, -2);
     mrp_lua_class_member_t *m;
     mrp_lua_value_t         v;
-    int                     vtype;
+    int                     vtype, etype;
+    void                   *items;
+    size_t                  nitem;
 
     if (midx < 0)
         goto notfound;
@@ -956,13 +1205,13 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
               m->name, data, u);
 
     if (m->flags & MRP_LUA_CLASS_READONLY && !u->initializing)
-        return seterr(err, esize, "%s.%s of Lua object is readonly",
+        return seterr(L, err, esize, "%s.%s of Lua object is readonly",
                       u->def->class_name, m->name);
 
     switch (m->type) {
     case MRP_LUA_STRING:
         if (vtype != LUA_TSTRING && vtype != LUA_TNIL)
-            return seterr(err, esize, "%s.%s expects string or nil, got %s",
+            return seterr(L, err, esize, "%s.%s expects string or nil, got %s",
                           u->def->class_name, m->name,
                           lua_typename(L, vtype), m->name);
 
@@ -983,7 +1232,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 
     case MRP_LUA_INTEGER:
         if (vtype != LUA_TNUMBER)
-            return seterr(err, esize, "%s.%s expects number, got %s",
+            return seterr(L, err, esize, "%s.%s expects number, got %s",
                           u->def->class_name, m->name, lua_typename(L, vtype));
 
         v.s32 = lua_tointeger(L, -1);
@@ -995,7 +1244,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 
     case MRP_LUA_DOUBLE:
         if (vtype != LUA_TNUMBER)
-            return seterr(err, esize, "%s.%s expects number, got %s",
+            return seterr(L, err, esize, "%s.%s expects number, got %s",
                           u->def->class_name, m->name, lua_typename(L, vtype));
 
         v.dbl = lua_tonumber(L, -1);
@@ -1007,7 +1256,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 
     case MRP_LUA_LFUNC:
         if (vtype != LUA_TFUNCTION && vtype != LUA_TNIL)
-            return seterr(err, esize, "%s.%s expects function, got %s",
+            return seterr(L, err, esize, "%s.%s expects function, got %s",
                           u->def->class_name, m->name, lua_typename(L, vtype));
 
         v.lfn = mrp_lua_object_ref_value(data, L, -1);
@@ -1018,7 +1267,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
             goto error;
 
     case MRP_LUA_CFUNC:
-        seterr(err, esize, "CFUNC is not implemented");
+        seterr(L, err, esize, "CFUNC is not implemented");
         goto error;
 
     case MRP_LUA_ANY:
@@ -1029,8 +1278,26 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
         else
             goto error;
 
+    case MRP_LUA_STRING_ARRAY:
+    case MRP_LUA_BOOLEAN_ARRAY:
+    case MRP_LUA_INTEGER_ARRAY:
+    case MRP_LUA_DOUBLE_ARRAY:
+        items = NULL;
+        nitem = (size_t)-1;
+        etype = m->type;
+        if (mrp_lua_object_collect_array(L, -1, &items, &nitem, etype, true,
+                                         err, esize) < 0)
+            return -1;
+        else {
+            v.array.items  = data + m->offs;
+            v.array.nitem  = data + m->size;
+            *v.array.items = items;
+            *v.array.nitem = nitem;
+        }
+        goto ok;
+
     default:
-        seterr(err, esize, "type %d not implemented");
+        seterr(L, err, esize, "type %d not implemented");
         break;
     }
 
@@ -1053,6 +1320,8 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
     int                     midx = class_member(u, L, -1);
     mrp_lua_class_member_t *m;
     mrp_lua_value_t         v;
+    void                  **items;
+    size_t                 *nitem;
 
     if (midx < 0)
         goto notfound;
@@ -1087,12 +1356,29 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
         goto ok;
 
     case MRP_LUA_CFUNC:
-        seterr(err, esize, "CFUNC is not implemented");
+        seterr(L, err, esize, "CFUNC is not implemented");
         goto error;
 
     case MRP_LUA_ANY:
         mrp_lua_object_deref_value(data, L, v.any, true);
         goto ok;
+
+    case MRP_LUA_STRING_ARRAY:
+    case MRP_LUA_BOOLEAN_ARRAY:
+    case MRP_LUA_INTEGER_ARRAY:
+    case MRP_LUA_DOUBLE_ARRAY:
+        items = data + m->offs;
+        nitem = data + m->size;
+        if (mrp_lua_object_push_array(L, m->type, *items, *nitem) > 0)
+            goto ok;
+        else {
+            seterr(L, err, esize, "failed to push array");
+            goto error;
+        }
+
+    case MRP_LUA_NONE:
+        seterr(L, err, esize, "invalid type");
+        goto error;
     }
 
  ok:
@@ -1135,7 +1421,8 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
                     goto error;
             }
             else {
-                seterr(err, esize, "trying toinitialize unknown member %s.%s",
+                seterr(L, err, esize,
+                       "trying toinitialize unknown member %s.%s",
                        u->def->class_name, n);
                 lua_pop(L, 2 + 1);
                 goto error;
