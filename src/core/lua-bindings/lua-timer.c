@@ -193,7 +193,7 @@ static int timer_lua_create(lua_State *L)
                           "got %d", narg);
     }
 
-    if (t->callback != LUA_NOREF) {
+    if (t->callback != LUA_NOREF && t->t == NULL) {
         t->t = mrp_add_timer(t->ctx->ml, t->msecs, timer_lua_cb, t);
 
         if (t->t == NULL) {
