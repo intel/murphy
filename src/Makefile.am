@@ -153,12 +153,14 @@ libmurphy_lua_utils_ladir =					\
 libmurphy_lua_utils_la_HEADERS =				\
 		core/lua-utils/strarray.h			\
 		core/lua-utils/funcbridge.h			\
-		core/lua-utils/object.h
+		core/lua-utils/object.h				\
+		core/lua-utils/error.h
 
 libmurphy_lua_utils_la_REGULAR_SOURCES =			\
 		core/lua-utils/strarray.c			\
 		core/lua-utils/funcbridge.c			\
-		core/lua-utils/object.c
+		core/lua-utils/object.c				\
+		core/lua-utils/error.c
 
 libmurphy_lua_utils_la_SOURCES =				\
 		$(libmurphy_lua_utils_la_REGULAR_SOURCES)	\
@@ -264,7 +266,8 @@ LUA_BINDINGS_SOURCES = 					\
 		core/lua-bindings/lua-json.c		\
 		core/lua-bindings/lua-timer.c   	\
 		core/lua-bindings/lua-deferred.c	\
-		core/lua-bindings/lua-sighandler.c
+		core/lua-bindings/lua-sighandler.c	\
+		core/lua-bindings/lua-transport.c
 
 libmurphy_core_lua_bindings_ladir =			\
 		$(includedir)/murphy/core/lua-bindings
