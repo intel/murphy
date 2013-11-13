@@ -744,7 +744,8 @@ libmurphy_resource_backend_la_REGULAR_SOURCES =                \
 		resource/resource-client.c	\
 		resource/zone.c			\
 		resource/config-lua.c		\
-		resource/resource-lua.c
+		resource/resource-lua.c 	\
+		resource/lua-resource.c
 
 libmurphy_resource_backend_la_SOURCES =                        \
 		$(libmurphy_resource_backend_la_REGULAR_SOURCES)        \
