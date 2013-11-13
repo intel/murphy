@@ -143,9 +143,7 @@ int mrp_json_lua_push(lua_State *L, mrp_json_t *json)
 {
     json_lua_t *lson;
 
-    if ((lson = mrp_json_lua_wrap(L, json)) != NULL)
-        mrp_lua_push_object(L, lson);
-    else
+    if ((lson = mrp_json_lua_wrap(L, json)) == NULL)
         lua_pushnil(L);
 
     return 1;
