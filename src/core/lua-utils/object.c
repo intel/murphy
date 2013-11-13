@@ -1008,10 +1008,17 @@ static void init_members(userdata_t *u)
     mrp_lua_class_member_t *m;
     int                     i;
 
+    if (u->def->flags & MRP_LUA_CLASS_NOINIT)
+        return;
+
     u->initializing = true;
     for (i = 0, m = members; i < nmember; i++, m++) {
+        if (m->flags & MRP_LUA_CLASS_NOINIT)
+            continue;
+
         mrp_debug("initializing %s.%s of Lua object %p(%p)", u->def->class_name,
                   m->name, data, u);
+
         m->setter(data, NULL, i, NULL);
     }
     u->initializing = false;
@@ -1453,9 +1460,12 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
     mrp_debug("setting %s.%s of Lua object %p(%p)", u->def->class_name,
               m->name, data, u);
 
-    if (m->flags & MRP_LUA_CLASS_READONLY && !u->initializing)
+    if ((m->flags & MRP_LUA_CLASS_READONLY) && !u->initializing)
         return seterr(L, err, esize, "%s.%s of Lua object is readonly",
                       u->def->class_name, m->name);
+
+    if (u->initializing && (m->flags & MRP_LUA_CLASS_NOINIT))
+        goto ok_noinit;
 
     switch (m->type) {
     case MRP_LUA_STRING:
@@ -1609,6 +1619,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
  ok:
     if ((m->flags & MRP_LUA_CLASS_NOTIFY) && u->def->notify)
         u->def->notify(data, L, midx);
+ ok_noinit:
     return 1;
 
  notfound:
@@ -1728,6 +1739,11 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
 
     if (lua_type(L, idx) != LUA_TTABLE)
         return 0;
+
+    if (u->def->flags & MRP_LUA_CLASS_NOINIT) {
+        mrp_log_warning("Explicit table-based member initializer called for");
+        mrp_log_warning("object %s marked for NOINIT.", u->def->class_name);
+    }
 
     u->initializing = true;
     MRP_LUA_FOREACH_FIELD(L, idx, n, l) {

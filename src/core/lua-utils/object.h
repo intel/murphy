@@ -173,11 +173,12 @@ typedef int  (*mrp_lua_getter_t)(void *data, lua_State *L, int member,
  */
 
 typedef enum {
-    MRP_LUA_CLASS_NOFLAGS    = 0x0,      /* empty flags */
-    MRP_LUA_CLASS_EXTENSIBLE = 0x1,      /* class is user-extensible from Lua */
-    MRP_LUA_CLASS_READONLY   = 0x2,      /* class or member is readonly */
-    MRP_LUA_CLASS_NOTIFY     = 0x4,      /* notify when member is changed */
-    MRP_LUA_CLASS_NOOVERRIDE = 0x8,      /* don't override setters, getters */
+    MRP_LUA_CLASS_NOFLAGS    = 0x00,     /* empty flags */
+    MRP_LUA_CLASS_EXTENSIBLE = 0x01,     /* class is user-extensible from Lua */
+    MRP_LUA_CLASS_READONLY   = 0x02,     /* class or member is readonly */
+    MRP_LUA_CLASS_NOTIFY     = 0x04,     /* notify when member is changed */
+    MRP_LUA_CLASS_NOINIT     = 0x08,     /* don't auto-initialize member */
+    MRP_LUA_CLASS_NOOVERRIDE = 0x10,     /* don't override setters, getters */
 } mrp_lua_class_flag_t;
 
 
@@ -376,9 +377,10 @@ struct mrp_lua_class_member_s {
  * @param _offs    member offset with visible part of userdata (if relevant)
  * @param _set     optional member-specific setter
  * @param _get     optional member-specific getter
- * @param _flags   member flags, bitwise or of MRP_LUA_CLASS_READONLY and
- *                 MRP_LUA_CLASS_NOTIFY. MRP_LUA_CLASS_NOFLAGS is available
- *                 to denote no specific flag set.
+ * @param _flags   member flags, bitwise or of MRP_LUA_CLASS_READONLY,
+ *                 MRP_LUA_CLASS_NOTIFY, and MRP_LUA_CLASS_NOINIT. Also
+ *                 MRP_LUA_CLASS_NOFLAGS is available to denote the empty
+ *                 set of flags.
  */
 #define MRP_LUA_CLASS_MEMBER(_type, _name, _offs, _set, _get, _flags)   \
                                                                         \
