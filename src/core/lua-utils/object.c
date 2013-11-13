@@ -67,6 +67,31 @@ static void init_members(userdata_t *u);
 static int  override_setfield(lua_State *L);
 static int  override_getfield(lua_State *L);
 
+static void invalid_destructor(void *data);
+
+static mrp_lua_classdef_t **classdefs;
+static int                  nclassdef;
+
+static mrp_lua_classdef_t invalid_classdef = {
+    .class_name    = "<invalid class>",
+    .class_id      = "<invalid class-id>",
+    .constructor   = "<invalid constructor>",
+    .destructor    = invalid_destructor,
+    .type_name     = "<invalid class type>",
+    .type_id       = MRP_LUA_NONE,
+    .userdata_id   = "<invalid userdata>",
+    .userdata_size = 0,
+    .methods       = NULL,
+    .overrides     = NULL,
+    .members       = NULL,
+    .nmember       = 0,
+    .natives       = NULL,
+    .nnative       = 0,
+    .notify        = NULL,
+    .flags         = 0,
+}, *invalid_class = &invalid_classdef;
+
+
 void mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 {
     /* make a metatatable for userdata, ie for 'c' part of object instances*/
@@ -106,14 +131,31 @@ void mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 
     /* make a metatable for class, ie. for LUA part of object instances */
     luaL_newmetatable(L, def->class_id);
+
+    if (mrp_reallocz(classdefs, nclassdef, nclassdef + 1) != NULL) {
+        def->type_id = MRP_LUA_OBJECT + nclassdef;
+        classdefs[nclassdef++] = def;
+    }
+    else {
+        mrp_log_error("Failed to store class %s in lookup table.",
+                      def->class_name);
+        def->type_id = MRP_LUA_NONE;
+    }
+
+    /* XXX TODO we could/should do better identification */
+    def->type_meta = lua_topointer(L, -1);
+
     lua_pushliteral(L, "__index");
     lua_pushvalue(L, -2);
     lua_settable(L, -3);        /* metatable.__index = metatable */
+
     luaL_openlib(L, NULL, def->overrides, 0);
     lua_setmetatable(L, -2);
-    
+
     lua_pop(L, 1);
+
 }
+
 
 void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
 {
@@ -134,7 +176,7 @@ void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
             }
             lua_remove(L, -2);
             q = tag;
-        }            
+        }
     } /* for */
 
     *q = '\0';
@@ -142,6 +184,119 @@ void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
     lua_getfield(L, -1, tag);
     lua_remove(L, -2);
 }
+
+
+static void invalid_destructor(void *data)
+{
+    MRP_UNUSED(data);
+    mrp_log_error("<invalid-destructor> called");
+}
+
+
+static mrp_lua_classdef_t *class_by_type(int type_id)
+{
+    int idx = type_id - MRP_LUA_OBJECT;
+
+    if (0 <= idx && idx < nclassdef)
+        return classdefs[idx];
+    else
+        return invalid_class;
+}
+
+
+static mrp_lua_classdef_t *class_by_type_name(const char *type_name)
+{
+    mrp_lua_classdef_t *def;
+    int                 i;
+
+    for (i = 0; i < nclassdef; i++) {
+        def = classdefs[i];
+
+        if (def->type_name[0] != type_name[0])
+            continue;
+
+        if (!strcmp(def->type_name + 1, type_name + 1))
+            return def;
+    }
+
+    return invalid_class;
+}
+
+
+static mrp_lua_classdef_t *class_by_class_name(const char *class_name)
+{
+    mrp_lua_classdef_t *def;
+    int                 i;
+
+    for (i = 0; i < nclassdef; i++) {
+        def = classdefs[i];
+
+        if (def->class_name[0] != class_name[0])
+            continue;
+
+        if (!strcmp(def->class_name + 1, class_name + 1))
+            return def;
+    }
+
+    return invalid_class;
+}
+
+
+static mrp_lua_classdef_t *class_by_class_id(const char *class_id)
+{
+    mrp_lua_classdef_t *def;
+    int                 i;
+
+    for (i = 0; i < nclassdef; i++) {
+        def = classdefs[i];
+
+        if (def->class_id[0] != class_id[0])
+            continue;
+
+        if (!strcmp(def->class_id + 1, class_id + 1))
+            return def;
+    }
+
+    return invalid_class;
+}
+
+
+static mrp_lua_classdef_t *class_by_userdata_id(const char *userdata_id)
+{
+    mrp_lua_classdef_t *def;
+    int                 i;
+
+    for (i = 0; i < nclassdef; i++) {
+        def = classdefs[i];
+
+        if (def->userdata_id[0] != userdata_id[0])
+            continue;
+
+        if (!strcmp(def->userdata_id + 1, userdata_id + 1))
+            return def;
+    }
+
+    return invalid_class;
+}
+
+
+mrp_lua_type_t mrp_lua_class_name_type(const char *class_name)
+{
+    return class_by_class_name(class_name)->type_id;
+}
+
+
+mrp_lua_type_t mrp_lua_class_id_type(const char *class_id)
+{
+    return class_by_class_id(class_id)->type_id;
+}
+
+
+mrp_lua_type_t mrp_lua_class_type(const char *type_name)
+{
+    return class_by_type_name(type_name)->type_id;
+}
+
 
 void *mrp_lua_create_object(lua_State          *L,
                             mrp_lua_classdef_t *def,
@@ -334,6 +489,68 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     return userdata ? (void *)(userdata + 1) : NULL;
 }
 
+
+int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type)
+{
+    mrp_lua_type_t      ltype = (mrp_lua_type_t)lua_type(L, idx);
+    mrp_lua_classdef_t *def;
+    int                 match;
+
+    switch (type) {
+    case MRP_LUA_NULL:
+    case MRP_LUA_BOOLEAN:
+    case MRP_LUA_STRING:
+    case MRP_LUA_DOUBLE:
+    case MRP_LUA_FUNC:
+        return (type == ltype);
+
+    case MRP_LUA_INTEGER:
+        return ((int)lua_tointeger(L, idx) == (double)lua_tonumber(L, idx));
+
+    case MRP_LUA_LFUNC:
+        return (ltype == LUA_TFUNCTION && !lua_iscfunction(L, idx));
+    case MRP_LUA_CFUNC:
+        return (ltype == LUA_TFUNCTION &&  lua_iscfunction(L, idx));
+    case MRP_LUA_BFUNC:
+        /* XXX TODO */ mrp_log_error("Can't handle funcbridge yet.");
+        return false;
+
+    case MRP_LUA_BOOLEAN_ARRAY:
+    case MRP_LUA_STRING_ARRAY:
+    case MRP_LUA_INTEGER_ARRAY:
+    case MRP_LUA_DOUBLE_ARRAY:
+        return (ltype == LUA_TTABLE); /* XXX could do be better */
+
+    case MRP_LUA_NONE:
+        return false;
+    case MRP_LUA_ANY:
+        return true;
+
+    case MRP_LUA_OBJECT:
+        return (ltype == LUA_TTABLE); /* XXX could do much be better */
+
+    default:
+        if (type > MRP_LUA_MAX)
+            return false;
+
+        if ((def = class_by_type(type)) == invalid_class)
+            return false;
+
+        if (lua_getmetatable(L, idx)) {
+             /* XXX TODO we could/should do better identification */
+            match = (lua_topointer(L, idx) == def->type_meta);
+            lua_pop(L, 1);
+        }
+        else
+            match = false;
+
+        return match;
+    }
+
+    return false;
+}
+
+
 void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
     userdata_t *userdata;
@@ -445,8 +662,14 @@ static int default_setter(void *data, lua_State *L, int member,
         case MRP_LUA_STRING:
             vptr->str = NULL;
             goto ok;
+        case MRP_LUA_FUNC:
         case MRP_LUA_LFUNC:
         case MRP_LUA_CFUNC:
+            vptr->lfn = LUA_NOREF;
+            goto ok;
+        case MRP_LUA_BFUNC:
+            vptr->bfn = NULL;
+            goto ok;
         case MRP_LUA_ANY:
             vptr->any = LUA_NOREF;
             goto ok;
@@ -459,6 +682,11 @@ static int default_setter(void *data, lua_State *L, int member,
             *itemsp = NULL;
             *nitemp = 0;
             goto ok;
+        case MRP_LUA_OBJECT:
+            if (m->type_id == MRP_LUA_NONE)
+                m->type_id = class_by_type_name(m->type_name)->type_id;
+            *((void **)(data + m->offs)) = NULL;
+            *((int   *)(data + m->size)) = LUA_NOREF;
         default:
             goto error;
         }
@@ -486,12 +714,22 @@ static int default_setter(void *data, lua_State *L, int member,
         vptr->dbl = v->dbl;
         goto ok;
 
+    case MRP_LUA_FUNC:
+        mrp_lua_object_unref_value(data, L, vptr->lfn);
+        vptr->lfn = v->lfn;
+        goto ok;
+
     case MRP_LUA_LFUNC:
         mrp_lua_object_unref_value(data, L, vptr->lfn);
         vptr->lfn = v->lfn;
         goto ok;
 
     case MRP_LUA_CFUNC:
+        mrp_lua_object_unref_value(data, L, vptr->lfn);
+        vptr->lfn = v->lfn;
+        goto ok;
+
+    case MRP_LUA_BFUNC:
         goto error;
 
     case MRP_LUA_ANY:
@@ -508,6 +746,12 @@ static int default_setter(void *data, lua_State *L, int member,
         mrp_lua_object_free_array(itemsp, nitemp, m->type);
         *itemsp = *v->array.items;
         *nitemp = *v->array.nitem;
+        goto ok;
+
+    case MRP_LUA_OBJECT:
+        mrp_lua_object_unref_value(data, L, *((int *)(data + m->size)));
+        *((void **)(data + m->offs)) = v->obj.ptr;
+        *((int   *)(data + m->size)) = v->obj.ref;
         goto ok;
 
     default:
@@ -551,11 +795,19 @@ static int default_getter(void *data, lua_State *L, int member,
         v->dbl = vptr->dbl;
         goto ok;
 
+    case MRP_LUA_FUNC:
+        v->lfn = vptr->lfn;
+        goto ok;
+
     case MRP_LUA_LFUNC:
         v->lfn = vptr->lfn;
         goto ok;
 
     case MRP_LUA_CFUNC:
+        v->lfn = vptr->lfn;
+        goto ok;
+
+    case MRP_LUA_BFUNC:
         goto error;
 
     case MRP_LUA_ANY:
@@ -567,6 +819,11 @@ static int default_getter(void *data, lua_State *L, int member,
     case MRP_LUA_INTEGER_ARRAY:
     case MRP_LUA_DOUBLE_ARRAY:
         v->array = vptr->array;
+        goto ok;
+
+    case MRP_LUA_OBJECT:
+        v->obj.ptr = *((void **)(data + m->offs));
+        v->obj.ref = *((int   *)(data + m->size));
         goto ok;
 
     default:
@@ -696,14 +953,6 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
         if (m->getter == NULL)
             m->getter = default_getter;
         m->flags |= (flags & MRP_LUA_CLASS_READONLY);
-
-#if 0
-        m->type   = members[i].type;
-        m->offs   = members[i].offs;
-        m->setter = members[i].setter ? members[i].setter : default_setter;
-        m->getter = members[i].getter ? members[i].getter : default_getter;
-        m->flags  = members[i].flags | (flags & MRP_LUA_CLASS_READONLY);
-#endif
 
         def->nmember++;
     }
@@ -1031,7 +1280,7 @@ static inline const char *array_type_name(int type)
 
 
 int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
-                                 size_t *nitemp, int expected, int copy,
+                                 size_t *nitemp, int expected, int dup,
                                  char *e, size_t esize)
 {
     const char *name, *str;
@@ -1041,7 +1290,7 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
 
     max   = *nitemp;
     tidx  = mrp_lua_absidx(L, tidx);
-    items = NULL;
+    items = *itemsp;
 
     if (expected != MRP_LUA_ANY) {
         ltype = array_lua_type(expected);
@@ -1079,13 +1328,13 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
         if (max != (size_t)-1 && i >= (int)max)
             goto overflow;
 
-        if (mrp_realloc(items, (i + 1) * isize) == NULL)
+        if (dup && mrp_realloc(items, (i + 1) * isize) == NULL)
             goto nomem;
 
         switch (expected) {
         case MRP_LUA_STRING_ARRAY:
             str = (vtype != LUA_TNIL ? lua_tostring(L, -1) : NULL);
-            if (copy) {
+            if (dup) {
                 ((char **)items)[i] = str ? mrp_strdup(str) : NULL;
                 if (!((char **)items)[i] && str)
                     goto nomem;
@@ -1254,11 +1503,30 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
         else
             goto error;
 
+    case MRP_LUA_CFUNC:
+        if (vtype != LUA_TFUNCTION && vtype != LUA_TNIL)
+            return seterr(L, err, esize, "%s.%s expects function, got %s",
+                          u->def->class_name, m->name, lua_typename(L, vtype));
+        if (!lua_iscfunction(L, -1))
+            return seterr(L, err, esize, "%s.%s expects Lua C-function.",
+                          u->def->class_name, m->name);
+        goto setfn;
+
+    case MRP_LUA_FUNC:
+        if (vtype != LUA_TFUNCTION && vtype != LUA_TNIL)
+            return seterr(L, err, esize, "%s.%s expects function, got %s",
+                          u->def->class_name, m->name, lua_typename(L, vtype));
+        if (lua_iscfunction(L, -1))
+            return seterr(L, err, esize, "%s.%s expects Lua C-function.",
+                          u->def->class_name, m->name);
+        goto setfn;
+
     case MRP_LUA_LFUNC:
         if (vtype != LUA_TFUNCTION && vtype != LUA_TNIL)
             return seterr(L, err, esize, "%s.%s expects function, got %s",
                           u->def->class_name, m->name, lua_typename(L, vtype));
 
+    setfn:
         v.lfn = mrp_lua_object_ref_value(data, L, -1);
 
         if (m->setter(data, L, midx, &v) == 1)
@@ -1266,13 +1534,20 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
         else
             goto error;
 
-    case MRP_LUA_CFUNC:
-        seterr(L, err, esize, "CFUNC is not implemented");
+    case MRP_LUA_BFUNC:
+        seterr(L, err, esize, "BFUNC is not implemented");
+        goto error;
+
+    case MRP_LUA_NULL:
+        seterr(L, err, esize, "setting member of invalid type NULL");
+        goto error;
+
+    case MRP_LUA_NONE:
+        seterr(L, err, esize, "setting member of invalid type NONE");
         goto error;
 
     case MRP_LUA_ANY:
         v.any = mrp_lua_object_ref_value(data, L, -1);
-
         if (m->setter(data, L, midx, &v) == 1)
             goto ok;
         else
@@ -1295,6 +1570,36 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
             *v.array.nitem = nitem;
         }
         goto ok;
+
+    case MRP_LUA_OBJECT:
+        if (m->type_id == MRP_LUA_NONE)
+            m->type_id = class_by_type_name(m->type_name)->type_id;
+
+        if (m->type_id == MRP_LUA_NONE) {
+            seterr(L, err, esize, "can't set member of unknown type %s",
+                   m->type_name);
+            goto error;
+        }
+
+        if (!mrp_lua_object_of_type(L, -1, m->type_id)) {
+            seterr(L, err, esize, "object type mismatch, expecting '%s'",
+                   class_by_type(m->type_id)->type_name);
+            goto error;
+        }
+
+        v.obj.ref = mrp_lua_object_ref_value(data, L, -1);
+
+        lua_pushliteral(L, "userdata");
+        lua_rawget(L, -2);
+        if ((v.obj.ptr = lua_touserdata(L, -1)) != NULL)
+            v.obj.ptr = ((userdata_t *)v.obj.ptr) + 1;
+        lua_pop(L, 1);
+
+        if (m->setter(data, L, midx, &v) == 1)
+            goto ok;
+        else
+            goto error;
+        break;
 
     default:
         seterr(L, err, esize, "type %d not implemented");
@@ -1351,12 +1656,28 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
         lua_pushnumber(L, v.dbl);
         goto ok;
 
+    case MRP_LUA_FUNC:
+        mrp_lua_object_deref_value(data, L, v.lfn, true);
+        goto ok;
+
     case MRP_LUA_LFUNC:
         mrp_lua_object_deref_value(data, L, v.lfn, true);
         goto ok;
 
     case MRP_LUA_CFUNC:
-        seterr(L, err, esize, "CFUNC is not implemented");
+        mrp_lua_object_deref_value(data, L, v.lfn, true);
+        goto ok;
+
+    case MRP_LUA_BFUNC:
+        seterr(L, err, esize, "BFUNC is not implemented");
+        goto error;
+
+    case MRP_LUA_NULL:
+        lua_pushnil(L);
+        goto ok;
+
+    case MRP_LUA_NONE:
+        seterr(L, err, esize, "invalid type");
         goto error;
 
     case MRP_LUA_ANY:
@@ -1376,8 +1697,11 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
             goto error;
         }
 
-    case MRP_LUA_NONE:
-        seterr(L, err, esize, "invalid type");
+    case MRP_LUA_OBJECT:
+        mrp_lua_object_deref_value(data, L, v.obj.ref, true);
+        break;
+
+    default:
         goto error;
     }
 
