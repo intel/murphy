@@ -1146,6 +1146,24 @@ int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
 }
 
 
+int mrp_lua_object_getref(void *owner, void *data, lua_State *L, int ref)
+{
+    userdata_t *uo = (userdata_t *)owner - 1;
+    userdata_t *ud = (userdata_t *)data  - 1;
+
+    if (ref == LUA_NOREF || ref == LUA_REFNIL)
+        return ref;
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, uo->reftbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ud->reftbl);
+    lua_rawgeti(L, -2, ref);
+    ref = luaL_ref(L, -2);
+    lua_pop(L, 2);
+
+    return ref;
+}
+
+
 static void object_create_exttbl(userdata_t *u, lua_State *L)
 {
     lua_newtable(L);

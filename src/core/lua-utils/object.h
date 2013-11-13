@@ -437,6 +437,12 @@ struct mrp_lua_class_member_s {
             .type_name = #_type,                                        \
             .type_id = -1        },
 
+#define MRP_LUA_CLASS_CHECKER(_type, _prefix, _class)                  \
+    static _type *_prefix##_check(lua_State *L, int idx)               \
+    {                                                                  \
+        return (_type *)mrp_lua_check_object(L, _class, idx);          \
+    } struct _prefix##_kludge_for_trailing_semicolon
+
 
 typedef struct mrp_lua_classdef_s     mrp_lua_classdef_t;
 typedef enum   mrp_lua_event_type_e   mrp_lua_event_type_t;
@@ -499,6 +505,10 @@ void mrp_lua_object_unref_value(void *object, lua_State *L, int ref);
 /** Retrieve and push to the stack the value for the fiven reference. */
 int mrp_lua_object_deref_value(void *object, lua_State *L, int ref,
                                int pushnil);
+/** Get a private reference for the given reference owned by the given object. */
+int mrp_lua_object_getref(void *owner, void *object, lua_State *L, int ref);
+/** Decreate the reference count of the given object reference. */
+#define mrp_lua_object_putref(o, L, ref) mrp_lua_object_unref_value(o, L, ref)
 /** Set a user-specified field for an extensible object to the value at vidx. */
 int mrp_lua_object_setext(void *object, lua_State *L, const char *name,
                           int vidx, char *err, size_t esize);
