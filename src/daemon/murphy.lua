@@ -211,3 +211,40 @@ element.lua {
                 end
 	     end
 }
+
+
+--
+
+json = m:JSON({ a = 'foo', b = 'bar', foobar = { 1, 2, 3, 5, 6 } })
+
+print(tostring(json))
+
+
+function connect_cb(self, peer, data)
+    print('incoming connection from ' .. peer .. ' on ' .. tostring(self))
+    accepted = self:accept()
+    print('accepted: ' .. tostring(accepted))
+end
+
+function closed_cb(self, error, data)
+    print('connection closed by peer')
+end
+
+function recv_cb(self, msg, data)
+    print('got message ' .. tostring(msg))
+end
+
+t = m:Transport({ connect = connect_cb,
+                  closed  = closed_cb,
+                  recv    = recv_cb,
+                  data    = 'foo',
+                  address = 'wsck:127.0.0.1:18081/ico_syc_protocol' })
+
+print(tostring(t))
+
+t:listen()
+
+print(tostring(t))
+
+print(t.accept)
+print(t.recv)
