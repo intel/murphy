@@ -522,15 +522,6 @@ int mrp_lua_object_deref_value(void *object, lua_State *L, int ref,
 int mrp_lua_object_getref(void *owner, void *object, lua_State *L, int ref);
 /** Decreate the reference count of the given object reference. */
 #define mrp_lua_object_putref(o, L, ref) mrp_lua_object_unref_value(o, L, ref)
-/** Set a user-specified field for an extensible object to the value at vidx. */
-int mrp_lua_object_setext(void *object, lua_State *L, const char *name,
-                          int vidx, char *err, size_t esize);
-/** Get and push the user-specified field of an extensible object. */
-void mrp_lua_object_getext(void *data, lua_State *L, const char *name);
-/** Set a user-specified index of an extensible object to the value at vidx. */
-void mrp_lua_object_setiext(void *data, lua_State *L, int idx, int val);
-/** Get and push the user-specified index of an extensible object. */
-void mrp_lua_object_getiext(void *data, lua_State *L, int idx);
 /** Set a pre-declared object member. */
 int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize);
 /** Get and push a pre-declared object member. */

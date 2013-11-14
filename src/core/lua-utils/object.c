@@ -43,15 +43,19 @@
 #include <murphy/common/mm.h>
 #include <murphy/core/lua-utils/object.h>
 
+#undef  __MURPHY_MANGLE_CLASS_SELF__     /* extra self-mangling if defined */
+#define CHECK    true                    /* do type/self-checking */
+#define NOCHECK (!CHECK)                 /* omit type/self-checking */
+
 typedef struct userdata_s userdata_t;
 
 struct userdata_s {
-    userdata_t *self;
+    userdata_t *selfish;
     mrp_lua_classdef_t *def;
     int  luatbl;
     int  reftbl;                          /* table of private references */
     int  exttbl;                          /* table of object extensions */
-    int  dead : 1;                        /* being cleaed up */
+    int  dead : 1;                        /* being cleaned up */
     int  initializing : 1;                /* being initialized */
 };
 
@@ -89,6 +93,63 @@ static mrp_lua_classdef_t invalid_classdef = {
     .notify        = NULL,
     .flags         = 0,
 }, *invalid_class = &invalid_classdef;
+
+
+#define USER_TO_DATA(u) ((void *)(((userdata_t *)(u)) + 1))
+#define DATA_TO_USER(d) (((userdata_t *)(d)) - 1)
+
+static inline void userdata_setself(userdata_t *u)
+{
+#ifdef __MURPHY_MANGLE_CLASS_SELF__
+    void *data = USER_TO_DATA(u);
+
+    u->selfish = (void *)(((ptrdiff_t)u) ^ ((ptrdiff_t)data));
+#else
+    u->selfish = u;
+#endif
+}
+
+
+static inline void *userdata_getself(userdata_t *u)
+{
+#ifdef __MURPHY_MANGLE_CLASS_SELF__
+    void *data = USER_TO_DATA(u);
+    void *self = (void *)(((ptrdiff_t)u->selfish) ^ ((ptrdiff_t)data));
+#else
+    void *self = u->selfish;
+#endif
+
+    if (u == self)
+        return self;
+    else
+        return NULL;
+}
+
+
+static inline userdata_t *userdata_get(void *data, bool check)
+{
+    userdata_t *u;
+
+    if (data != NULL) {
+        u = DATA_TO_USER(data);
+
+        if (!check || userdata_getself(u) == u)
+            return u;
+    }
+
+    return NULL;
+}
+
+
+static inline void *object_get(userdata_t *u, bool check)
+{
+    if (u != NULL) {
+        if (!check || (userdata_getself(u) == u))
+            return USER_TO_DATA(u);
+    }
+
+    return NULL;
+}
 
 
 int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
@@ -306,18 +367,6 @@ mrp_lua_type_t mrp_lua_class_type(const char *type_name)
 }
 
 
-static inline userdata_t *get_userdata(void *o)
-{
-    return (o != NULL ? (((userdata_t *)o) - 1) : NULL);
-}
-
-
-static inline void *get_object(userdata_t *u)
-{
-    return (u != NULL ? (void *)(u + 1) : NULL);
-}
-
-
 void *mrp_lua_create_object(lua_State          *L,
                             mrp_lua_classdef_t *def,
                             const char         *name,
@@ -358,7 +407,7 @@ void *mrp_lua_create_object(lua_State          *L,
     lua_rawset(L, -3);
 
     lua_pushvalue(L, -1);
-    userdata->self   = userdata;
+    userdata_setself(userdata);
     userdata->def    = def;
     userdata->luatbl = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -380,7 +429,7 @@ void *mrp_lua_create_object(lua_State          *L,
     if (def->flags & MRP_LUA_CLASS_EXTENSIBLE)
         object_create_exttbl(userdata, L);
 
-    return (void *)(userdata + 1);
+    return USER_TO_DATA(userdata);
 }
 
 
@@ -416,10 +465,10 @@ void mrp_lua_set_object_index(lua_State          *L,
 
 void mrp_lua_destroy_object(lua_State *L, const char *name,int idx, void *data)
 {
-    userdata_t *userdata = (userdata_t *)data - 1;
+    userdata_t *userdata = userdata_get(data, CHECK);
     mrp_lua_classdef_t *def;
 
-    if (data && userdata == userdata->self && !userdata->dead) {
+    if (userdata && !userdata->dead) {
         userdata->dead = true;
         def = userdata->def;
 
@@ -496,14 +545,14 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
         }
     }
 
-    if (userdata != userdata->self) {
+    if (userdata_getself(userdata) != userdata) {
         luaL_error(L, "invalid userdata");
         userdata = NULL;
     }
 
     lua_pop(L, 2);
 
-    return userdata ? (void *)(userdata + 1) : NULL;
+    return userdata ? USER_TO_DATA(userdata) : NULL;
 }
 
 
@@ -582,7 +631,7 @@ int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type)
      * We consider NULL to be a valid instance. Might need to be changed.
      */
 
-    if ((u = get_userdata(data)) != NULL)
+    if ((u = userdata_get(data, CHECK)) != NULL)
         return type == u->def->type_id;
     else
         return true;
@@ -611,21 +660,21 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 
     lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
 
-    if (!lua_rawequal(L, -1, -2) || userdata != userdata->self)
+    if (!lua_rawequal(L, -1, -2) || userdata != userdata_getself(userdata))
         userdata = NULL;
 
     lua_settop(L, top);
 
-    return userdata ? (void *)(userdata + 1) : NULL;
+    return userdata ? USER_TO_DATA(userdata) : NULL;
 }
 
 
 
 int mrp_lua_push_object(lua_State *L, void *data)
 {
-    userdata_t *userdata = (userdata_t *)data - 1;
+    userdata_t *userdata = userdata_get(data, CHECK);
 
-    if (!data || userdata != userdata->self || userdata->dead)
+    if (!userdata || userdata->dead)
         lua_pushnil(L);
     else
         lua_rawgeti(L, LUA_REGISTRYINDEX, userdata->luatbl);
@@ -633,12 +682,13 @@ int mrp_lua_push_object(lua_State *L, void *data)
     return 1;
 }
 
+
 mrp_lua_classdef_t *mrp_lua_get_object_classdef(void *data)
 {
-    userdata_t *userdata = (userdata_t *)data - 1;
+    userdata_t *userdata = userdata_get(data, CHECK);
     mrp_lua_classdef_t *def;
 
-    if (!data || userdata != userdata->self || userdata->dead)
+    if (!userdata || userdata->dead)
         def = NULL;
     else
         def = userdata->def;
@@ -676,7 +726,7 @@ static int userdata_destructor(lua_State *L)
         if (!lua_rawequal(L, -1, -2))
             luaL_typerror(L, -2, def->userdata_id);
         else
-            def->destructor((void *)(userdata + 1));
+            def->destructor(USER_TO_DATA(userdata));
     }
 
     return 0;
@@ -686,7 +736,7 @@ static int userdata_destructor(lua_State *L)
 static int default_setter(void *data, lua_State *L, int member,
                           mrp_lua_value_t *v)
 {
-    userdata_t             *u = (userdata_t *)data - 1;
+    userdata_t             *u = DATA_TO_USER(data);
     mrp_lua_class_member_t *m;
     mrp_lua_value_t        *vptr;
     void                  **itemsp;
@@ -807,7 +857,7 @@ static int default_setter(void *data, lua_State *L, int member,
 static int default_getter(void *data, lua_State *L, int member,
                           mrp_lua_value_t *v)
 {
-    userdata_t             *u = (userdata_t *)data - 1;
+    userdata_t             *u = DATA_TO_USER(data);
     mrp_lua_class_member_t *m;
     mrp_lua_value_t        *vptr;
 
@@ -1137,7 +1187,7 @@ static inline int get_reftbl(userdata_t *u)
 
 int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
 {
-    int tbl = get_reftbl(get_userdata(data));
+    int tbl = get_reftbl(userdata_get(data, CHECK));
     int ref;
 
     if (tbl != LUA_NOREF) {
@@ -1158,7 +1208,7 @@ void mrp_lua_object_unref_value(void *data, lua_State *L, int ref)
     int tbl;
 
     if (ref != LUA_NOREF && ref != LUA_REFNIL) {
-        tbl = get_reftbl(get_userdata(data));
+        tbl = get_reftbl(userdata_get(data, CHECK));
 
         if (tbl != LUA_NOREF) {
             lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
@@ -1174,7 +1224,7 @@ int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
     int tbl;
 
     if (ref != LUA_NOREF) {
-        tbl = get_reftbl(get_userdata(data));
+        tbl = get_reftbl(userdata_get(data, CHECK));
 
         if (ref != LUA_REFNIL && tbl != LUA_NOREF) {
             lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
@@ -1203,8 +1253,8 @@ int mrp_lua_object_getref(void *owner, void *data, lua_State *L, int ref)
     if (ref == LUA_NOREF || ref == LUA_REFNIL)
         return ref;
 
-    if ((otbl = get_reftbl(get_userdata(owner))) == LUA_NOREF ||
-        (dtbl = get_reftbl(get_userdata(data)))  == LUA_NOREF)
+    if ((otbl = get_reftbl(userdata_get(owner, CHECK))) == LUA_NOREF ||
+        (dtbl = get_reftbl(userdata_get(data , CHECK))) == LUA_NOREF)
         return LUA_NOREF;
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, otbl);
@@ -1248,10 +1298,10 @@ static void object_delete_exttbl(userdata_t *u, lua_State *L)
 }
 
 
-int mrp_lua_object_setext(void *data, lua_State *L, const char *name,
-                          int vidx, char *err, size_t esize)
+static int object_setext(void *data, lua_State *L, const char *name,
+                         int vidx, char *err, size_t esize)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    userdata_t *u = DATA_TO_USER(data);
 
     if (u->exttbl == LUA_NOREF) {
         if (err)
@@ -1273,9 +1323,9 @@ int mrp_lua_object_setext(void *data, lua_State *L, const char *name,
 }
 
 
-void mrp_lua_object_getext(void *data, lua_State *L, const char *name)
+static void object_getext(void *data, lua_State *L, const char *name)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    userdata_t *u = DATA_TO_USER(data);
 
    if (u->exttbl == LUA_NOREF) {
        lua_pushnil(L);
@@ -1288,9 +1338,9 @@ void mrp_lua_object_getext(void *data, lua_State *L, const char *name)
 }
 
 
-void mrp_lua_object_setiext(void *data, lua_State *L, int idx, int val)
+static void object_setiext(void *data, lua_State *L, int idx, int val)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    userdata_t *u = DATA_TO_USER(data);
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
     lua_pushvalue(L, val > 0 ? val : val - 1);
@@ -1299,9 +1349,9 @@ void mrp_lua_object_setiext(void *data, lua_State *L, int idx, int val)
 }
 
 
-void mrp_lua_object_getiext(void *data, lua_State *L, int idx)
+static void object_getiext(void *data, lua_State *L, int idx)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    userdata_t *u = DATA_TO_USER(data);
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
     lua_rawgeti(L, -1, idx);
@@ -1514,7 +1564,7 @@ int mrp_lua_object_push_array(lua_State *L, int type, void *items, size_t nitem)
 
 int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 {
-    userdata_t             *u = (userdata_t *)data - 1;
+    userdata_t             *u = DATA_TO_USER(data);
     int                     midx = class_member(u, L, -2);
     mrp_lua_class_member_t *m;
     mrp_lua_value_t         v;
@@ -1680,7 +1730,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
         lua_pushliteral(L, "userdata");
         lua_rawget(L, -2);
         if ((v.obj.ptr = lua_touserdata(L, -1)) != NULL)
-            v.obj.ptr = ((userdata_t *)v.obj.ptr) + 1;
+            v.obj.ptr = USER_TO_DATA(v.obj.ptr);
         lua_pop(L, 1);
 
         if (m->setter(data, L, midx, &v) == 1)
@@ -1710,7 +1760,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 
 int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
 {
-    userdata_t             *u = (userdata_t *)data - 1;
+    userdata_t             *u = DATA_TO_USER(data);
     int                     midx = class_member(u, L, -1);
     mrp_lua_class_member_t *m;
     mrp_lua_value_t         v;
@@ -1811,7 +1861,7 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
 int mrp_lua_init_members(void *data, lua_State *L, int idx,
                          char *err, size_t esize)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    userdata_t *u = userdata_get(data, CHECK);
     const char *n;
     size_t      l;
 
@@ -1839,7 +1889,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
             goto error;
         case 0:
             if (u->def->flags & MRP_LUA_CLASS_EXTENSIBLE) {
-                if (mrp_lua_object_setext(data, L, n, -1, err, esize) < 0)
+                if (object_setext(data, L, n, -1, err, esize) < 0)
                     goto error;
             }
             else {
@@ -1880,8 +1930,8 @@ static inline int is_native(userdata_t *u, const char *name)
 static int override_setfield(lua_State *L)
 {
     void       *data = mrp_lua_check_object(L, NULL, 1);
+    userdata_t *u    = DATA_TO_USER(data);
     char        err[128] = "";
-    userdata_t *u = (userdata_t *)data - 1;
     const char *name;
 
     if (data == NULL)
@@ -1912,10 +1962,10 @@ static int override_setfield(lua_State *L)
         if (is_native(u, name))
             return u->def->setfield(L);
         else
-            mrp_lua_object_setext(data, L, name, 3, NULL, 0);
+            object_setext(data, L, name, 3, NULL, 0);
     }
     else {
-        mrp_lua_object_setiext(data, L, lua_tointeger(L, 2), 3);
+        object_setiext(data, L, lua_tointeger(L, 2), 3);
     }
 
  out:
@@ -1928,8 +1978,8 @@ static int override_setfield(lua_State *L)
 static int override_getfield(lua_State *L)
 {
     void       *data = mrp_lua_check_object(L, NULL, 1);
+    userdata_t *u    = DATA_TO_USER(data);
     char        err[128] = "";
-    userdata_t *u = (userdata_t *)data - 1;
     const char *name;
 
     mrp_debug("getting field for object of type '%s'", u->def->class_name);
@@ -1955,10 +2005,10 @@ static int override_getfield(lua_State *L)
         if (is_native(u, name))
             return u->def->setfield(L);
         else
-            mrp_lua_object_getext(data, L, name);
+            object_getext(data, L, name);
     }
     else {
-        mrp_lua_object_getiext(data, L, 2);
+        object_getiext(data, L, 2);
     }
 
  out:
