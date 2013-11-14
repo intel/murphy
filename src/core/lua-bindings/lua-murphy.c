@@ -93,8 +93,12 @@ static int register_bindings(mrp_lua_bindings_t *b)
         lua_rawset(L, -3);
     }
 
-    if (b->classdef != NULL)
-        mrp_lua_create_object_class(L, b->classdef);
+    if (b->classdef != NULL) {
+        if (mrp_lua_create_object_class(L, b->classdef) < 0) {
+            mrp_log_error("Object class registration failed.");
+            return FALSE;
+        }
+    }
 
     return TRUE;
 }
