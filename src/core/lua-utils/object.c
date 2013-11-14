@@ -32,7 +32,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
-
+#include <errno.h>
 
 #include <lualib.h>
 #include <lauxlib.h>
@@ -62,7 +62,6 @@ static void object_create_reftbl(userdata_t *u, lua_State *L);
 static void object_delete_reftbl(userdata_t *u, lua_State *L);
 static void object_create_exttbl(userdata_t *u, lua_State *L);
 static void object_delete_exttbl(userdata_t *u, lua_State *L);
-static void init_members(userdata_t *u);
 static int  override_setfield(lua_State *L);
 static int  override_getfield(lua_State *L);
 
@@ -92,8 +91,16 @@ static mrp_lua_classdef_t invalid_classdef = {
 }, *invalid_class = &invalid_classdef;
 
 
-void mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
+int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 {
+    if (def->constructor == NULL) {
+        mrp_log_error("Classes with NULL constructor not allowed.");
+        mrp_log_error("Please define a constructor for class %s (type %s).",
+                      def->class_name, def->type_name);
+        errno = EINVAL;
+        return -1;
+    }
+
     /* make a metatatable for userdata, ie for 'c' part of object instances*/
     luaL_newmetatable(L, def->userdata_id);
     lua_pushliteral(L, "__index");
@@ -154,6 +161,7 @@ void mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 
     lua_pop(L, 1);
 
+    return 0;
 }
 
 
@@ -372,8 +380,6 @@ void *mrp_lua_create_object(lua_State          *L,
     if (def->flags & MRP_LUA_CLASS_EXTENSIBLE)
         object_create_exttbl(userdata, L);
 
-    init_members(userdata);
-
     return (void *)(userdata + 1);
 }
 
@@ -559,6 +565,27 @@ int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type)
     }
 
     return false;
+}
+
+
+int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type)
+{
+    userdata_t *u;
+
+    if (type < MRP_LUA_OBJECT) {
+        mrp_log_error("Can't do pointer-based type-equality for "
+                      "non-object types.");
+        return 0;
+    }
+
+    /*
+     * We consider NULL to be a valid instance. Might need to be changed.
+     */
+
+    if ((u = get_userdata(data)) != NULL)
+        return type == u->def->type_id;
+    else
+        return true;
 }
 
 
@@ -929,6 +956,9 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
                             char **natives, int nnative,
                             mrp_lua_class_notify_t notify)
 {
+#define F(flag)          MRP_LUA_CLASS_##flag
+#define INHERITED_FLAGS (F(READONLY)|F(RAWGETTER)|F(RAWSETTER))
+
     mrp_lua_class_member_t *m;
     int                     i;
 
@@ -959,11 +989,20 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
             goto fail;
 
         *m = members[i];
+
         if (m->setter == NULL)
             m->setter = default_setter;
         if (m->getter == NULL)
             m->getter = default_getter;
-        m->flags |= (flags & MRP_LUA_CLASS_READONLY);
+
+        m->flags |= (flags & INHERITED_FLAGS); /* inherit flags we can */
+
+        /* clear flags the default setter and getter don't do */
+        if (m->setter == default_setter)
+            m->flags &= ~MRP_LUA_CLASS_RAWSETTER;
+
+        if (m->getter == default_getter)
+            m->flags &= ~MRP_LUA_CLASS_RAWGETTER;
 
         def->nmember++;
     }
@@ -1008,31 +1047,6 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
     def->nnative = 0;
 
     return -1;
-}
-
-
-static void init_members(userdata_t *u)
-{
-    void                   *data = (void *)(u + 1);
-    mrp_lua_class_member_t *members = u->def->members;
-    int                     nmember = u->def->nmember;
-    mrp_lua_class_member_t *m;
-    int                     i;
-
-    if (u->def->flags & MRP_LUA_CLASS_NOINIT)
-        return;
-
-    u->initializing = true;
-    for (i = 0, m = members; i < nmember; i++, m++) {
-        if (m->flags & MRP_LUA_CLASS_NOINIT)
-            continue;
-
-        mrp_debug("initializing %s.%s of Lua object %p(%p)", u->def->class_name,
-                  m->name, data, u);
-
-        m->setter(data, NULL, i, NULL);
-    }
-    u->initializing = false;
 }
 
 
@@ -1517,12 +1531,19 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
     mrp_debug("setting %s.%s of Lua object %p(%p)", u->def->class_name,
               m->name, data, u);
 
-    if ((m->flags & MRP_LUA_CLASS_READONLY) && !u->initializing)
+    if (!u->initializing && (m->flags & MRP_LUA_CLASS_READONLY))
         return seterr(L, err, esize, "%s.%s of Lua object is readonly",
                       u->def->class_name, m->name);
 
     if (u->initializing && (m->flags & MRP_LUA_CLASS_NOINIT))
         goto ok_noinit;
+
+    if (m->flags & MRP_LUA_CLASS_RAWSETTER) {
+        if (m->setter(data, L, midx, NULL) == 1)
+            goto ok;
+        else
+            goto error;
+    }
 
     switch (m->type) {
     case MRP_LUA_STRING:
@@ -1704,6 +1725,9 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
     if (m->getter(data, L, midx, &v) != 1)
         goto error;
 
+    if (m->flags & MRP_LUA_CLASS_RAWGETTER)
+        goto ok;
+
     switch (m->type) {
     case MRP_LUA_STRING:
         if (v.str != NULL)
@@ -1808,6 +1832,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
 
         lua_pushvalue(L, -2);
         lua_pushvalue(L, -2);
+
         switch (mrp_lua_set_member(data, L, err, esize)) {
         case -1:
             lua_pop(L, 2 + 1);

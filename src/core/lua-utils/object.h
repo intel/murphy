@@ -75,6 +75,9 @@
 #define MRP_LUA_UDATA_ID(_name, _constr)                \
     MRP_LUA_CLASSID_ROOT#_name"."#_constr".userdata"
 
+#define MRP_LUA_TYPE_ID(_class_def)   ((_class_def)->type_id)
+#define MRP_LUA_TYPE_NAME(_class_def) ((_class_def)->type_name)
+
 #define MRP_LUA_CLASS_DEF(_name, _constr, _type, _destr, _methods, _overrides)\
     static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
         .class_name    = MRP_LUA_CLASS_NAME(_name),                           \
@@ -177,11 +180,20 @@ typedef enum {
     MRP_LUA_CLASS_EXTENSIBLE = 0x01,     /* class is user-extensible from Lua */
     MRP_LUA_CLASS_READONLY   = 0x02,     /* class or member is readonly */
     MRP_LUA_CLASS_NOTIFY     = 0x04,     /* notify when member is changed */
-    MRP_LUA_CLASS_NOINIT     = 0x08,     /* don't auto-initialize member */
+    MRP_LUA_CLASS_NOINIT     = 0x08,     /* don't initialize member */
     MRP_LUA_CLASS_NOOVERRIDE = 0x10,     /* don't override setters, getters */
     MRP_LUA_CLASS_PRIVREFS   = 0x20,     /* private references */
+    MRP_LUA_CLASS_RAWGETTER  = 0x40,     /* getter pushes to the stack */
+    MRP_LUA_CLASS_RAWSETTER  = 0x80,     /* setter takes args from the stack */
 } mrp_lua_class_flag_t;
 
+/*
+ * getter/setter statuses and macros
+ */
+
+#define MRP_LUA_OK_       1              /* successfully get/set */
+#define MRP_LUA_NOTFOUND  0              /* member not found */
+#define MRP_LUA_ERROR    -1              /* failed to get/set member */
 
 /*
  * supported class member types
@@ -211,7 +223,7 @@ typedef enum {
 
     MRP_LUA_ANY     = MRP_LUA_VTYPE(8),  /* member of any type */
     MRP_LUA_OBJECT  = MRP_LUA_VTYPE(9),  /* object member */
-
+    /* dynamically registered types */
     MRP_LUA_MAX     = MRP_LUA_VTYPE(MRP_LUA_VMAX)
 } mrp_lua_type_t;
 
@@ -475,7 +487,7 @@ struct mrp_lua_classdef_s {
     lua_CFunction            getfield;   /* overridden getfield, if any */
 };
 
-void  mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def);
+int   mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def);
 void  mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def);
 void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
                             const char *name, int);
@@ -538,9 +550,8 @@ mrp_lua_type_t mrp_lua_class_name_type(const char *class_name);
 mrp_lua_type_t mrp_lua_class_id_type(const char *class_id);
 /** Check if the object at the given stack index is of the given type. */
 int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type);
-
-
-
+/** Check if the given (known to be murphy Lua) object is of given type. */
+int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type);
 
 #endif  /* __MURPHY_LUA_OBJECT_H__ */
 
