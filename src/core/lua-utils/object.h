@@ -179,6 +179,7 @@ typedef enum {
     MRP_LUA_CLASS_NOTIFY     = 0x04,     /* notify when member is changed */
     MRP_LUA_CLASS_NOINIT     = 0x08,     /* don't auto-initialize member */
     MRP_LUA_CLASS_NOOVERRIDE = 0x10,     /* don't override setters, getters */
+    MRP_LUA_CLASS_PRIVREFS   = 0x20,     /* private references */
 } mrp_lua_class_flag_t;
 
 

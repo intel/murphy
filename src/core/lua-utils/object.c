@@ -49,11 +49,10 @@ struct userdata_s {
     userdata_t *self;
     mrp_lua_classdef_t *def;
     int  luatbl;
-    int  refcnt;
-    bool dead;
-    int  reftbl;
-    int  exttbl;
-    int  initializing : 1;
+    int  reftbl;                          /* table of private references */
+    int  exttbl;                          /* table of object extensions */
+    int  dead : 1;                        /* being cleaed up */
+    int  initializing : 1;                /* being initialized */
 };
 
 static bool valid_id(const char *);
@@ -71,6 +70,7 @@ static void invalid_destructor(void *data);
 
 static mrp_lua_classdef_t **classdefs;
 static int                  nclassdef;
+static int                  reftbl = LUA_NOREF;
 
 static mrp_lua_classdef_t invalid_classdef = {
     .class_name    = "<invalid class>",
@@ -298,6 +298,18 @@ mrp_lua_type_t mrp_lua_class_type(const char *type_name)
 }
 
 
+static inline userdata_t *get_userdata(void *o)
+{
+    return (o != NULL ? (((userdata_t *)o) - 1) : NULL);
+}
+
+
+static inline void *get_object(userdata_t *u)
+{
+    return (u != NULL ? (void *)(u + 1) : NULL);
+}
+
+
 void *mrp_lua_create_object(lua_State          *L,
                             mrp_lua_classdef_t *def,
                             const char         *name,
@@ -341,7 +353,6 @@ void *mrp_lua_create_object(lua_State          *L,
     userdata->self   = userdata;
     userdata->def    = def;
     userdata->luatbl = luaL_ref(L, LUA_REGISTRYINDEX);
-    userdata->refcnt = 1;
 
     if (name) {
         lua_pushstring(L, name);
@@ -1066,8 +1077,17 @@ static int seterr(lua_State *L, char *e, size_t size, const char *format, ...)
 
 static void object_create_reftbl(userdata_t *u, lua_State *L)
 {
-    lua_newtable(L);
-    u->reftbl = luaL_ref(L, LUA_REGISTRYINDEX);
+    if (u->def->flags & MRP_LUA_CLASS_PRIVREFS) {
+        lua_newtable(L);
+        u->reftbl = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+    else {
+        if (reftbl == LUA_NOREF) {
+            lua_newtable(L);
+            reftbl = luaL_ref(L, LUA_REGISTRYINDEX);
+        }
+        u->reftbl = reftbl;
+    }
 }
 
 
@@ -1075,7 +1095,7 @@ static void object_delete_reftbl(userdata_t *u, lua_State *L)
 {
     int tidx;
 
-    if (u->reftbl == LUA_NOREF)
+    if (u->reftbl == LUA_NOREF || u->reftbl == reftbl)
         return;
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, u->reftbl);
@@ -1095,15 +1115,25 @@ static void object_delete_reftbl(userdata_t *u, lua_State *L)
 }
 
 
+static inline int get_reftbl(userdata_t *u)
+{
+    return (u != NULL ? u->reftbl : reftbl);
+}
+
+
 int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
 {
-    userdata_t *u = (userdata_t *)data - 1;
-    int         ref;
+    int tbl = get_reftbl(get_userdata(data));
+    int ref;
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->reftbl);
-    lua_pushvalue(L, idx > 0 ? idx : idx - 1);
-    ref = luaL_ref(L, -2);
-    lua_pop(L, 1);
+    if (tbl != LUA_NOREF) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
+        lua_pushvalue(L, idx > 0 ? idx : idx - 1);
+        ref = luaL_ref(L, -2);
+        lua_pop(L, 1);
+    }
+    else
+        ref = LUA_NOREF;
 
     return ref;
 }
@@ -1111,23 +1141,29 @@ int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
 
 void mrp_lua_object_unref_value(void *data, lua_State *L, int ref)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    int tbl;
 
     if (ref != LUA_NOREF && ref != LUA_REFNIL) {
-        lua_rawgeti(L, LUA_REGISTRYINDEX, u->reftbl);
-        luaL_unref(L, -1, ref);
-        lua_pop(L, 1);
+        tbl = get_reftbl(get_userdata(data));
+
+        if (tbl != LUA_NOREF) {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
+            luaL_unref(L, -1, ref);
+            lua_pop(L, 1);
+        }
     }
 }
 
 
 int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
 {
-    userdata_t *u = (userdata_t *)data - 1;
+    int tbl;
 
     if (ref != LUA_NOREF) {
-        if (ref != LUA_REFNIL) {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, u->reftbl);
+        tbl = get_reftbl(get_userdata(data));
+
+        if (ref != LUA_REFNIL && tbl != LUA_NOREF) {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
             lua_rawgeti(L, -1, ref);
             lua_remove(L, -2);
         }
@@ -1148,14 +1184,17 @@ int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
 
 int mrp_lua_object_getref(void *owner, void *data, lua_State *L, int ref)
 {
-    userdata_t *uo = (userdata_t *)owner - 1;
-    userdata_t *ud = (userdata_t *)data  - 1;
+    int otbl, dtbl;
 
     if (ref == LUA_NOREF || ref == LUA_REFNIL)
         return ref;
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, uo->reftbl);
-    lua_rawgeti(L, LUA_REGISTRYINDEX, ud->reftbl);
+    if ((otbl = get_reftbl(get_userdata(owner))) == LUA_NOREF ||
+        (dtbl = get_reftbl(get_userdata(data)))  == LUA_NOREF)
+        return LUA_NOREF;
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, otbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, dtbl);
     lua_rawgeti(L, -2, ref);
     ref = luaL_ref(L, -2);
     lua_pop(L, 2);
