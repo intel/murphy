@@ -39,6 +39,9 @@ int  mrp_json_lua_create(lua_State *L);
 /** Create a Lua JSON object, wrap the given JSON object, increase refcount. */
 void *mrp_json_lua_wrap(lua_State *L, mrp_json_t *json);
 
+/** Get and add a reference to a wrapped JSON object. */
+mrp_json_t *mrp_json_lua_unwrap(void *lson);
+
 /** Wrap the given JSON object, increase refcount and push it on the stack. */
 int mrp_json_lua_push(lua_State *L, mrp_json_t *json);
 

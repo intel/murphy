@@ -161,6 +161,15 @@ mrp_json_t *mrp_json_lua_get(lua_State *L, int idx)
 }
 
 
+mrp_json_t *mrp_json_lua_unwrap(void *lson)
+{
+    if (mrp_lua_pointer_of_type(lson, MRP_LUA_TYPE_ID(JSON_LUA_CLASS)))
+        return mrp_json_ref(((json_lua_t *)lson)->json);
+    else
+        return NULL;
+}
+
+
 static void json_lua_destroy(void *data)
 {
     json_lua_t *lson = (json_lua_t *)data;
