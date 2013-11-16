@@ -93,11 +93,10 @@ typedef enum {
     SIGHANDLER_MEMBER_ONESHOT,
 } sighandler_member_t;
 
-MRP_LUA_CLASS_DEF_MEMBERS(sighandler, lua, sighandler_lua_t,
-                          sighandler_lua_destroy, sighandler_lua_methods,
-                          sighandler_lua_overrides, sighandler_lua_members,
-                          NULL, sighandler_lua_changed,
-                          MRP_LUA_CLASS_EXTENSIBLE);
+MRP_LUA_DEFINE_CLASS(sighandler, lua, sighandler_lua_t, sighandler_lua_destroy,
+                     sighandler_lua_methods, sighandler_lua_overrides,
+                     sighandler_lua_members, NULL, sighandler_lua_changed,
+                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 
 static void sighandler_lua_cb(mrp_sighandler_t *hlr, int sig, void *user_data)

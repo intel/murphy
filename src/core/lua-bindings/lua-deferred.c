@@ -37,8 +37,8 @@
 #include <murphy/common/log.h>
 #include <murphy/common/mm.h>
 #include <murphy/common/mainloop.h>
+#include <murphy/core/lua-utils/error.h>
 #include <murphy/core/lua-utils/object.h>
-#include <murphy/core/lua-utils/funcbridge.h>
 #include <murphy/core/lua-bindings/murphy.h>
 
 #define DEFERRED_LUA_CLASS MRP_LUA_CLASS(deferred, lua)
@@ -62,22 +62,21 @@ static void deferred_lua_destroy(void *data);
 static int deferred_lua_stringify(lua_State *L);
 static void deferred_lua_changed(void *data, lua_State *L, int member);
 
-
 /*
  * Lua deferred class
  */
 
-#define OFFS(m) MRP_OFFSET(deferred_lua_t, m)
-#define RDONLY  MRP_LUA_CLASS_READONLY
-#define NOTIFY  MRP_LUA_CLASS_NOTIFY
-#define NOFLAGS MRP_LUA_CLASS_NOFLAGS
+#define OFFS(m)  MRP_OFFSET(deferred_lua_t, m)
+#define RDONLY   MRP_LUA_CLASS_READONLY
+#define NOTIFY   MRP_LUA_CLASS_NOTIFY
+#define NOFLAGS  MRP_LUA_CLASS_NOFLAGS
+#define USESTACK MRP_LUA_CLASS_USESTACK
 
 MRP_LUA_METHOD_LIST_TABLE(deferred_lua_methods,
                           MRP_LUA_METHOD_CONSTRUCTOR(deferred_lua_create));
 
 MRP_LUA_METHOD_LIST_TABLE(deferred_lua_overrides,
-                          MRP_LUA_OVERRIDE_CALL     (deferred_lua_create)
-                          MRP_LUA_OVERRIDE_STRINGIFY(deferred_lua_stringify));
+                          MRP_LUA_OVERRIDE_CALL     (deferred_lua_create));
 
 MRP_LUA_MEMBER_LIST_TABLE(deferred_lua_members,
     MRP_LUA_CLASS_LFUNC  ("callback" , OFFS(callback) , NULL, NULL, NOTIFY )
@@ -92,10 +91,10 @@ typedef enum {
     DEFERRED_MEMBER_ONESHOT,
 } deferred_member_t;
 
-MRP_LUA_CLASS_DEF_MEMBERS(deferred, lua, deferred_lua_t, deferred_lua_destroy,
-                          deferred_lua_methods, deferred_lua_overrides,
-                          deferred_lua_members, NULL, deferred_lua_changed,
-                          MRP_LUA_CLASS_EXTENSIBLE);
+MRP_LUA_DEFINE_CLASS(deferred, lua, deferred_lua_t, deferred_lua_destroy,
+                     deferred_lua_methods, deferred_lua_overrides,
+                     deferred_lua_members, NULL, deferred_lua_changed,
+                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 
 static void deferred_lua_cb(mrp_deferred_t *deferred, void *user_data)

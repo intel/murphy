@@ -139,11 +139,10 @@ typedef enum {
 } transport_member_t;
 
 
-MRP_LUA_CLASS_DEF_MEMBERS(transport, lua, transport_lua_t,
-                          transport_lua_destroy, transport_lua_methods,
-                          transport_lua_overrides, transport_lua_members,
-                          NULL, transport_lua_changed,
-                          MRP_LUA_CLASS_EXTENSIBLE);
+MRP_LUA_DEFINE_CLASS(transport, lua, transport_lua_t, transport_lua_destroy,
+                     transport_lua_methods, transport_lua_overrides,
+                     transport_lua_members, NULL, transport_lua_changed,
+                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 MRP_LUA_CLASS_CHECKER(transport_lua_t, transport_lua, TRANSPORT_LUA_CLASS);
 

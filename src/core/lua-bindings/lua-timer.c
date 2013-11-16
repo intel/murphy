@@ -95,10 +95,10 @@ typedef enum {
     TIMER_MEMBER_ONESHOT
 } timer_member_t;
 
-MRP_LUA_CLASS_DEF_MEMBERS(timer, lua, timer_lua_t, timer_lua_destroy,
-                          timer_lua_methods, timer_lua_overrides,
-                          timer_lua_members, NULL, timer_lua_changed,
-                          MRP_LUA_CLASS_EXTENSIBLE);
+MRP_LUA_DEFINE_CLASS(timer, lua, timer_lua_t, timer_lua_destroy,
+                     timer_lua_methods, timer_lua_overrides,
+                     timer_lua_members, NULL, timer_lua_changed,
+                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 
 static void timer_lua_cb(mrp_timer_t *timer, void *user_data)
