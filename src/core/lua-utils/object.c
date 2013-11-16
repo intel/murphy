@@ -47,6 +47,8 @@
 #define CHECK    true                    /* do type/self-checking */
 #define NOCHECK (!CHECK)                 /* omit type/self-checking */
 
+#define CLASS_BRIDGE_METATABLE  "LuaBook.class_autobridge"
+
 typedef struct userdata_s userdata_t;
 
 struct userdata_s {
@@ -68,6 +70,8 @@ static void object_create_exttbl(userdata_t *u, lua_State *L);
 static void object_delete_exttbl(userdata_t *u, lua_State *L);
 static int  override_setfield(lua_State *L);
 static int  override_getfield(lua_State *L);
+static int override_tostring(lua_State *L);
+static int  object_setup_bridges(userdata_t *u, lua_State *L);
 
 static void invalid_destructor(void *data);
 
@@ -126,6 +130,12 @@ static inline void *userdata_getself(userdata_t *u)
 }
 
 
+static inline bool valid_userdata(userdata_t *u)
+{
+    return (userdata_getself(u) == u);
+}
+
+
 static inline userdata_t *userdata_get(void *data, bool check)
 {
     userdata_t *u;
@@ -169,6 +179,10 @@ int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
     lua_settable(L, -3);        /* metatable.__index = metatable */
     lua_pushcfunction(L, userdata_destructor);
     lua_setfield(L, -2, "__gc");
+
+    lua_pushcfunction(L, override_tostring);
+    lua_setfield(L, -2, "__tostring");
+
     lua_pop(L, 1);
 
     /* define pre-declared members */
@@ -180,12 +194,13 @@ int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
         mrp_lua_class_notify_t   notify   = def->notify;
         int                      flags    = def->flags;
 
-        def->members  = NULL;
-        def->nmember  = 0;
+        def->members = NULL;
+        def->nmember = 0;
         def->natives = NULL;
         def->nnative = 0;
-        def->notify   = NULL;
-        def->flags    = 0;
+        def->notify  = NULL;
+        def->flags   = 0;
+        def->brmeta  = LUA_NOREF;
 
         if (mrp_lua_declare_members(def, flags, members, nmember,
                                     natives, nnative, notify) != 0) {
@@ -428,6 +443,11 @@ void *mrp_lua_create_object(lua_State          *L,
     object_create_reftbl(userdata, L);
     if (def->flags & MRP_LUA_CLASS_EXTENSIBLE)
         object_create_exttbl(userdata, L);
+
+    if (object_setup_bridges(userdata, L) < 0) {
+        luaL_error(L, "Failed to set up bridged methods.");
+        return NULL;                     /* not reached */
+    }
 
     return USER_TO_DATA(userdata);
 }
@@ -929,8 +949,9 @@ static int default_getter(void *data, lua_State *L, int member,
 static int patch_overrides(mrp_lua_classdef_t *def)
 {
     luaL_reg set = { NULL, NULL }, get = { NULL, NULL }, *r, *overrides;
-    int      i, n, extra;
+    int      i, n, extra, tostring;
 
+    tostring = 0;
     for (n = 0, r = def->overrides; r->name != NULL; r++, n++) {
         if (!strcmp(r->name, "__newindex")) {
             if (set.name != NULL) {
@@ -963,16 +984,21 @@ static int patch_overrides(mrp_lua_classdef_t *def)
             r->func = override_getfield;
             continue;
         }
+
+        if (!strcmp(r->name, "__tostring")) {
+            tostring = 1;
+            continue;
+        }
     }
 
-    if (set.func && get.func) {
+    if (set.func && get.func && tostring) {
         def->setfield = set.func;
         def->getfield = get.func;
 
         return 0;
     }
 
-    extra = (set.func ? 0 : 1) + (get.func ? 0 : 1);
+    extra = (set.func ? 0 : 1) + (get.func ? 0 : 1) + (tostring ? 0 : 1);
 
     /* XXX TODO: currently this is leaked if/when a classdef is destroyed */
     if ((overrides = mrp_allocz_array(typeof(*overrides), n+1 + extra)) == NULL)
@@ -992,6 +1018,13 @@ static int patch_overrides(mrp_lua_classdef_t *def)
     if (get.func == NULL) {
         overrides[i].name = "__index";
         overrides[i].func = override_getfield;
+        i++;
+    }
+
+    if (!tostring) {
+        printf("*** overriding __tostring for %s\n", def->class_name);
+        overrides[i].name = "__tostring";
+        overrides[i].func = override_tostring;
         i++;
     }
 
@@ -1100,6 +1133,28 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
 }
 
 
+static int object_setup_bridges(userdata_t *u, lua_State *L)
+{
+    mrp_lua_classdef_t     *def = u->def;
+    mrp_lua_class_bridge_t *b;
+    int                     i;
+
+    for (i = 0, b = def->bridges; i < def->nbridge; i++, b++) {
+        b->fb = mrp_funcbridge_create_cfunc(L, b->name, b->signature, b->fc,
+                                            USER_TO_DATA(u));
+
+        if (b->fb == NULL)
+            return -1;
+
+        b->fb->autobridge = true;
+        b->fb->usestack   = b->flags & MRP_LUA_CLASS_USESTACK ? true : false;
+
+    }
+
+    return 0;
+}
+
+
 static int class_member(userdata_t *u, lua_State *L, int index)
 {
     mrp_lua_class_member_t *members = u->def->members;
@@ -1116,6 +1171,29 @@ static int class_member(userdata_t *u, lua_State *L, int index)
     for (i = 0, m = members; i < nmember; i++, m++)
         if (!strcmp(m->name, name))
             return i;
+
+    return -1;
+}
+
+
+static int class_bridge(userdata_t *u, lua_State *L, int index)
+{
+    mrp_lua_class_bridge_t *bridges, *b;
+    int                     nbridge;
+    const char             *name;
+    int                     bidx;
+
+    if ((bridges = u->def->bridges) == NULL || (nbridge = u->def->nbridge) == 0)
+        return -1;
+
+    if (lua_type(L, index) != LUA_TSTRING)
+        return -1;
+
+    name = lua_tostring(L, index);
+
+    for (bidx = 0, b = bridges; bidx < nbridge; bidx++, b++)
+        if (!strcmp(b->name, name))
+            return bidx;
 
     return -1;
 }
@@ -1408,17 +1486,20 @@ static inline const char *array_type_name(int type)
 
 
 int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
-                                 size_t *nitemp, int expected, int dup,
+                                 size_t *nitemp, int *expectedp, int dup,
                                  char *e, size_t esize)
 {
     const char *name, *str;
-    int         ktype, vtype, ltype, i;
+    int         ktype, vtype, ltype, i, expected, popnil;
     size_t      max, idx, isize;
     void       *items;
 
     max   = *nitemp;
     tidx  = mrp_lua_absidx(L, tidx);
     items = *itemsp;
+
+    expected = *expectedp;
+    popnil   = false;
 
     if (expected != MRP_LUA_ANY) {
         ltype = array_lua_type(expected);
@@ -1429,6 +1510,7 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
     }
 
     lua_pushnil(L);
+    popnil = true;
     MRP_LUA_FOREACH_ALL(L, i, tidx, ktype, name, idx) {
         vtype = lua_type(L, -1);
 
@@ -1444,6 +1526,9 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
 
             if (!expected)
                 goto type_error;
+
+            if (expected == MRP_LUA_INTEGER_ARRAY)
+                expected = MRP_LUA_DOUBLE_ARRAY;        /* safer for ANY */
 
             ltype = array_lua_type(expected);
             isize = array_item_size(expected);
@@ -1483,15 +1568,18 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
             goto type_error;
         }
     }
+    lua_pop(L, 1);
 
-    *itemsp = items;
-    *nitemp = i;
+    *itemsp    = items;
+    *nitemp    = i;
+    *expectedp = expected;
 
     return 0;
 
 
 #define CLEANUP() do {                                                  \
         mrp_lua_object_free_array(itemsp, nitemp, expected);            \
+        if (popnil) lua_pop(L, 1);                                      \
     } while (0)
 
  type_error:
@@ -1698,7 +1786,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
         items = NULL;
         nitem = (size_t)-1;
         etype = m->type;
-        if (mrp_lua_object_collect_array(L, -1, &items, &nitem, etype, true,
+        if (mrp_lua_object_collect_array(L, -1, &items, &nitem, &etype, true,
                                          err, esize) < 0)
             return -1;
         else {
@@ -1761,16 +1849,24 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
 {
     userdata_t             *u = DATA_TO_USER(data);
-    int                     midx = class_member(u, L, -1);
     mrp_lua_class_member_t *m;
+    mrp_lua_class_bridge_t *b;
+    int                     midx, bidx;
     mrp_lua_value_t         v;
     void                  **items;
     size_t                 *nitem;
 
-    if (midx < 0)
-        goto notfound;
+    if ((midx = class_member(u, L, -1)) >= 0)
+        m = u->def->members + midx;
+    else {
+        if ((bidx = class_bridge(u, L, -1)) >= 0) {
+            b = u->def->bridges + bidx;
 
-    m = u->def->members + midx;
+            return mrp_funcbridge_push(L, b->fb);
+        }
+
+        goto notfound;
+    }
 
     if (m->getter(data, L, midx, &v) != 1)
         goto error;
@@ -2013,6 +2109,24 @@ static int override_getfield(lua_State *L)
 
  out:
     lua_remove(L, -2);
+
+    return 1;
+}
+
+
+static int override_tostring(lua_State *L)
+{
+    void       *data;
+    userdata_t *u;
+    char        str[1024];
+
+    data = mrp_lua_check_object(L, NULL, 1);
+    u    = DATA_TO_USER(data);
+
+    snprintf(str, sizeof(str), "<object %s(%s)>@%p(%p)",
+             u->def->class_id, u->def->type_name, data, u);
+
+    lua_pushstring(L, str);
 
     return 1;
 }

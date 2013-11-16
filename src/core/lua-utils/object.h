@@ -176,15 +176,16 @@ typedef int  (*mrp_lua_getter_t)(void *data, lua_State *L, int member,
  */
 
 typedef enum {
-    MRP_LUA_CLASS_NOFLAGS    = 0x00,     /* empty flags */
-    MRP_LUA_CLASS_EXTENSIBLE = 0x01,     /* class is user-extensible from Lua */
-    MRP_LUA_CLASS_READONLY   = 0x02,     /* class or member is readonly */
-    MRP_LUA_CLASS_NOTIFY     = 0x04,     /* notify when member is changed */
-    MRP_LUA_CLASS_NOINIT     = 0x08,     /* don't initialize member */
-    MRP_LUA_CLASS_NOOVERRIDE = 0x10,     /* don't override setters, getters */
-    MRP_LUA_CLASS_PRIVREFS   = 0x20,     /* private references */
-    MRP_LUA_CLASS_RAWGETTER  = 0x40,     /* getter pushes to the stack */
-    MRP_LUA_CLASS_RAWSETTER  = 0x80,     /* setter takes args from the stack */
+    MRP_LUA_CLASS_NOFLAGS    = 0x000,    /* empty flags */
+    MRP_LUA_CLASS_EXTENSIBLE = 0x001,    /* class is user-extensible from Lua */
+    MRP_LUA_CLASS_READONLY   = 0x002,    /* class or member is readonly */
+    MRP_LUA_CLASS_NOTIFY     = 0x004,    /* notify when member is changed */
+    MRP_LUA_CLASS_NOINIT     = 0x008,    /* don't initialize member */
+    MRP_LUA_CLASS_NOOVERRIDE = 0x010,    /* don't override setters, getters */
+    MRP_LUA_CLASS_PRIVREFS   = 0x020,    /* private references */
+    MRP_LUA_CLASS_RAWGETTER  = 0x040,    /* getter pushes to the stack */
+    MRP_LUA_CLASS_RAWSETTER  = 0x080,    /* setter takes args from the stack */
+    MRP_LUA_CLASS_USESTACK   = 0x100,    /* autobridged method uses the stack */
 } mrp_lua_class_flag_t;
 
 /*
@@ -352,6 +353,31 @@ struct mrp_lua_class_member_s {
  * extended members and keep manual classes strictly as such.
  */
 
+#define MRP_LUA_CLASS_DEF_FULL(_name, _constr, _type, _destr, _methods,       \
+                               _overrides, _members, _natives,                \
+                               _notify, _bridges, _flags)                     \
+    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
+        .class_name    = MRP_LUA_CLASS_NAME(_name),                           \
+        .class_id      = MRP_LUA_CLASS_ID(_name, _constr),                    \
+        .constructor   = # _name "." # _constr,                               \
+        .destructor    = _destr,                                              \
+        .type_name     = #_type,                                              \
+        .type_id       = -1,                                                  \
+        .userdata_id   = MRP_LUA_UDATA_ID(_name, _constr),                    \
+        .userdata_size = sizeof(_type),                                       \
+        .methods       = _methods,                                            \
+        .overrides     = _overrides,                                          \
+        .members       = _members,                                            \
+        .nmember       = _members == NULL ? 0 : MRP_ARRAY_SIZE(_members),     \
+        .natives       = _natives,                                            \
+        .nnative       = _natives == NULL ? 0 : MRP_ARRAY_SIZE(_natives),     \
+        .bridges       = _bridges,                                            \
+        .nbridge       = _bridges == NULL ? 0 : MRP_ARRAY_SIZE(_bridges),     \
+        .notify        = _notify,                                             \
+        .flags         = _flags,                                              \
+    }
+
+
 #define MRP_LUA_CLASS_DEF_MEMBERS(_name, _constr, _type, _destr, _methods,    \
                                   _overrides, _members, _natives,             \
                                   _notify, _flags)                            \
@@ -450,6 +476,37 @@ struct mrp_lua_class_member_s {
             .type_name = #_type,                                        \
             .type_id = -1        },
 
+
+#include "murphy/core/lua-utils/funcbridge.h"
+
+/*
+ * a bridged class method descriptor
+ */
+
+typedef struct {
+    char                   *name;        /* function name */
+    const char             *signature;   /* function signature */
+    union {
+        mrp_funcbridge_cfunc_t  fc;      /* C function to bridge to */
+        mrp_funcbridge_t       *fb;      /* function bridge */
+    };
+    int                     flags;       /* method flags */
+} mrp_lua_class_bridge_t;
+
+
+/** Macro to declare the list of bridged class methods. */
+#define MRP_LUA_BRIDGE_LIST_TABLE(_name, ...) \
+    static mrp_lua_class_bridge_t _name[] = { __VA_ARGS__ }
+
+#define MRP_LUA_CLASS_BRIDGE(_method, _sig, _fn, _flags)                \
+    {                                                                   \
+        .name      = _method,                                           \
+        .signature = _sig,                                              \
+        .fc        = _fn,                                               \
+        .flags     = _flags,                                            \
+    }
+
+
 #define MRP_LUA_CLASS_CHECKER(_type, _prefix, _class)                  \
     static _type *_prefix##_check(lua_State *L, int idx)               \
     {                                                                  \
@@ -481,6 +538,9 @@ struct mrp_lua_classdef_s {
     int                      nmember;    /* number of pre-declared members */
     char                   **natives;    /* 'native' member names */
     int                      nnative;    /* number of native member names */
+    mrp_lua_class_bridge_t  *bridges;    /* bridged methods */
+    int                      nbridge;    /* number of bridged methods */
+    int                      brmeta;     /* reference to bridging metatable */
     mrp_lua_class_flag_t     flags;      /* class member flags */
     mrp_lua_class_notify_t   notify;     /* member change notify callback */
     lua_CFunction            setfield;   /* overridden setfield, if any */
@@ -531,7 +591,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
                          char *err, size_t esize);
 /** Attempt to an array at tidx of expected type, with *nitemp max items. */
 int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
-                                 size_t *nitemp, int expected, int dup,
+                                 size_t *nitemp, int *expected, int dup,
                                  char *e, size_t esize);
 /** Free an array duplicated by mrp_lua_object_collect_array. */
 void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type);
@@ -539,6 +599,8 @@ void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type);
 mrp_lua_type_t mrp_lua_class_name_type(const char *class_name);
 /** Get the class type id for the given class id. */
 mrp_lua_type_t mrp_lua_class_id_type(const char *class_id);
+/** Get the class type id for the given type name. */
+mrp_lua_type_t mrp_lua_class_type(const char *type_name);
 /** Check if the object at the given stack index is of the given type. */
 int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type);
 /** Check if the given (known to be murphy Lua) object is of given type. */
