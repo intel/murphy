@@ -32,6 +32,12 @@
 
 #include <lua.h>
 
+#include "murphy/common/debug.h"
+
+/*
+ * basic error handling
+ */
+
 /** Macro to declare an error buffer for mrp_lua_{error, throw}. */
 #define MRP_LUA_ERRBUF(...)                                             \
     size_t _ela[] = { 256, __VA_ARGS__ };                               \
@@ -63,5 +69,53 @@
 
 /** The low-level error formatting/throwing/printing routine. */
 int mrp_lua_set_error(lua_State *L, char *errbuf, size_t size, ...);
+
+
+/*
+ * debugging
+ */
+
+/** Workhorse macro to produce stack dumps */
+#define __mrp_lua_stackdump(_fl, _ln, _fn, _L, _fmt, _args...) do {         \
+    int _i, _depth, _t;                                                     \
+                                                                            \
+    if (_fmt && *_fmt)                                                      \
+        mrp_debug_at(_fl, _ln, _fn, _fmt, ## _args);                        \
+                                                                            \
+    if ((_depth = lua_gettop(_L)) > 0)                                      \
+        mrp_debug_at(_fl, _ln, _fn, "   Lua stack (depth: %d)", _depth);    \
+    else                                                                    \
+        mrp_debug_at(_fl, _ln, _fn, "   Lua stack: empty");                 \
+                                                                            \
+    for (_i = -1; _i > -1 - _depth; _i--) {                                 \
+        switch ((_t = lua_type(_L, _i))) {                                  \
+        case LUA_TSTRING:                                                   \
+            mrp_debug_at(_fl, _ln, _fn, "      [#%d:'%s']", _i,             \
+                         lua_tostring(_L, _i));                             \
+            break;                                                          \
+        case LUA_TNUMBER:                                                   \
+            if (((int)lua_tointeger(_L,_i) == (double)lua_tonumber(_L,_i))) \
+                mrp_debug_at(_fl, _ln, _fn, "      [#%d: %d]", _i,          \
+                          (int)lua_tointeger(_L, _i));                      \
+            else                                                            \
+                mrp_debug_at(_fl, _ln, _fn, "      [#%d: %f]", _i,          \
+                          (double)lua_tonumber(_L, _i));                    \
+            break;                                                          \
+        case LUA_TTABLE:                                                    \
+            mrp_debug_at(_fl, _ln, _fn, "      [#%d: {%p}]", _i,            \
+                         lua_topointer(_L, _i));                            \
+            break;                                                          \
+        default:                                                            \
+            mrp_debug_at(_fl, _ln, _fn, "      [#%d: %s]", _i,              \
+                         lua_typename(_L, _t));                             \
+        }                                                                   \
+    }                                                                       \
+} while (0)
+
+
+/** Macro to produce a simple debug dump of the Lua stack. */
+#define mrp_lua_stackdump(L, fmt, args...) \
+    __mrp_lua_stackdump(__FILE__, __LINE__, __FUNCTION__, L, fmt, ## args)
+
 
 #endif /* __MURPHY_LUA_ERROR_H__ */
