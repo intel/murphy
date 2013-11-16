@@ -60,6 +60,25 @@ MRP_CDECL_BEGIN
             mrp_debug_msg(__site, __LOC__, fmt, ## args);                 \
     } while (0)
 
+
+/** mrp_debug varian with explicitly passed site info. */
+#define mrp_debug_at(_file, _line, _func, fmt, args...)        do {       \
+        static const char *__site =                                       \
+            MRP_DEBUG_SITE(_file, _line, _func);                          \
+        static int __site_stamp = -1;                                     \
+        static int __site_enabled;                                        \
+                                                                          \
+        if (MRP_UNLIKELY(__site_stamp != mrp_debug_stamp)) {              \
+            __site_enabled = mrp_debug_check(__FUNCTION__,                \
+                                             __FILE__, __LINE__);         \
+            __site_stamp   = mrp_debug_stamp;                             \
+        }                                                                 \
+                                                                          \
+        if (MRP_UNLIKELY(__site_enabled))                                 \
+            mrp_debug_msg(__site, _file, _line, _func, fmt, ## args);     \
+    } while (0)
+
+
 /** Global debug configuration stamp, exported for minimum-overhead checking. */
 extern int mrp_debug_stamp;
 
