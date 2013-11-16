@@ -41,25 +41,26 @@
 #include <murphy/common/debug.h>
 #include <murphy/common/log.h>
 #include <murphy/common/mm.h>
+
 #include <murphy/core/lua-utils/object.h>
 
 #undef  __MURPHY_MANGLE_CLASS_SELF__     /* extra self-mangling if defined */
 #define CHECK    true                    /* do type/self-checking */
 #define NOCHECK (!CHECK)                 /* omit type/self-checking */
 
-#define CLASS_BRIDGE_METATABLE  "LuaBook.class_autobridge"
+/**
+ * Metadata we use to administer objects allocated via us.
+ */
+typedef struct {
+    void *selfish;                       /* verification pointer(ish) to us */
+    mrp_lua_classdef_t *def;             /* class definition for this object */
+    int  luatbl;                         /* lua table */
+    int  reftbl;                         /* table of private references */
+    int  exttbl;                         /* table of object extensions */
+    int  dead : 1;                       /* being cleaned up */
+    int  initializing : 1;               /* being initialized */
+} userdata_t;
 
-typedef struct userdata_s userdata_t;
-
-struct userdata_s {
-    userdata_t *selfish;
-    mrp_lua_classdef_t *def;
-    int  luatbl;
-    int  reftbl;                          /* table of private references */
-    int  exttbl;                          /* table of object extensions */
-    int  dead : 1;                        /* being cleaned up */
-    int  initializing : 1;                /* being initialized */
-};
 
 static bool valid_id(const char *);
 static int  userdata_destructor(lua_State *);
@@ -75,10 +76,10 @@ static int  object_setup_bridges(userdata_t *u, lua_State *L);
 
 static void invalid_destructor(void *data);
 
-static mrp_lua_classdef_t **classdefs;
-static int                  nclassdef;
-static int                  reftbl = LUA_NOREF;
 
+/**
+ * A static non-NULL class definition we return for failed lookups.
+ */
 static mrp_lua_classdef_t invalid_classdef = {
     .class_name    = "<invalid class>",
     .class_id      = "<invalid class-id>",
@@ -99,9 +100,24 @@ static mrp_lua_classdef_t invalid_classdef = {
 }, *invalid_class = &invalid_classdef;
 
 
+/**
+ * indirect table to look up classdefs by type_ids
+ */
+static mrp_lua_classdef_t **classdefs;
+static int                  nclassdef;
+
+/** Our (reference to our) shared table for storing references within object. */
+static int reftbl = LUA_NOREF;
+
+
+/**
+ * Macros to convert between userdata and user-visible data addresses.
+ */
 #define USER_TO_DATA(u) ((void *)(((userdata_t *)(u)) + 1))
 #define DATA_TO_USER(d) (((userdata_t *)(d)) - 1)
 
+
+/** Encode our self(ish) pointer. */
 static inline void userdata_setself(userdata_t *u)
 {
 #ifdef __MURPHY_MANGLE_CLASS_SELF__
@@ -113,7 +129,7 @@ static inline void userdata_setself(userdata_t *u)
 #endif
 }
 
-
+/** Decode our self(ish) pointer, return NULL if the most basic check fails. */
 static inline void *userdata_getself(userdata_t *u)
 {
 #ifdef __MURPHY_MANGLE_CLASS_SELF__
@@ -129,13 +145,13 @@ static inline void *userdata_getself(userdata_t *u)
         return NULL;
 }
 
-
+/** Check if the give pointer appears to point to a valid userdata. */
 static inline bool valid_userdata(userdata_t *u)
 {
     return (userdata_getself(u) == u);
 }
 
-
+/** Obtain userdata for a data pointer, optionally checking basic validity. */
 static inline userdata_t *userdata_get(void *data, bool check)
 {
     userdata_t *u;
@@ -150,7 +166,7 @@ static inline userdata_t *userdata_get(void *data, bool check)
     return NULL;
 }
 
-
+/** Obtain data for a userdata pointer, optionally checking for validity. */
 static inline void *object_get(userdata_t *u, bool check)
 {
     if (u != NULL) {
@@ -162,6 +178,7 @@ static inline void *object_get(userdata_t *u, bool check)
 }
 
 
+/** Create and register a new object class definition. */
 int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 {
     if (def->constructor == NULL) {
@@ -241,6 +258,7 @@ int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 }
 
 
+/** Traverse a dott global name and push the table it resolves to, or nil. */
 void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
 {
     const char *p;
@@ -363,29 +381,27 @@ static mrp_lua_classdef_t *class_by_userdata_id(const char *userdata_id)
     return invalid_class;
 }
 
-
+/** Get the type_id for the given class name. */
 mrp_lua_type_t mrp_lua_class_name_type(const char *class_name)
 {
     return class_by_class_name(class_name)->type_id;
 }
 
-
+/** Get the type_id for the given class id. */
 mrp_lua_type_t mrp_lua_class_id_type(const char *class_id)
 {
     return class_by_class_id(class_id)->type_id;
 }
 
-
+/** Get the type_id for the given class type name. */
 mrp_lua_type_t mrp_lua_class_type(const char *type_name)
 {
     return class_by_type_name(type_name)->type_id;
 }
 
-
-void *mrp_lua_create_object(lua_State          *L,
-                            mrp_lua_classdef_t *def,
-                            const char         *name,
-                            int                 idx)
+/** Create a new object, optionally assign it to a class table name or index. */
+void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
+                            const char *name, int idx)
 {
     int class = 0;
     size_t size;
@@ -453,9 +469,9 @@ void *mrp_lua_create_object(lua_State          *L,
 }
 
 
-void mrp_lua_set_object_name(lua_State          *L,
-                             mrp_lua_classdef_t *def,
-                             const char         *name)
+/** Set the name of the object @-1 to the given name in the class table. */
+void mrp_lua_set_object_name(lua_State *L, mrp_lua_classdef_t *def,
+                             const char *name)
 {
     if (valid_id(name)) {
         mrp_lua_get_class_table(L, def);
@@ -469,9 +485,8 @@ void mrp_lua_set_object_name(lua_State          *L,
     }
 }
 
-void mrp_lua_set_object_index(lua_State          *L,
-                              mrp_lua_classdef_t *def,
-                              int                 idx)
+/** Assign the object @-1 to the given index in the class table. */
+void mrp_lua_set_object_index(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
     mrp_lua_get_class_table(L, def);
     luaL_checktype(L, -1, LUA_TTABLE);
@@ -483,7 +498,8 @@ void mrp_lua_set_object_index(lua_State          *L,
     lua_pop(L, 1);
 }
 
-void mrp_lua_destroy_object(lua_State *L, const char *name,int idx, void *data)
+/** Trigger (potential) destruction of the given object. */
+void mrp_lua_destroy_object(lua_State *L, const char *name, int idx, void *data)
 {
     userdata_t *userdata = userdata_get(data, CHECK);
     mrp_lua_classdef_t *def;
@@ -524,7 +540,8 @@ void mrp_lua_destroy_object(lua_State *L, const char *name,int idx, void *data)
     }
 }
 
-int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def,const char *name)
+/** Find the object corresponding to the given name in the class table. */
+int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def, const char *name)
 {
     if (!name)
         lua_pushnil(L);
@@ -541,7 +558,7 @@ int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def,const char *name)
     return 1;
 }
 
-
+/** Check if the object @idx is ours and optionally of the given type. */
 void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
     userdata_t *userdata;
@@ -575,7 +592,7 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     return userdata ? USER_TO_DATA(userdata) : NULL;
 }
 
-
+/** Check if the object @idx is of the given virtual type. */
 int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type)
 {
     mrp_lua_type_t      ltype = (mrp_lua_type_t)lua_type(L, idx);
@@ -636,7 +653,7 @@ int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type)
     return false;
 }
 
-
+/** Check if the given data is of the given virtual type. */
 int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type)
 {
     userdata_t *u;
@@ -657,7 +674,7 @@ int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type)
         return true;
 }
 
-
+/** Obtain the user-visible data for the object @idx. */
 void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
     userdata_t *userdata;
@@ -688,8 +705,7 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     return userdata ? USER_TO_DATA(userdata) : NULL;
 }
 
-
-
+/** Push the given data on the stack. */
 int mrp_lua_push_object(lua_State *L, void *data)
 {
     userdata_t *userdata = userdata_get(data, CHECK);
@@ -702,7 +718,7 @@ int mrp_lua_push_object(lua_State *L, void *data)
     return 1;
 }
 
-
+/** Obtain the class definition for the given object. */
 mrp_lua_classdef_t *mrp_lua_get_object_classdef(void *data)
 {
     userdata_t *userdata = userdata_get(data, CHECK);
@@ -1010,19 +1026,21 @@ static int patch_overrides(mrp_lua_classdef_t *def)
     }
 
     if (set.func == NULL) {
+        mrp_debug("overriding __newindex for class %s", def->class_name);
         overrides[i].name = "__newindex";
         overrides[i].func = override_setfield;
         i++;
     }
 
     if (get.func == NULL) {
+        mrp_debug("overriding __index for class %s", def->class_name);
         overrides[i].name = "__index";
         overrides[i].func = override_getfield;
         i++;
     }
 
     if (!tostring) {
-        printf("*** overriding __tostring for %s\n", def->class_name);
+        mrp_debug("overriding __tostring for class %s", def->class_name);
         overrides[i].name = "__tostring";
         overrides[i].func = override_tostring;
         i++;
@@ -1034,6 +1052,7 @@ static int patch_overrides(mrp_lua_classdef_t *def)
 }
 
 
+/** Declare automatically handled class members for the given class. */
 int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
                             mrp_lua_class_member_t *members, int nmember,
                             char **natives, int nnative,
@@ -1168,6 +1187,19 @@ static int class_member(userdata_t *u, lua_State *L, int index)
 
     name = lua_tostring(L, index);
 
+    /*
+     * XXX TODO, check how to speed this up. For instance if Lua
+     * strings or references to string happened to be always
+     * represented by the same value as long as they are interned
+     * (ie. not collected) we could simply check for numeric
+     * equality of the stack item or a reference to thereof to one
+     * store in the object classdef...
+     *
+     * Alternatively if all else fails, at least pass in the length
+     * here and store it alongside all native names, to speed up
+     * negtive tests.
+     */
+
     for (i = 0, m = members; i < nmember; i++, m++)
         if (!strcmp(m->name, name))
             return i;
@@ -1190,6 +1222,10 @@ static int class_bridge(userdata_t *u, lua_State *L, int index)
         return -1;
 
     name = lua_tostring(L, index);
+
+    /*
+     * XXX TODO, ditto as for class_member()
+     */
 
     for (bidx = 0, b = bridges; bidx < nbridge; bidx++, b++)
         if (!strcmp(b->name, name))
@@ -1263,6 +1299,7 @@ static inline int get_reftbl(userdata_t *u)
 }
 
 
+/** Refcount the object @idx for or within the given object. */
 int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
 {
     int tbl = get_reftbl(userdata_get(data, CHECK));
@@ -1280,7 +1317,7 @@ int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
     return ref;
 }
 
-
+/** Release the given reference for/from within the given object. */
 void mrp_lua_object_unref_value(void *data, lua_State *L, int ref)
 {
     int tbl;
@@ -1296,7 +1333,7 @@ void mrp_lua_object_unref_value(void *data, lua_State *L, int ref)
     }
 }
 
-
+/** Obtain and push the object for the given reference on the stack. */
 int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
 {
     int tbl;
@@ -1323,7 +1360,7 @@ int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
     }
 }
 
-
+/** Obtain a new reference based on the reference owned by owner. */
 int mrp_lua_object_getref(void *owner, void *data, lua_State *L, int ref)
 {
     int otbl, dtbl;
@@ -1485,6 +1522,7 @@ static inline const char *array_type_name(int type)
 }
 
 
+/** Collect, optionally dupping, all items from an assumed array @tidx. */
 int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
                                  size_t *nitemp, int *expectedp, int dup,
                                  char *e, size_t esize)
@@ -1593,7 +1631,7 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
 #undef CLEANUP
 }
 
-
+/** Free an array collected and duplicated by the collector above. */
 void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type)
 {
     size_t   nitem = *nitemp;
@@ -1617,7 +1655,7 @@ void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type)
     }
 }
 
-
+/** Push the given array of simple native C type on the stack. */
 int mrp_lua_object_push_array(lua_State *L, int type, void *items, size_t nitem)
 {
     int i;
@@ -1649,7 +1687,7 @@ int mrp_lua_object_push_array(lua_State *L, int type, void *items, size_t nitem)
     return 1;
 }
 
-
+/** Perform a setfield-like member assignment on the given object. */
 int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 {
     userdata_t             *u = DATA_TO_USER(data);
@@ -1845,7 +1883,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
     return -1;
 }
 
-
+/** Perform a getfield-like member-lookup on the given object. */
 int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
 {
     userdata_t             *u = DATA_TO_USER(data);
@@ -1953,7 +1991,7 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
     return -1;
 }
 
-
+/** Perform a table-based member initialization for the given object. */
 int mrp_lua_init_members(void *data, lua_State *L, int idx,
                          char *err, size_t esize)
 {
@@ -2013,6 +2051,10 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
 static inline int is_native(userdata_t *u, const char *name)
 {
     int i;
+
+    /*
+     * XXX TODO, ditto as for class_member() and class_bridge()
+     */
 
     for (i = 0; i < u->def->nnative; i++)
         if (u->def->natives[i][0] == name[0] &&
