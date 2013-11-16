@@ -1156,8 +1156,9 @@ static int object_setup_bridges(userdata_t *u, lua_State *L)
 {
     mrp_lua_classdef_t     *def = u->def;
     mrp_lua_class_bridge_t *b;
-    int                     i;
+    int                     i, class_usestack;
 
+    class_usestack = (def->flags & MRP_LUA_CLASS_USESTACK) ? true : false;
     for (i = 0, b = def->bridges; i < def->nbridge; i++, b++) {
         b->fb = mrp_funcbridge_create_cfunc(L, b->name, b->signature, b->fc,
                                             USER_TO_DATA(u));
@@ -1166,8 +1167,8 @@ static int object_setup_bridges(userdata_t *u, lua_State *L)
             return -1;
 
         b->fb->autobridge = true;
-        b->fb->usestack   = b->flags & MRP_LUA_CLASS_USESTACK ? true : false;
-
+        b->fb->usestack   = (b->flags & MRP_LUA_CLASS_USESTACK) ? true : false;
+        b->fb->usestack  |= class_usestack;
     }
 
     return 0;

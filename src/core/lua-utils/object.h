@@ -271,16 +271,71 @@ struct mrp_lua_class_member_s {
 
 
 /**
- * Macro to declare the C implementation of a Lua class, along with
- * a set of explicitly defined class members. The object infrastructure
- * can assist you in taking care of the setting and retrieval of the
- * class members.
+ * Murphy Lua Object Infrastructure
  *
- * You can select how much assistance you want on a per-member basis and
- * you can relatively freely choose between fully automatic handling,
- * where you practically do not need to do almost anything yourself, and
- * fully manual handling where you need to take care of almost all details
- * of setting and retrieval (setfield/getfield).
+ * The Murphy Lua object infrastructure allow you to declare and define
+ * the C implementation of a Lua class, along with a set of explicitly
+ * and or implicitly defined class members and class methods.
+ *
+ * Implicitly-defined members and methods - direct full control
+ *
+ * With implicitly defined members and methods you have almost absolute
+ * control over what members and methods, when and how your C object
+ * backend exposes to the Lua runtime, with minimal intervention from
+ * the Murphy object infrastructure.
+ *
+ * You can almost freely override any method of your Lua object. Ignoring
+ * some Lua-intrinsic details about raw versus ordinary member lookup, in
+ * practice overriding a method causes your corresponding C handler to be
+ * invoked whenever the Lua runtime makes a call to a member you have
+ * overridden in the Murphy Lua class definition of the object.
+ *
+ * A basic technique to gain almost full control of the behavior of your
+ * objects exposed behavior is simply to override the getfield (Lua
+ * __index) and setfield (Lua __newindex) meta-methods in the objects
+ * class definition. This way whenever someone tries to fetch, or set
+ * a specific member in your object you will be called backed to either
+ * provide the associated data, for getfield, or take the provided data
+ * and associate it with the supplied field name or index, for setfield.
+ *
+ * In your overridden C callbacks you take care of all the necessary
+ * actions of pushing the values corresponfing to fetched fields/indices
+ * and storing values associated with set fields or indices. You can do
+ * value, object state, accessibility (read-write) checks or any other
+ * check you see necessary and reject the operation by returning an error,
+ * or throwing an exception to the Lua runtime.
+ *
+ * Explicitly-defined members and methods - less control, but less code
+ *
+ * With explicitly defined members and/or methods, you specify the
+ * members and/or methods for your object class along with metainformation
+ * such as read-write/readonly status, write/update notifications,
+ * dedicated member-specific getter/setter callbacks, etc. and let the
+ * infrastructure take care of the details of passing information between
+ * your objects and the Lua interpreter. In the case of explicitly-
+ * defined members/methods, the Murphy Lua object infrastructure still
+ * offers a certain degree of flexibility about the details of how you
+ * want to handle specific members/methods. You can configure these by
+ * setting flags, each representing a certain option, on the member or
+ * for some flags on the full class.
+ *
+ * To provide a good balance between maximum flexibility and maximum
+ * control, the infrastructure allows you to mix and match pretty
+ * explicit and implicit member/method control pretty freely. You can
+ * declare parts of your members (typically the regularly behaving easy
+ * ones) explicitly, while handle the hairy ones (or those that are
+ * difficult or impossible to map to C by the metadata) with your own
+ * overridden getfield and setfield handlers. Which approach you take is
+ * fully up to you and you are very much encouraged to experiment with
+ * both to understand the limitations vs. conveniences presented by
+ * each in practical terms.
+ *
+ * As stated earlier, in pratice, you can select how much assistance you
+ * want from the infra on a per-member basis. You can relatively freely
+ * choose between fully automatic handling, where you do not need to do
+ * much apart from providing the corret metadata describing your object,
+ * and fully manual handling where you need to take care of almost all
+ * details of setting and retrieval (setfield/getfield).
  *
  * Occasionally the infra has technical limitations and if you hit any of
  * these you have no choice but take care of the details yourself. Usually
@@ -353,56 +408,30 @@ struct mrp_lua_class_member_s {
  * extended members and keep manual classes strictly as such.
  */
 
-#define MRP_LUA_CLASS_DEF_FULL(_name, _constr, _type, _destr, _methods,       \
-                               _overrides, _members, _natives,                \
-                               _notify, _bridges, _flags)                     \
-    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
-        .class_name    = MRP_LUA_CLASS_NAME(_name),                           \
-        .class_id      = MRP_LUA_CLASS_ID(_name, _constr),                    \
-        .constructor   = # _name "." # _constr,                               \
-        .destructor    = _destr,                                              \
-        .type_name     = #_type,                                              \
-        .type_id       = -1,                                                  \
-        .userdata_id   = MRP_LUA_UDATA_ID(_name, _constr),                    \
-        .userdata_size = sizeof(_type),                                       \
-        .methods       = _methods,                                            \
-        .overrides     = _overrides,                                          \
-        .members       = _members,                                            \
-        .nmember       = _members == NULL ? 0 : MRP_ARRAY_SIZE(_members),     \
-        .natives       = _natives,                                            \
-        .nnative       = _natives == NULL ? 0 : MRP_ARRAY_SIZE(_natives),     \
-        .bridges       = _bridges,                                            \
-        .nbridge       = _bridges == NULL ? 0 : MRP_ARRAY_SIZE(_bridges),     \
-        .notify        = _notify,                                             \
-        .flags         = _flags,                                              \
+/** Macro to define a Murphy Lua class. */
+#define MRP_LUA_DEFINE_CLASS(_name, _constr, _type, _destr,               \
+                             _methods, _overrides, _members,              \
+                             _blacklist, _notify, _bridges, _class_flags) \
+    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {     \
+        .class_name    = MRP_LUA_CLASS_NAME(_name),                       \
+        .class_id      = MRP_LUA_CLASS_ID(_name, _constr),                \
+        .constructor   = # _name "." # _constr,                           \
+        .destructor    = _destr,                                          \
+        .type_name     = #_type,                                          \
+        .type_id       = -1,                                              \
+        .userdata_id   = MRP_LUA_UDATA_ID(_name, _constr),                \
+        .userdata_size = sizeof(_type),                                   \
+        .methods       = _methods,                                        \
+        .overrides     = _overrides,                                      \
+        .members       = _members,                                        \
+        .nmember       = _members == NULL ? 0 : MRP_ARRAY_SIZE(_members), \
+        .natives       = _blacklist,                                      \
+        .nnative       = _blacklist==NULL ? 0:MRP_ARRAY_SIZE(_blacklist), \
+        .bridges       = _bridges,                                        \
+        .nbridge       = _bridges == NULL ? 0 : MRP_ARRAY_SIZE(_bridges), \
+        .notify        = _notify,                                         \
+        .flags         = _class_flags,                                    \
     }
-
-
-#define MRP_LUA_CLASS_DEF_MEMBERS(_name, _constr, _type, _destr, _methods,    \
-                                  _overrides, _members, _natives,             \
-                                  _notify, _flags)                            \
-    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
-        .class_name    = MRP_LUA_CLASS_NAME(_name),                           \
-        .class_id      = MRP_LUA_CLASS_ID(_name, _constr),                    \
-        .constructor   = # _name "." # _constr,                               \
-        .destructor    = _destr,                                              \
-        .type_name     = #_type,                                              \
-        .type_id       = -1,                                                  \
-        .userdata_id   = MRP_LUA_UDATA_ID(_name, _constr),                    \
-        .userdata_size = sizeof(_type),                                       \
-        .methods       = _methods,                                            \
-        .overrides     = _overrides,                                          \
-        .members       = _members,                                            \
-        .nmember       = _members == NULL ? 0 : MRP_ARRAY_SIZE(_members),     \
-        .natives       = _natives,                                            \
-        .nnative       = _natives == NULL ? 0 : MRP_ARRAY_SIZE(_natives),     \
-        .notify        = _notify,                                             \
-        .flags         = _flags,                                              \
-    }
-
-
-
-
 
 /** Macro to declare the list of class members. */
 #define MRP_LUA_MEMBER_LIST_TABLE(_name, ...) \
@@ -498,10 +527,20 @@ typedef struct {
 #define MRP_LUA_BRIDGE_LIST_TABLE(_name, ...) \
     static mrp_lua_class_bridge_t _name[] = { __VA_ARGS__ }
 
-#define MRP_LUA_CLASS_BRIDGE(_method, _sig, _fn, _flags)                \
+/**
+ * Generic generic macro to declare a bridged method for a class.
+ *
+ * @param _name      member name in Lua for this method
+ * @param _signature signature of this method (see funcbridge.h)
+ * @param _fn        bridged function to be invoked for this method
+ * @param _flags     member flags, currently either MRP_LUA_CLASS_NOFLAGS,
+ *                   or MRP_LUA_CLASS_USESTACK.
+ */
+
+#define MRP_LUA_CLASS_BRIDGE(_method, _signature, _fn, _flags)          \
     {                                                                   \
         .name      = _method,                                           \
-        .signature = _sig,                                              \
+        .signature = _signature,                                        \
         .fc        = _fn,                                               \
         .flags     = _flags,                                            \
     }
