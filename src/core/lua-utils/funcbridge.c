@@ -29,13 +29,14 @@
 
 #include <stdlib.h>
 #include <string.h>
-
+#include <errno.h>
 
 #include <lualib.h>
 #include <lauxlib.h>
 
 #include <murphy/common.h>
 
+#include <murphy/core/lua-utils/error.h>
 #include <murphy/core/lua-utils/funcbridge.h>
 #include <murphy/core/lua-utils/object.h>
 
@@ -122,6 +123,145 @@ void mrp_create_funcarray_class(lua_State *L)
 }
 
 
+int parse_signature(const char *signature, char **sigp, mrp_lua_type_t **typep)
+{
+    char            type[256];
+    char           *sigs;
+    mrp_lua_type_t *types, t;
+    int             ntype;
+    int             len;
+    size_t          l;
+
+    *sigp  = sigs  = NULL;
+    *typep = types = NULL;
+    ntype  = 0;
+
+    if (signature == NULL)
+        return 0;
+
+    if ((len = strlen(signature)) == 0)
+        return 0;
+
+    if ((sigs = mrp_allocz(len + 1)) == NULL)
+        return -1;
+
+    if ((types = mrp_allocz_array(typeof(*types), len + 1)) == NULL) {
+        mrp_free(sigs);
+        return -1;
+    }
+
+    *sigp  = sigs;
+    *typep = types;
+
+    while (*signature) {
+        switch (*signature) {
+        case MRP_FUNCBRIDGE_STRING:
+        case MRP_FUNCBRIDGE_INTEGER:
+        case MRP_FUNCBRIDGE_FLOATING:
+        case MRP_FUNCBRIDGE_BOOLEAN:
+        case MRP_FUNCBRIDGE_POINTER:
+        case MRP_FUNCBRIDGE_OBJECT:
+            *sigs++ = *signature++;
+            break;
+
+        case MRP_FUNCBRIDGE_ARRAY:
+            *sigs++ = *signature;
+
+            if (!signature[1] || signature[2] != MRP_FUNCBRIDGE_ARRAY_END) {
+                mrp_log_error("Invalid array reference in signature at '%s'.",
+                              signature);
+                errno = EINVAL;
+                goto fail;
+            }
+
+            switch (signature[1]) {
+            case MRP_FUNCBRIDGE_STRING:
+                types[ntype++] = MRP_LUA_STRING_ARRAY;
+                break;
+            case MRP_FUNCBRIDGE_INTEGER:
+                types[ntype++] = MRP_LUA_INTEGER_ARRAY;
+                break;
+            case MRP_FUNCBRIDGE_FLOATING:
+                types[ntype++] = MRP_LUA_DOUBLE_ARRAY;
+                break;
+            case MRP_FUNCBRIDGE_BOOLEAN:
+                types[ntype++] = MRP_LUA_BOOLEAN_ARRAY;
+                break;
+            case MRP_FUNCBRIDGE_ANY:
+                types[ntype++] = MRP_LUA_ANY;
+                break;
+            default:
+                mrp_log_error("Invalid array type in signature at '%s'.",
+                              signature);
+                errno = EINVAL;
+                goto fail;
+            }
+
+            signature += 3;
+            break;
+
+        case MRP_FUNCBRIDGE_MRPLUATYPE:
+            *sigs++ = *signature;
+
+            if (signature[1] != '(' || !signature[2]) {
+                mrp_log_error("Invalid object signagure at '%s'.", signature);
+                errno = EINVAL;
+                goto fail;
+            }
+
+            signature++;
+
+            l = 0;
+            while (*signature && *signature != ')' && l < sizeof(type) - 1) {
+                type[l++] = *signature++;
+            }
+
+            if (*signature != ')' || l >= sizeof(type) - 1) {
+                errno = E2BIG;
+                goto fail;
+            }
+            type[l] = '\0';
+
+            if ((t = mrp_lua_class_type(type)) == MRP_LUA_NONE) {
+                if (type[0] == MRP_FUNCBRIDGE_ANY && type[1] == '\0')
+                    t = MRP_LUA_ANY;
+            }
+
+            if (t == MRP_LUA_NONE) {
+                mrp_log_error("Function bridge signature references "
+                              "unknown type '%s'.", type);
+                errno = EINVAL;
+                goto fail;
+            }
+
+            types[ntype++] = t;
+            signature++;
+            break;
+
+        default:
+            mrp_log_error("Invalid type in signature at '%s'.", signature);
+            errno = EINVAL;
+            goto fail;
+        }
+    }
+
+    types[ntype++] = MRP_LUA_NONE;
+    *sigs = '\0';
+
+    mrp_realloc(types, sizeof(*types) * ntype);
+
+    return 0;
+
+ fail:
+    mrp_free(*sigp);
+    mrp_free(*typep);
+
+    *sigp  = NULL;
+    *typep = NULL;
+
+    return -1;
+}
+
 
 
 mrp_funcbridge_t *mrp_funcbridge_create_cfunc(lua_State *L, const char *name,
@@ -142,7 +282,14 @@ mrp_funcbridge_t *mrp_funcbridge_create_cfunc(lua_State *L, const char *name,
         fb = create_funcbridge(L, 0, 1);
 
         fb->type = MRP_C_FUNCTION;
-        fb->c.signature = strdup(signature);
+        if (parse_signature(signature, &fb->c.signature, &fb->c.sigtypes) < 0) {
+            mrp_log_error("Failed to parse signature '%s'.", signature);
+            fb->c.signature = mrp_strdup(signature);
+        }
+        else
+            mrp_debug("signature '%s' parsed into '%s'", signature,
+                      fb->c.signature);
+
         fb->c.func = func;
         fb->c.data = data;
 
@@ -604,22 +751,110 @@ static int funcarray_destructor(lua_State *L)
 }
 
 
+static inline int funcbridge_type(mrp_lua_type_t type)
+{
+#define MAP(_t, _fbt) case MRP_LUA_##_t: return MRP_FUNCBRIDGE_##_fbt;
+    switch (type) {
+        MAP(STRING , STRING);
+        MAP(INTEGER, INTEGER);
+        MAP(DOUBLE , FLOATING);
+        MAP(BOOLEAN, BOOLEAN);
+        MAP(OBJECT , OBJECT);
+        MAP(STRING_ARRAY , ARRAY);
+        MAP(INTEGER_ARRAY, ARRAY);
+        MAP(DOUBLE_ARRAY , ARRAY);
+        MAP(BOOLEAN_ARRAY, ARRAY);
+    default:
+        return MRP_FUNCBRIDGE_UNSUPPORTED;
+    }
+}
+
+
+static inline int funcbridge_elemtype(mrp_lua_type_t type)
+{
+    switch (type) {
+        MAP(STRING_ARRAY , STRING);
+        MAP(INTEGER_ARRAY, INTEGER);
+        MAP(DOUBLE_ARRAY , FLOATING);
+        MAP(BOOLEAN_ARRAY, BOOLEAN);
+    default:
+        return MRP_FUNCBRIDGE_UNSUPPORTED;
+    }
+}
+
+
+static int autobridge_patch(lua_State *L, void *object, int npop, int *refs)
+{
+    int i;
+
+    /* remove nref elements from the bottom, save references to them */
+    for (i = 1; i <= npop; i++) {
+        lua_pushvalue(L, 1);
+        lua_remove(L, 1);
+    }
+
+    for (i = -npop; i <= -1; i++) {
+        refs[npop+i] = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+
+    if (object && mrp_lua_check_object(L, NULL, 1) != object) {
+        mrp_log_error("wrong stack detected before calling autobridge");
+#if 0
+        /*
+         * Hmm... on a second though, let's not count on that only
+         * the self/object argument is missing for the autobridge
+         * method call. Who knows what else is wrong with the stack...
+         */
+        if (object != NULL) {
+            mrp_lua_push_object(L, object);
+            lua_insert(L, 1);
+        }
+#endif
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static void autobridge_restore(lua_State *L, void *object, int npop, int *refs)
+{
+    int i;
+
+    MRP_UNUSED(object);
+
+    lua_settop(L, 0);
+
+    for (i = 1; i <= npop; i++) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, refs[i-1]);
+        luaL_unref(L, LUA_REGISTRYINDEX, refs[i-1]);
+        lua_insert(L, 1);
+    }
+}
+
 
 static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
 {
-#define ARG_MAX 256
+#define ARG_MAX   256
+#define ARRAY_MAX 256
 
     int ret;
-    int i, n, m, b, e;
+    int i, n, m, b, e, tidx;
     const char *s;
     char t;
     mrp_funcbridge_value_t args[ARG_MAX];
     mrp_funcbridge_value_t *a, r;
+    mrp_lua_type_t          type;
+    int                     elem;
+    size_t                  tlen;
+    int                     status, refs[3];
 
     e = lua_gettop(L);
     f = (f < 0) ? e + f + 1 : f;
-    b = f + 1;
+    b = f + 1 + (fb->autobridge ? 1 : 0);
     n = e - b + 1;
+
+    mrp_debug("fn:%d, beg:%d, end:%d, num:%d", f, b, e, n);
 
     switch (fb->type) {
 
@@ -627,10 +862,11 @@ static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
         m = strlen(fb->c.signature);
 
         if (n >= ARG_MAX - 1 || n > m)
-            return luaL_error(L, "too many arguments");
+            return luaL_error(L, "too many arguments (%d > %d)", n, m);
         if (n < m)
-            return luaL_error(L, "too few arguments");
+            return luaL_error(L, "too few arguments (%d < %d)", n, m);
 
+        tidx = 0;
         for (i = b, s = fb->c.signature, a= args;    i <= e;    i++, s++, a++){
             switch (*s) {
             case MRP_FUNCBRIDGE_STRING:
@@ -645,6 +881,55 @@ static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
             case MRP_FUNCBRIDGE_OBJECT:
                 a->pointer = mrp_lua_check_object(L, NULL, i);
                 break;
+            case MRP_FUNCBRIDGE_ARRAY:
+                if (fb->c.sigtypes == NULL ||
+                    (type = fb->c.sigtypes[tidx++]) == MRP_LUA_NONE) {
+                invalid_array_type:
+                    return luaL_error(L, "type info missing for array or "
+                                      "array argument %d", (i - b + 1));
+                }
+
+                switch (type) {
+                case MRP_LUA_STRING_ARRAY:
+                    tlen = sizeof(char  *);
+                    elem = MRP_FUNCBRIDGE_STRING;
+                    break;
+                case MRP_LUA_INTEGER_ARRAY:
+                    tlen = sizeof(int32_t);
+                    elem = MRP_FUNCBRIDGE_INTEGER;
+                    break;
+                case MRP_LUA_DOUBLE_ARRAY:
+                    tlen = sizeof(double );
+                    elem = MRP_FUNCBRIDGE_DOUBLE;
+                    break;
+                case MRP_LUA_BOOLEAN_ARRAY:
+                    tlen = sizeof(bool   );
+                    elem = MRP_FUNCBRIDGE_BOOLEAN;
+                    break;
+                case MRP_LUA_ANY:
+                    tlen = sizeof(double);
+                    elem = MRP_FUNCBRIDGE_ANY;
+                    break;
+                default: goto invalid_array_type;
+                }
+
+                a->array.items = alloca(tlen * ARRAY_MAX);
+                a->array.nitem = ARRAY_MAX;
+
+                if (mrp_lua_object_collect_array(L, i, &a->array.items,
+                                                 &a->array.nitem, &type,
+                                                 false, NULL, 0) < 0) {
+                    return luaL_error(L, "failed to collect array");
+                }
+
+                if (elem == MRP_FUNCBRIDGE_ANY) {
+                    elem = funcbridge_elemtype(type);
+                    if (elem == MRP_FUNCBRIDGE_UNSUPPORTED)
+                        goto invalid_array_type;
+                }
+                a->array.type = elem;
+                break;
+
             default:
                 return luaL_error(L, "argument %d has unsupported type '%c'",
                                   (i - b) + 1, i);
@@ -652,7 +937,25 @@ static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
         }
         memset(a, 0, sizeof(*a));
 
-        if (!fb->c.func(L, fb->c.data, fb->c.signature, args, &t, &r))
+        if (fb->autobridge && fb->usestack) {
+            mrp_debug("patching stack for autobridge %p", fb->c.func);
+
+            if (autobridge_patch(L, fb->c.data, 1, refs) < 0) {
+                autobridge_restore(L, fb->c.data, 1, refs);
+                return luaL_error(L, "incorrect stack to call autobridge %p",
+                                  fb->c.func);
+            }
+        }
+
+        status = fb->c.func(L, fb->c.data, fb->c.signature, args, &t, &r);
+
+        if (fb->autobridge && fb->usestack) {
+            mrp_debug("restoring stack after autobridge call");
+
+            autobridge_restore(L, fb->c.data, 1, refs);
+        }
+
+        if (!status)
             return luaL_error(L, "c function invocation failed");
 
         switch (t) {
@@ -692,6 +995,13 @@ static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
     return ret;
 
 #undef ARG_MAX
+#undef ARRAY_MAX
+}
+
+
+int mrp_call_funcbridge(lua_State *L, mrp_funcbridge_t *fb, int f)
+{
+    return make_lua_call(L, fb, f);
 }
 
 
