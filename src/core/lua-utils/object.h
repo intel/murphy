@@ -160,6 +160,53 @@ static inline int mrp_lua_absidx(lua_State *L, int idx) {
     return ((idx < 0) ? lua_gettop(L) + idx + 1 : idx);
 }
 
+
+/*
+ * stringification (debugging and Lua __tostring)
+ */
+
+/**
+ * tostring/stringification mode
+ */
+typedef enum {
+    /* verbosity modifiers */
+    MRP_LUA_TOSTR_LUA      = 0x000,      /* native Lua tostr */
+    MRP_LUA_TOSTR_MINIMAL  = 0x010,      /* minimal useful output */
+    MRP_LUA_TOSTR_COMPACT  = 0x020,      /* compact (sub-oneline) output */
+    MRP_LUA_TOSTR_ONELINE  = 0x040,      /* all output that fits into a line */
+    MRP_LUA_TOSTR_SHORT    = 0x080,      /* shortest multiline output */
+    MRP_LUA_TOSTR_MEDIUM   = 0x100,      /* medium multiline output */
+    MRP_LUA_TOSTR_FULL     = 0x200,      /* full object output */
+    MRP_LUA_TOSTR_VERBOSE  = 0x400,      /* dump all data imaginable */
+    MRP_LUA_TOSTR_MODEMASK = 0xff0,      /* dump mode mask */
+
+    /* content modifiers */
+    MRP_LUA_TOSTR_META    = 0x001,       /* show metadata (userdata_t) part */
+    MRP_LUA_TOSTR_DATA    = 0x002,       /* show user-visible data */
+    MRP_LUA_TOSTR_BOTH    = 0x003,       /* both meta- and user-visible data */
+} mrp_lua_tostr_mode_t;
+
+/** Default configuration. */
+#define MRP_LUA_TOSTR_DEFAULT   (MRP_LUA_TOSTR_COMPACT | MRP_LUA_TOSTR_META)
+
+/** Stack-dump configuration. */
+#define MRP_LUA_TOSTR_STACKDUMP (MRP_LUA_TOSTR_MINIMAL | MRP_LUA_TOSTR_META)
+
+/** Stack-dump configuration for errors. */
+#define MRP_LUA_TOSTR_ERRORDUMP (MRP_LUA_TOSTR_ONELINE | MRP_LUA_TOSTR_BOTH)
+
+/** Type of an object stringification handler. */
+typedef ssize_t (*mrp_lua_tostr_t)(mrp_lua_tostr_mode_t mode, char *buf,
+                                   size_t size, lua_State *L, void *data);
+
+/** Dump the given object to the provided buffer. */
+ssize_t mrp_lua_object_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
+                             lua_State *L, void *data);
+
+/** Dump the object at the given stack location to the provided buffer. */
+ssize_t mrp_lua_index_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
+                            lua_State *L, int index);
+
 /*
  * pre-declared class members
  */
@@ -411,7 +458,8 @@ struct mrp_lua_class_member_s {
 /** Macro to define a Murphy Lua class. */
 #define MRP_LUA_DEFINE_CLASS(_name, _constr, _type, _destr,               \
                              _methods, _overrides, _members,              \
-                             _blacklist, _notify, _bridges, _class_flags) \
+                             _blacklist, _notify, _tostring,              \
+                             _bridges, _class_flags)                      \
     static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {     \
         .class_name    = MRP_LUA_CLASS_NAME(_name),                       \
         .class_id      = MRP_LUA_CLASS_ID(_name, _constr),                \
@@ -430,6 +478,7 @@ struct mrp_lua_class_member_s {
         .bridges       = _bridges,                                        \
         .nbridge       = _bridges == NULL ? 0 : MRP_ARRAY_SIZE(_bridges), \
         .notify        = _notify,                                         \
+        .tostring      = _tostring,                                       \
         .flags         = _class_flags,                                    \
     }
 
@@ -571,6 +620,8 @@ struct mrp_lua_classdef_s {
     size_t        userdata_size;
     luaL_reg     *methods;
     luaL_reg     *overrides;
+
+    mrp_lua_tostr_t tostring;            /* stringification handler */
 
     /* pre-declared members */
     mrp_lua_class_member_t  *members;    /* pre-declared members */

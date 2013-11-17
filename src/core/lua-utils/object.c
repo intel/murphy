@@ -2161,17 +2161,140 @@ static int override_tostring(lua_State *L)
 {
     void       *data;
     userdata_t *u;
-    char        str[1024];
+    char        buf[1024];
 
     data = mrp_lua_check_object(L, NULL, 1);
     u    = DATA_TO_USER(data);
 
-    snprintf(str, sizeof(str), "<object %s(%s)>@%p(%p)",
-             u->def->class_id, u->def->type_name, data, u);
+    if (u->def->tostring == NULL ||
+        u->def->tostring(MRP_LUA_TOSTR_LUA, buf, sizeof(buf), L, data) <= 0) {
+        snprintf(buf, sizeof(buf), "<object %s(%s)>@%p(%p)",
+                 u->def->class_id, u->def->type_name, data, u);
+    }
 
-    lua_pushstring(L, str);
+    lua_pushstring(L, buf);
 
     return 1;
+}
+
+
+static ssize_t userdata_minimal_tostr(char *buf, size_t size, userdata_t *u)
+{
+    return snprintf(buf, size, "<%d:%p>", u->def->type_id, u);
+}
+
+
+static ssize_t userdata_compact_tostr(char *buf, size_t size, userdata_t *u)
+{
+    return snprintf(buf, size, "<%c:%s(%p)>",
+                    (u->initializing ? 'I' : (u->dead ? 'D' : 'a')),
+                    u->def->type_name, u);
+}
+
+
+static ssize_t userdata_oneline_tostr(char *buf, size_t size, userdata_t *u)
+{
+    void *data = USER_TO_DATA(u);
+
+    return snprintf(buf, size, "<%c:%s(%p/%p)>",
+                    (u->initializing ? 'I' : (u->dead ? 'D' : 'a')),
+                    u->def->type_name, u, data);
+}
+
+
+static ssize_t userdata_short_tostr(char *buf, size_t size, userdata_t *u)
+{
+    return userdata_oneline_tostr(buf, size, u);
+}
+
+
+static ssize_t userdata_medium_tostr(char *buf, size_t size, userdata_t *u)
+{
+    return userdata_oneline_tostr(buf, size, u);
+}
+
+
+static ssize_t userdata_full_tostr(char *buf, size_t size, userdata_t *u)
+{
+    return userdata_oneline_tostr(buf, size, u);
+}
+
+
+static ssize_t userdata_verbose_tostr(char *buf, size_t size, userdata_t *u)
+{
+    return userdata_oneline_tostr(buf, size, u);
+}
+
+
+static ssize_t userdata_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
+                              userdata_t *u)
+{
+    switch (mode & MRP_LUA_TOSTR_MODEMASK) {
+    case MRP_LUA_TOSTR_MINIMAL: return userdata_minimal_tostr(buf, size, u);
+    default:
+    case MRP_LUA_TOSTR_COMPACT: return userdata_compact_tostr(buf, size, u);
+    case MRP_LUA_TOSTR_ONELINE: return userdata_oneline_tostr(buf, size, u);
+    case MRP_LUA_TOSTR_SHORT:   return userdata_short_tostr  (buf, size, u);
+    case MRP_LUA_TOSTR_MEDIUM:  return userdata_medium_tostr (buf, size, u);
+    case MRP_LUA_TOSTR_FULL:    return userdata_full_tostr   (buf, size, u);
+    case MRP_LUA_TOSTR_VERBOSE: return userdata_verbose_tostr(buf, size, u);
+    }
+
+    return 0;
+}
+
+
+/** Dump the given object to the provided buffer. */
+ssize_t mrp_lua_object_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
+                             lua_State *L, void *data)
+{
+    userdata_t *u = userdata_get(data, CHECK);
+    char       *p = buf;
+    ssize_t     n = 0;;
+
+    MRP_UNUSED(L);
+
+    if (u == NULL)
+        return snprintf(p, size, "<non-object %p>", u);
+
+    if (mode & MRP_LUA_TOSTR_META) {
+        n = userdata_tostr(mode, p, size, u);
+
+        if (n <= 0)
+            goto error;
+        if ((size_t)n >= size)
+            goto overflow;
+    }
+
+    if (mode & MRP_LUA_TOSTR_DATA) {
+        p    += (size_t)n;
+        size -= (size_t)n;
+
+        if (u->def->tostring != NULL) {
+            n = u->def->tostring(mode, p, size, L, data);
+
+            if (n < 0)
+                goto error;
+            if ((size_t)n >= size)
+                goto overflow;
+        }
+    }
+
+    return (ssize_t)(p + n - buf);
+
+ overflow:
+    return (ssize_t)(p + n - buf);
+
+ error:
+    return n;
+}
+
+
+/** Dump the object at the given stack location to the provided buffer. */
+ssize_t mrp_lua_index_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
+                            lua_State *L, int index)
+{
+    return mrp_lua_object_tostr(mode, buf, size, L, lua_touserdata(L, index));
 }
 
 
