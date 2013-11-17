@@ -61,8 +61,9 @@ typedef struct {
 
 static int timer_lua_create(lua_State *L);
 static void timer_lua_destroy(void *data);
-static int timer_lua_stringify(lua_State *L);
 static void timer_lua_changed(void *data, lua_State *L, int member);
+static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                  size_t size, lua_State *L, void *data);
 
 
 /*
@@ -78,8 +79,7 @@ MRP_LUA_METHOD_LIST_TABLE(timer_lua_methods,
                           MRP_LUA_METHOD_CONSTRUCTOR(timer_lua_create));
 
 MRP_LUA_METHOD_LIST_TABLE(timer_lua_overrides,
-                          MRP_LUA_OVERRIDE_CALL     (timer_lua_create)
-                          MRP_LUA_OVERRIDE_STRINGIFY(timer_lua_stringify));
+                          MRP_LUA_OVERRIDE_CALL     (timer_lua_create));
 
 MRP_LUA_MEMBER_LIST_TABLE(timer_lua_members,
     MRP_LUA_CLASS_INTEGER("interval", OFFS(msecs)   , NULL, NULL, NOTIFY)
@@ -98,7 +98,7 @@ typedef enum {
 MRP_LUA_DEFINE_CLASS(timer, lua, timer_lua_t, timer_lua_destroy,
                      timer_lua_methods, timer_lua_overrides,
                      timer_lua_members, NULL, timer_lua_changed,
-                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
+                     timer_lua_tostring, NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 
 static void timer_lua_cb(mrp_timer_t *timer, void *user_data)
@@ -228,16 +228,21 @@ static timer_lua_t *timer_lua_check(lua_State *L, int idx)
 }
 
 
-static int timer_lua_stringify(lua_State *L)
+static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                  size_t size, lua_State *L, void *data)
 {
-    timer_lua_t *t = timer_lua_check(L, 1);
+    timer_lua_t *t = (timer_lua_t *)data;
 
-    lua_pushfstring(L, "<%s%stimer %p(%p) @ %d msecs>",
-                    t->t       ? "enabled " : "disabled ",
-                    t->oneshot ? "oneshot " : "",
-                    t, t->t, t->msecs);
+    MRP_UNUSED(L);
 
-    return 1;
+    switch (mode & MRP_LUA_TOSTR_MODEMASK) {
+    case MRP_LUA_TOSTR_LUA:
+    default:
+        return snprintf(buf, size, "{%s%s timer %p @ %d msecs}",
+                        t->t        ? "disabled " : "",
+                        t->oneshot  ? "oneshot"   : "",
+                        t->t, t->msecs);
+    }
 }
 
 

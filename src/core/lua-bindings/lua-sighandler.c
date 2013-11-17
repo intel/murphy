@@ -59,8 +59,9 @@ typedef struct {
 
 static int sighandler_lua_create(lua_State *L);
 static void sighandler_lua_destroy(void *data);
-static int sighandler_lua_stringify(lua_State *L);
 static void sighandler_lua_changed(void *data, lua_State *L, int member);
+static ssize_t sighandler_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                       size_t size, lua_State *L, void *data);
 
 
 /*
@@ -76,8 +77,7 @@ MRP_LUA_METHOD_LIST_TABLE(sighandler_lua_methods,
                           MRP_LUA_METHOD_CONSTRUCTOR(sighandler_lua_create));
 
 MRP_LUA_METHOD_LIST_TABLE(sighandler_lua_overrides,
-                          MRP_LUA_OVERRIDE_CALL     (sighandler_lua_create)
-                          MRP_LUA_OVERRIDE_STRINGIFY(sighandler_lua_stringify));
+                          MRP_LUA_OVERRIDE_CALL     (sighandler_lua_create));
 
 MRP_LUA_MEMBER_LIST_TABLE(sighandler_lua_members,
     MRP_LUA_CLASS_INTEGER("signal"   , OFFS(signum)   , NULL, NULL, RDONLY )
@@ -96,7 +96,7 @@ typedef enum {
 MRP_LUA_DEFINE_CLASS(sighandler, lua, sighandler_lua_t, sighandler_lua_destroy,
                      sighandler_lua_methods, sighandler_lua_overrides,
                      sighandler_lua_members, NULL, sighandler_lua_changed,
-                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
+                     sighandler_lua_tostring, NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 
 static void sighandler_lua_cb(mrp_sighandler_t *hlr, int sig, void *user_data)
@@ -205,16 +205,21 @@ static sighandler_lua_t *sighandler_lua_check(lua_State *L, int idx)
 }
 
 
-static int sighandler_lua_stringify(lua_State *L)
+static ssize_t sighandler_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                       size_t size, lua_State *L, void *data)
 {
-    sighandler_lua_t *h = sighandler_lua_check(L, 1);
+    sighandler_lua_t *h = (sighandler_lua_t *)data;
     const char       *s = strsignal(h->signum);
 
-    lua_pushfstring(L, "<%ssighandler %p(%p) of '%s'>",
-                    h->oneshot ? "oneshot " : "", h, h->h,
-                    s ? s : "unknown signal");
+    MRP_UNUSED(L);
 
-    return 1;
+    switch (mode & MRP_LUA_TOSTR_MODEMASK) {
+    case MRP_LUA_TOSTR_LUA:
+    default:
+        return snprintf(buf, size, "{%ssighandler %p of '%s'}",
+                        h->oneshot  ? "oneshot " : "", h->h,
+                        s ? s : "unknow signal");
+    }
 }
 
 

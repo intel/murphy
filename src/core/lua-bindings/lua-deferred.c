@@ -59,8 +59,9 @@ typedef struct {
 
 static int deferred_lua_create(lua_State *L);
 static void deferred_lua_destroy(void *data);
-static int deferred_lua_stringify(lua_State *L);
 static void deferred_lua_changed(void *data, lua_State *L, int member);
+static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                     size_t size, lua_State *L, void *data);
 
 /*
  * Lua deferred class
@@ -94,7 +95,7 @@ typedef enum {
 MRP_LUA_DEFINE_CLASS(deferred, lua, deferred_lua_t, deferred_lua_destroy,
                      deferred_lua_methods, deferred_lua_overrides,
                      deferred_lua_members, NULL, deferred_lua_changed,
-                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
+                     deferred_lua_tostring, NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 
 static void deferred_lua_cb(mrp_deferred_t *deferred, void *user_data)
@@ -218,16 +219,21 @@ static deferred_lua_t *deferred_lua_check(lua_State *L, int idx)
 }
 
 
-static int deferred_lua_stringify(lua_State *L)
+static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                     size_t size, lua_State *L, void *data)
 {
-    deferred_lua_t *d = deferred_lua_check(L, 1);
+    deferred_lua_t *d = (deferred_lua_t *)data;
 
-    lua_pushfstring(L, "<%s %sdeferred %p(%p)>",
-                    d->disabled ? "disabled" : "enabled",
-                    d->oneshot  ? "oneshot " : "",
-                    d, d->d);
+    MRP_UNUSED(L);
 
-    return 1;
+    switch (mode & MRP_LUA_TOSTR_MODEMASK) {
+    case MRP_LUA_TOSTR_LUA:
+    default:
+        return snprintf(buf, size, "{%s %s deferred %p}",
+                        d->disabled ? "disabled" : "enabled",
+                        d->oneshot  ? "oneshot"  : "recurring",
+                        d->d);
+    }
 }
 
 
