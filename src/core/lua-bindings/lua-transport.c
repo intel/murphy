@@ -93,8 +93,9 @@ static int transport_lua_connect(lua_State *L);
 static int transport_lua_accept(lua_State *L);
 static void transport_lua_destroy(void *data);
 static int transport_lua_disconnect(lua_State *L);
-static int transport_lua_stringify(lua_State *L);
 static void transport_lua_changed(void *data, lua_State *L, int member);
+static ssize_t transport_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                      size_t size, lua_State *L, void *data);
 
 
 /*
@@ -115,8 +116,7 @@ MRP_LUA_METHOD_LIST_TABLE(transport_lua_methods,
                           MRP_LUA_METHOD(disconnect, transport_lua_disconnect));
 
 MRP_LUA_METHOD_LIST_TABLE(transport_lua_overrides,
-                          MRP_LUA_OVERRIDE_CALL     (transport_lua_create)
-                          MRP_LUA_OVERRIDE_STRINGIFY(transport_lua_stringify));
+                          MRP_LUA_OVERRIDE_CALL     (transport_lua_create));
 
 MRP_LUA_MEMBER_LIST_TABLE(transport_lua_members,
     MRP_LUA_CLASS_LFUNC  ("connect" , CB(connect)   , NULL, NULL, NOTIFY)
@@ -142,7 +142,7 @@ typedef enum {
 MRP_LUA_DEFINE_CLASS(transport, lua, transport_lua_t, transport_lua_destroy,
                      transport_lua_methods, transport_lua_overrides,
                      transport_lua_members, NULL, transport_lua_changed,
-                     NULL, MRP_LUA_CLASS_EXTENSIBLE);
+                     transport_lua_tostring, NULL, MRP_LUA_CLASS_EXTENSIBLE);
 
 MRP_LUA_CLASS_CHECKER(transport_lua_t, transport_lua, TRANSPORT_LUA_CLASS);
 
@@ -352,8 +352,8 @@ static void transport_lua_changed(void *data, lua_State *L, int member)
 
     case TRANSPORT_MEMBER_ADDRESS:
         if (set_address(t, t->address, MRP_LUA_ERRPASS, t->t == NULL) < 0)
-            return ((void)mrp_lua_error(-1, L, "%s", MRP_LUA_ERR));
-        break;
+            mrp_lua_error(-1, L, "%s", MRP_LUA_ERR);
+        return;
 
     case TRANSPORT_MEMBER_ENCODING:
         break;
@@ -507,15 +507,20 @@ static void transport_lua_destroy(void *data)
 }
 
 
-static int transport_lua_stringify(lua_State *L)
+static ssize_t transport_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                      size_t size, lua_State *L, void *data)
 {
-    transport_lua_t *t = transport_lua_check(L, 1);
+    transport_lua_t *t = (transport_lua_t *)data;
 
-    lua_pushfstring(L, "<%stransport <%s> %p(%p)>",
-                    t->t && t->t->connected ? "connected" : "",
-                    t->address ? t->address : "no address", t, t->t);
+    MRP_UNUSED(L);
 
-    return 1;
+    switch (mode & MRP_LUA_TOSTR_MODEMASK) {
+    case MRP_LUA_TOSTR_LUA:
+    default:
+        return snprintf(buf, size, "{%stransport <%s> %p}",
+                        t->t && t->t->connected ? "connected" : "",
+                        t->address ? t->address : "no address", t->t);
+    }
 }
 
 
