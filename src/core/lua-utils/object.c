@@ -407,6 +407,8 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
     size_t size;
     userdata_t *userdata;
 
+    MRP_UNUSED(class_by_userdata_id);
+
     if (name || idx) {
         if (name && !valid_id(name))
             return NULL;
