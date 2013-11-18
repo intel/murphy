@@ -69,8 +69,7 @@ MRP_CDECL_BEGIN
         static int __site_enabled;                                        \
                                                                           \
         if (MRP_UNLIKELY(__site_stamp != mrp_debug_stamp)) {              \
-            __site_enabled = mrp_debug_check(__FUNCTION__,                \
-                                             __FILE__, __LINE__);         \
+            __site_enabled = mrp_debug_check(_func, _file, _line);        \
             __site_stamp   = mrp_debug_stamp;                             \
         }                                                                 \
                                                                           \
