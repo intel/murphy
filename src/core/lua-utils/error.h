@@ -30,9 +30,13 @@
 #ifndef __MURPHY_LUA_ERROR_H__
 #define __MURPHY_LUA_ERROR_H__
 
+#include <stdlib.h>
+#include <setjmp.h>
 #include <lua.h>
 
 #include "murphy/common/debug.h"
+#include "murphy/common/mm.h"
+#include "murphy/common/list.h"
 
 /*
  * basic error handling
@@ -69,6 +73,130 @@
 
 /** The low-level error formatting/throwing/printing routine. */
 int mrp_lua_set_error(lua_State *L, char *errbuf, size_t size, ...);
+
+
+/*
+ * chained error-path cleanup
+ */
+
+
+/** Error trap callback type. */
+typedef int (*mrp_lua_trapcb_t)(lua_State *L, void *data);
+
+/** An error trap callback buffer. */
+typedef struct {
+    mrp_list_hook_t   hook;              /* hook to trap-list */
+    mrp_lua_trapcb_t  cb;                /* trap callback */
+    void             *data;              /* trap callback data */
+    const char       *name;              /* stringified data */
+} mrp_lua_trap_t;
+
+/** Lua error buffer with a chain of trap handlers. */
+typedef struct {
+    mrp_list_hook_t traps;               /* traps to call during cleanup */
+    lua_State      *L;                   /* lua state buffer */
+    char            buf[1024];           /* error message buffer */
+    char           *err;                 /* buffer write pointer */
+    size_t          len;                 /* remaining buffer length */
+    int             error;               /* error code */
+    jmp_buf         jmp;                 /* saved jump location */
+} mrp_lua_errbuf_t;
+
+
+#define MRP_LUA_CATCH(_err, _L)                                         \
+    mrp_lua_errbuf_t _err##_buf = {                                     \
+        .traps = { .prev = &_err.traps, .next = &_err.traps },          \
+        .buf   = { '\0' },                                              \
+        .len   = 0,                                                     \
+        .error = 0,                                                     \
+    }, _err = &_err##_buf;                                              \
+    if (setjmp(&(_err)->loc) != 0) {                                    \
+        mrp_log_error("%s", (_err)->buf);                               \
+        mrp_lua_trigger_traps(_err, NULL, _L, -1);                      \
+    }
+
+#define MRP_LUA_THROW(_err, _ret, _L, _fmt, ...) do {                   \
+        ssize_t _n;                                                     \
+                                                                        \
+        _n = snprintf((_err)->err, (_err)->len, _fmt, __VA_ARGS__);     \
+        if (_n >= (_err)->len)                                          \
+            (_err)->len = 0;                                            \
+        else                                                            \
+            (_err)->len -= (size_t)n;                                   \
+                                                                        \
+        longjmp(&(_err)->jmp, _ret);                                    \
+    } while (0)
+
+
+/** Macro to declare an error buffer/error-path cleanup chain. */
+#define MRP_LUA_TRAPCHAIN(_err)                                         \
+    mrp_lua_errbuf_t _err = {                                           \
+        .traps = { .prev = &_err.traps, .next = &_err.traps },          \
+        .buf   = { '\0' },                                              \
+        .len   = 0,                                                     \
+        .error = 0,                                                     \
+    }
+
+/** Macro to push a new item to the cleanup chain. */
+#define mrp_lua_push_trap(_err, _cb, _data) do {                        \
+        mrp_lua_trap_t *_trap = mrp_allocz(sizeof(*_trap));             \
+                                                                        \
+        mrp_clear(_trap);                                               \
+        mrp_list_init(&_trap->hook);                                    \
+        _trap->cb   = _cb;                                              \
+        _trap->data = _data;                                            \
+        _trap->name = #_data;                                           \
+        mrp_list_append(&(_err)->traps, &_trap->hook);                  \
+    } while (0)
+
+/** Macro to run trap handlers then execute (usually return) back up. */
+#define mrp_lua_trigger_traps(_err, _guardptr, _L, _retval) do {            \
+        void             *_guard = (void *)_guardptr;                       \
+        mrp_list_hook_t  *_p, *_n;                                          \
+        mrp_lua_trap_t   *_t;                                               \
+                                                                            \
+        if (_guard == NULL)                                                 \
+            _guard = (void *)_err;                                          \
+                                                                            \
+        mrp_list_foreach(&(_err)->traps, _p, _n) {                          \
+            if ((void *)_p > _guard)                                        \
+                break;                                                      \
+                                                                            \
+            _t = mrp_list_entry(_p, typeof(*_t), hook);                     \
+                                                                            \
+            mrp_list_delete(_p);                                            \
+            mrp_debug_at(__FILE__, __LINE__, "mrp_lua_run_traps",           \
+                        "Running trap '%s'...", _t->name);                  \
+            if (_t->cb(_L, _t->data) < 0)                                   \
+                mrp_log_error("Uh-oh... fasten your seatbelts and prepare " \
+                              "for crash. Trap handler reported failure."); \
+            mrp_free(_p);                                                   \
+        }                                                                   \
+                                                                            \
+        return _retval;                                                     \
+    } while (0)
+
+/** Macro to purge trap handlers up to a given guard. */
+#define mrp_lua_cancel_traps(_err, _guardptr) do {                          \
+        void             *_guard = (void *)_guardptr;                       \
+        mrp_list_hook_t  *_p, *_n;                                          \
+        mrp_lua_trap_t   *_t;                                               \
+                                                                            \
+        if (_guard == NULL)                                                 \
+            _guard = (void *)_err;                                          \
+                                                                            \
+        mrp_list_foreach_back(&(_err)->traps, _p, _n) {                     \
+            if ((void *)_p > _guard)                                        \
+                break;                                                      \
+                                                                            \
+            _t = mrp_list_entry(_p, typeof(*_t), hook);                     \
+                                                                            \
+            mrp_list_delete(_p);                                            \
+            mrp_debug_at(__FILE__, __LINE__, "mrp_lua_cancel_traps",        \
+                        "Cancelling trap '%s'...", _t->name);               \
+            mrp_free(_p);                                                   \
+        }                                                                   \
+    } while (0)
 
 
 /*

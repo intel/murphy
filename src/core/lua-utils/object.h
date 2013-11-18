@@ -241,7 +241,7 @@ typedef enum {
 
 #define MRP_LUA_OK_       1              /* successfully get/set */
 #define MRP_LUA_NOTFOUND  0              /* member not found */
-#define MRP_LUA_ERROR    -1              /* failed to get/set member */
+#define MRP_LUA_FAIL     -1              /* failed to get/set member */
 
 /*
  * supported class member types
