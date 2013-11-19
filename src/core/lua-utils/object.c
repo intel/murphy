@@ -1441,39 +1441,56 @@ static int object_setext(void *data, lua_State *L, const char *name,
 }
 
 
-static void object_getext(void *data, lua_State *L, const char *name)
+static int object_getext(void *data, lua_State *L, const char *name)
 {
     userdata_t *u = DATA_TO_USER(data);
 
-   if (u->exttbl == LUA_NOREF) {
-       lua_pushnil(L);
-       return;
-   }
+    if (u->exttbl == LUA_NOREF) {
+        lua_pushnil(L);
+        return 1;
+    }
 
-   lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
-   lua_getfield(L, -1, name);
-   lua_remove(L, -2);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
+    lua_getfield(L, -1, name);
+    lua_remove(L, -2);
+
+    return 1;
 }
 
 
-static void object_setiext(void *data, lua_State *L, int idx, int val)
+static int object_setiext(void *data, lua_State *L, int idx, int val)
 {
     userdata_t *u = DATA_TO_USER(data);
+
+    if (u->exttbl == LUA_NOREF) {
+        return luaL_error(L, "trying to set user-defined index %d "
+                          "for non-extensible object %s", idx,
+                          u->def->class_name);
+    }
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
     lua_pushvalue(L, val > 0 ? val : val - 1);
     lua_rawseti(L, -2, idx);
     lua_pop(L, 1);
+
+    return 1;
 }
 
 
-static void object_getiext(void *data, lua_State *L, int idx)
+static int object_getiext(void *data, lua_State *L, int idx)
 {
     userdata_t *u = DATA_TO_USER(data);
+
+    if (u->exttbl == LUA_NOREF) {
+        lua_pushnil(L);
+        return 1;
+    }
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
     lua_rawgeti(L, -1, idx);
     lua_remove(L, -2);
+
+    return 1;
 }
 
 
@@ -2074,6 +2091,7 @@ static int override_setfield(lua_State *L)
     userdata_t *u    = DATA_TO_USER(data);
     char        err[128] = "";
     const char *name;
+    int         status;
 
     if (data == NULL)
         return luaL_error(L, "failed to find class userdata");
@@ -2081,9 +2099,13 @@ static int override_setfield(lua_State *L)
     mrp_debug("setting field for object of type '%s'", u->def->class_name);
 
     switch (mrp_lua_set_member(data, L, err, sizeof(err))) {
-    case 0:  break;
-    case 1:  goto out;
-    default: return luaL_error(L, "failed to set member (%s)", err);
+    case 1:  /* ok */
+        status = 0;
+        goto out;
+    case 0:  /* field not found */
+        break;
+    default: /* error */
+        return luaL_error(L, "failed to set member (%s)", err);
     }
 
     switch (lua_type(L, 2)) {
@@ -2099,20 +2121,36 @@ static int override_setfield(lua_State *L)
 
     luaL_checkany(L, 3);
 
-    if (name != NULL) {
-        if (is_native(u, name))
+    /*
+     * if the class is not extensible call user setfield if we have one
+     * if it is extensible
+     *    - for string keys
+     *        - if the field is whitelisted call setfield, if we have one
+     *        - otherwise set extension
+     *    - for numeric indices set extended array element
+     */
+
+    if (!(u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)) {
+        if (name != NULL && u->def->setfield)
             return u->def->setfield(L);
         else
-            object_setext(data, L, name, 3, NULL, 0);
+            status = -1;
     }
     else {
-        object_setiext(data, L, lua_tointeger(L, 2), 3);
+        if (name != NULL) {
+            if (u->def->setfield && is_native(u, name))
+                return u->def->setfield(L);
+            else
+                status = object_setext(data, L, name, 3, NULL, 0);
+        }
+        else
+            status = object_setiext(data, L, lua_tointeger(L, 2), 3);
     }
 
  out:
     lua_pop(L, 3);
 
-    return 0;
+    return status;
 }
 
 
@@ -2122,13 +2160,18 @@ static int override_getfield(lua_State *L)
     userdata_t *u    = DATA_TO_USER(data);
     char        err[128] = "";
     const char *name;
+    int         status;
 
     mrp_debug("getting field for object of type '%s'", u->def->class_name);
 
     switch (mrp_lua_get_member(data, L, err, sizeof(err))) {
-    case 0:  break;
-    case 1:  goto out;
-    default: return luaL_error(L, "failed to set member (%s)", err);
+    case 1:  /* ok */
+        status = 1;
+        goto out;
+    case 0:  /* field not found */
+        break;
+    default: /* error */
+        return luaL_error(L, "failed to set member (%s)", err);
     }
 
     switch (lua_type(L, 2)) {
@@ -2142,20 +2185,36 @@ static int override_getfield(lua_State *L)
         return luaL_argerror(L, 2, "expecting string or integer");
     }
 
-    if (name != NULL) {
-        if (is_native(u, name))
-            return u->def->setfield(L);
+    /*
+     * if the class is not extensible call user getfield if we have one
+     * if it is extensible
+     *    - for string keys
+     *        - if the field is whitelisted call getfield, if we have one
+     *        - otherwise get extension
+     *    - for numeric indices get extended array element
+     */
+
+    if (!(u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)) {
+        if (name != NULL && u->def->getfield)
+            return u->def->getfield(L);
         else
-            object_getext(data, L, name);
+            status = -1;
     }
     else {
-        object_getiext(data, L, 2);
+        if (name != NULL) {
+            if (u->def->getfield && is_native(u, name))
+                return u->def->getfield(L);
+            else
+                status = object_getext(data, L, name);
+        }
+        else
+            status = object_getiext(data, L, 2);
     }
 
  out:
-    lua_remove(L, -2);
+    lua_remove(L, status < 1 ? -1 : -2);
 
-    return 1;
+    return status;
 }
 
 
