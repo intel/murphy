@@ -39,11 +39,13 @@
 #include <murphy/core/event.h>
 #include <murphy/core/plugin.h>
 
-
 #define PLUGIN_PREFIX "plugin-"
+#define BUILTIN TRUE
+#define DYNAMIC FALSE
 
-static mrp_plugin_descr_t *open_builtin(const char *name);
-static mrp_plugin_descr_t *open_dynamic(const char *path, void **handle);
+static mrp_plugin_descr_t *open_builtin(mrp_context_t *ctx, const char *name);
+static mrp_plugin_descr_t *open_dynamic(mrp_context_t *ctx, const char *name,
+                                        void **handle);
 static mrp_plugin_t *find_plugin(mrp_context_t *ctx, char *name);
 static mrp_plugin_t *find_plugin_instance(mrp_context_t *ctx,
                                           const char *instance);
@@ -90,6 +92,115 @@ MRP_REGISTER_EVENTS(events,
                     { MRP_PLUGIN_EVENT_UNLOADED, PLUGIN_EVENT_UNLOADED });
 
 
+static inline int is_listed(const char *list,  const char *name)
+{
+    const char *b, *n, *e;
+
+    if (list == NULL || name == NULL)
+        return FALSE;
+
+    if ((list[0] == '*' && list[1] == '\0') || (!strcmp(list, "all")))
+        return TRUE;
+
+    b = list;
+    while (b && *b) {
+        while (*b == ' ' || *b == '\t' || *b == ',')
+            b++;
+
+        if ((e = n = strchr(b, ',')) != NULL) {
+            while (e > b && (*e == ' ' || *e == '\t' || *e == ','))
+                e--;
+        }
+
+        if ((e != NULL && e > b && !strncmp(b, name, e - b)) ||
+            (e == NULL &&          !strcmp (b, name)))
+            return TRUE;
+
+        if ((b[0] == '*' && (b[1] == ',' ||
+                             b[1] == ' ' || b[1] == '\t' ||
+                             b[1] == '\0')) ||
+            (b[0] == 'a' && b[1] == 'l' && b[2] == 'l' &&
+             (b[1] == ',' ||
+              b[1] == ' ' || b[1] == '\t' ||
+              b[1] == '\0'))) {
+            mrp_log_warning("Wildcard entry in blacklist/whitelist '%s'", list);
+            return TRUE;
+        }
+
+        b = n ? n + 1 : NULL;
+    }
+
+    return FALSE;
+}
+
+
+static inline int is_blacklisted(mrp_context_t *ctx, const char *name,
+                                 int builtin)
+{
+#define IS_WILDCARD(l) \
+    (((l) != NULL && (l)[0] == '*' && (l)[1] == '\0') ||        \
+     ((l) != NULL && !strcmp((l), "all")))
+
+    const char *bl, *wl, *type_bl, *type_wl;
+    int         b, w, tb, tw, blacklist;
+
+    mrp_debug("checking if %s plugin %s is blacklisted",
+              builtin ? "builtin" : "dynamic", name);
+
+    bl = ctx->blacklist_plugins;
+    wl = ctx->whitelist_plugins;
+    b  = is_listed(bl, name);
+    w  = is_listed(wl, name);
+
+    if (builtin) {
+        type_bl = ctx->blacklist_builtin;
+        type_wl = ctx->whitelist_builtin;
+    }
+    else {
+        type_bl = ctx->blacklist_dynamic;
+        type_wl = ctx->whitelist_dynamic;
+    }
+
+    tb = is_listed(type_bl, name);
+    tw = is_listed(type_wl, name);
+
+    mrp_debug("%s: b:(%s,%s), w:(%s,%s)", name,
+              b ? "true" : "false", tb ? "true" : "false",
+              w ? "true" : "false", tw ? "true" : "false");
+
+    if (IS_WILDCARD(bl) || IS_WILDCARD(type_bl)) {
+        if (w || tw)
+            blacklist = FALSE;
+         else
+            blacklist = TRUE;
+
+        goto verdict;
+    }
+
+    if (IS_WILDCARD(wl) || IS_WILDCARD(type_wl)) {
+        if (b || tb)
+            blacklist = TRUE;
+        else
+            blacklist = FALSE;
+
+        goto verdict;
+    }
+
+    blacklist = (( is_listed(bl, name) || is_listed(type_bl, name)) &&
+                 !(is_listed(wl, name) || is_listed(type_wl, name)));
+
+
+ verdict:
+    if (blacklist)
+        mrp_log_warning("%s plugin '%s' is blacklisted.",
+                        builtin ? "Builtin" : "Dynamic", name);
+
+    mrp_debug("%s: %sblacklisted", name, blacklist ? "" : "not ");
+
+    return blacklist;
+}
+
+
 static int emit_plugin_event(int idx, mrp_plugin_t *plugin)
 {
     uint16_t name = MRP_PLUGIN_TAG_PLUGIN;
@@ -129,9 +240,12 @@ int mrp_plugin_exists(mrp_context_t *ctx, const char *name)
     struct stat st;
     char        path[PATH_MAX];
 
-    if (open_builtin(name))
+    if (open_builtin(ctx, name))
         return TRUE;
     else {
+        if (is_blacklisted(ctx, name, DYNAMIC))
+            return FALSE;
+
         snprintf(path, sizeof(path), "%s/%s%s.so", ctx->plugin_dir,
                  PLUGIN_PREFIX, name);
         if (stat(path, &st) == 0)
@@ -199,8 +313,8 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
     snprintf(path, sizeof(path), "%s/%s%s.so", ctx->plugin_dir,
              PLUGIN_PREFIX, name);
 
-    dynamic = open_dynamic(path, &handle);
-    builtin = open_builtin(name);
+    dynamic = open_dynamic(ctx, name, &handle);
+    builtin = open_builtin(ctx, name);
 
     if (dynamic != NULL) {
         if (builtin != NULL)
@@ -333,7 +447,6 @@ int mrp_load_all_plugins(mrp_context_t *ctx)
     type    = MRP_DIRENT_REG;
     pattern = PLUGIN_PREFIX".*\\.so$";
     mrp_scan_dir(ctx->plugin_dir, pattern, type, load_plugin_cb, ctx);
-
 
     mrp_list_foreach(&builtin_plugins, p, n) {
         plugin = mrp_list_entry(p, typeof(*plugin), hook);
@@ -556,11 +669,19 @@ static mrp_plugin_t *find_plugin(mrp_context_t *ctx, char *name)
 }
 
 
-static mrp_plugin_descr_t *open_dynamic(const char *path, void **handle)
+static mrp_plugin_descr_t *open_dynamic(mrp_context_t *ctx, const char *name,
+                                        void **handle)
 {
     mrp_plugin_descr_t *(*describe)(void);
     mrp_plugin_descr_t   *d;
     void                 *h;
+    char                  path[PATH_MAX];
+
+    snprintf(path, sizeof(path), "%s/%s%s.so", ctx->plugin_dir,
+             PLUGIN_PREFIX, name);
+
+    if (is_blacklisted(ctx, name, DYNAMIC))
+        return NULL;
 
     if ((h = dlopen(path, RTLD_LAZY | RTLD_LOCAL)) != NULL) {
         if ((describe = dlsym(h, "mrp_get_plugin_descriptor")) != NULL) {
@@ -601,10 +722,13 @@ static mrp_plugin_descr_t *open_dynamic(const char *path, void **handle)
 }
 
 
-static mrp_plugin_descr_t *open_builtin(const char *name)
+static mrp_plugin_descr_t *open_builtin(mrp_context_t *ctx, const char *name)
 {
     mrp_list_hook_t *p, *n;
     mrp_plugin_t    *plugin;
+
+    if (is_blacklisted(ctx, name, BUILTIN))
+        return NULL;
 
     mrp_list_foreach(&builtin_plugins, p, n) {
         plugin = mrp_list_entry(p, typeof(*plugin), hook);

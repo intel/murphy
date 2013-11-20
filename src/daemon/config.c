@@ -87,6 +87,12 @@ static void print_usage(mrp_context_t *ctx, const char *argv0, int exit_code,
            "  -h, --help                     show help on usage\n"
            "  -q, --query-plugins            show detailed information about\n"
            "                                 all the available plugins\n"
+           "  -B, --blacklist-plugins <list> disable list of plugins\n"
+           "  -I, --blacklist-builtin <list> disable list of builtin plugins\n"
+           "  -E, --blacklist-dynamic <list> disable list of dynamic plugins\n"
+           "  -w, --whitelist-plugins <list> disable list of plugins\n"
+           "  -i, --whitelist-builtin <list> disable list of builtin plugins\n"
+           "  -e, --whitelist-dynamic <list> disable list of dynamic plugins\n"
            "  -V, --valgrind                 run through valgrind\n",
            argv0, ctx->config_file, ctx->config_dir, ctx->plugin_dir);
 
@@ -220,21 +226,29 @@ static void config_set_defaults(mrp_context_t *ctx, char *argv0)
 
 void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
 {
-#   define OPTIONS "c:C:l:t:fP:a:vd:DhHqV"
+#   define OPTIONS "c:C:l:t:fP:a:vd:DhHqB:I:E:w:i:e:V"
     struct option options[] = {
-        { "config-file"  , required_argument, NULL, 'c' },
-        { "config-dir"   , required_argument, NULL, 'C' },
-        { "plugin-dir"   , required_argument, NULL, 'P' },
-        { "log-level"    , required_argument, NULL, 'l' },
-        { "log-target"   , required_argument, NULL, 't' },
-        { "verbose"      , optional_argument, NULL, 'v' },
-        { "debug"        , required_argument, NULL, 'd' },
-        { "list-debug"   , no_argument      , NULL, 'D' },
-        { "foreground"   , no_argument      , NULL, 'f' },
-        { "help"         , no_argument      , NULL, 'h' },
-        { "more-help"    , no_argument      , NULL, 'H' },
-        { "query-plugins", no_argument      , NULL, 'q' },
-        { "valgrind"     , optional_argument, NULL, 'V' },
+        { "config-file"      , required_argument, NULL, 'c' },
+        { "config-dir"       , required_argument, NULL, 'C' },
+        { "plugin-dir"       , required_argument, NULL, 'P' },
+        { "log-level"        , required_argument, NULL, 'l' },
+        { "log-target"       , required_argument, NULL, 't' },
+        { "verbose"          , optional_argument, NULL, 'v' },
+        { "debug"            , required_argument, NULL, 'd' },
+        { "list-debug"       , no_argument      , NULL, 'D' },
+        { "foreground"       , no_argument      , NULL, 'f' },
+        { "help"             , no_argument      , NULL, 'h' },
+        { "more-help"        , no_argument      , NULL, 'H' },
+        { "query-plugins"    , no_argument      , NULL, 'q' },
+        { "blacklist"        , required_argument, NULL, 'B' },
+        { "blacklist-plugins", required_argument, NULL, 'B' },
+        { "blacklist-builtin", required_argument, NULL, 'I' },
+        { "blacklist-dynamic", required_argument, NULL, 'E' },
+        { "whitelist"        , required_argument, NULL, 'w' },
+        { "whitelist-plugins", required_argument, NULL, 'w' },
+        { "whitelist-builtin", required_argument, NULL, 'i' },
+        { "whitelist-dynamic", required_argument, NULL, 'e' },
+        { "valgrind"         , optional_argument, NULL, 'V' },
         { NULL, 0, NULL, 0 }
     };
 
@@ -334,6 +348,48 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
             print_plugin_help(ctx, TRUE);
             break;
 
+        case 'B':
+            if (ctx->blacklist_plugins != NULL)
+                print_usage(ctx, argv[0], EINVAL,
+                            "blacklist option given multiple times");
+            SAVE_OPTARG("-B", optarg);
+            ctx->blacklist_plugins = optarg;
+            break;
+        case 'I':
+            if (ctx->blacklist_builtin != NULL)
+                print_usage(ctx, argv[0], EINVAL,
+                            "builtin blacklist option given multiple times");
+            SAVE_OPTARG("-I", optarg);
+            ctx->blacklist_builtin = optarg;
+            break;
+        case 'E':
+            if (ctx->blacklist_dynamic != NULL)
+                print_usage(ctx, argv[0], EINVAL,
+                            "dynamic blacklist option given multiple times");
+            SAVE_OPTARG("-E", optarg);
+            ctx->blacklist_dynamic = optarg;
+            break;
+        case 'w':
+            if (ctx->whitelist_plugins != NULL)
+                print_usage(ctx, argv[0], EINVAL,
+                            "whitelist option given multiple times");
+            SAVE_OPTARG("-w", optarg);
+            ctx->whitelist_plugins = optarg;
+            break;
+        case 'i':
+            if (ctx->whitelist_builtin != NULL)
+                print_usage(ctx, argv[0], EINVAL,
+                            "builtin whitelist option given multiple times");
+            SAVE_OPTARG("-i", optarg);
+            ctx->whitelist_builtin = optarg;
+            break;
+        case 'e':
+            if (ctx->whitelist_dynamic != NULL)
+                print_usage(ctx, argv[0], EINVAL,
+                            "dynamic whitelist option given multiple times");
+            SAVE_OPTARG("-e", optarg);
+            ctx->whitelist_dynamic = optarg;
+            break;
         case 'V':
             valgrind(optarg, argc, argv, optind, saved_argc, saved_argv, envp);
             break;

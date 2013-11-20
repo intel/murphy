@@ -60,6 +60,13 @@ struct mrp_context_s {
 
     char       *resolver_ruleset;          /* resolver ruleset file */
 
+    const char *blacklist_plugins;         /* blacklisted plugins */
+    const char *blacklist_builtin;         /* blacklisted builtin plugins */
+    const char *blacklist_dynamic;         /* blacklisted dynamic plugins */
+    const char *whitelist_plugins;         /* whitelisted plugins */
+    const char *whitelist_builtin;         /* whitelisted builtin plugins */
+    const char *whitelist_dynamic;         /* whitelisted dynamic plugins */
+
     /* actual runtime context data */
     int              state;                /* context/daemon state */
     mrp_mainloop_t  *ml;                   /* mainloop */

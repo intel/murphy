@@ -129,6 +129,19 @@ static void load_configuration(mrp_context_t *ctx)
     cfg = mrp_parse_cfgfile(ctx->config_file);
 
     if (cfg != NULL) {
+        mrp_log_info("Blacklisted plugins of any type: %s",
+                     ctx->blacklist_plugins ? ctx->blacklist_plugins:"<none>");
+        mrp_log_info("Blacklisted builtin plugins: %s",
+                     ctx->blacklist_builtin ? ctx->blacklist_builtin:"<none>");
+        mrp_log_info("Blacklisted dynamic plugins: %s",
+                     ctx->blacklist_dynamic ? ctx->blacklist_dynamic:"<none>");
+        mrp_log_info("Whitelisted plugins of any type: %s",
+                     ctx->whitelist_plugins ? ctx->whitelist_plugins:"<none>");
+        mrp_log_info("Whitelisted builtin plugins: %s",
+                     ctx->whitelist_builtin ? ctx->whitelist_builtin:"<none>");
+        mrp_log_info("Whitelisted dynamic plugins: %s",
+                     ctx->whitelist_dynamic ? ctx->whitelist_dynamic:"<none>");
+
         if (!mrp_exec_cfgfile(ctx, cfg)) {
             mrp_log_error("Failed to execute configuration.");
             exit(1);
