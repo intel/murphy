@@ -40,8 +40,10 @@
 #include <murphy/common/macros.h>
 #include <murphy/common/debug.h>
 #include <murphy/common/log.h>
+#include <murphy/common/env.h>
 #include <murphy/common/mm.h>
 
+#include <murphy/core/lua-bindings/murphy.h>
 #include <murphy/core/lua-utils/object.h>
 
 #undef  __MURPHY_MANGLE_CLASS_SELF__     /* extra self-mangling if defined */
@@ -59,6 +61,7 @@ typedef struct {
     int  exttbl;                         /* table of object extensions */
     int  dead : 1;                       /* being cleaned up */
     int  initializing : 1;               /* being initialized */
+    mrp_list_hook_t hook[0];             /* to object list if we're tracking */
 } userdata_t;
 
 
@@ -101,6 +104,14 @@ static mrp_lua_classdef_t invalid_classdef = {
 
 
 /**
+ * object infra configurable settings
+ */
+static struct {
+    bool track;                          /* track objects per classdef */
+} cfg;
+
+
+/**
  * indirect table to look up classdefs by type_ids
  */
 static mrp_lua_classdef_t **classdefs;
@@ -109,12 +120,34 @@ static int                  nclassdef;
 /** Our (reference to our) shared table for storing references within object. */
 static int reftbl = LUA_NOREF;
 
-
 /**
  * Macros to convert between userdata and user-visible data addresses.
  */
+#define USERDATA_SIZE                                                   \
+    (cfg.track?MRP_OFFSET(userdata_t, hook[1]):MRP_OFFSET(userdata_t, hook[0]))
+
+#define USER_TO_DATA(u)                                                 \
+    ((void *)(cfg.track ?                                               \
+              &((userdata_t *)(u))->hook[1] : &((userdata_t *)(u))->hook[0]))
+
+#define DATA_TO_USER(d) ((userdata_t *)(((void *)d) - USERDATA_SIZE))
+
+#if 0
 #define USER_TO_DATA(u) ((void *)(((userdata_t *)(u)) + 1))
 #define DATA_TO_USER(d) (((userdata_t *)(d)) - 1)
+#endif
+
+
+/** Check our configuration from the environment. */
+static void check_config(void)
+{
+    char *config = getenv(MRP_LUA_CONFIG_ENVVAR);
+
+    cfg.track = mrp_env_config_bool(config, "track", false);
+
+    if (cfg.track)
+        mrp_log_info("Murphy Lua object tracking enabled.");
+}
 
 
 /** Encode our self(ish) pointer. */
@@ -181,12 +214,19 @@ static inline void *object_get(userdata_t *u, bool check)
 /** Create and register a new object class definition. */
 int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 {
+    static bool chkconfig = true;
+
     if (def->constructor == NULL) {
         mrp_log_error("Classes with NULL constructor not allowed.");
         mrp_log_error("Please define a constructor for class %s (type %s).",
                       def->class_name, def->type_name);
         errno = EINVAL;
         return -1;
+    }
+
+    if (chkconfig) {
+        check_config();
+        chkconfig = false;
     }
 
     /* make a metatatable for userdata, ie for 'c' part of object instances*/
@@ -225,6 +265,8 @@ int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
                        def->class_name);
         }
     }
+
+    mrp_list_init(&def->objects);
 
     /* make the class table */
     luaL_openlib(L, def->constructor, def->methods, 0);
@@ -427,10 +469,14 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
 
     lua_pushliteral(L, "userdata");
 
-    size = sizeof(userdata_t) + def->userdata_size;
+    size = USERDATA_SIZE + def->userdata_size;
     userdata = (userdata_t *)lua_newuserdata(L, size);
 
     memset(userdata, 0, size);
+
+    if (cfg.track)
+        mrp_list_init(&userdata->hook[0]);
+
     userdata->reftbl = LUA_NOREF;
     userdata->exttbl = LUA_NOREF;
 
@@ -466,6 +512,9 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
         luaL_error(L, "Failed to set up bridged methods.");
         return NULL;                     /* not reached */
     }
+
+    if (cfg.track)
+        mrp_list_append(&def->objects, &userdata->hook[0]);
 
     return USER_TO_DATA(userdata);
 }
@@ -760,6 +809,10 @@ static int userdata_destructor(lua_State *L)
         luaL_error(L, "attempt to destroy unknown type of userdata");
     else {
         def = userdata->def;
+
+        if (cfg.track)
+            mrp_list_delete(&userdata->hook[0]);
+
         lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
         if (!lua_rawequal(L, -1, -2))
             luaL_typerror(L, -2, def->userdata_id);
@@ -2356,6 +2409,62 @@ ssize_t mrp_lua_index_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
                             lua_State *L, int index)
 {
     return mrp_lua_object_tostr(mode, buf, size, L, lua_touserdata(L, index));
+}
+
+
+/** Dump all live or zombie Lua objects. */
+void mrp_lua_dump_objects(mrp_lua_tostr_mode_t mode, lua_State *L, FILE *fp)
+{
+    mrp_lua_classdef_t *def;
+    mrp_list_hook_t    *p, *n;
+    userdata_t         *u;
+    void               *d;
+    int                 i, cnt;
+    char                obj[4096];
+
+    fprintf(fp, "Lua memory usage: %d k, %.2f M\n",
+            lua_gc(L, LUA_GCCOUNT, 0), lua_gc(L, LUA_GCCOUNT, 0) / 1024.0);
+
+    for (i = 0; i < nclassdef; i++) {
+        def = classdefs[i];
+
+        if (mrp_list_empty(&def->objects)) {
+            fprintf(fp, "No objects active for Lua class <%s> (%s).\n",
+                    def->class_name, def->type_name);
+            continue;
+        }
+        else
+            fprintf(fp, "Active/zombie objects for Lua class <%s> (%s):\n",
+                    def->class_name, def->type_name);
+
+        cnt = 0;
+        mrp_list_foreach(&def->objects, p, n) {
+            u = mrp_list_entry(p, typeof(*u), hook[0]);
+            d = USER_TO_DATA(u);
+
+            if (mrp_lua_object_tostr(mode, obj, sizeof(obj), L, d) > 0)
+                fprintf(fp, "    #%d: %s\n", cnt, obj);
+            else
+                fprintf(fp, "    failed to dump object %p(%p)\n", u, d);
+            cnt++;
+        }
+    }
+}
+
+
+static void MRP_EXIT cleanup_check(void)
+{
+    lua_State *L;
+
+    if ((L = mrp_lua_get_lua_state()) == NULL) {
+        mrp_log_error("Failed to get Lua state, can't dump objects.");
+        return;
+    }
+
+    if (cfg.track) {
+        lua_gc(L, LUA_GCCOLLECT, 0);
+        mrp_lua_dump_objects(MRP_LUA_TOSTR_CHECKDUMP, L, stdout);
+    }
 }
 
 

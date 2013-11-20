@@ -33,6 +33,8 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#define MRP_LUA_CONFIG_ENVVAR "__MURPHY_LUA_CONFIG"
+
 #define MRP_LUA_ENTER                           \
     mrp_debug("enter")
 
@@ -194,6 +196,9 @@ typedef enum {
 
 /** Stack-dump configuration for errors. */
 #define MRP_LUA_TOSTR_ERRORDUMP (MRP_LUA_TOSTR_ONELINE | MRP_LUA_TOSTR_BOTH)
+
+/** Stack-dump confguration for object-tracking check dump. */
+#define MRP_LUA_TOSTR_CHECKDUMP (MRP_LUA_TOSTR_ONELINE | MRP_LUA_TOSTR_BOTH)
 
 /** Type of an object stringification handler. */
 typedef ssize_t (*mrp_lua_tostr_t)(mrp_lua_tostr_mode_t mode, char *buf,
@@ -622,6 +627,7 @@ struct mrp_lua_classdef_s {
     luaL_reg     *overrides;
 
     mrp_lua_tostr_t tostring;            /* stringification handler */
+    mrp_list_hook_t objects;             /* instances of this class */
 
     /* pre-declared members */
     mrp_lua_class_member_t  *members;    /* pre-declared members */
