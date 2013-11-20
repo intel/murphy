@@ -1608,6 +1608,8 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
     max   = *nitemp;
     tidx  = mrp_lua_absidx(L, tidx);
     items = *itemsp;
+    ltype = LUA_TNONE;
+    isize = 0;
 
     expected = *expectedp;
     popnil   = false;
