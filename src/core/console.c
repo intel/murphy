@@ -165,6 +165,12 @@ mrp_console_t *mrp_create_console(mrp_context_t *ctx, mrp_console_req_t *req,
 
     console_t *c;
 
+    if (ctx->disable_console) {
+        mrp_log_error("Usage of debug console has been explicitly disabled.");
+        errno = EPERM;
+        return NULL;
+    }
+
     if (req->write == NULL || req->close      == NULL ||
         req->free  == NULL || req->set_prompt == NULL)
         return NULL;

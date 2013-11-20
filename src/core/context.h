@@ -66,6 +66,7 @@ struct mrp_context_s {
     const char *whitelist_plugins;         /* whitelisted plugins */
     const char *whitelist_builtin;         /* whitelisted builtin plugins */
     const char *whitelist_dynamic;         /* whitelisted dynamic plugins */
+    bool        disable_console;           /* disable murphy console */
 
     /* actual runtime context data */
     int              state;                /* context/daemon state */
