@@ -48,6 +48,7 @@ libmurphy_common_la_HEADERS =		\
 		common/log.h		\
 		common/debug.h 		\
 		common/debug-info.h	\
+		common/env.h		\
 		common/mm.h		\
 		common/hashtbl.h	\
 		common/process.h	\
@@ -63,6 +64,7 @@ libmurphy_common_la_HEADERS =		\
 libmurphy_common_la_REGULAR_SOURCES =		\
 		common/log.c			\
 		common/debug.c			\
+		common/env.c			\
 		common/mm.c			\
 		common/hashtbl.c		\
 		common/mainloop.c		\
