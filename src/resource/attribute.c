@@ -163,7 +163,7 @@ int mrp_attribute_set_values(mrp_attr_t      *values,
 
 
     MRP_ASSERT(!nattr || (nattr > 0 && defs && attrs),
-               "invlaid arguments");
+               "invalid arguments");
 
     for (i = 0;  i < nattr;  i++) {
         adef = defs  + i;
@@ -175,7 +175,8 @@ int mrp_attribute_set_values(mrp_attr_t      *values,
 
         if (adef->type !=  mqi_string)
             *vdst = *vsrc;
-        else {
+        else if (vdst->string != vsrc->string) {
+            /* if the string is not the same, change it */
             mrp_free((void *)vdst->string);
             if (!(vdst->string = mrp_strdup(vsrc->string)))
                 return -1;
