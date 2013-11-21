@@ -93,6 +93,8 @@ static void print_usage(mrp_context_t *ctx, const char *argv0, int exit_code,
            "  -w, --whitelist-plugins <list> disable list of plugins\n"
            "  -i, --whitelist-builtin <list> disable list of builtin plugins\n"
            "  -e, --whitelist-dynamic <list> disable list of dynamic plugins\n"
+           "  -R, --no-poststart-load        "
+                    "disable post-startup plugin loading\n"
            "  -p, --disable-console          disable Murphy debug console\n"
            "  -V, --valgrind                 run through valgrind\n",
            argv0, ctx->config_file, ctx->config_dir, ctx->plugin_dir);
@@ -227,7 +229,7 @@ static void config_set_defaults(mrp_context_t *ctx, char *argv0)
 
 void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
 {
-#   define OPTIONS "c:C:l:t:fP:a:vd:DhHqB:I:E:w:i:e:pV"
+#   define OPTIONS "c:C:l:t:fP:a:vd:DhHqB:I:E:w:i:e:RpV"
     struct option options[] = {
         { "config-file"      , required_argument, NULL, 'c' },
         { "config-dir"       , required_argument, NULL, 'C' },
@@ -249,6 +251,7 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
         { "whitelist-plugins", required_argument, NULL, 'w' },
         { "whitelist-builtin", required_argument, NULL, 'i' },
         { "whitelist-dynamic", required_argument, NULL, 'e' },
+        { "no-poststart-load", no_argument      , NULL, 'R' },
         { "disable-console"  , no_argument      , NULL, 'p' },
         { "valgrind"         , optional_argument, NULL, 'V' },
         { NULL, 0, NULL, 0 }
@@ -392,6 +395,12 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
             SAVE_OPTARG("-e", optarg);
             ctx->whitelist_dynamic = optarg;
             break;
+
+        case 'R':
+            SAVE_OPT("-R");
+            ctx->disable_runtime_load = true;
+            break;
+
         case 'p':
             SAVE_OPT("-p");
             ctx->disable_console = TRUE;

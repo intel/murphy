@@ -303,6 +303,11 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
     if (instance == NULL)
         instance = name;
 
+    if (ctx->state == MRP_STATE_RUNNING && ctx->disable_runtime_load) {
+        mrp_log_error("Post-startup plugin loading has been disabled.");
+        return NULL;
+    }
+
     if (find_plugin_instance(ctx, instance) != NULL) {
         mrp_log_error("Plugin '%s' has already been loaded.", instance);
         return NULL;
