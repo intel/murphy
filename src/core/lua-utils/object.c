@@ -2454,22 +2454,6 @@ void mrp_lua_dump_objects(mrp_lua_tostr_mode_t mode, lua_State *L, FILE *fp)
 }
 
 
-static void MRP_EXIT cleanup_check(void)
-{
-    lua_State *L;
-
-    if ((L = mrp_lua_get_lua_state()) == NULL) {
-        mrp_log_error("Failed to get Lua state, can't dump objects.");
-        return;
-    }
-
-    if (cfg.track) {
-        lua_gc(L, LUA_GCCOLLECT, 0);
-        mrp_lua_dump_objects(MRP_LUA_TOSTR_CHECKDUMP, L, stdout);
-    }
-}
-
-
 /*
  * Local Variables:
  * c-basic-offset: 4
