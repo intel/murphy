@@ -33,6 +33,8 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include "murphy/common/list.h"
+
 #define MRP_LUA_CONFIG_ENVVAR "__MURPHY_LUA_CONFIG"
 
 #define MRP_LUA_ENTER                           \
