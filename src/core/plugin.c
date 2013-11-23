@@ -43,6 +43,8 @@
 #define BUILTIN TRUE
 #define DYNAMIC FALSE
 
+#define __PARANOID_BLACKLIST_CHECK__
+
 static mrp_plugin_descr_t *open_builtin(mrp_context_t *ctx, const char *name);
 static mrp_plugin_descr_t *open_dynamic(mrp_context_t *ctx, const char *name,
                                         void **handle);
@@ -191,10 +193,6 @@ static inline int is_blacklisted(mrp_context_t *ctx, const char *name,
 
 
  verdict:
-    if (blacklist)
-        mrp_log_warning("%s plugin '%s' is blacklisted.",
-                        builtin ? "Builtin" : "Dynamic", name);
-
     mrp_debug("%s: %sblacklisted", name, blacklist ? "" : "not ");
 
     return blacklist;
@@ -231,6 +229,23 @@ int mrp_register_builtin_plugin(mrp_plugin_descr_t *descriptor)
         mrp_log_error("Ignoring static plugin '%s' with an invalid or "
                       "incomplete plugin descriptor.", descriptor->path);
         return FALSE;
+    }
+}
+
+
+void mrp_block_blacklisted_plugins(mrp_context_t *ctx)
+{
+    mrp_list_hook_t *p, *n;
+    mrp_plugin_t    *builtin;
+
+    mrp_list_foreach(&builtin_plugins, p, n) {
+        builtin = mrp_list_entry(p, typeof(*builtin), hook);
+
+        if (is_blacklisted(ctx, builtin->descriptor->name, BUILTIN)) {
+            mrp_log_info("Unlinking blacklisted builtin plugin %s",
+                         builtin->descriptor->name);
+            mrp_list_delete(&builtin->hook);
+        }
     }
 }
 
@@ -329,7 +344,8 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
     }
     else {
         if (builtin == NULL) {
-            mrp_log_error("Could not find plugin '%s'.", name);
+            mrp_log_error("Could not find plugin '%s' to load '%s'.", name,
+                          instance);
             return NULL;
         }
         descr = builtin;
@@ -732,14 +748,20 @@ static mrp_plugin_descr_t *open_builtin(mrp_context_t *ctx, const char *name)
     mrp_list_hook_t *p, *n;
     mrp_plugin_t    *plugin;
 
-    if (is_blacklisted(ctx, name, BUILTIN))
-        return NULL;
-
     mrp_list_foreach(&builtin_plugins, p, n) {
         plugin = mrp_list_entry(p, typeof(*plugin), hook);
 
-        if (!strcmp(plugin->descriptor->name, name))
-            return plugin->descriptor;
+        if (!strcmp(plugin->descriptor->name, name)) {
+#ifdef __PARANOID_BLACKLIST_CHECK__
+            if (is_blacklisted(ctx, name, BUILTIN)) {
+                mrp_log_warning("Hmm... blacklisted builtin %s still "
+                                "reachable, blocking it.", name);
+                return NULL;
+            }
+            else
+#endif
+                return plugin->descriptor;
+        }
     }
 
     return NULL;

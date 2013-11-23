@@ -430,6 +430,7 @@ int mrp_start_plugin(mrp_plugin_t *plugin);
 int mrp_stop_plugin(mrp_plugin_t *plugin);
 int mrp_request_plugin(mrp_context_t *ctx, const char *name,
                        const char *instance);
+void mrp_block_blacklisted_plugins(mrp_context_t *ctx);
 
 mrp_plugin_arg_t *mrp_plugin_find_undecl_arg(mrp_plugin_arg_t *undecl,
                                              const char *key,
