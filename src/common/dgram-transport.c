@@ -695,6 +695,64 @@ static int dgrm_senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
 }
 
 
+static int sendnativeto(mrp_transport_t *mu, void *data, uint32_t type_id,
+                        mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    dgrm_t        *u   = (dgrm_t *)mu;
+    mrp_typemap_t *map = u->map;
+    void          *buf;
+    size_t         size, reserve;
+    uint32_t      *lenp;
+    ssize_t        n;
+
+    if (MRP_UNLIKELY(u->sock == -1)) {
+        if (!open_socket(u, ((struct sockaddr *)addr)->sa_family))
+            return FALSE;
+    }
+
+    reserve = sizeof(*lenp);
+
+    if (mrp_encode_native(data, type_id, reserve, &buf, &size, map) > 0) {
+        lenp  = buf;
+        *lenp = htobe32(size - sizeof(*lenp));
+
+        if (u->connected)
+            n = send(u->sock, buf, size, 0);
+        else
+            n = sendto(u->sock, buf, size, 0, &addr->any, addrlen);
+
+        mrp_free(buf);
+
+        if (n == (ssize_t)size)
+            return TRUE;
+        else {
+            if (n == -1 && errno == EAGAIN) {
+                mrp_log_error("%s(): XXX TODO: dgrm-transport send"
+                              " needs queuing", __FUNCTION__);
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+
+static int dgrm_sendnative(mrp_transport_t *mu, void *data, uint32_t type_id)
+{
+    if (mu->connected)
+        return sendnativeto(mu, data, type_id, NULL, 0);
+    else
+        return FALSE;
+}
+
+
+static int dgrm_sendnativeto(mrp_transport_t *mu, void *data, uint32_t type_id,
+                             mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    return sendnativeto(mu, data, type_id, addr, addrlen);
+}
+
+
 MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
                        dgrm_bind, dgrm_listen, NULL,
@@ -702,7 +760,8 @@ MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
                        dgrm_send, dgrm_sendto,
                        dgrm_sendraw, dgrm_sendrawto,
                        dgrm_senddata, dgrm_senddatato,
-                       NULL, NULL);
+                       NULL, NULL,
+                       dgrm_sendnative, dgrm_sendnativeto);
 
 MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
@@ -711,7 +770,8 @@ MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_send, dgrm_sendto,
                        dgrm_sendraw, dgrm_sendrawto,
                        dgrm_senddata, dgrm_senddatato,
-                       NULL, NULL);
+                       NULL, NULL,
+                       dgrm_sendnative, dgrm_sendnativeto);
 
 MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
@@ -720,4 +780,5 @@ MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
                        dgrm_send, dgrm_sendto,
                        dgrm_sendraw, dgrm_sendrawto,
                        dgrm_senddata, dgrm_senddatato,
-                       NULL, NULL);
+                       NULL, NULL,
+                       dgrm_sendnative, dgrm_sendnativeto);

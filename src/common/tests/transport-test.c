@@ -83,6 +83,10 @@ typedef struct {
 } custom_t;
 
 
+typedef custom_t native_t;
+
+static uint32_t native_id;
+
 MRP_DATA_DESCRIPTOR(custom_descr, TAG_CUSTOM, custom_t,
                     MRP_DATA_MEMBER(custom_t,  seq, MRP_MSG_FIELD_UINT32),
                     MRP_DATA_MEMBER(custom_t,  msg, MRP_MSG_FIELD_STRING),
@@ -117,6 +121,8 @@ MRP_DATA_DESCRIPTOR(buggy_descr, TAG_CUSTOM, custom_t,
                     MRP_DATA_ARRAY_GUARD(custom_t, au32, u32, U32_GUARD,
                                          MRP_MSG_FIELD_UINT32));
 
+
+
 mrp_data_descr_t *data_descr;
 
 
@@ -125,6 +131,7 @@ typedef enum {
     MODE_MESSAGE = 1,
     MODE_DATA    = 2,
     MODE_RAW     = 3,
+    MODE_NATIVE  = 4,
 } msg_mode_t;
 
 
@@ -335,6 +342,57 @@ void recv_raw(mrp_transport_t *t, void *data, size_t size, void *user_data)
 }
 
 
+void free_native(native_t *msg)
+{
+    mrp_free_native(msg, native_id);
+}
+
+
+void recvfrom_native(mrp_transport_t *t, void *data, uint32_t type_id,
+                     mrp_sockaddr_t *addr, socklen_t addrlen, void *user_data)
+{
+    context_t *c   = (context_t *)user_data;
+    native_t  *msg = (native_t *)data;
+    native_t   rpl;
+    char       buf[256];
+    uint32_t   au32[] = { 9, 8, 7, 6, 5, -1 };
+    int        status;
+
+    mrp_log_info("received native message of type 0x%x", type_id);
+    dump_custom(data, stdout);
+
+    if (type_id != native_id) {
+        mrp_log_error("Received type 0x%x, expected 0x%x.", type_id, native_id);
+        exit(1);
+    }
+
+    if (c->server) {
+        rpl = *msg;
+        snprintf(buf, sizeof(buf), "reply to message #%u", msg->seq);
+        rpl.rpl  = buf;
+        rpl.au32 = au32;
+
+        if (c->connect)
+            status = mrp_transport_sendnative(t, &rpl, native_id);
+        else
+            status = mrp_transport_sendnativeto(t, &rpl, native_id,
+                                                addr, addrlen);
+        if (status)
+            mrp_log_info("reply successfully sent");
+        else
+            mrp_log_error("failed to send reply");
+    }
+
+    free_native(msg);
+}
+
+
+void recv_native(mrp_transport_t *t, void *data, uint32_t type_id,
+                 void *user_data)
+{
+    recvfrom_native(t, data, type_id, NULL, 0, user_data);
+}
+
 
 void closed_evt(mrp_transport_t *t, int error, void *user_data)
 {
@@ -386,6 +444,34 @@ void type_init(context_t *c)
 }
 
 
+void register_native(void)
+{
+    MRP_NATIVE_TYPE(native_type, native_t,
+                    MRP_UINT32(native_t, seq        , DEFAULT),
+                    MRP_STRING(native_t, msg        , DEFAULT),
+                    MRP_UINT8 (native_t, u8         , DEFAULT),
+                    MRP_INT8  (native_t, s8         , DEFAULT),
+                    MRP_UINT16(native_t, u16        , DEFAULT),
+                    MRP_INT16 (native_t, s16        , DEFAULT),
+                    MRP_DOUBLE(native_t, dbl        , DEFAULT),
+                    MRP_BOOL  (native_t, bln        , DEFAULT),
+                    MRP_ARRAY (native_t, astr       , DEFAULT, SIZED,
+                               char *, nstr),
+                    MRP_UINT32(native_t, nstr       , DEFAULT),
+                    MRP_ARRAY (native_t, au32       , DEFAULT, GUARDED,
+                               uint32_t, "", .u32 = -1),
+                    MRP_STRING(native_t, rpl        , DEFAULT));
+
+
+    if ((native_id = mrp_register_native(&native_type)) != MRP_INVALID_TYPE)
+        mrp_log_info("Successfully registered native type 'native_t'.");
+    else {
+        mrp_log_error("Failed to register native type 'native_t'.");
+        exit(1);
+    }
+}
+
+
 void server_init(context_t *c)
 {
     static mrp_transport_evt_t evt = {
@@ -408,6 +494,10 @@ void server_init(context_t *c)
         evt.recvraw      = recv_raw;
         evt.recvrawfrom  = recvfrom_raw;
         break;
+    case MODE_NATIVE:
+        evt.recvnative     = recv_native;
+        evt.recvnativefrom = recvfrom_native;
+        break;
     case MODE_MESSAGE:
     default:
         evt.recvmsg      = recv_msg;
@@ -422,8 +512,9 @@ void server_init(context_t *c)
     flags = MRP_TRANSPORT_REUSEADDR;
 
     switch (c->mode) {
-    case MODE_DATA:    flags |= MRP_TRANSPORT_MODE_DATA; break;
-    case MODE_RAW:     flags |= MRP_TRANSPORT_MODE_RAW;  break;
+    case MODE_DATA:    flags |= MRP_TRANSPORT_MODE_DATA;   break;
+    case MODE_RAW:     flags |= MRP_TRANSPORT_MODE_RAW;    break;
+    case MODE_NATIVE:  flags |= MRP_TRANSPORT_MODE_NATIVE; break;
     default:
     case MODE_MESSAGE: flags |= MRP_TRANSPORT_MODE_MSG;
     }
@@ -560,6 +651,44 @@ void send_raw(context_t *c)
 }
 
 
+void send_native(context_t *c)
+{
+    uint32_t  seq = c->seqno++;
+    custom_t  msg;
+    char      buf[256];
+    char     *astr[] = { "this", "is", "a", "test", "string", "array" };
+    uint32_t  au32[] = { 1, 2, 3, 4, 5, 6, 7, -1 };
+    int       status;
+
+    msg.seq = seq;
+    snprintf(buf, sizeof(buf), "this is message #%u", (unsigned int)seq);
+    msg.msg  = buf;
+    msg.u8   =   seq & 0xf;
+    msg.s8   = -(seq & 0xf);
+    msg.u16  =   seq;
+    msg.s16  = - seq;
+    msg.dbl  =   seq / 3.0;
+    msg.bln  =   seq & 0x1;
+    msg.astr = astr;
+    msg.nstr = MRP_ARRAY_SIZE(astr);
+    msg.fsck = 1000;
+    msg.au32 = au32;
+    msg.rpl  = "";
+
+    if (c->connect)
+        status = mrp_transport_sendnative(c->t, &msg, native_id);
+    else
+        status = mrp_transport_sendnativeto(c->t, &msg, native_id,
+                                            &c->addr, c->alen);
+
+    if (!status) {
+        mrp_log_error("Failed to send message #%d.", msg.seq);
+        exit(1);
+    }
+    else
+        mrp_log_info("Message #%d succesfully sent.", msg.seq);
+}
+
 
 void send_cb(mrp_timer_t *t, void *user_data)
 {
@@ -568,8 +697,9 @@ void send_cb(mrp_timer_t *t, void *user_data)
     MRP_UNUSED(t);
 
     switch (c->mode) {
-    case MODE_DATA:    send_data(c); break;
-    case MODE_RAW:     send_raw(c);  break;
+    case MODE_DATA:    send_data(c);   break;
+    case MODE_RAW:     send_raw(c);    break;
+    case MODE_NATIVE:  send_native(c); break;
     default:
     case MODE_MESSAGE: send_msg(c);
     }
@@ -599,6 +729,11 @@ void client_init(context_t *c)
         evt.recvraw      = recv_raw;
         evt.recvrawfrom  = recvfrom_raw;
         flags            = MRP_TRANSPORT_MODE_RAW;
+        break;
+    case MODE_NATIVE:
+        evt.recvnative     = recv_native;
+        evt.recvnativefrom = recvfrom_native;
+        flags              = MRP_TRANSPORT_MODE_NATIVE;
         break;
     default:
     case MODE_MESSAGE:
@@ -667,6 +802,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -c, --custom                   use custom messages\n"
            "  -m, --message                  use generic messages (default)\n"
            "  -r, --raw                      use raw messages\n"
+           "  -n, --native                   use native messages\n"
            "  -b, --buggy                    use buggy data descriptors\n"
            "  -t, --log-target=TARGET        log target to use\n"
            "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
@@ -696,13 +832,14 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "scmrbCa:l:t:v:d:h"
+#   define OPTIONS "scmrnbCa:l:t:v:d:h"
     struct option options[] = {
         { "server"    , no_argument      , NULL, 's' },
         { "address"   , required_argument, NULL, 'a' },
         { "custom"    , no_argument      , NULL, 'c' },
         { "message"   , no_argument      , NULL, 'm' },
         { "raw"       , no_argument      , NULL, 'r' },
+        { "native"    , no_argument      , NULL, 'n' },
         { "connect"   , no_argument      , NULL, 'C' },
 
         { "buggy"     , no_argument      , NULL, 'b' },
@@ -745,6 +882,15 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
         case 'r':
             if (ctx->mode == MODE_DEFAULT)
                 ctx->mode = MODE_RAW;
+            else {
+                mrp_log_error("Multiple modes requested.");
+                exit(1);
+            }
+            break;
+
+        case 'n':
+            if (ctx->mode == MODE_DEFAULT)
+                ctx->mode = MODE_NATIVE;
             else {
                 mrp_log_error("Multiple modes requested.");
                 exit(1);
@@ -818,6 +964,10 @@ int main(int argc, char *argv[])
     switch (c.mode) {
     case MODE_DATA:    mrp_log_info("Using custom data messages..."); break;
     case MODE_RAW:     mrp_log_info("Using raw messages...");         break;
+    case MODE_NATIVE:
+        register_native();
+        mrp_log_info("Using native messages...");
+        break;
     default:
     case MODE_MESSAGE: mrp_log_info("Using generic messages...");
     }

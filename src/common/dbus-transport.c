@@ -1715,5 +1715,6 @@ MRP_REGISTER_TRANSPORT(dbus, DBUS, dbus_t, dbus_resolve,
                        dbus_sendmsg, dbus_sendmsgto,
                        dbus_sendraw, dbus_sendrawto,
                        dbus_senddata, dbus_senddatato,
+                       NULL, NULL,
                        NULL, NULL);
 

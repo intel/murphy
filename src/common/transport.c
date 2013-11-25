@@ -32,8 +32,9 @@
 
 #include <murphy/common/mm.h>
 #include <murphy/common/list.h>
-#include <murphy/common/transport.h>
 #include <murphy/common/log.h>
+#include <murphy/common/native-types.h>
+#include <murphy/common/transport.h>
 
 static int check_destroy(mrp_transport_t *t);
 static int recv_data(mrp_transport_t *t, void *data, size_t size,
@@ -575,12 +576,51 @@ int mrp_transport_sendcustomto(mrp_transport_t *t, void *data,
 }
 
 
+int mrp_transport_sendnative(mrp_transport_t *t, void *data, uint32_t type_id)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_NATIVE && t->descr->req.sendnative) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendnative(t, data, type_id);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
+int mrp_transport_sendnativeto(mrp_transport_t *t, void *data, uint32_t type_id,
+                               mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_NATIVE && t->descr->req.sendnativeto) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendnativeto(t, data, type_id,
+                                                    addr, addrlen);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
 static int recv_data(mrp_transport_t *t, void *data, size_t size,
                      mrp_sockaddr_t *addr, socklen_t addrlen)
 {
     mrp_data_descr_t *type;
     uint16_t          tag;
     mrp_msg_t        *msg;
+    uint32_t          type_id;
     void             *decoded;
 
     switch (t->mode) {
@@ -686,6 +726,29 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
             }
         }
         return -EPROTOTYPE;
+
+    case MRP_TRANSPORT_MODE_NATIVE:
+        type_id = 0;
+        if (mrp_decode_native(&data, &size, &decoded, &type_id, t->map) < 0)
+            return -EPROTO;
+
+        if (decoded == NULL || size != 0) {
+            mrp_free_native(decoded, type_id);
+            return -EPROTO;
+        }
+
+        if (t->connected) {
+            MRP_TRANSPORT_BUSY(t, {
+                    t->evt.recvnative(t, decoded, type_id, t->user_data);
+                });
+        }
+        else {
+            MRP_TRANSPORT_BUSY(t, {
+                    t->evt.recvnativefrom(t, decoded, type_id, addr, addrlen,
+                                          t->user_data);
+                });
+        }
+        return 0;
 
     default:
         return -EPROTOTYPE;
