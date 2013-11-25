@@ -4,7 +4,7 @@ noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
                  internal-transport-test process-watch-test native-test \
                  sdbus-error-message
 
-if DBUS_ENABLED
+if LIBDBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
 
