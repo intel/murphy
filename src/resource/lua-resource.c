@@ -325,9 +325,14 @@ static int resource_set_add_resource(lua_State *L)
     }
     lua_pop(L, 1);
 
-    /* create resource object and add it to the resource table in the resource set object */
+    /* create resource object and add it to the resource table in the resource
+     * set object */
 
-    resource = (resource_lua_t *) mrp_lua_create_object(L, RESOURCE_LUA_CLASS, NULL, 0);
+    resource = (resource_lua_t *) mrp_lua_create_object(L, RESOURCE_LUA_CLASS,
+            NULL, 0);
+
+    if (!resource)
+        goto error;
 
     resource->mandatory = mandatory;
     resource->shared = shared;
@@ -335,20 +340,26 @@ static int resource_set_add_resource(lua_State *L)
     resource->available = FALSE;
     resource->resource_name = mrp_strdup(resource_name);
 
+    if (!resource->resource_name)
+        goto error;
+
     resource->parent = rset;
     resource->L = L;
     resource->ctx = rset->ctx;
 
-    resource->real_attributes = (attribute_lua_t *) mrp_lua_create_object(L, ATTRIBUTE_LUA_CLASS, NULL, 0);
+    resource->real_attributes = (attribute_lua_t *) mrp_lua_create_object(L,
+            ATTRIBUTE_LUA_CLASS, NULL, 0);
     resource->real_attributes->L = L;
     resource->real_attributes->ctx = rset->ctx;
     resource->real_attributes->parent = resource;
     resource->real_attributes->resource_set = rset;
     resource->real_attributes->initialized = TRUE;
 
-    attrs = mrp_resource_set_read_all_attributes(rset->resource_set, resource_name, MAX_ATTRS-1, attribute_list);
+    attrs = mrp_resource_set_read_all_attributes(rset->resource_set,
+            resource->resource_name, MAX_ATTRS-1, attribute_list);
 
-    if (mrp_resource_set_add_resource(rset->resource_set, resource->resource_name, shared, attrs, mandatory) < 0)
+    if (mrp_resource_set_add_resource(rset->resource_set,
+            resource->resource_name, shared, attrs, mandatory) < 0)
         goto error;
 
     /* add to resource map */
@@ -358,6 +369,8 @@ static int resource_set_add_resource(lua_State *L)
     return 1;
 
 error:
+    /* TODO: clean up the already allocated objects */
+
     return luaL_error(L, "internal resource library error");
 }
 
@@ -445,6 +458,9 @@ static int resource_set_lua_create(lua_State *L)
     narg = lua_gettop(L);
 
     rset = (resource_set_lua_t *) mrp_lua_create_object(L, RESOURCE_SET_LUA_CLASS, NULL, 0);
+
+    if (!rset)
+        return luaL_error(L, "could not create Lua object");
 
     rset->L = L;
     rset->ctx = ctx;
@@ -923,7 +939,8 @@ static int attribute_lua_stringify(lua_State *L)
                 p += 1;
                 break;
             case mqi_integer:
-                snprintf(numbuf, sizeof(numbuf), "%d", attrs->value.integer);
+                snprintf(numbuf, sizeof(numbuf), "%d",
+                        (int) attrs->value.integer);
                 vallen = strlen(numbuf);
                 available -= vallen + 1;
                 if (available < 0)
@@ -991,14 +1008,16 @@ static int attribute_lua_getfield(lua_State *L)
 
     /* attributes are indexed by string */
 
-    if (lua_type(L, 2) != LUA_TSTRING) {
+    if (lua_type(L, 2) != LUA_TSTRING)
         return luaL_error(L, "invalid attribute index type (needs to be string)");
-    }
 
     key = lua_tostring(L, 2);
 
     attrs = mrp_resource_set_read_all_attributes(rset->resource_set,
             res->resource_name, MAX_ATTRS-1, attribute_list);
+
+    if (!attrs)
+        return luaL_error(L, "internal resource library error");
 
     while (attrs->name != NULL) {
 
@@ -1049,15 +1068,17 @@ static int attribute_lua_setfield(lua_State *L)
 
     /* attributes are indexed by string */
 
-    if (lua_type(L, 2) != LUA_TSTRING) {
+    if (lua_type(L, 2) != LUA_TSTRING)
         return luaL_error(L, "invalid attribute index type (needs to be string)");
-    }
 
     key = lua_tostring(L, 2);
     new_type = lua_type(L, 3);
 
     attrs = mrp_resource_set_read_all_attributes(rset->resource_set,
             res->resource_name, MAX_ATTRS-1, attribute_list);
+
+    if (!attrs)
+        return luaL_error(L, "internal resource library error");
 
     orig = attrs;
 
