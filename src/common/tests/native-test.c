@@ -42,16 +42,17 @@ typedef enum {
 
 
 typedef struct {
-    char     *name;
-    gender_t  gender;
-    uint16_t  age;
-    uint16_t  height;
-    float     weight;
-    char      nationality[32];
-    hand_t    hand;
-    bool      glasses;
-    art_t    *favourites;
-    uint32_t  nfavourite;
+    char      *name;
+    gender_t   gender;
+    uint16_t   age;
+    char     **languages;
+    uint16_t   height;
+    float      weight;
+    char       nationality[32];
+    hand_t     hand;
+    bool       glasses;
+    art_t     *favourites;
+    uint32_t   nfavourite;
 } person_t;
 
 
@@ -86,10 +87,15 @@ art_t paps_favourites[] = {
 };
 
 
+char *paps_languages[] = {
+    "english", "swedish", "finnish", NULL
+};
+
 person_t pap = {
     .name        = "Pap",
     .gender      = MALE,
     .age         = 30,
+    .languages   = paps_languages,
     .height      = 180,
     .weight      = 84.5,
     .nationality = "martian",
@@ -124,10 +130,15 @@ art_t moms_favourites[] = {
 };
 
 
+char *moms_languages[] = {
+    "finnish", "english", "swedish", "french", NULL
+};
+
 person_t mom = {
     .name        = "Mom",
     .gender      = FEMALE,
     .age         = 28,
+    .languages   = moms_languages,
     .height      = 165,
     .weight      = 57.8,
     .nationality = "venusian",
@@ -138,11 +149,16 @@ person_t mom = {
 };
 
 
+char *kids_languages[] = {
+    "english", "finnish", "swedish", NULL
+};
+
 person_t tom_dick_and_harry[] = {
     {
         .name        = "Tom",
         .gender      = MALE,
         .age         = 10,
+        .languages   = kids_languages + 1,
         .height      = 135,
         .weight      = 40.5,
         .nationality = "UFO",
@@ -155,6 +171,7 @@ person_t tom_dick_and_harry[] = {
         .name        = "Dick",
         .gender      = MALE,
         .age         = 12,
+        .languages   = kids_languages,
         .height      = 145,
         .weight      = 45.5,
         .nationality = "UFO",
@@ -167,6 +184,7 @@ person_t tom_dick_and_harry[] = {
         .name        = "Harry",
         .gender      = MALE,
         .age         = 14,
+        .languages   = kids_languages + 2,
         .height      = 165,
         .weight      = 60.5,
         .nationality = "UFO",
@@ -197,6 +215,8 @@ int main(int argc, char *argv[])
                     MRP_STRING(person_t, name       , DEFAULT),
                     MRP_UINT32(person_t, gender     , DEFAULT),
                     MRP_UINT16(person_t, age        , DEFAULT),
+                    MRP_ARRAY (person_t, languages  , DEFAULT, GUARDED,
+                               char *, "", .strp = NULL),
                     MRP_UINT16(person_t, height     , DEFAULT),
                     MRP_FLOAT (person_t, weight     , DEFAULT),
                     MRP_STRING(person_t, nationality, INLINED),

@@ -110,6 +110,7 @@ static int member_index(mrp_native_type_t *t, const char *name)
 static int copy_member(mrp_native_type_t *t, mrp_native_member_t *m)
 {
     mrp_native_member_t *tm;
+    size_t               size;
 
     if ((tm = native_member(t, member_index(t, m->any.name))) != NULL)
         return tm - t->members;
@@ -118,7 +119,16 @@ static int copy_member(mrp_native_type_t *t, mrp_native_member_t *m)
 
     *tm = *m;
 
-    if ((tm->any.name = mrp_strdup(m->any.name)) != 0) {
+    if (*m->any.name != '"')
+         tm->any.name = mrp_strdup(m->any.name);
+     else {
+         size = strlen(m->any.name) + 1 - 2;
+
+         if ((tm->any.name = mrp_allocz(size)) != NULL)
+             strncpy(tm->any.name, m->any.name + 1, size - 1);
+     }
+
+    if (tm->any.name != NULL) {
         t->nmember++;
         return tm - t->members;
     }
@@ -381,7 +391,7 @@ uint32_t mrp_register_native(mrp_native_type_t *type)
 
             if (m == NULL) {
                 m = native_member(type,
-                                      member_index(type, s->blob.size.name));
+                                  member_index(type, s->blob.size.name));
 
                 if (m == NULL)
                     goto fail;
@@ -408,8 +418,7 @@ uint32_t mrp_register_native(mrp_native_type_t *type)
 
                 if (m == NULL) {
                     m = native_member(type,
-                                          member_index(type,
-                                                       s->array.size.name));
+                                      member_index(type, s->array.size.name));
 
                     if (m == NULL)
                         goto fail;
@@ -448,12 +457,15 @@ uint32_t mrp_register_native(mrp_native_type_t *type)
                 if (elemt == NULL)
                     goto fail;
 
-                idx = member_index(elemt, s->array.size.name);
+                if (elemt->id < MRP_TYPE_ARRAY)
+                    idx = 0;
+                else {
+                    idx = member_index(elemt, s->array.size.name);
+                    d->array.size.idx = member_index(elemt, s->array.size.name);
 
-                d->array.size.idx = member_index(elemt, s->array.size.name);
-
-                if (d->array.size.idx == (uint32_t)-1)
-                    goto fail;
+                    if (d->array.size.idx == (uint32_t)-1)
+                        goto fail;
+                }
             }
 
             break;
@@ -722,6 +734,8 @@ static int encode_array(mrp_tlv_t *tlv, void *arrp, mrp_native_array_t *m,
         v = elem;
 
         switch (t->id) {
+        case MRP_TYPE_STRING:
+            v = *(void **)elem;
         case MRP_TYPE_INT8:
         case MRP_TYPE_UINT8:
         case MRP_TYPE_INT16:
@@ -733,7 +747,6 @@ static int encode_array(mrp_tlv_t *tlv, void *arrp, mrp_native_array_t *m,
         case MRP_TYPE_FLOAT:
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
-        case MRP_TYPE_STRING:
             if (encode_basic(tlv, t->id, v) < 0)
                 return -1;
             break;
@@ -1281,6 +1294,8 @@ static int print_array(char **bufp, size_t *sizep, int level,
         v = elem;
 
         switch (et->id) {
+        case MRP_TYPE_STRING:
+            v = *(void **)elem;
         case MRP_TYPE_INT8:
         case MRP_TYPE_UINT8:
         case MRP_TYPE_INT16:
@@ -1292,7 +1307,6 @@ static int print_array(char **bufp, size_t *sizep, int level,
         case MRP_TYPE_FLOAT:
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
-        case MRP_TYPE_STRING:
             if (print_basic(level, &p, &size, et->id, NULL, v) < 0)
                 return -1;
             break;
