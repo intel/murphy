@@ -184,6 +184,9 @@ static void state_callback(mrp_res_context_t *context,
                     resource = mrp_res_get_resource_by_name(context, rs,
                             resource_names->strings[i]);
 
+                    if (!resource)
+                        continue;
+
                     printf("resource %d is %s\n", i, resource->name);
                     if (strcmp(resource->name, "audio_playback") == 0)
                         system_handles_audio = TRUE;
@@ -199,6 +202,10 @@ static void state_callback(mrp_res_context_t *context,
                         attr = mrp_res_get_attribute_by_name(context,
                                 resource,
                                 attributes->strings[j]);
+
+                        if (!attr)
+                            continue;
+
                         printf("attr %s has ", attr->name);
                         switch(attr->type) {
                             case mrp_string:
@@ -207,7 +214,7 @@ static void state_callback(mrp_res_context_t *context,
                                 break;
                             case mrp_int32:
                                 printf("type int32 and value %d\n",
-                                        attr->integer);
+                                        (int) attr->integer);
                                 break;
                             case mrp_uint32:
                                 printf("type uint32 and value %u\n",
@@ -314,7 +321,8 @@ static void resource_callback(mrp_res_context_t *cx,
     res = mrp_res_get_resource_by_name(cx, rs, "audio_playback");
     attr = mrp_res_get_attribute_by_name(cx, res, "role");
 
-    printf("attribute '%s' has role '%s'\n", res->name, attr->string);
+    if (res && attr)
+        printf("attribute '%s' has role '%s'\n", res->name, attr->string);
 
     /* acquiring a copy of an existing release set means:
      *  - acquired state: update, since otherwise no meaning
@@ -332,6 +340,8 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
     int size;
 
     my_app_data *app_data = (my_app_data *) user_data;
+
+    memset(buf, 0, sizeof(buf));
 
     if (events & MRP_IO_EVENT_IN) {
         size = read(fd, buf, sizeof(buf) - 1);
@@ -360,7 +370,9 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
             case 'Q':
                 if (app_data->rs)
                     mrp_res_delete_resource_set(app_data->cx, app_data->rs);
-                mrp_mainloop_quit(ml, 0);
+                if (ml)
+                    mrp_mainloop_quit(ml, 0);
+                break;
             default:
                 printf("'C' to create resource set\n'A' to acquire\n'D' to release\n'Q' to quit\n");
                 break;
