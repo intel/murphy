@@ -27,6 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <unistd.h>
+
 #include <lualib.h>
 #include <lauxlib.h>
 
@@ -42,6 +44,8 @@ static mrp_context_t *context;
 static MRP_LIST_HOOK(bindings);
 static MRP_LIST_HOOK(pending);
 static int debug_level;
+static char *config_file;
+static char *config_dir;
 
 static void setup_allocator(lua_State *L);
 
@@ -183,6 +187,15 @@ lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx)
 }
 
 
+void mrp_lua_set_murphy_lua_config_file(const char *path)
+{
+    if (config_file == NULL && path != NULL) {
+        config_file = mrp_strdup(path);
+        mrp_log_info("Lua config file is: '%s'.", config_file);
+    }
+}
+
+
 mrp_context_t *mrp_lua_check_murphy_context(lua_State *L, int index)
 {
     mrp_lua_murphy_t *m;
@@ -209,6 +222,56 @@ lua_State *mrp_lua_get_lua_state(void)
         return context->lua_state;
     else
         return NULL;
+}
+
+const char *mrp_lua_get_murphy_lua_config_dir(void)
+{
+    char   *base, dir[PATH_MAX];
+    size_t  offs, len;
+
+    if (config_file == NULL)
+        return NULL;
+
+    if (config_dir == NULL) {
+        if (config_file[0] != '/') {
+            if (getcwd(dir, sizeof(dir)) == NULL)
+                return NULL;
+            else {
+                offs = strlen(dir);
+
+                if (offs >= sizeof(dir) - 1)
+                    return NULL;
+
+                dir[offs++] = '/';
+                dir[offs]   = '\0';
+            }
+        }
+        else
+            offs = 0;
+
+        base = strrchr(config_file, '/');
+
+        if (base != NULL)
+            while (base > config_file && base[-1] == '/')
+                base--;
+
+        if (base != NULL && base > config_file) {
+            len = base - config_file;
+
+            if (sizeof(dir) - offs - 1 <= len)
+                return NULL;
+
+            strncpy(dir + offs, config_file, len);
+            offs += len;
+            dir[offs] = '\0';
+
+            config_dir = mrp_strdup(dir);
+
+            mrp_log_info("Lua config directory is '%s'.", config_dir);
+        }
+    }
+
+    return config_dir;
 }
 
 

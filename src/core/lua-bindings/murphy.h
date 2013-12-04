@@ -74,11 +74,17 @@ typedef struct {
 /** Set murphy context for the bindings. */
 lua_State *mrp_lua_set_murphy_context(mrp_context_t *ctx);
 
+/** Set the path to the main Lua configuration file. */
+void mrp_lua_set_murphy_lua_config_file(const char *path);
+
 /** Get murphy context for the bindings. */
 mrp_context_t *mrp_lua_get_murphy_context(void);
 
 /** Get the common Lua state for the bindings. */
 lua_State *mrp_lua_get_lua_state(void);
+
+/** Get the main Lua configuration directory. */
+const char *mrp_lua_get_murphy_lua_config_dir(void);
 
 /** Register the given lua murphy bindings. */
 int mrp_lua_register_murphy_bindings(mrp_lua_bindings_t *b);

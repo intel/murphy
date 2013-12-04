@@ -27,6 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <unistd.h>
+
 #include <lualib.h>
 #include <lauxlib.h>
 
@@ -34,6 +36,83 @@
 #include <murphy/common/log.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/lua-bindings/murphy.h>
+
+
+static int include_file(lua_State *L, int try_only)
+{
+    const char *file, *dir;;
+    char        path[PATH_MAX];
+    int         narg;
+
+    narg = lua_gettop(L);
+
+    switch (narg) {
+    case 1:
+        if (lua_type(L, -1) != LUA_TSTRING)
+            return luaL_error(L, "expecting <string> for inclusion");
+        break;
+    case 2:
+        if (lua_type(L, -2) != LUA_TUSERDATA ||
+            lua_type(L, -1) != LUA_TSTRING)
+            return luaL_error(L, "expecting <murphy>, <string> for inclusion");
+        break;
+    default:
+        return luaL_error(L, "expecting <string> for inclusion");
+    }
+
+    /*
+     * XXX TODO:
+     * Maybe it'd make sense to support searching a set of user-configurable
+     * include diretories if the given path is not an absolute one.
+     */
+
+    file = lua_tostring(L, -1);
+
+    if (file[0] != '/') {
+        if ((dir = mrp_lua_get_murphy_lua_config_dir()) != NULL) {
+            if (snprintf(path, sizeof(path),
+                         "%s/%s", dir, file) < (ssize_t)sizeof(path))
+                file = path;
+            else {
+                mrp_log_error("too long include file name");
+                lua_settop(L, 0);
+
+                return -1;
+            }
+        }
+    }
+
+    if (try_only && access(file, R_OK) < 0) {
+        lua_settop(L, 0);
+
+        return 0;
+    }
+
+
+    if (!luaL_loadfile(L, file) && !lua_pcall(L, 0, 0, 0)) {
+        lua_settop(L, 0);
+
+        return 0;
+    }
+
+    mrp_log_error("failed to include Lua file '%s'.", file);
+    mrp_log_error("%s", lua_tostring(L, -1));
+    lua_settop(L, 0);
+
+    return -1;
+}
+
+
+static int tryinclude_luafile(lua_State *L)
+{
+    return include_file(L, TRUE);
+}
+
+
+static int include_luafile(lua_State *L)
+{
+    return include_file(L, FALSE);
+}
 
 
 static int open_lualib(lua_State *L)
@@ -87,4 +166,7 @@ static int open_lualib(lua_State *L)
 }
 
 
-MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL, { "open_lualib", open_lualib });
+MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
+                             { "open_lualib", open_lualib        },
+                             { "include"    , include_luafile    },
+                             { "try_include", tryinclude_luafile });

@@ -157,6 +157,8 @@ static int plugin_init(mrp_plugin_t *plugin)
         else
             mrp_log_info("plugin-lua: resolver Lua support disabled.");
 
+        mrp_lua_set_murphy_lua_config_file(cfg);
+
         if (load_config(L, cfg))
             return TRUE;
         else
