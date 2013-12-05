@@ -847,7 +847,8 @@ static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
     mrp_lua_type_t          type;
     int                     elem;
     size_t                  tlen;
-    int                     status, refs[3];
+    int                     status;
+    int                     refs[3] = { LUA_NOREF, LUA_NOREF, LUA_NOREF };
 
     e = lua_gettop(L);
     f = (f < 0) ? e + f + 1 : f;
