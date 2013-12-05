@@ -35,14 +35,31 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
 #include <murphy/core/plugin.h>
+
+#include <murphy/core/lua-utils/include.h>
 #include <murphy/core/lua-bindings/murphy.h>
 
+static MRP_LIST_HOOK(included);
 
-static int include_file(lua_State *L, int try_only)
+static int include_lua(lua_State *L, const char *file, int try, int once)
 {
-    const char *file, *dir;;
-    char        path[PATH_MAX];
-    int         narg;
+    mrp_list_hook_t *files = once ? &included : NULL;
+    const char      *dirs[2];
+
+    dirs[0] = mrp_lua_get_murphy_lua_config_dir();
+    dirs[1] = NULL;
+
+    if (mrp_lua_include_file(L, file, &dirs[0], files) == 0 || try)
+        return 0;
+    else
+        return -1;
+}
+
+
+static int include_lua_file(lua_State *L, int try, int once)
+{
+    const char *file;
+    int         narg, status;
 
     narg = lua_gettop(L);
 
@@ -60,58 +77,43 @@ static int include_file(lua_State *L, int try_only)
         return luaL_error(L, "expecting <string> for inclusion");
     }
 
-    /*
-     * XXX TODO:
-     * Maybe it'd make sense to support searching a set of user-configurable
-     * include diretories if the given path is not an absolute one.
-     */
-
     file = lua_tostring(L, -1);
 
-    if (file[0] != '/') {
-        if ((dir = mrp_lua_get_murphy_lua_config_dir()) != NULL) {
-            if (snprintf(path, sizeof(path),
-                         "%s/%s", dir, file) < (ssize_t)sizeof(path))
-                file = path;
-            else {
-                mrp_log_error("too long include file name");
-                lua_settop(L, 0);
-
-                return -1;
-            }
-        }
-    }
-
-    if (try_only && access(file, R_OK) < 0) {
-        lua_settop(L, 0);
-
-        return 0;
-    }
-
-
-    if (!luaL_loadfile(L, file) && !lua_pcall(L, 0, 0, 0)) {
-        lua_settop(L, 0);
-
-        return 0;
-    }
-
-    mrp_log_error("failed to include Lua file '%s'.", file);
-    mrp_log_error("%s", lua_tostring(L, -1));
+    status = include_lua(L, file, try, once);
     lua_settop(L, 0);
 
-    return -1;
+    if (status == 0 || try)
+        return 0;
+    else {
+        mrp_log_error("failed to include%s Lua file '%s'.",
+                      once ? "_once" : "", file);
+
+        return luaL_error(L, "failed to include file '%s'.", file);
+    }
 }
 
 
-static int tryinclude_luafile(lua_State *L)
+static int try_luafile(lua_State *L)
 {
-    return include_file(L, TRUE);
+    return include_lua_file(L, TRUE, FALSE);
+}
+
+
+static int try_once_luafile(lua_State *L)
+{
+    return include_lua_file(L, TRUE, TRUE);
 }
 
 
 static int include_luafile(lua_State *L)
 {
-    return include_file(L, FALSE);
+    return include_lua_file(L, FALSE, FALSE);
+}
+
+
+static int include_once_luafile(lua_State *L)
+{
+    return include_lua_file(L, FALSE, TRUE);
 }
 
 
@@ -157,8 +159,11 @@ static int open_lualib(lua_State *L)
             mrp_debug("loading Lua lib '%s' with %p...", name, lib->loader);
             lib->loader(L);
         }
-        else
-            return luaL_error(L, "failed to load unknown Lua lib '%s'", name);
+        else {
+            if (include_lua(L, name, FALSE, TRUE) < 0)
+                return luaL_error(L, "failed to load unknown "
+                                  "Lua library '%s'", name);
+        }
     }
 
     lua_settop(L, 0);
@@ -167,6 +172,8 @@ static int open_lualib(lua_State *L)
 
 
 MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
-                             { "open_lualib", open_lualib        },
-                             { "include"    , include_luafile    },
-                             { "try_include", tryinclude_luafile });
+                             { "open_lualib"     , open_lualib          },
+                             { "include"         , include_luafile      },
+                             { "include_once"    , include_once_luafile },
+                             { "try_include"     , try_luafile          },
+                             { "try_include_once", try_once_luafile     });
