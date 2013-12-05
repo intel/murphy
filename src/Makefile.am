@@ -156,13 +156,15 @@ libmurphy_lua_utils_la_HEADERS =				\
 		core/lua-utils/strarray.h			\
 		core/lua-utils/funcbridge.h			\
 		core/lua-utils/object.h				\
-		core/lua-utils/error.h
+		core/lua-utils/error.h				\
+		core/lua-utils/include.h
 
 libmurphy_lua_utils_la_REGULAR_SOURCES =			\
 		core/lua-utils/strarray.c			\
 		core/lua-utils/funcbridge.c			\
 		core/lua-utils/object.c				\
-		core/lua-utils/error.c
+		core/lua-utils/error.c				\
+		core/lua-utils/include.c
 
 libmurphy_lua_utils_la_SOURCES =				\
 		$(libmurphy_lua_utils_la_REGULAR_SOURCES)	\
