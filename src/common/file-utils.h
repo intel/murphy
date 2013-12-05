@@ -65,5 +65,8 @@ typedef int (*mrp_scan_dir_cb_t)(const char *entry, mrp_dirent_type_t type,
 int mrp_scan_dir(const char *path, const char *pattern, mrp_dirent_type_t mask,
                  mrp_scan_dir_cb_t cb, void *user_data);
 
+/** Do an #include-like search for the given file among the given dirs. */
+int mrp_find_file(const char *file, const char **dirs, int mode, char *buf,
+                  size_t size);
 
 #endif /* __MURPHY_FILEUTILS_H__ */

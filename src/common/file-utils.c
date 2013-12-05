@@ -29,6 +29,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
 #include <string.h>
 #include <dirent.h>
 #include <regex.h>
@@ -133,4 +134,48 @@ int mrp_scan_dir(const char *path, const char *pattern, mrp_dirent_type_t mask,
         regfree(&regexp);
 
     return TRUE;
+}
+
+
+int mrp_find_file(const char *file, const char **dirs, int mode, char *buf,
+                  size_t size)
+{
+    const char *dir;
+    char        path[PATH_MAX];
+    int         i;
+
+    if (file[0] != '/') {
+        if (dirs != NULL) {
+            for (dir = dirs[i=0]; dir != NULL; dir = dirs[++i]) {
+                if (snprintf(path, sizeof(path), "%s/%s",
+                             dir, file) >= (ssize_t)sizeof(path))
+                    continue;
+
+                if (access(path, mode) == 0) {
+                    file = path;
+                    goto found;
+                }
+            }
+        }
+
+        if (snprintf(path, sizeof(path), "./%s", file) < (ssize_t)sizeof(path)) {
+            if (access(path, mode) == 0) {
+                file = path;
+                goto found;
+            }
+        }
+    }
+    else {
+        if (access(file, mode) == 0)
+            goto found;
+    }
+
+    errno = ENOENT;
+    return -1;
+
+ found:
+    if (buf != NULL && size > 0)
+        snprintf(buf, size, "%s", file);
+
+    return 0;
 }
