@@ -40,6 +40,7 @@
 #include <murphy/core/lua-bindings/murphy.h>
 
 static MRP_LIST_HOOK(included);
+static int include_disabled;
 
 static int include_lua(lua_State *L, const char *file, int try, int once)
 {
@@ -60,6 +61,9 @@ static int include_lua_file(lua_State *L, int try, int once)
 {
     const char *file;
     int         narg, status;
+
+    if (include_disabled)
+        return luaL_error(L, "Lua inclusion is disabled.");
 
     narg = lua_gettop(L);
 
@@ -117,6 +121,16 @@ static int include_once_luafile(lua_State *L)
 }
 
 
+static int disable_include(lua_State *L)
+{
+    MRP_UNUSED(L);
+
+    include_disabled = TRUE;
+
+    return 0;
+}
+
+
 static int open_lualib(lua_State *L)
 {
     struct {
@@ -160,6 +174,9 @@ static int open_lualib(lua_State *L)
             lib->loader(L);
         }
         else {
+            if (include_disabled)
+                return luaL_error(L, "Lua inclusion is disabled.");
+
             if (include_lua(L, name, FALSE, TRUE) < 0)
                 return luaL_error(L, "failed to load unknown "
                                   "Lua library '%s'", name);
@@ -176,4 +193,5 @@ MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
                              { "include"         , include_luafile      },
                              { "include_once"    , include_once_luafile },
                              { "try_include"     , try_luafile          },
-                             { "try_include_once", try_once_luafile     });
+                             { "try_include_once", try_once_luafile     },
+                             { "disable_include" , disable_include      });
