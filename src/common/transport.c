@@ -227,6 +227,14 @@ int mrp_transport_setopt(mrp_transport_t *t, const char *opt, const void *val)
     if (t != NULL) {
         if (t->descr->req.setopt != NULL)
             return t->descr->req.setopt(t, opt, val);
+        else {
+            if (t->mode == MRP_TRANSPORT_MODE_NATIVE) {
+                if (!strcmp(opt, MRP_TRANSPORT_OPT_TYPEMAP)) {
+                    t->map = (void *)val;
+                    return TRUE;
+                }
+            }
+        }
     }
 
     return FALSE;
@@ -317,6 +325,7 @@ mrp_transport_t *mrp_transport_accept(mrp_transport_t *lt,
         t->flags         = (lt->flags & MRP_TRANSPORT_INHERIT) | flags;
         t->flags         = t->flags & ~MRP_TRANSPORT_MODE_MASK;
         t->mode          = lt->mode;
+        t->map           = lt->map;
 
         MRP_TRANSPORT_BUSY(t, {
                 if (!t->descr->req.accept(t, lt)) {

@@ -92,6 +92,9 @@ typedef enum {
 
 #define MRP_TRANSPORT_MODE(t) ((t)->flags & MRP_TRANSPORT_MODE_MASK)
 
+
+#define MRP_TRANSPORT_OPT_TYPEMAP "type-map"
+
 /*
  * transport requests
  *
