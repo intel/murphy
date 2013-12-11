@@ -32,6 +32,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include <murphy/common/macros.h>
 #include <murphy/common/list.h>
@@ -112,12 +113,12 @@ typedef struct {
 
 
 /** Macro to initialize a typemap entry. */
-#define MRP_MAP_TYPE(_mapped_id, _type_id)                              \
-    (mrp_typemap_t) { .typeid = _type_id, .mapped = _mapped_id }
+#define MRP_TYPEMAP(_mapped_id, _type_id)               \
+    { .typeid = _type_id, .mapped = _mapped_id }
 
 /** Macro to set a typemap termination entry. */
-#define MRP_TYPEMAP_END                                         \
-    (mrp_typemap_t) { MRP_INVALID_TYPE, MRP_INVALID_TYPE }
+#define MRP_TYPEMAP_END                                 \
+    { MRP_INVALID_TYPE, MRP_INVALID_TYPE }
 
 /**
  * type and member descriptors

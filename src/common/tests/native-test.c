@@ -268,10 +268,10 @@ int main(int argc, char *argv[])
 
     ebuf = NULL;
 
-    map[0] = MRP_MAP_TYPE(1, art_type_id   );
-    map[1] = MRP_MAP_TYPE(2, person_type_id);
-    map[2] = MRP_MAP_TYPE(3, family_type_id);
-    map[3] = MRP_TYPEMAP_END;
+    map[0] = (mrp_typemap_t)MRP_TYPEMAP(1, art_type_id   );
+    map[1] = (mrp_typemap_t)MRP_TYPEMAP(2, person_type_id);
+    map[2] = (mrp_typemap_t)MRP_TYPEMAP(3, family_type_id);
+    map[3] = (mrp_typemap_t)MRP_TYPEMAP_END;
 
     if (mrp_encode_native(&family, family_type_id, 0, &ebuf, &esize, map) < 0) {
         mrp_log_error("Failed to encode test data.");
