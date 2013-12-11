@@ -922,7 +922,7 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
             const char *sender)
 {
     char buf[MAX_PATH_LENGTH];
-    char resbuf[128];
+    char *resbuf[128];
     int ret;
     mrp_htbl_config_t resources_conf;
     resource_set_o_t *rset = NULL;
@@ -988,6 +988,9 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
     available_resources_arr = copy_string_array(
                 mrp_resource_definition_get_all_names(128,
                         (const char **) resbuf));
+
+    if (!available_resources_arr)
+        goto error;
 
     rset->available_resources_prop = create_property(mgr->ctx,
             rset->path, RSET_IFACE, "as", PROP_AVAILABLE_RESOURCES,
