@@ -403,6 +403,9 @@ static int table_create_from_lua(lua_State *L)
 
     MRP_LUA_ENTER;
 
+    if (!lua_istable(L, 2))
+        luaL_error(L, "expecting table as argument");
+
     tbl = (mrp_lua_mdb_table_t *)mrp_lua_create_object(L, TABLE_CLASS, NULL,0);
 
     tbl->builtin = true;
@@ -924,6 +927,9 @@ static int select_create_from_lua(lua_State *L)
     char  qry[2048];
 
     MRP_LUA_ENTER;
+
+    if (!lua_istable(L, 2))
+        luaL_error(L, "expecting table as argument");
 
     sel = (mrp_lua_mdb_select_t *)mrp_lua_create_object(L,SELECT_CLASS,NULL,0);
 
