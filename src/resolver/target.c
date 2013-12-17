@@ -635,3 +635,121 @@ void dump_targets(mrp_resolver_t *r, FILE *fp)
             fprintf(fp, "  no update script\n");
     }
 }
+
+typedef enum {
+    DOT_NODE_TYPE_FACT,
+    DOT_NODE_TYPE_TABLE,
+    DOT_NODE_TYPE_SINK,
+    DOT_NODE_TYPE_SELECT,
+    DOT_NODE_TYPE_OTHER,
+} dot_node_type_t;
+
+
+static dot_node_type_t dot_node_type(char *name)
+{
+    if (!name)
+        return DOT_NODE_TYPE_OTHER;
+
+    if (name[0] == '$')
+        return DOT_NODE_TYPE_FACT;
+
+    if (strncmp(name, "_table_", 7) == 0)
+        return DOT_NODE_TYPE_TABLE;
+
+    if (strncmp(name, "_sink_", 6) == 0)
+        return DOT_NODE_TYPE_SINK;
+
+    if (strncmp(name, "_select_", 8) == 0)
+        return DOT_NODE_TYPE_SELECT;
+
+    return DOT_NODE_TYPE_OTHER;
+}
+
+
+static char *dot_fix(char *name)
+{
+    dot_node_type_t t = dot_node_type(name);
+
+    switch(t) {
+        case DOT_NODE_TYPE_FACT:
+            /* remove illegal characters */
+            return &name[1];
+
+        case DOT_NODE_TYPE_TABLE:
+            return &name[7];
+
+        case DOT_NODE_TYPE_SINK:
+            return &name[6];
+
+        case DOT_NODE_TYPE_SELECT:
+            return &name[8];
+
+        default:
+            break;
+    }
+    return name;
+}
+
+
+static char *dot_get_shape(dot_node_type_t t)
+{
+    switch(t) {
+        case DOT_NODE_TYPE_FACT:
+        case DOT_NODE_TYPE_TABLE:
+            return "box";
+
+        case DOT_NODE_TYPE_SINK:
+            return "trapezium";
+
+        case DOT_NODE_TYPE_SELECT:
+            return "diamond";
+
+        default:
+            break;
+    }
+    return "ellipse";
+}
+
+
+void mrp_resolver_dump_dot_graph(mrp_resolver_t *r, FILE *fp)
+{
+    int i, j;
+    target_t *t;
+
+    fprintf(fp, "digraph decision_graph {\n");
+
+    /* vertexes */
+    for (i = 0; i < r->ntarget; i++) {
+        dot_node_type_t i_type;
+        char *name;
+
+        t = r->targets + i;
+        name = dot_fix(t->name);
+        if (strcmp(name, "autoupdate") == 0)
+            continue;
+
+        i_type = dot_node_type(t->name);
+        fprintf(fp, "    %s [shape=%s];\n", name, dot_get_shape(i_type));
+    }
+
+    fprintf(fp, "\n");
+
+    /* edges */
+    for (i = 0; i < r->ntarget; i++) {
+        t = r->targets + i;
+        char *i_name = dot_fix(t->name);
+
+        if (strcmp(i_name, "autoupdate") == 0)
+            continue;
+
+        if (t->depends != NULL) {
+            for (j = 0; j < t->ndepend; j++) {
+                char *j_name = dot_fix(t->depends[j]);
+
+                fprintf(fp, "    %s -> %s;\n", i_name, j_name);
+            }
+        }
+    }
+
+    fprintf(fp, "}\n");
+}
