@@ -54,12 +54,14 @@
 #define ZONE_ID_IDX          0
 #define ZONE_NAME_IDX        1
 #define CLASS_NAME_IDX       2
-#define FIRST_ATTRIBUTE_IDX  3
+#define RSET_ID_IDX          3
+#define FIRST_ATTRIBUTE_IDX  4
 
 typedef struct {
     uint32_t          zone_id;
     const char       *zone_name;
     const char       *class_name;
+    uint32_t          rset_id;
     mrp_attr_value_t  attrs[MQI_COLUMN_MAX];
 } owner_row_t;
 
@@ -80,9 +82,9 @@ static void manager_end_transaction(mrp_zone_t *);
 
 static void delete_resource_owner(mrp_zone_t *, mrp_resource_t *);
 static void insert_resource_owner(mrp_zone_t *, mrp_application_class_t *,
-                                  mrp_resource_t *);
+                                  mrp_resource_set_t *, mrp_resource_t *);
 static void update_resource_owner(mrp_zone_t *, mrp_application_class_t *,
-                                  mrp_resource_t *);
+                                  mrp_resource_set_t *, mrp_resource_t *);
 static void set_attr_descriptors(mqi_column_desc_t *, mrp_resource_t *);
 
 
@@ -91,7 +93,8 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
     MQI_COLUMN_DEFINITION_LIST(base_coldefs,
         MQI_COLUMN_DEFINITION( "zone_id"          , MQI_UNSIGNED             ),
         MQI_COLUMN_DEFINITION( "zone_name"        , MQI_VARCHAR(NAME_LENGTH) ),
-        MQI_COLUMN_DEFINITION( "application_class", MQI_VARCHAR(NAME_LENGTH) )
+        MQI_COLUMN_DEFINITION( "application_class", MQI_VARCHAR(NAME_LENGTH) ),
+        MQI_COLUMN_DEFINITION( "resource_set_id"  , MQI_UNSIGNED             )
     );
 
     MQI_INDEX_DEFINITION(indexdef,
@@ -101,7 +104,7 @@ int mrp_resource_owner_create_database_table(mrp_resource_def_t *rdef)
     static bool initialized = false;
 
     char name[256];
-    mqi_column_def_t  coldefs[MQI_COLUMN_MAX + 1];
+    mqi_column_def_t coldefs[MQI_COLUMN_MAX + 1];
     mqi_column_def_t *col;
     mrp_attr_def_t *atd;
     mqi_handle_t table;
@@ -381,11 +384,11 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             owner->res   != old->res     )
         {
             if (!owner->res)
-                delete_resource_owner(zone, old->res);
+               delete_resource_owner(zone,old->res);
             else if (!old->res)
-                insert_resource_owner(zone, owner->class, owner->res);
+               insert_resource_owner(zone,owner->class,owner->rset,owner->res);
             else
-                update_resource_owner(zone, owner->class, owner->res);
+               update_resource_owner(zone,owner->class,owner->rset,owner->res);
         }
     }
 }
@@ -638,6 +641,7 @@ static void delete_resource_owner(mrp_zone_t *zone, mrp_resource_t *res)
 
 static void insert_resource_owner(mrp_zone_t *zone,
                                   mrp_application_class_t *class,
+                                  mrp_resource_set_t *rset,
                                   mrp_resource_t *res)
 {
     mrp_resource_def_t *rdef = res->def;
@@ -653,6 +657,7 @@ static void insert_resource_owner(mrp_zone_t *zone,
     row.zone_id    = zone->id;
     row.zone_name  = zone->name;
     row.class_name = class->name;
+    row.rset_id    = rset->id;
     memcpy(row.attrs, res->attrs, rdef->nattr * sizeof(mrp_attr_value_t));
 
     i = 0;
@@ -667,6 +672,10 @@ static void insert_resource_owner(mrp_zone_t *zone,
     cdsc[i].cindex = CLASS_NAME_IDX;
     cdsc[i].offset = MQI_OFFSET(owner_row_t, class_name);
 
+    i++;
+    cdsc[i].cindex = RSET_ID_IDX;
+    cdsc[i].offset = MQI_OFFSET(owner_row_t, rset_id);
+    
     set_attr_descriptors(cdsc + (i+1), res);
 
     rows[0] = &row;
@@ -678,6 +687,7 @@ static void insert_resource_owner(mrp_zone_t *zone,
 
 static void update_resource_owner(mrp_zone_t *zone,
                                   mrp_application_class_t *class,
+                                  mrp_resource_set_t *rset,
                                   mrp_resource_t *res)
 {
     static uint32_t zone_id;
@@ -698,11 +708,16 @@ static void update_resource_owner(mrp_zone_t *zone,
                "too many attributes for a table");
 
     row.class_name = class->name;
+    row.rset_id    = rset->id;
     memcpy(row.attrs, res->attrs, rdef->nattr * sizeof(mrp_attr_value_t));
 
     i = 0;
     cdsc[i].cindex = CLASS_NAME_IDX;
     cdsc[i].offset = MQI_OFFSET(owner_row_t, class_name);
+
+    i++;
+    cdsc[i].cindex = RSET_ID_IDX;
+    cdsc[i].offset = MQI_OFFSET(owner_row_t, rset_id);
 
     set_attr_descriptors(cdsc + (i+1), res);
 
