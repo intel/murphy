@@ -169,30 +169,32 @@ void mrp_resource_lua_init(lua_State *L)
 bool mrp_resource_lua_veto(mrp_zone_t *zone,
                            mrp_resource_set_t *rset,
                            mrp_resource_owner_t *owners,
-                           mrp_resource_mask_t grant)
+                           mrp_resource_mask_t grant,
+                           mrp_resource_set_t *reqset)
 {
     lua_State *L = mrp_lua_get_lua_state();
     mrp_lua_resmethod_t *methods = mrp_lua_get_resource_methods();
     mrp_funcarray_t *veto;
-    mrp_resource_setref_t *sref;
+    mrp_resource_setref_t *sref, *rref;
     mrp_resource_ownersref_t *oref;
     mrp_funcbridge_value_t args[16];
     int i;
 
     if (L && zone && rset && owners && methods &&
         (sref = find_in_id_hash(rset->id)) &&
-        (oref = owners_get(L, zone->id)))
+        (oref = owners_get(L, zone->id)) &&
+        (rref = find_in_id_hash(reqset->id)))
     {
         oref->owners = owners;
 
         if ((veto = methods->veto)) {
-
             args[i=0].string  = zone->name;
             args[++i].pointer = sref;
             args[++i].integer = grant;
             args[++i].pointer = oref;
+            args[++i].pointer = rref;
 
-            return mrp_funcarray_call_from_c(L, veto, "sodo", args);
+            return mrp_funcarray_call_from_c(L, veto, "sodoo", args);
         }
     }
 

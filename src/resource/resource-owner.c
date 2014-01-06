@@ -245,7 +245,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                 }
                 owners = get_owner(zoneid, 0);
                 if ((grant & mandatory) == mandatory &&
-                    mrp_resource_lua_veto(zone, rset, owners, grant))
+                    mrp_resource_lua_veto(zone, rset, owners, grant, reqset))
                 {
                     advice = grant;
                 }

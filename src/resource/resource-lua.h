@@ -49,7 +49,8 @@ struct mrp_resource_setref_s {
 void mrp_resource_lua_init(lua_State *);
 
 bool mrp_resource_lua_veto(mrp_zone_t *, mrp_resource_set_t *,
-                           mrp_resource_owner_t *, mrp_resource_mask_t);
+                           mrp_resource_owner_t *, mrp_resource_mask_t,
+                           mrp_resource_set_t *);
 void mrp_resource_lua_set_owners(mrp_zone_t *, mrp_resource_owner_t *);
 
 void mrp_resource_lua_register_resource_set(mrp_resource_set_t *);
