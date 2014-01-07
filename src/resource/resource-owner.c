@@ -253,10 +253,10 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     /* rollback, ie. restore the backed up state */
                     rc = NULL;
                     while ((res=mrp_resource_set_iterate_resources(rset,&rc))){
-                         rdef  = res->def;
-                         rid   = rdef->id;
-                         mask  = (mrp_resource_mask_t)1 << rid;
-                         owner = get_owner(zoneid, rid);
+                        rdef = res->def;
+                        rid = rdef->id;
+                        mask = (mrp_resource_mask_t)1 << rid;
+                        owner = get_owner(zoneid, rid);
                         *owner = backup[rid];
 
                         if ((grant & mask)) {
@@ -310,10 +310,12 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             else {
                 if (grant == rset->resource.mask.grant) {
                     if (rset->state == mrp_resource_acquire &&
-                        !grant && rset->dont_wait)
+                        !grant && rset->dont_wait.current)
                     {
-                        notify = MRP_RESOURCE_EVENT_RELEASE;
                         rset->state = mrp_resource_release;
+                        rset->dont_wait.current = rset->dont_wait.client;
+
+                        notify = MRP_RESOURCE_EVENT_RELEASE;
                         move = true;
                     }
                 }
@@ -321,10 +323,13 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     rset->resource.mask.grant = grant;
                     changed = true;
 
-                    if (!grant && rset->auto_release) {
-                        if (rset->state != mrp_resource_release)
-                            notify = MRP_RESOURCE_EVENT_RELEASE;
+                    if (rset->state != mrp_resource_release &&
+                        !grant && rset->auto_release.current)
+                    {
                         rset->state = mrp_resource_release;
+                        rset->auto_release.current = rset->auto_release.client;
+
+                        notify = MRP_RESOURCE_EVENT_RELEASE;
                         move = true;
                     }
                 }

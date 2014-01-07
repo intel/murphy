@@ -93,8 +93,12 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
         mrp_log_error("Memory alloc failure. Can't create resource set");
     else {
         rset->id = ++our_id;
-        rset->auto_release = auto_release;
-        rset->dont_wait = dont_wait;
+
+        rset->dont_wait.current = dont_wait;
+        rset->dont_wait.client  = dont_wait;
+ 
+        rset->auto_release.current = auto_release;
+        rset->auto_release.client  = auto_release;
 
         mrp_list_init(&rset->resource.list);
         rset->resource.share = false;
@@ -244,7 +248,7 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
     MRP_ASSERT(rset && name, "invalid argument");
 
     rsetid  = rset->id;
-    autorel = rset->auto_release;
+    autorel = rset->auto_release.client;
 
     if (!(res = mrp_resource_create(name, rsetid, autorel, shared, attrs))) {
         mrp_log_error("Can't add resource '%s' name to resource set %u",
@@ -399,6 +403,22 @@ void mrp_resource_set_notify(mrp_resource_set_t *rset, mrp_resource_event_t ev)
         mrp_resource_notify(res, rset, ev);
 }
 
+void mrp_resource_set_request_auto_release(mrp_resource_set_t *rset,
+                                           bool auto_release)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    rset->auto_release.current = auto_release;
+}
+
+void mrp_resource_set_request_dont_wait(mrp_resource_set_t *rset,
+                                        bool dont_wait)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    rset->dont_wait.current = dont_wait;
+}
+
 int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
                            char *buf, int len)
 {
@@ -425,8 +445,8 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
           rset->resource.mask.grant, rset->resource.mask.advice,
           mrp_application_class_get_sorting_key(rset), rset->class.priority,
           rset->resource.share ? "shared   ":"exclusive",
-          rset->auto_release ? ",autorelease" : "",
-          rset->dont_wait ? ",dontwait" : "",
+          rset->auto_release.client ? ",autorelease" : "",
+          rset->dont_wait.client ? ",dontwait" : "",
           state_str(rset->state));
 
     mrp_list_foreach(&rset->resource.list, resen, n) {

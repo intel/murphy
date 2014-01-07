@@ -61,8 +61,10 @@ typedef struct ownerref_s    ownerref_t;
 
 enum field_e {
     APPLICATION_CLASS = 1,
+    AUTO_RELEASE,
     RESOURCE_SET,
     ATTRIBUTES,
+    DONT_WAIT,
     RESOURCE,
     STATE,
     ID
@@ -497,6 +499,14 @@ static int setref_getfield(lua_State *L)
             lua_pushstring(L, state);
             break;
 
+        case DONT_WAIT:
+            lua_pushboolean(L, rset->dont_wait.current);
+            break;
+
+        case AUTO_RELEASE:
+            lua_pushboolean(L, rset->auto_release.current);
+            break;
+
         case APPLICATION_CLASS:
             lua_pushstring(L, rset->class.ptr->name);
             break;
@@ -512,11 +522,29 @@ static int setref_getfield(lua_State *L)
 
 static int setref_setfield(lua_State *L)
 {
-    MRP_UNUSED(L);
+    mrp_resource_setref_t *ref = setref_check(L, 1);
+    mrp_resource_set_t *rset;
+    field_t field;
 
     MRP_LUA_ENTER;
 
-    printf("*** setref setfield\n");
+    if (ref && (rset = ref->rset)) {
+        field = field_check(L, 2, NULL);
+
+        switch (field) {
+
+        case DONT_WAIT:
+            rset->dont_wait.current = lua_toboolean(L, 3);
+            break;
+
+        case AUTO_RELEASE:
+            rset->auto_release.current = lua_toboolean(L, 3);
+            break;
+
+        default:
+            break;
+        }
+    }
 
     MRP_LUA_LEAVE(0);
 }
@@ -632,12 +660,19 @@ static field_t field_name_to_type(const char *name, size_t len)
             return RESOURCE;
         break;
 
+    case 9:
+        if (!strcmp(name, "dont_wait"))
+            return DONT_WAIT;
+        break;
+
     case 10:
         if (!strcmp(name, "attributes"))
             return ATTRIBUTES;
         break;
 
     case 12:
+        if (!strcmp(name, "auto_release"))
+            return AUTO_RELEASE;
         if (!strcmp(name, "resource_set"))
             return RESOURCE_SET;
         break;

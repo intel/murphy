@@ -35,13 +35,18 @@
 #include "data-types.h"
 
 
-
 struct mrp_resource_set_s {
     mrp_list_hook_t                 list;
     uint32_t                        id;
     mrp_resource_state_t            state;
-    bool                            auto_release;
-    bool                            dont_wait;
+    struct {
+        bool current;
+        bool client;
+    }                               auto_release;
+    struct {
+        bool current;
+        bool client;
+    }                               dont_wait;
     struct {
         struct {
             mrp_resource_mask_t all;
@@ -78,6 +83,10 @@ uint32_t            mrp_get_resource_set_count(void);
 void                mrp_resource_set_updated(mrp_resource_set_t *);
 void                mrp_resource_set_notify(mrp_resource_set_t *,
                                             mrp_resource_event_t);
+void                mrp_resource_set_request_auto_release(mrp_resource_set_t *,
+                                                          bool);
+void                mrp_resource_set_request_dont_wait(mrp_resource_set_t *,
+                                                       bool);
 int                 mrp_resource_set_print(mrp_resource_set_t *, size_t,
                                            char *, int);
 
