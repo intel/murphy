@@ -933,7 +933,8 @@ static mrp_dbus_msg_t *msg_encode(mrp_dbus_t *dbus, const char *destination,
     if (m == NULL)
         return NULL;
 
-    if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_OBJECT_PATH, &sender_id))
+    if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_OBJECT_PATH,
+                                   (void *)sender_id))
         goto fail;
 
     if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_UINT16, &msg->nfield))
@@ -967,12 +968,12 @@ static mrp_dbus_msg_t *msg_encode(mrp_dbus_t *dbus, const char *destination,
             if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_UINT32, &asize))
                 goto fail;
 
-            if (!mrp_dbus_msg_open_container(m, MRP_DBUS_TYPE_ARRAY, NULL))
+            if (!mrp_dbus_msg_open_container(m, MRP_DBUS_TYPE_ARRAY, sig))
                 goto fail;
 
             for (i = 0; i < asize; i++) {
                 blb = ((uint8_t *)f->blb)[i];
-                if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_UINT16, &blb))
+                if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_BYTE, &blb))
                     goto fail;
             }
 
@@ -1310,7 +1311,8 @@ static mrp_dbus_msg_t *data_encode(mrp_dbus_t *dbus, const char *destination,
     fields = descr->fields;
     nfield = descr->nfield;
 
-    if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_OBJECT_PATH, &sender_id))
+    if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_OBJECT_PATH,
+                                   (void *)sender_id))
         goto fail;
 
     if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_UINT16, &tag))
@@ -1647,7 +1649,8 @@ static mrp_dbus_msg_t *raw_encode(mrp_dbus_t *dbus, const char *destination,
     if (m == NULL)
         return NULL;
 
-    if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_OBJECT_PATH, &sender_id))
+    if (!mrp_dbus_msg_append_basic(m, MRP_DBUS_TYPE_OBJECT_PATH,
+                                   (void *)sender_id))
         goto fail;
 
     sig = MRP_DBUS_TYPE_BYTE_AS_STRING;
