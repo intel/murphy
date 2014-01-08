@@ -1,8 +1,7 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
 noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
-                 internal-transport-test process-watch-test native-test \
-                 sdbus-error-message
+                 internal-transport-test process-watch-test native-test
 
 if LIBDBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
