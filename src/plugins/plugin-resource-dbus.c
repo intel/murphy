@@ -40,7 +40,7 @@
 
 #include <murphy/common.h>
 #include <murphy/core.h>
-#include <murphy/common/dbus-sdbus.h>
+#include <murphy/common/dbus-libdbus.h>
 
 #include <murphy/resource/client-api.h>
 

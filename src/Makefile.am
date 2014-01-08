@@ -1203,11 +1203,11 @@ endif
 
 # resource-dbus plugin
 if BUILD_RESOURCES
-if SDBUS_ENABLED
+if LIBDBUS_ENABLED
 RESOURCE_DBUS_PLUGIN_SOURCES = plugins/plugin-resource-dbus.c
-RESOURCE_DBUS_PLUGIN_CFLAGS  = $(SDBUS_CFLAGS)
+RESOURCE_DBUS_PLUGIN_CFLAGS  = $(LIBDBUS_CFLAGS)
 RESOURCE_DBUS_PLUGIN_LIBS    =					\
-				libmurphy-dbus-sdbus.la		\
+				libmurphy-dbus-libdbus.la		\
 				libmurphy-core.la		\
 				libmurphy-common.la		\
 				$(RESOURCE_LIBRARY)
