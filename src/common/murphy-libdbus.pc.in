@@ -7,5 +7,5 @@ Name: murphy-dbus
 Description: Murphy policy framework, dbus library.
 Requires: murphy-common
 Version: @PACKAGE_VERSION@
-Libs: -L${libdir} -lmurphy-dbus @DBUS_LIBS@
-Cflags: -I${includedir} @DBUS_CFLAGS@ 
+Libs: -L${libdir} -lmurphy-libdbus @LIBDBUS_LIBS@
+Cflags: -I${includedir} @LIBDBUS_CFLAGS@

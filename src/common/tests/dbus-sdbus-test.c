@@ -40,7 +40,7 @@
 #include <getopt.h>
 
 #include <murphy/common.h>
-#include <murphy/common/libdbus.h>
+#include <murphy/common/dbus-sdbus.h>
 
 #define SERVER_NAME      "org.test.murphy-server"
 #define SERVER_PATH      "/server"
@@ -69,40 +69,97 @@ typedef struct {
 } context_t;
 
 
-static int ping_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
+static mrp_dbus_msg_t *create_pong_signal(mrp_dbus_t *dbus, const char *dest,
+                                          uint32_t seq)
 {
-    context_t  *c = (context_t *)user_data;
+    const char     *sig = "u";
+    mrp_dbus_msg_t *msg;
+
+    msg = mrp_dbus_msg_signal(dbus, dest, SERVER_PATH, SERVER_INTERFACE, PONG);
+
+    if (msg != NULL) {
+        if (mrp_dbus_msg_open_container(msg, MRP_DBUS_TYPE_ARRAY, sig) &&
+            mrp_dbus_msg_append_basic(msg, MRP_DBUS_TYPE_UINT32, &seq) &&
+            mrp_dbus_msg_close_container(msg))
+            return msg;
+        else
+            mrp_dbus_msg_unref(msg);
+    }
+
+    return NULL;
+}
+
+
+static uint32_t parse_pong_signal(mrp_dbus_msg_t *msg)
+{
+    const char *sig = "u";
     uint32_t    seq;
-    const char *dest;
+
+    if (mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_ARRAY, sig) &&
+        mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &seq) &&
+        mrp_dbus_msg_exit_container(msg))
+        return seq;
+    else
+        return (uint32_t)-1;
+}
+
+
+static int ping_handler(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *user_data)
+{
+    context_t      *c = (context_t *)user_data;
+    mrp_dbus_msg_t *pong;
+    uint32_t        seq;
+    const char     *dest;
 
     MRP_UNUSED(c);
 
-    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_CALL &&
-        dbus_message_get_args(msg, NULL,
-                              DBUS_TYPE_UINT32, &seq,
-                              DBUS_TYPE_INVALID))
+    if (mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &seq))
         mrp_log_info("-> ping request #%u", seq);
     else
         mrp_log_error("-> malformed ping request");
 
-    if (!mrp_dbus_reply(dbus, msg,
-                        DBUS_TYPE_UINT32, &seq,
-                        DBUS_TYPE_INVALID))
-        mrp_log_error("Failed to send ping reply #%u.", seq);
-    else
+    if (mrp_dbus_reply(dbus, msg, MRP_DBUS_TYPE_UINT32, &seq,
+                        MRP_DBUS_TYPE_INVALID))
         mrp_log_info("<- ping reply #%u", seq);
+    else
+        mrp_log_error("Failed to send ping reply #%u.", seq);
 
     if (seq & 0x1)
-        dest = dbus_message_get_sender(msg);
+        dest = mrp_dbus_msg_sender(msg);
     else
         dest = NULL;
 
-    if (!mrp_dbus_signal(dbus, dest, SERVER_PATH, SERVER_INTERFACE, PONG,
-                         DBUS_TYPE_UINT32, &seq,
-                         DBUS_TYPE_INVALID))
-        mrp_log_error("Failed to send pong signal #%u.", seq);
+    if ((pong = create_pong_signal(dbus, dest, seq)) != NULL) {
+        if (mrp_dbus_send_msg(dbus, pong))
+            mrp_log_info("<- pong %s #%u", dest ? "signal" : "broadcast", seq);
+        else
+            mrp_log_error("Failed to send pong signal #%u.", seq);
+
+        mrp_dbus_msg_unref(pong);
+    }
     else
-        mrp_log_info("<- pong %s #%u", dest ? "signal" : "broadcast", seq);
+        mrp_log_error("Failed to create pong signal #%u.", seq);
+
+    return TRUE;
+}
+
+
+static int name_owner_changed(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg,
+                              void *user_data)
+{
+    context_t  *c = (context_t *)user_data;
+    const char *name, *prev, *next;
+
+    MRP_UNUSED(c);
+    MRP_UNUSED(dbus);
+
+    if (mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &name) &&
+        mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &prev) &&
+        mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &next))
+        mrp_log_info("Name %s was reassigned from %s to %s...", name,
+                     prev, next);
+    else
+        mrp_log_error("Failed to parse NameOwnerChanged signal.");
 
     return TRUE;
 }
@@ -135,6 +192,16 @@ static void server_setup(context_t *c)
         mrp_log_error("Failed to export D-BUS method '%s'.", PING);
         exit(1);
     }
+
+    if (!mrp_dbus_subscribe_signal(c->dbus, name_owner_changed, c,
+                                   "org.freedesktop.DBus",
+                                   "/org/freedesktop/DBus",
+                                   "org.freedesktop.DBus",
+                                   "NameOwnerChanged",
+                                   NULL)) {
+        mrp_log_error("Failed to subscribe to NameOwnerChanged signals.");
+        exit(1);
+    }
 }
 
 
@@ -142,13 +209,14 @@ void server_cleanup(context_t *c)
 {
     if (c->srvname && *c->srvname)
         mrp_dbus_release_name(c->dbus, c->srvname, NULL);
+
     mrp_dbus_remove_method(c->dbus, SERVER_PATH, SERVER_INTERFACE,
                            PING, ping_handler, c);
     mrp_dbus_unref(c->dbus);
 }
 
 
-static void ping_reply(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
+static void ping_reply(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *user_data)
 {
     context_t *c = (context_t *)user_data;
     uint32_t   seq;
@@ -156,29 +224,16 @@ static void ping_reply(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
     MRP_UNUSED(dbus);
     MRP_UNUSED(user_data);
 
-    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR) {
-        const char *ename, *emsg;
+    if (mrp_dbus_msg_type(msg) == MRP_DBUS_MESSAGE_TYPE_ERROR) {
+        mrp_log_error("Received errorping reply.");
 
-        if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_STRING, &ename,
-                                   DBUS_TYPE_STRING, &emsg,
-                                   DBUS_TYPE_INVALID)) {
-            ename = "<unknown>";
-            emsg  = "<unknown>";
-        }
-
-        mrp_log_error("Received error reply (%s, %s) to ping.", ename, emsg);
-
-        c->cid = 0;
         return;
     }
 
-    if (dbus_message_get_args(msg, NULL,
-                              DBUS_TYPE_UINT32, &seq,
-                              DBUS_TYPE_INVALID))
+    if (mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &seq))
         mrp_log_info("-> ping reply #%u", seq);
     else
-        mrp_log_error("Received malformed ping reply.");
+        mrp_log_error("Received malformedping reply.");
 
     c->cid = 0;
 }
@@ -197,8 +252,8 @@ static void ping_request(context_t *c)
     c->cid = mrp_dbus_call(c->dbus,
                            c->srvname, SERVER_PATH, SERVER_INTERFACE,
                            PING, 500, ping_reply, c,
-                           DBUS_TYPE_UINT32, &seq,
-                           DBUS_TYPE_INVALID);
+                           MRP_DBUS_TYPE_UINT32, &seq,
+                           MRP_DBUS_TYPE_INVALID);
 
     if (c->cid > 0)
         mrp_log_info("<- ping request #%u", seq);
@@ -217,7 +272,7 @@ static void send_cb(mrp_timer_t *t, void *user_data)
 }
 
 
-static int pong_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
+static int pong_handler(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *user_data)
 {
     context_t *c = (context_t *)user_data;
     uint32_t   seq;
@@ -225,10 +280,7 @@ static int pong_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
     MRP_UNUSED(c);
     MRP_UNUSED(dbus);
 
-    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL &&
-        dbus_message_get_args(msg, NULL,
-                              DBUS_TYPE_UINT32, &seq,
-                              DBUS_TYPE_INVALID))
+    if ((seq = parse_pong_signal(msg)) != (uint32_t)-1)
         mrp_log_info("-> pong signal #%u", seq);
     else
         mrp_log_error("-> malformed pong signal");
@@ -314,11 +366,11 @@ static void client_setup(context_t *c)
 
 static void client_cleanup(context_t *c)
 {
-    mrp_dbus_follow_name(c->dbus, c->srvname, server_status_cb, c);
+    mrp_dbus_forget_name(c->dbus, c->srvname, server_status_cb, c);
     mrp_del_timer(c->timer);
-    mrp_dbus_subscribe_signal(c->dbus, pong_handler, c,
-                              c->name, SERVER_PATH, SERVER_INTERFACE,
-                              PONG, NULL);
+    mrp_dbus_unsubscribe_signal(c->dbus, pong_handler, c,
+                                c->name, SERVER_PATH, SERVER_INTERFACE,
+                                PONG, NULL);
     mrp_dbus_unref(c->dbus);
 }
 
@@ -345,7 +397,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -l, --log-level=LEVELS         logging level to use\n"
            "      LEVELS is a comma separated list of info, error and warning\n"
            "  -v, --verbose                  increase logging verbosity\n"
-           "  -d, --debug                    enable debug messages\n"
+           "  -d, --debug site               enable debug message for <site>\n"
            "  -h, --help                     show help on usage\n",
            argv0);
 
@@ -369,7 +421,7 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "sab:n:l:t:vdh"
+#   define OPTIONS "sab:n:l:t:vd:h"
     struct option options[] = {
         { "server"    , no_argument      , NULL, 's' },
         { "bus"       , required_argument, NULL, 'b' },
@@ -378,14 +430,13 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
         { "log-level" , required_argument, NULL, 'l' },
         { "log-target", required_argument, NULL, 't' },
         { "verbose"   , optional_argument, NULL, 'v' },
-        { "debug"     , no_argument      , NULL, 'd' },
+        { "debug"     , required_argument, NULL, 'd' },
         { "help"      , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
 
-    int  opt, debug;
+    int  opt;
 
-    debug = FALSE;
     config_set_defaults(ctx);
 
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
@@ -424,7 +475,9 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
             break;
 
         case 'd':
-            debug = TRUE;
+            ctx->log_mask |= MRP_LOG_MASK_DEBUG;
+            mrp_debug_set_config(optarg);
+            mrp_debug_enable(TRUE);
             break;
 
         case 'h':
@@ -436,9 +489,6 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
             print_usage(argv[0], EINVAL, "invalid option '%c'", opt);
         }
     }
-
-    if (debug)
-        ctx->log_mask |= MRP_LOG_MASK_DEBUG;
 
     return TRUE;
 }

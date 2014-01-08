@@ -38,6 +38,7 @@
 #include <murphy/common/list.h>
 #include <murphy/common/mainloop.h>
 #include <murphy/common/msg.h>
+#include <murphy/common/native-types.h>
 
 MRP_CDECL_BEGIN
 
@@ -77,6 +78,7 @@ typedef enum {
     MRP_TRANSPORT_MODE_RAW    = 0x01,    /* uses bitpipe mode */
     MRP_TRANSPORT_MODE_DATA   = 0x02,    /* uses registered data types */
     MRP_TRANSPORT_MODE_CUSTOM = 0x03,    /* custom message encoding */
+    MRP_TRANSPORT_MODE_NATIVE = 0x04,    /* uses registered native-types */
 } mrp_transport_mode_t;
 
 typedef enum {
@@ -128,6 +130,8 @@ typedef struct {
     int (*senddata)(mrp_transport_t *t, void *data, uint16_t tag);
     /** Send data with a custom encoder over a transport. */
     int (*sendcustom)(mrp_transport_t *t, void *data);
+    /* Send a native type over a (connected) transport. */
+    int (*sendnative)(mrp_transport_t *t, void *data, uint32_t type_id);
 
     /** Send a message over a(n unconnected) transport. */
     int (*sendmsgto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
@@ -140,6 +144,9 @@ typedef struct {
                       mrp_sockaddr_t *addr, socklen_t addrlen);
     /** Send data with a custom encoder over a transport. */
     int (*sendcustomto)(mrp_transport_t *t, void *data,
+                        mrp_sockaddr_t *addr, socklen_t addrlen);
+    /** Send a native type over a transport. */
+    int (*sendnativeto)(mrp_transport_t *t, void *data, uint32_t type_id,
                         mrp_sockaddr_t *addr, socklen_t addrlen);
 } mrp_transport_req_t;
 
@@ -168,6 +175,9 @@ typedef struct {
         /** Custom encoded data callback for connected transports. */
         void (*recvcustom)(mrp_transport_t *t, void *data,
                            void *user_data);
+        /** Native type callback for connected transports. */
+        void (*recvnative)(mrp_transport_t *t, void *data, uint32_t type_id,
+                           void *user_data);
     };
 
     /** Message received on an unconnected transport. */
@@ -186,6 +196,10 @@ typedef struct {
                              void *user_data);
         /** Custom encoded data callback for unconnected transports. */
         void (*recvcustomfrom)(mrp_transport_t *t, void *data,
+                               mrp_sockaddr_t *addr, socklen_t addrlen,
+                               void *user_data);
+        /** Native type callback for unconnected transports. */
+        void (*recvnativefrom)(mrp_transport_t *t, void *data, uint32_t type_id,
                                mrp_sockaddr_t *addr, socklen_t addrlen,
                                void *user_data);
     };
@@ -224,6 +238,7 @@ typedef struct {
                                         mrp_sockaddr_t *addr,             \
                                         socklen_t addrlen);               \
     void                    *user_data;                                   \
+    mrp_typemap_t           *map;                                         \
     int                      flags;                                       \
     int                      mode;                                        \
     int                      busy;                                        \
@@ -364,7 +379,8 @@ struct mrp_transport_s {
                                _sendmsg, _sendmsgto,                      \
                                _sendraw, _sendrawto,                      \
                                _senddata, _senddatato,                    \
-                               _sendcustom, _sendcustomto)                \
+                               _sendcustom, _sendcustomto,                \
+                               _sendnative, _sendnativeto)                \
     static void _prfx##_register_transport(void)                          \
          __attribute__((constructor));                                    \
                                                                           \
@@ -391,6 +407,8 @@ struct mrp_transport_s {
                 .senddatato   = _senddatato,                              \
                 .sendcustom   = _sendcustom,                              \
                 .sendcustomto = _sendcustomto,                            \
+                .sendnative   = _sendnative,                              \
+                .sendnativeto = _sendnativeto,                            \
             },                                                            \
         };                                                                \
                                                                           \
@@ -476,6 +494,13 @@ int mrp_transport_sendcustom(mrp_transport_t *t, void *data);
 
 /** Send registered data through the given transport to the remote address. */
 int mrp_transport_sendcustomto(mrp_transport_t *t, void *data,
+                               mrp_sockaddr_t *addr, socklen_t addrlen);
+
+/** Send a native type through the given (connected) transport. */
+int mrp_transport_sendnative(mrp_transport_t *t, void *data, uint32_t type_id);
+
+/** Send a native type through the given transport to the remote address. */
+int mrp_transport_sendnativeto(mrp_transport_t *t, void *data, uint32_t type_id,
                                mrp_sockaddr_t *addr, socklen_t addrlen);
 
 MRP_CDECL_END

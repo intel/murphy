@@ -40,7 +40,7 @@
 #include <getopt.h>
 
 #include <murphy/common.h>
-#include <murphy/common/libdbus.h>
+#include <murphy/common/dbus-libdbus.h>
 
 #define SERVER_NAME      "org.test.murphy-server"
 #define SERVER_PATH      "/server"
@@ -54,7 +54,6 @@
 
 typedef struct {
     char            *busaddr;
-    char            *srvname;
     int              server;
     int              log_mask;
     const char      *log_target;
@@ -69,7 +68,7 @@ typedef struct {
 } context_t;
 
 
-static int ping_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
+static int ping_handler(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *user_data)
 {
     context_t  *c = (context_t *)user_data;
     uint32_t    seq;
@@ -77,32 +76,31 @@ static int ping_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
 
     MRP_UNUSED(c);
 
-    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_CALL &&
-        dbus_message_get_args(msg, NULL,
-                              DBUS_TYPE_UINT32, &seq,
-                              DBUS_TYPE_INVALID))
-        mrp_log_info("-> ping request #%u", seq);
-    else
-        mrp_log_error("-> malformed ping request");
+    if (mrp_dbus_msg_type(msg) == MRP_DBUS_MESSAGE_TYPE_METHOD_CALL) {
+        if (mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &seq))
+            mrp_log_info("-> ping request #%u", seq);
+        else
+            mrp_log_error("-> malformed ping request");
 
-    if (!mrp_dbus_reply(dbus, msg,
-                        DBUS_TYPE_UINT32, &seq,
-                        DBUS_TYPE_INVALID))
-        mrp_log_error("Failed to send ping reply #%u.", seq);
-    else
-        mrp_log_info("<- ping reply #%u", seq);
+        if (!mrp_dbus_reply(dbus, msg,
+                            MRP_DBUS_TYPE_UINT32, &seq,
+                            MRP_DBUS_TYPE_INVALID))
+            mrp_log_error("Failed to send ping reply #%u.", seq);
+        else
+            mrp_log_info("<- ping reply #%u", seq);
 
-    if (seq & 0x1)
-        dest = dbus_message_get_sender(msg);
-    else
-        dest = NULL;
+        if (seq & 0x1)
+            dest = mrp_dbus_msg_sender(msg);
+        else
+            dest = NULL;
 
-    if (!mrp_dbus_signal(dbus, dest, SERVER_PATH, SERVER_INTERFACE, PONG,
-                         DBUS_TYPE_UINT32, &seq,
-                         DBUS_TYPE_INVALID))
-        mrp_log_error("Failed to send pong signal #%u.", seq);
-    else
-        mrp_log_info("<- pong %s #%u", dest ? "signal" : "broadcast", seq);
+        if (!mrp_dbus_signal(dbus, dest, SERVER_PATH, SERVER_INTERFACE, PONG,
+                             MRP_DBUS_TYPE_UINT32, &seq,
+                             MRP_DBUS_TYPE_INVALID))
+            mrp_log_error("Failed to send pong signal #%u.", seq);
+        else
+            mrp_log_info("<- pong %s #%u", dest ? "signal" : "broadcast", seq);
+    }
 
     return TRUE;
 }
@@ -122,12 +120,10 @@ static void server_setup(context_t *c)
     mrp_log_info("Our address is %s on the bus...",
                  c->name ? c->name : "unknown");
 
-    if (c->srvname && *c->srvname) {
-        if (!mrp_dbus_acquire_name(c->dbus, c->srvname, NULL)) {
-            mrp_log_error("Failed to acquire D-BUS name '%s' on bus '%s'.",
-                          c->srvname, c->busaddr);
-            exit(1);
-        }
+    if (!mrp_dbus_acquire_name(c->dbus, SERVER_NAME, NULL)) {
+        mrp_log_error("Failed to acquire D-BUS name '%s' on bus '%s'.",
+                      SERVER_NAME, c->busaddr);
+        exit(1);
     }
 
     if (!mrp_dbus_export_method(c->dbus, SERVER_PATH, SERVER_INTERFACE,
@@ -140,15 +136,14 @@ static void server_setup(context_t *c)
 
 void server_cleanup(context_t *c)
 {
-    if (c->srvname && *c->srvname)
-        mrp_dbus_release_name(c->dbus, c->srvname, NULL);
+    mrp_dbus_release_name(c->dbus, SERVER_NAME, NULL);
     mrp_dbus_remove_method(c->dbus, SERVER_PATH, SERVER_INTERFACE,
                            PING, ping_handler, c);
     mrp_dbus_unref(c->dbus);
 }
 
 
-static void ping_reply(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
+static void ping_reply(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *user_data)
 {
     context_t *c = (context_t *)user_data;
     uint32_t   seq;
@@ -156,26 +151,7 @@ static void ping_reply(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
     MRP_UNUSED(dbus);
     MRP_UNUSED(user_data);
 
-    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_ERROR) {
-        const char *ename, *emsg;
-
-        if (!dbus_message_get_args(msg, NULL,
-                                   DBUS_TYPE_STRING, &ename,
-                                   DBUS_TYPE_STRING, &emsg,
-                                   DBUS_TYPE_INVALID)) {
-            ename = "<unknown>";
-            emsg  = "<unknown>";
-        }
-
-        mrp_log_error("Received error reply (%s, %s) to ping.", ename, emsg);
-
-        c->cid = 0;
-        return;
-    }
-
-    if (dbus_message_get_args(msg, NULL,
-                              DBUS_TYPE_UINT32, &seq,
-                              DBUS_TYPE_INVALID))
+    if (mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &seq))
         mrp_log_info("-> ping reply #%u", seq);
     else
         mrp_log_error("Received malformed ping reply.");
@@ -195,10 +171,10 @@ static void ping_request(context_t *c)
 
     seq    = c->seqno++;
     c->cid = mrp_dbus_call(c->dbus,
-                           c->srvname, SERVER_PATH, SERVER_INTERFACE,
+                           SERVER_NAME, SERVER_PATH, SERVER_INTERFACE,
                            PING, 500, ping_reply, c,
-                           DBUS_TYPE_UINT32, &seq,
-                           DBUS_TYPE_INVALID);
+                           MRP_DBUS_TYPE_UINT32, &seq,
+                           MRP_DBUS_TYPE_INVALID);
 
     if (c->cid > 0)
         mrp_log_info("<- ping request #%u", seq);
@@ -217,7 +193,7 @@ static void send_cb(mrp_timer_t *t, void *user_data)
 }
 
 
-static int pong_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
+static int pong_handler(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *user_data)
 {
     context_t *c = (context_t *)user_data;
     uint32_t   seq;
@@ -225,13 +201,12 @@ static int pong_handler(mrp_dbus_t *dbus, DBusMessage *msg, void *user_data)
     MRP_UNUSED(c);
     MRP_UNUSED(dbus);
 
-    if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_SIGNAL &&
-        dbus_message_get_args(msg, NULL,
-                              DBUS_TYPE_UINT32, &seq,
-                              DBUS_TYPE_INVALID))
-        mrp_log_info("-> pong signal #%u", seq);
-    else
-        mrp_log_error("-> malformed pong signal");
+    if (mrp_dbus_msg_type(msg) == MRP_DBUS_MESSAGE_TYPE_SIGNAL) {
+        if (mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &seq))
+            mrp_log_info("-> pong signal #%u", seq);
+        else
+            mrp_log_error("-> malformed pong signal");
+    }
 
     return TRUE;
 }
@@ -284,7 +259,7 @@ static void client_setup(context_t *c)
     mrp_log_info("Our address is %s on the bus...",
                  c->name ? c->name : "unknown");
 
-    mrp_dbus_follow_name(c->dbus, c->srvname, server_status_cb, c);
+    mrp_dbus_follow_name(c->dbus, SERVER_NAME, server_status_cb, c);
 
     if (c->all_pongs) {
         mrp_log_info("Subscribing for all pong signals...");
@@ -314,7 +289,7 @@ static void client_setup(context_t *c)
 
 static void client_cleanup(context_t *c)
 {
-    mrp_dbus_follow_name(c->dbus, c->srvname, server_status_cb, c);
+    mrp_dbus_follow_name(c->dbus, SERVER_NAME, server_status_cb, c);
     mrp_del_timer(c->timer);
     mrp_dbus_subscribe_signal(c->dbus, pong_handler, c,
                               c->name, SERVER_PATH, SERVER_INTERFACE,
@@ -360,7 +335,6 @@ static void config_set_defaults(context_t *ctx)
 {
     mrp_clear(ctx);
     ctx->busaddr    = "session";
-    ctx->srvname    = SERVER_NAME;
     ctx->server     = FALSE;
     ctx->log_mask   = MRP_LOG_UPTO(MRP_LOG_DEBUG);
     ctx->log_target = MRP_LOG_TO_STDERR;
@@ -369,11 +343,10 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "sab:n:l:t:vdh"
+#   define OPTIONS "sab:l:t:vdh"
     struct option options[] = {
         { "server"    , no_argument      , NULL, 's' },
         { "bus"       , required_argument, NULL, 'b' },
-        { "name"      , required_argument, NULL, 'n' },
         { "all-pongs" , no_argument      , NULL, 'a' },
         { "log-level" , required_argument, NULL, 'l' },
         { "log-target", required_argument, NULL, 't' },
@@ -396,10 +369,6 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
 
         case 'b':
             ctx->busaddr = optarg;
-            break;
-
-        case 'n':
-            ctx->srvname = optarg;
             break;
 
         case 'a':

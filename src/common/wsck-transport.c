@@ -990,4 +990,5 @@ MRP_REGISTER_TRANSPORT(wsck, WSCKP, wsck_t, wsck_resolve,
                        wsck_send, NULL,
                        wsck_sendraw, NULL,
                        wsck_senddata, NULL,
-                       wsck_sendcustom, NULL);
+                       wsck_sendcustom, NULL,
+                       NULL, NULL);

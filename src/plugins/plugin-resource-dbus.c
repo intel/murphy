@@ -38,11 +38,9 @@
 #include <sys/stat.h>
 #include <signal.h>
 
-#include <dbus/dbus.h>
-
 #include <murphy/common.h>
 #include <murphy/core.h>
-#include <murphy/common/dbus.h>
+#include <murphy/common/dbus-sdbus.h>
 
 #include <murphy/resource/client-api.h>
 
@@ -176,9 +174,9 @@ typedef struct {
     property_o_t *conf_prop;
 } resource_o_t;
 
-static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
-static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
-static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data);
+static int mgr_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data);
+static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data);
+static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data);
 static void dbus_name_cb(mrp_dbus_t *dbus, const char *name, int up,
                           const char *owner, void *user_data);
 
@@ -311,148 +309,181 @@ static char **copy_string_array(const char **array)
     return ret;
 }
 
+static const char *get_dbus_type(mrp_attr_t *v)
+{
+    switch(v->type) {
+        case mqi_string:
+            return MRP_DBUS_TYPE_STRING_AS_STRING;
+        case mqi_integer:
+            return MRP_DBUS_TYPE_INT32_AS_STRING;
+        case mqi_unsignd:
+            return MRP_DBUS_TYPE_UINT32_AS_STRING;
+        case mqi_floating:
+            return MRP_DBUS_TYPE_DOUBLE_AS_STRING;
+        default:
+            goto end;
+    }
+
+end:
+    return NULL;
+}
 
 static int dbus_value_cb(void *key, void *object, void *user_data)
 {
-    DBusMessageIter *iter = user_data;
-    DBusMessageIter dict_iter;
-    DBusMessageIter variant_iter;
+    mrp_dbus_msg_t *reply = user_data;
     char *arg_name = key;
     mrp_attr_t *arg_value = object;
+    const char *sig = get_dbus_type(arg_value);
+    char dsig[3];
+    int ret;
 
-    dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY, NULL,
-            &dict_iter);
+    if (!sig) {
+        mrp_log_error("unknown database type");
+        goto end;
+    }
 
-    dbus_message_iter_append_basic(&dict_iter, DBUS_TYPE_STRING, &arg_name);
+    ret = snprintf(dsig, sizeof(dsig), "%s%s", sig, MRP_DBUS_TYPE_VARIANT_AS_STRING);
 
-    /* TODO: do this with get_property_entry or similar to deal with multiple
-       types of different values? */
+    if (ret < 0 || ret == sizeof(dsig)) {
+        mrp_log_error("invalid signature");
+        goto end;
+    }
+
+    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, dsig)) {
+        mrp_log_error("failed to open dict container with sig '%s'", dsig);
+        goto end;
+    }
+
+    if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_STRING, arg_name)) {
+        mrp_log_error("failed to append argument name '%s'", arg_name);
+        goto end_close_dict;
+    }
 
     switch(arg_value->type) {
         case mqi_string:
-            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
-                    "s", &variant_iter);
-            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_STRING,
-                    &arg_value->value.string);
+            if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_VARIANT, sig))
+                goto end_close_dict;
+            if (!mrp_dbus_msg_append_basic(reply, sig[0],
+                    (char *) arg_value->value.string))
+                goto end_close_variant;
             break;
         case mqi_integer:
-            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
-                    "i", &variant_iter);
-            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_INT32,
-                    &arg_value->value.integer);
+            if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_VARIANT, sig))
+                goto end_close_dict;
+            if (!mrp_dbus_msg_append_basic(reply, sig[0],
+                    &arg_value->value.integer))
+                goto end_close_variant;
             break;
         case mqi_unsignd:
-            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
-                    "u", &variant_iter);
-            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_UINT32,
-                    &arg_value->value.unsignd);
+            if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_VARIANT, sig))
+                goto end_close_dict;
+            if (!mrp_dbus_msg_append_basic(reply, sig[0],
+                    &arg_value->value.unsignd))
+                goto end_close_variant;
             break;
         case mqi_floating:
-            dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT,
-                    "d", &variant_iter);
-            dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_DOUBLE,
-                    &arg_value->value.floating);
+            if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_VARIANT, sig))
+                goto end_close_dict;
+            if (!mrp_dbus_msg_append_basic(reply, sig[0],
+                    &arg_value->value.floating))
+                goto end_close_variant;
             break;
         default:
             mrp_log_error("unknown type %d in attributes", arg_value->type);
             break;
     }
 
-    dbus_message_iter_close_container(&dict_iter, &variant_iter);
-
-    dbus_message_iter_close_container(iter, &dict_iter);
-
+end_close_variant:
+    mrp_dbus_msg_close_container(reply); /* variant container */
+end_close_dict:
+    mrp_dbus_msg_close_container(reply); /* dict container */
+end:
     return MRP_HTBL_ITER_MORE;
 }
 
 
-static bool get_property_entry(property_o_t *prop, DBusMessageIter *dict_iter)
+static bool get_property_entry(property_o_t *prop, mrp_dbus_msg_t *reply)
 {
-    DBusMessageIter variant_iter;
-
     /* FIXME: check return values */
+    if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_STRING, prop->name))
+        goto error;
 
-    dbus_message_iter_append_basic(dict_iter, DBUS_TYPE_STRING, &prop->name);
-
-    dbus_message_iter_open_container(dict_iter, DBUS_TYPE_VARIANT,
-            prop->dbus_sig, &variant_iter);
+    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_VARIANT, prop->dbus_sig))
+        goto error;
 
     /* TODO: this might be remade to be generic? */
 
     if (strcmp(prop->dbus_sig, "s") == 0) {
-        dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_STRING,
-                &prop->value);
+        if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_STRING, prop->value))
+            goto error_close_variant;
     }
     else if (strcmp(prop->dbus_sig, "b") == 0) {
-        dbus_message_iter_append_basic(&variant_iter, DBUS_TYPE_BOOLEAN,
-                prop->value);
+        bool value = *(bool *) prop->value;
+        uint32_t v = value;
+        mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_BOOLEAN, &v);
     }
     else if (strcmp(prop->dbus_sig, "as") == 0) {
-        DBusMessageIter array_iter;
         char **i = prop->value;
-
-        dbus_message_iter_open_container(&variant_iter, DBUS_TYPE_ARRAY,
-                "s", &array_iter);
+        if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "s"))
+            goto error_close_variant;
 
         while (*i) {
-            dbus_message_iter_append_basic(&array_iter, DBUS_TYPE_STRING, i);
+            if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_STRING, *i)) {
+                mrp_dbus_msg_close_container(reply); /* array */
+                goto error_close_variant;
+            }
             i++;
         }
-
-        dbus_message_iter_close_container(&variant_iter, &array_iter);
+        mrp_dbus_msg_close_container(reply); /* array */
     }
     else if (strcmp(prop->dbus_sig, "ao") == 0) {
-        DBusMessageIter array_iter;
         char **i = prop->value;
-
-        dbus_message_iter_open_container(&variant_iter, DBUS_TYPE_ARRAY,
-                "o", &array_iter);
+        if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "o"))
+            goto error_close_variant;
 
         while (*i) {
-            dbus_message_iter_append_basic(&array_iter,
-                    DBUS_TYPE_OBJECT_PATH, i);
+            if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_OBJECT_PATH, *i)) {
+                mrp_dbus_msg_close_container(reply); /* array */
+                goto error_close_variant;
+            }
             i++;
         }
-
-        dbus_message_iter_close_container(&variant_iter, &array_iter);
+        mrp_dbus_msg_close_container(reply); /* array */
     }
     else if (strcmp(prop->dbus_sig, "a{sv}") == 0) {
-        DBusMessageIter array_iter;
-
-        dbus_message_iter_open_container(&variant_iter, DBUS_TYPE_ARRAY, "{sv}",
-                &array_iter);
+        if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "{sv}"))
+            goto error_close_variant;
 
         /* iterate through the elements in the map */
-        mrp_htbl_foreach(prop->value, dbus_value_cb, &array_iter);
+        mrp_htbl_foreach(prop->value, dbus_value_cb, reply);
 
-        dbus_message_iter_close_container(&variant_iter, &array_iter);
-
+        mrp_dbus_msg_close_container(reply); /* array */
     }
     else {
         mrp_log_error("Unknown sig '%s'", prop->dbus_sig);
-        goto error;
+        goto error_close_variant;
     }
 
-    dbus_message_iter_close_container(dict_iter, &variant_iter);
+    mrp_dbus_msg_close_container(reply); /* variant */
 
     return TRUE;
 
+error_close_variant:
+    mrp_dbus_msg_close_container(reply); /* variant */
 error:
     return FALSE;
 }
 
 
-static bool get_property_dict_entry(property_o_t *prop, DBusMessageIter *iter)
+static bool get_property_dict_entry(property_o_t *prop, mrp_dbus_msg_t *reply)
 {
-    DBusMessageIter dict_iter;
     bool ret;
 
-    dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY, NULL,
-            &dict_iter);
+    mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, "sv");
 
-    ret = get_property_entry(prop, &dict_iter);
+    ret = get_property_entry(prop, reply);
 
-    dbus_message_iter_close_container(iter, &dict_iter);
+    mrp_dbus_msg_close_container(reply);
 
     return ret;
 }
@@ -461,23 +492,20 @@ static bool get_property_dict_entry(property_o_t *prop, DBusMessageIter *iter)
 static void trigger_property_changed_signal(dbus_data_t *ctx,
         property_o_t *prop)
 {
-    DBusMessage *sig;
-    DBusMessageIter msg_iter;
+    mrp_dbus_msg_t *sig;
 
     if (!prop)
         return;
 
     mrp_log_info("propertyChanged signal (%s)", prop->name);
 
-    sig = dbus_message_new_signal(prop->path, prop->interface,
-            SIG_PROPERTYCHANGED);
+    sig = mrp_dbus_msg_signal(ctx->dbus, NULL, prop->path,
+                    prop->interface, SIG_PROPERTYCHANGED);
 
-    dbus_message_iter_init_append(sig, &msg_iter);
-
-    get_property_entry(prop, &msg_iter);
+    get_property_entry(prop, sig);
 
     mrp_dbus_send_msg(ctx->dbus, sig);
-    dbus_message_unref(sig);
+    mrp_dbus_msg_unref(sig);
 }
 
 
@@ -721,7 +749,7 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     char buf[MAX_PATH_LENGTH];
     int ret;
     char *name = NULL;
-    dbus_bool_t *mandatory = NULL, *shared = NULL;
+    bool *mandatory = NULL, *shared = NULL;
 
     /* attribute handling */
     mrp_attr_t attr_buf[128];
@@ -743,8 +771,8 @@ static resource_o_t * create_resource(resource_set_o_t *rset,
     if (ret < 0 || ret >= MAX_PATH_LENGTH)
         goto error;
 
-    mandatory = mrp_allocz(sizeof(dbus_bool_t));
-    shared = mrp_allocz(sizeof(dbus_bool_t));
+    mandatory = mrp_allocz(sizeof(bool));
+    shared = mrp_allocz(sizeof(bool));
     name = mrp_strdup(resource_name);
 
     if (!mandatory || !shared || !name) {
@@ -1229,14 +1257,14 @@ error:
 
 
 
-static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
+static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 {
-    const char *member = dbus_message_get_member(msg);
-    const char *iface = dbus_message_get_interface(msg);
-    const char *path = dbus_message_get_path(msg);
+    const char *member = mrp_dbus_msg_member(msg);
+    const char *iface = mrp_dbus_msg_interface(msg);
+    const char *path = mrp_dbus_msg_path(msg);
     char *error_msg = "Received invalid message";
 
-    DBusMessage *reply;
+    mrp_dbus_msg_t *reply;
     char buf[MAX_PATH_LENGTH];
 
     dbus_data_t *ctx = data;
@@ -1274,108 +1302,101 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         goto error_reply;
 
     if (strcmp(member, RESOURCE_GET_PROPERTIES) == 0) {
-        DBusMessageIter msg_iter;
-        DBusMessageIter array_iter;
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
         if (!reply)
             goto error;
 
         mrp_log_info("getProperties of resource %s", path);
 
-        dbus_message_iter_init_append(reply, &msg_iter);
+        mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "{sv}");
 
-        dbus_message_iter_open_container(&msg_iter, DBUS_TYPE_ARRAY, "{sv}",
-                &array_iter);
+        get_property_dict_entry(resource->name_prop, reply);
+        get_property_dict_entry(resource->status_prop, reply);
+        get_property_dict_entry(resource->mandatory_prop, reply);
+        get_property_dict_entry(resource->shared_prop, reply);
+        get_property_dict_entry(resource->arguments_prop, reply);
+        get_property_dict_entry(resource->conf_prop, reply);
 
-        get_property_dict_entry(resource->name_prop, &array_iter);
-        get_property_dict_entry(resource->status_prop, &array_iter);
-        get_property_dict_entry(resource->mandatory_prop, &array_iter);
-        get_property_dict_entry(resource->shared_prop, &array_iter);
-        get_property_dict_entry(resource->arguments_prop, &array_iter);
-        get_property_dict_entry(resource->conf_prop, &array_iter);
-
-        dbus_message_iter_close_container(&msg_iter, &array_iter);
+        mrp_dbus_msg_close_container(reply);
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, RESOURCE_SET_PROPERTY) == 0) {
-        DBusMessageIter msg_iter;
-        DBusMessageIter variant_iter;
-
         const char *name;
+        char *sig;
 
         mrp_log_info("setProperty of resource %s", path);
 
-        dbus_message_iter_init(msg, &msg_iter);
-
-        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_STRING) {
-            error_msg = "Missing resource property key";
+        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &name)) {
             goto error_reply;
         }
 
-        dbus_message_iter_get_basic(&msg_iter, &name);
-
-        if (!dbus_message_iter_has_next(&msg_iter)) {
-            error_msg = "Missing resource property value";
-            goto error_reply;
-        }
-
-        dbus_message_iter_next(&msg_iter);
-
-        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_VARIANT) {
-            error_msg = "Resource property value not wrapped in variant";
-            goto error_reply;
-        }
-
-        dbus_message_iter_recurse(&msg_iter, &variant_iter);
-
-        if (resource->rset->locked && strcmp(name, PROP_ATTRIBUTES_CONF) != 0) {
-            error_msg = "Resource set cannot be changed after requesting";
-            goto error_reply;
-        }
-
+        /* get the type of key 'name' */
         if (strcmp(name, PROP_MANDATORY) == 0) {
-            dbus_bool_t value;
-            dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
+            uint32_t v = 0;
+            bool *value;
+            sig = "s";
 
-            if (dbus_message_iter_get_arg_type(&variant_iter)
-                        != DBUS_TYPE_BOOLEAN) {
-                mrp_free(tmp);
+            value = mrp_allocz(sizeof(bool));
+            if (!value) {
+                error_msg = "internal error";
                 goto error_reply;
             }
 
-            dbus_message_iter_get_basic(&variant_iter, &value);
+            mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_VARIANT, sig);
 
-            *tmp = value;
-            update_property(resource->mandatory_prop, tmp);
+            mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_BOOLEAN, &v);
+            *value = !!v;
+
+            update_property(resource->mandatory_prop, value);
+
+            mrp_dbus_msg_exit_container(msg);
         }
         else if (strcmp(name, PROP_SHARED) == 0) {
-            dbus_bool_t value;
-            dbus_bool_t *tmp = mrp_alloc(sizeof(dbus_bool_t));
+            uint32_t v = 0;
+            bool *value;
+            sig = "s";
+            value = mrp_allocz(sizeof(bool));
 
-            if (dbus_message_iter_get_arg_type(&variant_iter)
-                        != DBUS_TYPE_BOOLEAN) {
-                mrp_free(tmp);
+            if (!value) {
+                error_msg = "Internal error";
                 goto error_reply;
             }
 
-            dbus_message_iter_get_basic(&variant_iter, &value);
+            mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_VARIANT, sig);
 
-            *tmp = value;
-            update_property(resource->shared_prop, tmp);
+            mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_BOOLEAN, &v);
+            *value = !!v;
+
+            update_property(resource->shared_prop, value);
+
+            mrp_dbus_msg_exit_container(msg);
         }
         else if (strcmp(name, PROP_ATTRIBUTES_CONF) == 0) {
-            DBusMessageIter a_iter;
-            DBusMessageIter d_iter;
-            DBusMessageIter v_iter;
             mrp_htbl_config_t map_conf;
             mrp_htbl_t *conf;
-            int value_type;
             int new_count = 0;
             int old_count = 0;
+
+            sig = "a{sv}";
+
+            if (resource->rset->locked != 0) {
+                error_msg = "Resource set cannot be changed after requesting";
+                goto error_reply;
+            }
+
+            if (!mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_VARIANT, sig)) {
+                error_msg = "Invalid message";
+                goto error_reply;
+            }
+
+            if (!mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_ARRAY, "{sv}")) {
+                error_msg = "Invalid message";
+                goto error_reply;
+            }
 
             map_conf.comp = mrp_string_comp;
             map_conf.hash = mrp_string_hash;
@@ -1385,44 +1406,23 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
 
             conf = mrp_htbl_create(&map_conf);
 
-            if (!conf)
-                goto error_reply;
-
-            if (dbus_message_iter_get_arg_type(&variant_iter)
-                        != DBUS_TYPE_ARRAY) {
-                mrp_htbl_destroy(conf, TRUE);
-                error_msg = "Resource configuration attribute array missing";
+            if (!conf) {
+                error_msg = "Internal error";
                 goto error_reply;
             }
 
-            dbus_message_iter_recurse(&variant_iter, &a_iter);
-
-            while (dbus_message_iter_get_arg_type(&a_iter)
-                    != DBUS_TYPE_INVALID) {
+            while (mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_DICT_ENTRY, "sv")) {
                 char *key;
                 mrp_attr_t *prev_value;
                 mrp_attr_t *new_value;
+                const char *value_sig;
 
-                if (dbus_message_iter_get_arg_type(&a_iter)
-                            != DBUS_TYPE_DICT_ENTRY) {
+                if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &key)) {
                     mrp_htbl_destroy(conf, TRUE);
-                    error_msg = "Configuration attribute array"
-                                        "doesn't contain dictionary entries";
                     goto error_reply;
                 }
-
-                dbus_message_iter_recurse(&a_iter, &d_iter);
-
-                if (dbus_message_iter_get_arg_type(&d_iter)
-                            != DBUS_TYPE_STRING) {
-                    mrp_htbl_destroy(conf, TRUE);
-                    error_msg = "Configuration attribute key missing";
-                    goto error_reply;
-                }
-
-                dbus_message_iter_get_basic(&d_iter, &key);
-
                 prev_value = mrp_htbl_lookup(resource->conf_prop->value, key);
+
                 if (!prev_value) {
                     mrp_log_error("no previous value %s in attributes", key);
                     error_msg = "Configuration attribute definition missing";
@@ -1430,94 +1430,79 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                     goto error_reply;
                 }
 
-                if (!dbus_message_iter_has_next(&d_iter)) {
-                    mrp_htbl_destroy(conf, TRUE);
-                    error_msg = "Configuration attribute value missing";
-                    goto error_reply;
-                }
-                dbus_message_iter_next(&d_iter);
+                value_sig = get_dbus_type(prev_value);
 
-                if (dbus_message_iter_get_arg_type(&d_iter)
-                            != DBUS_TYPE_VARIANT) {
+                if (!value_sig) {
+                    error_msg = "Failed to map database value to D-Bus signature";
                     mrp_htbl_destroy(conf, TRUE);
-                    error_msg = "Attribute value not wrapped in variant";
                     goto error_reply;
                 }
 
-                dbus_message_iter_recurse(&d_iter, &v_iter);
+                if (!mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_VARIANT, value_sig)) {
+                    error_msg = "Invalid message";
+                    mrp_htbl_destroy(conf, TRUE);
+                    goto error_reply;
+                }
 
                 new_value = mrp_allocz(sizeof(mrp_attr_t));
                 if (!new_value) {
                     error_msg = "Internal error";
+                    mrp_htbl_destroy(conf, TRUE);
                     goto error_reply;
                 }
 
-                value_type = dbus_message_iter_get_arg_type(&v_iter);
-
-                switch (value_type) {
-                    case DBUS_TYPE_STRING:
+                switch(prev_value->type) {
+                    case mqi_string:
                     {
                         char *value;
 
-                        if (prev_value->type != mqi_string) {
-                            mrp_htbl_destroy(conf, TRUE);
+                        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &value)) {
                             mrp_free(new_value);
-                            error_msg = "Attribute value not string";
+                            mrp_htbl_destroy(conf, TRUE);
                             goto error_reply;
                         }
-
-                        dbus_message_iter_get_basic(&v_iter, &value);
                         new_value->name = mrp_strdup(key);
                         new_value->type = mqi_string;
                         new_value->value.string = mrp_strdup(value);
                         break;
                     }
-                    case DBUS_TYPE_INT32:
-                    {
-                        int32_t value;
-
-                        if (prev_value->type != mqi_integer) {
-                            mrp_htbl_destroy(conf, TRUE);
-                            mrp_free(new_value);
-                            error_msg = "Attribute value not int32";
-                            goto error_reply;
-                        }
-
-                        dbus_message_iter_get_basic(&v_iter, &value);
-                        new_value->name = mrp_strdup(key);
-                        new_value->type = mqi_integer;
-                        new_value->value.integer = value;
-                        break;
-                    }
-                    case DBUS_TYPE_UINT32:
+                    case mqi_unsignd:
                     {
                         uint32_t value;
 
-                        if (prev_value->type != mqi_unsignd) {
-                            mrp_htbl_destroy(conf, TRUE);
+                        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_UINT32, &value)) {
                             mrp_free(new_value);
-                            error_msg = "Attribute value not uint32";
+                            mrp_htbl_destroy(conf, TRUE);
                             goto error_reply;
                         }
-
-                        dbus_message_iter_get_basic(&v_iter, &value);
                         new_value->name = mrp_strdup(key);
                         new_value->type = mqi_unsignd;
                         new_value->value.unsignd = value;
                         break;
                     }
-                    case DBUS_TYPE_DOUBLE:
+                    case mqi_integer:
+                    {
+                        int32_t value;
+
+                        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_INT32, &value)) {
+                            mrp_free(new_value);
+                            mrp_htbl_destroy(conf, TRUE);
+                            goto error_reply;
+                        }
+                        new_value->name = mrp_strdup(key);
+                        new_value->type = mqi_integer;
+                        new_value->value.integer = value;
+                        break;
+                    }
+                    case mqi_floating:
                     {
                         double value;
 
-                        if (prev_value->type != mqi_floating) {
-                            mrp_htbl_destroy(conf, TRUE);
+                        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_DOUBLE, &value)) {
                             mrp_free(new_value);
-                            error_msg = "Attribute value not double";
+                            mrp_htbl_destroy(conf, TRUE);
                             goto error_reply;
                         }
-
-                        dbus_message_iter_get_basic(&v_iter, &value);
                         new_value->name = mrp_strdup(key);
                         new_value->type = mqi_floating;
                         new_value->value.floating = value;
@@ -1530,10 +1515,10 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                         goto error_reply;
                 }
 
-                mrp_htbl_insert(conf, (void *) new_value->name, new_value);
+                mrp_dbus_msg_exit_container(msg);
 
+                mrp_htbl_insert(conf, (void *) new_value->name, new_value);
                 new_count++;
-                dbus_message_iter_next(&a_iter);
             }
 
             /* What about if not all properties were set? Maybe
@@ -1574,19 +1559,21 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                 update_attributes(resource->name_prop->value,
                         resource->rset->set, conf);
             }
+
+            mrp_dbus_msg_exit_container(msg);
         }
         else {
             error_msg = "Resource property read-only or missing";
             goto error_reply;
         }
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
         if (!reply)
             goto error;
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, RESOURCE_DELETE) == 0) {
         mrp_log_info("Deleting resource %s", path);
@@ -1594,29 +1581,34 @@ static int resource_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_htbl_remove(rset->resources, (void *) path, TRUE);
         update_property(rset->resources_prop, htbl_keys(rset->resources));
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
         if (!reply)
             goto error;
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
 
     return TRUE;
 
 error_reply:
-    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED, error_msg);
+    {
+        mrp_dbus_err_t err;
+        mrp_dbus_error_init(&err);
+        mrp_dbus_error_set(&err, "org.freedesktop.DBus.Error.Failed", error_msg);
 
-    if (reply) {
-        mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        reply = mrp_dbus_msg_error(dbus, msg, &err);
+
+        if (reply) {
+            mrp_dbus_send_msg(dbus, reply);
+            mrp_dbus_msg_unref(reply);
+        }
     }
-
-    return FALSE;
+    return TRUE;
 
 error:
-    return FALSE;
+    return TRUE;
 }
 
 
@@ -1625,8 +1617,8 @@ static int add_resource_cb(void *key, void *object, void *user_data)
     resource_o_t *r = object;
     resource_set_o_t *rset = user_data;
 
-    bool shared = *(dbus_bool_t *) r->shared_prop->value;
-    bool mandatory = *(dbus_bool_t *) r->mandatory_prop->value;
+    bool shared = *(bool *) r->shared_prop->value;
+    bool mandatory = *(bool *) r->mandatory_prop->value;
     char *name = r->name_prop->value;
 
     int count = 0;
@@ -1645,14 +1637,14 @@ static int add_resource_cb(void *key, void *object, void *user_data)
 }
 
 
-static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
+static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 {
-    const char *member = dbus_message_get_member(msg);
-    const char *iface = dbus_message_get_interface(msg);
-    const char *path = dbus_message_get_path(msg);
+    const char *member = mrp_dbus_msg_member(msg);
+    const char *iface = mrp_dbus_msg_interface(msg);
+    const char *path = mrp_dbus_msg_path(msg);
     char *error_msg = "Received invalid message";
 
-    DBusMessage *reply;
+    mrp_dbus_msg_t *reply;
 
     dbus_data_t *ctx = data;
 
@@ -1667,40 +1659,37 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
     }
 
     if (strcmp(member, RSET_GET_PROPERTIES) == 0) {
-        DBusMessageIter msg_iter;
-        DBusMessageIter array_iter;
 
         /* FIXME: check return values */
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
         if (!reply)
             goto error;
 
         mrp_log_info("getProperties of rset %s", path);
 
-        dbus_message_iter_init_append(reply, &msg_iter);
+        if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "{sv}")) {
+            mrp_dbus_msg_unref(reply);
+            goto error_reply;
+        }
 
-        dbus_message_iter_open_container(&msg_iter, DBUS_TYPE_ARRAY, "{sv}",
-                &array_iter);
+        get_property_dict_entry(rset->class_prop, reply);
+        get_property_dict_entry(rset->status_prop, reply);
+        get_property_dict_entry(rset->resources_prop, reply);
+        get_property_dict_entry(rset->available_resources_prop, reply);
 
-        get_property_dict_entry(rset->class_prop, &array_iter);
-        get_property_dict_entry(rset->status_prop, &array_iter);
-        get_property_dict_entry(rset->resources_prop, &array_iter);
-        get_property_dict_entry(rset->available_resources_prop, &array_iter);
-
-        dbus_message_iter_close_container(&msg_iter, &array_iter);
+        mrp_dbus_msg_close_container(reply);
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, RSET_ADD_RESOURCE) == 0) {
         const char *name;
 
         resource_o_t *resource;
 
-        if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &name,
-                DBUS_TYPE_INVALID)) {
+        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &name)) {
             goto error_reply;
         }
 
@@ -1712,14 +1701,17 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         if (!mrp_dbus_export_method(ctx->dbus, resource->path,
                     RESOURCE_IFACE, RESOURCE_GET_PROPERTIES, resource_cb,
                     ctx)) {
+            destroy_resource(resource);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, resource->path,
                     RESOURCE_IFACE, RESOURCE_SET_PROPERTY, resource_cb, ctx)) {
+            destroy_resource(resource);
             goto error_reply;
         }
         if (!mrp_dbus_export_method(ctx->dbus, resource->path,
                     RESOURCE_IFACE, RESOURCE_DELETE, resource_cb, ctx)) {
+            destroy_resource(resource);
             goto error_reply;
         }
 
@@ -1727,16 +1719,25 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
                 resource);
         update_property(rset->resources_prop, htbl_keys(rset->resources));
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
-        if (!reply)
+        if (!reply) {
+            mrp_htbl_remove(rset->resources, (void *) path, TRUE);
+            update_property(rset->resources_prop, htbl_keys(rset->resources));
             goto error;
+        }
 
-        dbus_message_append_args(reply, DBUS_TYPE_OBJECT_PATH, &resource->path,
-                DBUS_TYPE_INVALID);
+        if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_OBJECT_PATH, resource->path)) {
+            mrp_htbl_remove(rset->resources, (void *) path, TRUE);
+            update_property(rset->resources_prop, htbl_keys(rset->resources));
+            mrp_dbus_msg_unref(reply);
+            goto error_reply;
+        }
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
+
+        mrp_log_info("created resource %s\n", resource->path);
     }
     else if (strcmp(member, RSET_REQUEST) == 0) {
         mrp_log_info("Requesting rset %s", path);
@@ -1765,26 +1766,24 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
          */
         rset->locked = TRUE;
 
-        reply = dbus_message_new_method_return(msg);
-
+        reply = mrp_dbus_msg_method_return(dbus, msg);
         if (!reply)
             goto error;
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, RSET_RELEASE) == 0) {
         mrp_log_info("Releasing rset %s", path);
 
         mrp_resource_set_release(rset->set, 0);
 
-        reply = dbus_message_new_method_return(msg);
-        if (!reply) {
+        reply = mrp_dbus_msg_method_return(dbus, msg);
+        if (!reply)
             goto error;
-        }
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, RSET_DELETE) == 0) {
         mrp_log_info("Deleting rset %s", path);
@@ -1792,91 +1791,86 @@ static int rset_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_htbl_remove(ctx->mgr->rsets, (void *) path, TRUE);
         update_property(ctx->mgr->rsets_prop, htbl_keys(ctx->mgr->rsets));
 
-        reply = dbus_message_new_method_return(msg);
-
+        reply = mrp_dbus_msg_method_return(dbus, msg);
         if (!reply)
             goto error;
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, RSET_SET_PROPERTY) == 0) {
-        DBusMessageIter msg_iter;
-        DBusMessageIter variant_iter;
-
-        const char *name;
-        const char *value;
+        char *name = NULL;
+        char *value = NULL;
 
         if (rset->locked) {
             error_msg = "Resource set cannot be changed after requesting";
             goto error_reply;
         }
 
-        dbus_message_iter_init(msg, &msg_iter);
-
-        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_STRING) {
+        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &name)) {
+            error_msg = "Message didn't contain the property name";
             goto error_reply;
         }
 
-        dbus_message_iter_get_basic(&msg_iter, &name);
-
-        if (!dbus_message_iter_has_next(&msg_iter)) {
+        if (strcmp(name, PROP_CLASS) != 0) {
+            error_msg = "Unknown property name in message";
             goto error_reply;
         }
 
-        dbus_message_iter_next(&msg_iter);
-
-        if (dbus_message_iter_get_arg_type(&msg_iter) != DBUS_TYPE_VARIANT) {
+        if (!mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_VARIANT, "s")) {
+            error_msg = "Property value isn't contained inside a variant";
             goto error_reply;
         }
 
-        dbus_message_iter_recurse(&msg_iter, &variant_iter);
-
-        if (strcmp(name, PROP_CLASS) == 0) {
-            if (dbus_message_iter_get_arg_type(&variant_iter)
-                        != DBUS_TYPE_STRING) {
-                goto error_reply;
-            }
-
-            dbus_message_iter_get_basic(&variant_iter, &value);
-
-            update_property(rset->class_prop, mrp_strdup(value));
-        }
-        else {
+        if (!mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &value)) {
+            mrp_dbus_msg_exit_container(msg);
             goto error_reply;
         }
 
-        reply = dbus_message_new_method_return(msg);
+        update_property(rset->class_prop, mrp_strdup(value));
+
+        mrp_dbus_msg_exit_container(msg);
+
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
         if (!reply)
             goto error;
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
 
     return TRUE;
 
 error_reply:
-    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED, error_msg);
+    {
+        mrp_dbus_err_t err;
+        mrp_dbus_error_init(&err);
+        mrp_dbus_error_set(&err, "org.freedesktop.DBus.Error.Failed", error_msg);
 
-    if (reply) {
-        mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_log_error("rset_cb failure: %s", error_msg);
+
+        reply = mrp_dbus_msg_error(dbus, msg, &err);
+
+        if (reply) {
+            mrp_dbus_send_msg(dbus, reply);
+            mrp_dbus_msg_unref(reply);
+        }
     }
+    return TRUE;
 
 error:
-    return FALSE;
+    return TRUE;
 }
 
 
-static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
+static int mgr_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 {
-    const char *member = dbus_message_get_member(msg);
-    const char *iface = dbus_message_get_interface(msg);
-    const char *path = dbus_message_get_path(msg);
+    const char *member = mrp_dbus_msg_member(msg);
+    const char *iface = mrp_dbus_msg_interface(msg);
+    const char *path = mrp_dbus_msg_path(msg);
 
-    DBusMessage *reply;
+    mrp_dbus_msg_t *reply;
 
     dbus_data_t *ctx = data;
 
@@ -1884,30 +1878,27 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
             " interface: '%s'", member, path, iface);
 
     if (strcmp(member, MANAGER_GET_PROPERTIES) == 0) {
-        DBusMessageIter msg_iter;
-        DBusMessageIter array_iter;
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
 
         if (!reply)
             goto error;
 
         mrp_log_info("getProperties of manager %s", path);
 
-        dbus_message_iter_init_append(reply, &msg_iter);
+        if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "{sv}")) {
+            goto error_reply;
+        }
 
-        dbus_message_iter_open_container(&msg_iter, DBUS_TYPE_ARRAY, "{sv}",
-                &array_iter);
+        get_property_dict_entry(ctx->mgr->rsets_prop, reply);
 
-        get_property_dict_entry(ctx->mgr->rsets_prop, &array_iter);
-
-        dbus_message_iter_close_container(&msg_iter, &array_iter);
+        mrp_dbus_msg_close_container(reply);
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
     }
     else if (strcmp(member, MANAGER_CREATE_RESOURCE_SET) == 0) {
-        const char *sender = dbus_message_get_sender(msg);
+        const char *sender = mrp_dbus_msg_sender(msg);
         resource_set_o_t *rset = create_rset(ctx->mgr, ctx->mgr->next_id++,
                 sender);
 
@@ -1948,31 +1939,45 @@ static int mgr_cb(mrp_dbus_t *dbus, DBusMessage *msg, void *data)
         mrp_htbl_insert(ctx->mgr->rsets, (void *) rset->path, rset);
         update_property(ctx->mgr->rsets_prop, htbl_keys(ctx->mgr->rsets));
 
-        reply = dbus_message_new_method_return(msg);
+        reply = mrp_dbus_msg_method_return(dbus, msg);
         if (!reply) {
-            destroy_rset(rset);
+            mrp_htbl_remove(ctx->mgr->rsets, (void *) rset->path, TRUE);
+            update_property(ctx->mgr->rsets_prop, htbl_keys(ctx->mgr->rsets));
             goto error;
         }
 
-        dbus_message_append_args(reply, DBUS_TYPE_OBJECT_PATH, &rset->path,
-                DBUS_TYPE_INVALID);
+        if (!mrp_dbus_msg_append_basic(reply, MRP_DBUS_TYPE_OBJECT_PATH,
+                    rset->path)) {
+            mrp_htbl_remove(ctx->mgr->rsets, (void *) rset->path, TRUE);
+            update_property(ctx->mgr->rsets_prop, htbl_keys(ctx->mgr->rsets));
+            mrp_dbus_msg_unref(reply);
+            goto error_reply;
+        }
 
         mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+        mrp_dbus_msg_unref(reply);
+
+        mrp_log_info("created resource set %s\n", rset->path);
     }
 
     return TRUE;
 
 error_reply:
-    reply = dbus_message_new_error(msg, DBUS_ERROR_FAILED,
-                "Received invalid message");
-    if (reply) {
-        mrp_dbus_send_msg(dbus, reply);
-        dbus_message_unref(reply);
+    {
+        mrp_dbus_err_t err;
+        mrp_dbus_error_init(&err);
+        mrp_dbus_error_set(&err, "org.freedesktop.DBus.Error.Failed", "Received invalid message");
+
+        reply = mrp_dbus_msg_error(dbus, msg, &err);
+
+        if (reply) {
+            mrp_dbus_send_msg(dbus, reply);
+            mrp_dbus_msg_unref(reply);
+        }
     }
 
 error:
-    return FALSE;
+    return TRUE;
 }
 
 
@@ -2052,6 +2057,7 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
 {
     mrp_plugin_arg_t *args = plugin->args;
     dbus_data_t *ctx = mrp_allocz(sizeof(dbus_data_t));
+    mrp_dbus_err_t err;
 
     if (!ctx)
         goto error;
@@ -2061,10 +2067,14 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     ctx->default_zone = args[ARG_DR_DEFAULT_ZONE].str;
     ctx->default_class = args[ARG_DR_DEFAULT_CLASS].str;
     ctx->bus = args[ARG_DR_BUS].str;
-    ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, ctx->bus, NULL);
+
+    mrp_log_info("Connecting to bus '%s'", ctx->bus);
+
+    ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, ctx->bus,
+            mrp_dbus_error_init(&err));
 
     if (!ctx->dbus) {
-        mrp_log_error("Failed to connect to D-Bus");
+        mrp_log_error("Failed to connect to D-Bus: %s", err.message);
         goto error;
     }
 

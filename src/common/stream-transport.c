@@ -682,6 +682,42 @@ static int strm_senddata(mrp_transport_t *mt, void *data, uint16_t tag)
 }
 
 
+static int strm_sendnative(mrp_transport_t *mt, void *data, uint32_t type_id)
+{
+    strm_t        *t   = (strm_t *)mt;
+    mrp_typemap_t *map = t->map;
+    void          *buf;
+    size_t         size, reserve;
+    uint32_t      *lenp;
+    ssize_t        n;
+
+    if (t->connected) {
+        reserve = sizeof(*lenp);
+
+        if (mrp_encode_native(data, type_id, reserve, &buf, &size, map) == 0) {
+            lenp  = buf;
+            *lenp = htobe32(size - sizeof(*lenp));
+
+            n = write(t->sock, buf, size);
+
+            mrp_free(buf);
+
+            if (n == (ssize_t)size)
+                return TRUE;
+            else {
+                if (n == -1 && errno == EAGAIN) {
+                    mrp_log_error("%s(): XXX TODO: this sucks, need to add"
+                                  " output queueing for strm-transport.",
+                                  __FUNCTION__);
+                }
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+
 MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
                        strm_bind, strm_listen, strm_accept,
@@ -689,7 +725,8 @@ MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
                        strm_send, NULL,
                        strm_sendraw, NULL,
                        strm_senddata, NULL,
-                       NULL, NULL);
+                       NULL, NULL,
+                       strm_sendnative, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
@@ -698,7 +735,8 @@ MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_send, NULL,
                        strm_sendraw, NULL,
                        strm_senddata, NULL,
-                       NULL, NULL);
+                       NULL, NULL,
+                       strm_sendnative, NULL);
 
 MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
@@ -707,4 +745,5 @@ MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
                        strm_send, NULL,
                        strm_sendraw, NULL,
                        strm_senddata, NULL,
-                       NULL, NULL);
+                       NULL, NULL,
+                       strm_sendnative, NULL);

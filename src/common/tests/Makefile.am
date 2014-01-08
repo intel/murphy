@@ -1,8 +1,10 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
 noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
-            internal-transport-test process-watch-test
-if DBUS_ENABLED
+                 internal-transport-test process-watch-test native-test \
+                 sdbus-error-message
+
+if LIBDBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
 
@@ -20,8 +22,8 @@ hash_test_LDADD   = ../../libmurphy-common.la
 
 # mainloop test
 mainloop_test_SOURCES = mainloop-test.c
-mainloop_test_CFLAGS  = $(AM_CFLAGS) $(GLIB_CFLAGS) $(DBUS_CFLAGS)
-mainloop_test_LDADD   = ../../libmurphy-common.la $(GLIB_LIBS) $(DBUS_LIBS)
+mainloop_test_CFLAGS  = $(AM_CFLAGS) $(GLIB_CFLAGS) $(LIBDBUS_CFLAGS)
+mainloop_test_LDADD   = ../../libmurphy-common.la $(GLIB_LIBS) $(LIBDBUS_LIBS)
 if PULSE_ENABLED
 mainloop_test_CFLAGS += $(PULSE_CFLAGS)
 mainloop_test_LDADD  += ../../libmurphy-pulse.la $(PULSE_LIBS)
@@ -51,6 +53,11 @@ msg_test_SOURCES = msg-test.c
 msg_test_CFLAGS  = $(AM_CFLAGS)
 msg_test_LDADD   = ../../libmurphy-common.la
 
+# native type test
+native_test_SOURCES = native-test.c
+native_test_CFLAGS  = $(AM_CFLAGS)
+native_test_LDADD   = ../../libmurphy-common.la
+
 # transport test
 transport_test_SOURCES = transport-test.c
 transport_test_CFLAGS  = $(AM_CFLAGS)
@@ -66,19 +73,53 @@ process_watch_test_SOURCES = process-test.c
 process_watch_test_CFLAGS  = $(AM_CFLAGS)
 process_watch_test_LDADD   = ../../libmurphy-common.la
 
-if DBUS_ENABLED
-transport_test_LDADD  += ../../libmurphy-dbus.la
+if LIBDBUS_ENABLED
+transport_test_LDADD  += ../../libmurphy-libdbus.la
 
-# DBUS test
+noinst_PROGRAMS += mainloop-test
+
+# DBUS tests
+noinst_PROGRAMS    += dbus-test
 dbus_test_SOURCES = dbus-test.c
-dbus_test_CFLAGS  = $(AM_CFLAGS) $(DBUS_CFLAGS)
-dbus_test_LDADD   = ../../libmurphy-dbus.la ../../libmurphy-common.la $(DBUS_LIBS)
+dbus_test_CFLAGS  = $(AM_CFLAGS) $(LIBDBUS_CFLAGS)
+dbus_test_LDADD   = ../../libmurphy-libdbus.la ../../libmurphy-common.la $(LIBDBUS_LIBS)
+
+noinst_PROGRAMS    += libdbus-test libdbus-transport-test
+libdbus_test_SOURCES = libdbus-test.c
+libdbus_test_CFLAGS  = $(AM_CFLAGS) $(LIBDBUS_CFLAGS)
+libdbus_test_LDADD   = ../../libmurphy-dbus-libdbus.la ../../libmurphy-common.la $(LIBDBUS_LIBS)
+
+libdbus_transport_test_SOURCES = libdbus-transport-test.c
+libdbus_transport_test_CFLAGS  = $(AM_CFLAGS)
+libdbus_transport_test_LDADD   = ../../libmurphy-common.la \
+                                 ../../libmurphy-dbus-libdbus.la
 endif
 
-## databuf test
-#databuf_test_SOURCES = databuf-test.c
-#databuf_test_CFLAGS  = $(AM_CFLAGS)
-#databuf_test_LDADD   = ../../libmurphy-common.la
+if SDBUS_ENABLED
+noinst_PROGRAMS    += sdbus-test dbus-sdbus-test sdbus-transport-test sdbus-error-message
+
+sdbus_test_SOURCES = sdbus-test.c
+sdbus_test_CFLAGS  = $(AM_CFLAGS) $(SDBUS_CFLAGS)
+sdbus_test_LDADD   = ../../libmurphy-common.la $(SDBUS_LIBS)
+
+dbus_sdbus_test_SOURCES = dbus-sdbus-test.c
+dbus_sdbus_test_CFLAGS  = $(AM_CFLAGS) $(SDBUS_CFLAGS)
+dbus_sdbus_test_LDADD   = 				\
+			../../libmurphy-common.la	\
+			../../libmurphy-dbus-sdbus.la
+
+sdbus_transport_test_SOURCES = libdbus-transport-test.c
+sdbus_transport_test_CFLAGS  = $(AM_CFLAGS)
+sdbus_transport_test_LDADD   =				\
+			../../libmurphy-common.la	\
+			../../libmurphy-dbus-sdbus.la
+
+sdbus_error_message_SOURCES = sdbus-error-message.c
+sdbus_error_message_CFLAGS  = $(AM_CFLAGS) $(SDBUS_CFLAGS)
+sdbus_error_message_LDADD   =				\
+			../../libmurphy-common.la	\
+			../../libmurphy-dbus-sdbus.la
+endif
 
 # fragbuf test
 fragbuf_test_SOURCES = fragbuf-test.c
