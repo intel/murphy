@@ -461,7 +461,8 @@ generate-linker-scripts: linker-script.libdbus
 
 # libdbus-based library with full abstraction
 murphy_dbus_libdbus_headers =		\
-		common/dbus-libdbus.h
+		common/dbus-libdbus.h	\
+		common/dbus-error.h
 
 if LIBDBUS_ENABLED
 lib_LTLIBRARIES += libmurphy-dbus-libdbus.la
@@ -518,7 +519,8 @@ generate-linker-scripts: linker-script.dbus-libdbus
 
 # systemd-bus based library
 murphy_dbus_sdbus_headers = 			\
-		common/dbus-sdbus.h
+		common/dbus-sdbus.h		\
+		common/dbus-error.h
 
 if SDBUS_ENABLED
 lib_LTLIBRARIES += libmurphy-dbus-sdbus.la
