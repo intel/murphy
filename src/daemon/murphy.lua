@@ -3,6 +3,12 @@ m = murphy.get()
 -- try loading console plugin
 m:try_load_plugin('console')
 
+--[[
+m:try_load_plugin('console', 'dbusconsole' , {
+    address = 'dbus:[session]@org.Murphy/console'
+})
+--]]
+
 m:try_load_plugin('console', 'webconsole', {
                               address = 'wsck:127.0.0.1:3000/murphy',
                               httpdir = 'src/plugins/console',
