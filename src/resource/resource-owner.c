@@ -573,9 +573,10 @@ static bool advice_ownership(mrp_resource_owner_t    *owner,
             /* someone else owns it but it can be shared */
             break;
 
-
         if (owner->class == class) {
-            if (owner->rset->class.priority == rset->class.priority)
+            if (owner->rset->class.priority == rset->class.priority &&
+                    class->order == MRP_RESOURCE_ORDER_LIFO)
+                /* same class and resource goes to the last one who asks it */
                 break;
         }
 
