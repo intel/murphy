@@ -220,25 +220,31 @@ int generate_autoupdate_target(mrp_resolver_t *r, const char *name)
     if (r->auto_update != NULL)
         return FALSE;
 
-    depends = alloca(r->ntarget * sizeof(depends[0]));
-    ndepend = 0;
-
     mrp_debug("constructing autoupdate target '%s'...", name);
 
-    if (sort_targets(r) != 0) {
-        mrp_debug("failed to sort dependency graph");
-        return FALSE;
-    }
+    if (r->ntarget > 0) {
+        depends = alloca(r->ntarget * sizeof(depends[0]));
+        ndepend = 0;
 
-    for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
-        if (t->update_facts != NULL && t->update_facts[0] >= 0) {
-            mrp_debug("  including target '%s' (%s)", t->name,
-                      fact_name(r, t->update_facts[0]));
-            depends[ndepend] = t->name;
-            ndepend++;
+        if (sort_targets(r) != 0) {
+            mrp_debug("failed to sort dependency graph");
+            return FALSE;
         }
-        else
-            mrp_debug("  excluding target '%s'", t->name);
+
+        for (i = 0, t = r->targets; i < r->ntarget; i++, t++) {
+            if (t->update_facts != NULL && t->update_facts[0] >= 0) {
+                mrp_debug("  including target '%s' (%s)", t->name,
+                          fact_name(r, t->update_facts[0]));
+                depends[ndepend] = t->name;
+                ndepend++;
+            }
+            else
+                mrp_debug("  excluding target '%s'", t->name);
+        }
+    }
+    else {
+        depends = NULL;
+        ndepend = 0;
     }
 
     at = create_target(r, name, depends, ndepend, NULL, NULL);
