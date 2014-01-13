@@ -291,22 +291,27 @@ static void register_default_types(void)
         abort();
     }
 
-    DECLARE_TYPE( int8_t , INT8  );
-    DECLARE_TYPE(uint8_t , UINT8 );
-    DECLARE_TYPE(int16_t , INT16 );
-    DECLARE_TYPE(uint16_t, UINT16);
-    DECLARE_TYPE(int32_t , INT32 );
-    DECLARE_TYPE(uint32_t, UINT32);
-    DECLARE_TYPE(int64_t , INT64 );
-    DECLARE_TYPE(uint64_t, UINT64);
-    DECLARE_TYPE(float   , FLOAT );
-    DECLARE_TYPE(double  , DOUBLE);
-    DECLARE_TYPE(bool    , BOOL  );
-    DECLARE_TYPE(char *  , STRING);
-    DECLARE_TYPE(void *  , BLOB  );
-    DECLARE_TYPE(void *  , ARRAY );
-    DECLARE_TYPE(void *  , STRUCT);
-
+    DECLARE_TYPE( int8_t       , INT8  );
+    DECLARE_TYPE(uint8_t       , UINT8 );
+    DECLARE_TYPE(int16_t       , INT16 );
+    DECLARE_TYPE(uint16_t      , UINT16);
+    DECLARE_TYPE(int32_t       , INT32 );
+    DECLARE_TYPE(uint32_t      , UINT32);
+    DECLARE_TYPE(int64_t       , INT64 );
+    DECLARE_TYPE(uint64_t      , UINT64);
+    DECLARE_TYPE(float         , FLOAT );
+    DECLARE_TYPE(double        , DOUBLE);
+    DECLARE_TYPE(bool          , BOOL  );
+    DECLARE_TYPE(int           , INT   );
+    DECLARE_TYPE(unsigned int  , UINT  );
+    DECLARE_TYPE(short         , SHORT );
+    DECLARE_TYPE(unsigned short, USHORT);
+    DECLARE_TYPE(size_t        , SIZET );
+    DECLARE_TYPE(ssize_t       , SSIZET);
+    DECLARE_TYPE(char *       , STRING);
+    DECLARE_TYPE(void *       , BLOB  );
+    DECLARE_TYPE(void *       , ARRAY );
+    DECLARE_TYPE(void *       , STRUCT);
 
     REGISTER_TYPE(&INT8_type);
     REGISTER_TYPE(&UINT8_type);
@@ -319,6 +324,12 @@ static void register_default_types(void)
     REGISTER_TYPE(&FLOAT_type);
     REGISTER_TYPE(&DOUBLE_type);
     REGISTER_TYPE(&BOOL_type);
+    REGISTER_TYPE(&INT_type);
+    REGISTER_TYPE(&UINT_type);
+    REGISTER_TYPE(&SHORT_type);
+    REGISTER_TYPE(&USHORT_type);
+    REGISTER_TYPE(&SIZET_type);
+    REGISTER_TYPE(&SSIZET_type);
     REGISTER_TYPE(&STRING_type);
     REGISTER_TYPE(&BLOB_type);
     REGISTER_TYPE(&ARRAY_type);
@@ -537,7 +548,22 @@ static int encode_basic(mrp_tlv_t *tlv, mrp_type_t type, mrp_value_t *v)
     case MRP_TYPE_DOUBLE:  return mrp_tlv_push_double(tlv, TAG_NONE, v->dbl);
     case MRP_TYPE_BOOL:    return mrp_tlv_push_bool  (tlv, TAG_NONE, v->bln);
     case MRP_TYPE_STRING:  return mrp_tlv_push_string(tlv, TAG_NONE, v->str);
-    default:               return -1;
+
+    case MRP_TYPE_INT:
+        return mrp_tlv_push_int32 (tlv, TAG_NONE, (int32_t)v->i);
+    case MRP_TYPE_UINT:
+        return mrp_tlv_push_uint32(tlv, TAG_NONE, (uint32_t)v->ui);
+    case MRP_TYPE_SHORT:
+        return mrp_tlv_push_int32 (tlv, TAG_NONE, (int32_t)v->si);
+    case MRP_TYPE_USHORT:
+        return mrp_tlv_push_uint32(tlv, TAG_NONE, (uint32_t)v->usi);
+    case MRP_TYPE_SIZET:
+        return mrp_tlv_push_uint32(tlv, TAG_NONE, (uint32_t)v->sz);
+    case MRP_TYPE_SSIZET:
+        return mrp_tlv_push_int32 (tlv, TAG_NONE, (int32_t)v->ssz);
+
+    default:
+        return -1;
     }
 }
 
@@ -594,6 +620,12 @@ static int guard_offset_and_size(mrp_native_array_t *m, size_t *offsp,
     case MRP_TYPE_DOUBLE:
     case MRP_TYPE_BOOL:
     case MRP_TYPE_STRING:
+    case MRP_TYPE_INT:
+    case MRP_TYPE_UINT:
+    case MRP_TYPE_SHORT:
+    case MRP_TYPE_USHORT:
+    case MRP_TYPE_SIZET:
+    case MRP_TYPE_SSIZET:
         *offsp = 0;
         *sizep = t->size;
         return 0;
@@ -632,6 +664,14 @@ static inline int get_explicit_array_size(void *base, mrp_native_type_t *t,
     case MRP_TYPE_UINT32: n = v->u32;      break;
     case MRP_TYPE_INT64:  n = (int)v->s64; break;
     case MRP_TYPE_UINT64: n = (int)v->u64; break;
+
+    case MRP_TYPE_INT:    n = (int)           v->i;   break;
+    case MRP_TYPE_UINT:   n = (unsigned int)  v->ui;  break;
+    case MRP_TYPE_SHORT:  n = (short)         v->si;  break;
+    case MRP_TYPE_USHORT: n = (unsigned short)v->usi; break;
+    case MRP_TYPE_SIZET:  n = (size_t)        v->sz;  break;
+    case MRP_TYPE_SSIZET: n = (ssize_t)       v->ssz; break;
+
     default:
         errno = EINVAL;
         return -1;
@@ -747,6 +787,12 @@ static int encode_array(mrp_tlv_t *tlv, void *arrp, mrp_native_array_t *m,
         case MRP_TYPE_FLOAT:
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
+        case MRP_TYPE_INT:
+        case MRP_TYPE_UINT:
+        case MRP_TYPE_SHORT:
+        case MRP_TYPE_USHORT:
+        case MRP_TYPE_SIZET:
+        case MRP_TYPE_SSIZET:
             if (encode_basic(tlv, t->id, v) < 0)
                 return -1;
             break;
@@ -806,6 +852,12 @@ static int encode_struct(mrp_tlv_t *tlv, void *data, mrp_native_type_t *t,
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
         case MRP_TYPE_STRING:
+        case MRP_TYPE_INT:
+        case MRP_TYPE_UINT:
+        case MRP_TYPE_SHORT:
+        case MRP_TYPE_USHORT:
+        case MRP_TYPE_SIZET:
+        case MRP_TYPE_SSIZET:
             if (encode_basic(tlv, m->any.type, v) < 0)
                 return -1;
             break;
@@ -921,6 +973,9 @@ static void *alloc_str_chunk(size_t size, void *chunksp)
 static int decode_basic(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
                         mrp_type_t type, mrp_value_t *v)
 {
+    int32_t  i;
+    uint32_t u;
+
     switch (type) {
     case MRP_TYPE_INT8:    return mrp_tlv_pull_int8  (tlv, TAG_NONE, &v->s8);
     case MRP_TYPE_UINT8:   return mrp_tlv_pull_uint8 (tlv, TAG_NONE, &v->u8);
@@ -933,9 +988,48 @@ static int decode_basic(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
     case MRP_TYPE_FLOAT:   return mrp_tlv_pull_float (tlv, TAG_NONE, &v->flt);
     case MRP_TYPE_DOUBLE:  return mrp_tlv_pull_double(tlv, TAG_NONE, &v->dbl);
     case MRP_TYPE_BOOL:    return mrp_tlv_pull_bool  (tlv, TAG_NONE, &v->bln);
-    case MRP_TYPE_STRING:  return mrp_tlv_pull_string(tlv, TAG_NONE, &v->strp,-1,
-                                                      alloc_str_chunk, chunks);
-    default:               return -1;
+    case MRP_TYPE_STRING:
+        return mrp_tlv_pull_string(tlv, TAG_NONE, &v->strp,
+                                   -1, alloc_str_chunk, chunks);
+
+    case MRP_TYPE_INT:
+        if (mrp_tlv_pull_int32(tlv, TAG_NONE, &i) < 0)
+            return -1;
+        v->i = (int)i;
+        return 0;
+
+    case MRP_TYPE_UINT:
+        if (mrp_tlv_pull_uint32(tlv, TAG_NONE, &u) < 0)
+            return -1;
+        v->ui = (unsigned int)u;
+        return 0;
+
+    case MRP_TYPE_SHORT:
+        if (mrp_tlv_pull_int32(tlv, TAG_NONE, &i) < 0)
+            return -1;
+        v->si = (short)i;
+        return 0;
+
+    case MRP_TYPE_USHORT:
+        if (mrp_tlv_pull_uint32(tlv, TAG_NONE, &u) < 0)
+            return -1;
+        v->usi = (unsigned short)u;
+        return 0;
+
+    case MRP_TYPE_SIZET:
+        if (mrp_tlv_pull_uint32(tlv, TAG_NONE, &u) < 0)
+            return -1;
+        v->sz = (size_t)u;
+        return 0;
+
+    case MRP_TYPE_SSIZET:
+        if (mrp_tlv_pull_int32(tlv, TAG_NONE, &i) < 0)
+            return -1;
+        v->ssz = (ssize_t)i;
+        return 0;
+
+    default:
+        return -1;
     }
 }
 
@@ -1018,6 +1112,12 @@ static int decode_array(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
         case MRP_TYPE_STRING:
+        case MRP_TYPE_INT:
+        case MRP_TYPE_UINT:
+        case MRP_TYPE_SHORT:
+        case MRP_TYPE_USHORT:
+        case MRP_TYPE_SIZET:
+        case MRP_TYPE_SSIZET:
             if (decode_basic(tlv, chunks, mt->id, v) < 0)
                 return -1;
             break;
@@ -1103,6 +1203,12 @@ static int decode_struct(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
         case MRP_TYPE_FLOAT:
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
+        case MRP_TYPE_INT:
+        case MRP_TYPE_UINT:
+        case MRP_TYPE_SHORT:
+        case MRP_TYPE_USHORT:
+        case MRP_TYPE_SIZET:
+        case MRP_TYPE_SSIZET:
             if (decode_basic(tlv, chunks, m->any.type, v) < 0)
                 return -1;
             break;
@@ -1214,51 +1320,75 @@ static int print_basic(int level, char **bufp, size_t *sizep, int type,
         return -1;
 
     switch (type) {
-        case MRP_TYPE_INT8:
-            PRINT(level, p, size, "%s%s%d\n", NAME, v->s8);
-            break;
-        case MRP_TYPE_UINT8:
-            PRINT(level, p, size, "%s%s%u\n", NAME, v->u8);
-            break;
+    case MRP_TYPE_INT8:
+        PRINT(level, p, size, "%s%s%d\n", NAME, v->s8);
+        break;
+    case MRP_TYPE_UINT8:
+        PRINT(level, p, size, "%s%s%u\n", NAME, v->u8);
+        break;
 
-        case MRP_TYPE_INT16:
-            PRINT(level, p, size, "%s%s%d\n", NAME, v->s16);
-            break;
-        case MRP_TYPE_UINT16:
-            PRINT(level, p, size, "%s%s%u\n", NAME, v->u16);
-            break;
+    case MRP_TYPE_INT16:
+        PRINT(level, p, size, "%s%s%d\n", NAME, v->s16);
+        break;
+    case MRP_TYPE_UINT16:
+        PRINT(level, p, size, "%s%s%u\n", NAME, v->u16);
+        break;
 
-        case MRP_TYPE_INT32:
-            PRINT(level, p, size, "%s%s%d\n", NAME, v->s32);
-            break;
-        case MRP_TYPE_UINT32:
-            PRINT(level, p, size, "%s%s%u\n", NAME, v->u32);
-            break;
+    case MRP_TYPE_INT32:
+        PRINT(level, p, size, "%s%s%d\n", NAME, v->s32);
+        break;
+    case MRP_TYPE_UINT32:
+        PRINT(level, p, size, "%s%s%u\n", NAME, v->u32);
+        break;
 
-        case MRP_TYPE_INT64:
-            PRINT(level, p, size, "%s%s%lld\n", NAME, (long long)v->s64);
-            break;
-        case MRP_TYPE_UINT64:
-            PRINT(level, p, size, "%s%s%llu\n", NAME,
-                  (unsigned long long)v->s64);
-            break;
+    case MRP_TYPE_INT64:
+        PRINT(level, p, size, "%s%s%lld\n", NAME, (long long)v->s64);
+        break;
+    case MRP_TYPE_UINT64:
+        PRINT(level, p, size, "%s%s%llu\n", NAME,
+              (unsigned long long)v->s64);
+        break;
 
-        case MRP_TYPE_FLOAT:
-            PRINT(level, p, size, "%s%s%f\n", NAME, v->flt);
-            break;
-        case MRP_TYPE_DOUBLE:
-            PRINT(level, p, size, "%s%s%f\n", NAME, v->dbl);
-            break;
+    case MRP_TYPE_FLOAT:
+        PRINT(level, p, size, "%s%s%f\n", NAME, v->flt);
+        break;
+    case MRP_TYPE_DOUBLE:
+        PRINT(level, p, size, "%s%s%f\n", NAME, v->dbl);
+        break;
 
-        case MRP_TYPE_BOOL:
-            PRINT(level, p, size, "%s%s%s\n", NAME,
-                  v->bln ? "<true>" : "<false>");
-            break;
+    case MRP_TYPE_BOOL:
+        PRINT(level, p, size, "%s%s%s\n", NAME,
+              v->bln ? "<true>" : "<false>");
+        break;
 
-        case MRP_TYPE_STRING:
-            PRINT(level, p, size, "%s%s%s\n", NAME,
-                  v->str ? v->str : "<null>");
-            break;
+    case MRP_TYPE_STRING:
+        PRINT(level, p, size, "%s%s%s\n", NAME,
+              v->str ? v->str : "<null>");
+        break;
+
+    case MRP_TYPE_INT:
+        PRINT(level, p, size, "%s%s%d\n", NAME, v->i);
+        break;
+    case MRP_TYPE_UINT:
+        PRINT(level, p, size, "%s%s%u\n", NAME, v->ui);
+        break;
+
+    case MRP_TYPE_SHORT:
+        PRINT(level, p, size, "%s%s%hd\n", NAME, v->si);
+        break;
+    case MRP_TYPE_USHORT:
+        PRINT(level, p, size, "%s%s%hu\n", NAME, v->usi);
+        break;
+
+    case MRP_TYPE_SIZET:
+        PRINT(level, p, size, "%s%s%zu\n", NAME, v->sz);
+        break;
+    case MRP_TYPE_SSIZET:
+        PRINT(level, p, size, "%s%s%zd\n", NAME, v->ssz);
+        break;
+
+    default:
+        PRINT(level, p, size, "%s%s%s\n", NAME, "<unknown>");
     }
 
     *bufp  = p;
@@ -1307,6 +1437,12 @@ static int print_array(char **bufp, size_t *sizep, int level,
         case MRP_TYPE_FLOAT:
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
+        case MRP_TYPE_INT:
+        case MRP_TYPE_UINT:
+        case MRP_TYPE_SHORT:
+        case MRP_TYPE_USHORT:
+        case MRP_TYPE_SIZET:
+        case MRP_TYPE_SSIZET:
             if (print_basic(level, &p, &size, et->id, NULL, v) < 0)
                 return -1;
             break;
@@ -1379,6 +1515,12 @@ static int print_struct(char **bufp, size_t *sizep, int level,
         case MRP_TYPE_FLOAT:
         case MRP_TYPE_DOUBLE:
         case MRP_TYPE_BOOL:
+        case MRP_TYPE_INT:
+        case MRP_TYPE_UINT:
+        case MRP_TYPE_SHORT:
+        case MRP_TYPE_USHORT:
+        case MRP_TYPE_SIZET:
+        case MRP_TYPE_SSIZET:
         case MRP_TYPE_STRING:
             if (print_basic(level, &p, &size, m->any.type, m->any.name, v) < 0)
                 return -1;

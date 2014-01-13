@@ -59,6 +59,12 @@ typedef enum {
     MRP_TYPE_FLOAT,
     MRP_TYPE_DOUBLE,
     MRP_TYPE_BOOL,
+    MRP_TYPE_INT,
+    MRP_TYPE_UINT,
+    MRP_TYPE_SHORT,
+    MRP_TYPE_USHORT,
+    MRP_TYPE_SIZET,
+    MRP_TYPE_SSIZET,
     MRP_TYPE_STRING,
     MRP_TYPE_BLOB,
     MRP_TYPE_ARRAY,
@@ -97,6 +103,18 @@ typedef union {
     void     *blb;
     char      str[0];
     char     *strp;
+    int             i;
+    int            *ip;
+    unsigned int    ui;
+    unsigned int   *uip;
+    short           si;
+    short          *sip;
+    unsigned short  usi;
+    unsigned short *usip;
+    size_t          sz;
+    size_t         *szp;
+    ssize_t         ssz;
+    ssize_t        *sszp;
     void     *ptr;
     void    **ptrp;
 } mrp_value_t;
@@ -294,6 +312,13 @@ typedef struct {
 #define MRP_FLOAT(_ot, _m, _l)  __MRP_MEMBER(_ot, MRP_TYPE_FLOAT , _m, _l)
 #define MRP_DOUBLE(_ot, _m, _l) __MRP_MEMBER(_ot, MRP_TYPE_DOUBLE, _m, _l)
 #define MRP_BOOL(_ot, _m, _l)   __MRP_MEMBER(_ot, MRP_TYPE_BOOL  , _m, _l)
+
+#define MRP_INT(_ot, _m, _l)    __MRP_MEMBER(_ot, MRP_TYPE_INT   , _m, _l)
+#define MRP_UINT(_ot, _m, _l)   __MRP_MEMBER(_ot, MRP_TYPE_UINT  , _m, _l)
+#define MRP_SHORT(_ot, _m, _l)  __MRP_MEMBER(_ot, MRP_TYPE_SHORT , _m, _l)
+#define MRP_USHORT(_ot, _m, _l) __MRP_MEMBER(_ot, MRP_TYPE_USHORT, _m, _l)
+#define MRP_SIZET(_ot, _m, _l)  __MRP_MEMBER(_ot, MRP_TYPE_SIZET , _m, _l)
+#define MRP_SSIZET(_ot, _m, _l) __MRP_MEMBER(_ot, MRP_TYPE_SSIZET, _m, _l)
 
 /** Macro for declaring string members of the native type. */
 #define MRP_STRING(_objtype, _member, _layout)                  \
