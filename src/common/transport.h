@@ -85,9 +85,11 @@ typedef enum {
     MRP_TRANSPORT_MODE_MASK   = 0x0f,    /* mask of mode bits */
     MRP_TRANSPORT_INHERIT     = 0x0f,    /* mask of all inherited flags */
 
-    MRP_TRANSPORT_REUSEADDR = 0x10,
-    MRP_TRANSPORT_NONBLOCK  = 0x20,
-    MRP_TRANSPORT_CLOEXEC   = 0x40,
+    MRP_TRANSPORT_REUSEADDR = 0x010,
+    MRP_TRANSPORT_NONBLOCK  = 0x020,
+    MRP_TRANSPORT_CLOEXEC   = 0x040,
+    MRP_TRANSPORT_CONNECTED = 0x080,
+    MRP_TRANSPORT_LISTENED  = 0x001,
 } mrp_transport_flag_t;
 
 #define MRP_TRANSPORT_MODE(t) ((t)->flags & MRP_TRANSPORT_MODE_MASK)
@@ -440,7 +442,7 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
                                            void *conn, mrp_transport_evt_t *evt,
                                            void *user_data, int flags,
-                                           int connected);
+                                           int state);
 
 /** Set a (possibly type-specific) transport option. */
 int mrp_transport_setopt(mrp_transport_t *t, const char *opt, const void *val);

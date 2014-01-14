@@ -184,7 +184,7 @@ mrp_transport_t *mrp_transport_create(mrp_mainloop_t *ml, const char *type,
 mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
                                            void *conn, mrp_transport_evt_t *evt,
                                            void *user_data, int flags,
-                                           int connected)
+                                           int state)
 {
     mrp_transport_descr_t *d;
     mrp_transport_t       *t;
@@ -199,15 +199,23 @@ mrp_transport_t *mrp_transport_create_from(mrp_mainloop_t *ml, const char *type,
 
     if ((d = find_transport(type)) != NULL) {
         if ((t = mrp_allocz(d->size)) != NULL) {
+            t->descr     = d;
             t->ml        = ml;
             t->evt       = *evt;
             t->user_data = user_data;
-            t->connected = connected;
 
             t->check_destroy = check_destroy;
             t->recv_data     = recv_data;
             t->flags         = flags & ~MRP_TRANSPORT_MODE_MASK;
             t->mode          = flags &  MRP_TRANSPORT_MODE_MASK;
+
+            t->connected = !!(state & MRP_TRANSPORT_CONNECTED);
+            t->listened  = !!(state & MRP_TRANSPORT_LISTENED);
+
+            if (t->connected && t->listened) {
+                mrp_free(t);
+                return NULL;
+            }
 
             if (!t->descr->req.createfrom(t, conn)) {
                 mrp_free(t);

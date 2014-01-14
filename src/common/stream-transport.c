@@ -267,10 +267,9 @@ static int strm_createfrom(mrp_transport_t *mt, void *conn)
             fcntl(t->sock, F_SETFL, O_NONBLOCK, nb);
         }
 
-        if (t->connected) {
-            t->buf = mrp_fragbuf_create(TRUE, 0);
-
-            if (t->buf != NULL) {
+        if (t->connected || t->listened) {
+            if (!t->connected ||
+                (t->buf = mrp_fragbuf_create(TRUE, 0)) != NULL) {
                 events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
                 t->iow = mrp_add_io_watch(t->ml, t->sock, events,
                                           strm_recv_cb, t);
