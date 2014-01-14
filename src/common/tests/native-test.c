@@ -42,17 +42,17 @@ typedef enum {
 
 
 typedef struct {
-    char      *name;
-    gender_t   gender;
-    uint16_t   age;
-    char     **languages;
-    uint16_t   height;
-    float      weight;
-    char       nationality[32];
-    hand_t     hand;
-    bool       glasses;
-    art_t     *favourites;
-    uint32_t   nfavourite;
+    char          *name;
+    gender_t       gender;
+    int            age;
+    char         **languages;
+    unsigned int   height;
+    float          weight;
+    char           nationality[32];
+    hand_t         hand;
+    bool           glasses;
+    art_t         *favourites;
+    size_t         nfavourite;
 } person_t;
 
 
@@ -214,17 +214,17 @@ int main(int argc, char *argv[])
     MRP_NATIVE_TYPE(person_type, person_t,
                     MRP_STRING(person_t, name       , DEFAULT),
                     MRP_UINT32(person_t, gender     , DEFAULT),
-                    MRP_UINT16(person_t, age        , DEFAULT),
+                    MRP_INT   (person_t, age        , DEFAULT),
                     MRP_ARRAY (person_t, languages  , DEFAULT, GUARDED,
                                char *, "", .strp = NULL),
-                    MRP_UINT16(person_t, height     , DEFAULT),
+                    MRP_UINT  (person_t, height     , DEFAULT),
                     MRP_FLOAT (person_t, weight     , DEFAULT),
                     MRP_STRING(person_t, nationality, INLINED),
                     MRP_UINT32(person_t, hand       , DEFAULT),
                     MRP_BOOL  (person_t, glasses    , DEFAULT),
                     MRP_ARRAY (person_t, favourites , DEFAULT, SIZED,
                                art_t, nfavourite),
-                    MRP_UINT32(person_t, nfavourite , DEFAULT));
+                    MRP_SIZET (person_t, nfavourite , DEFAULT));
     MRP_NATIVE_TYPE(family_type, family_t,
                     MRP_STRUCT(family_t, father  , DEFAULT, person_t),
                     MRP_STRUCT(family_t, mother  , DEFAULT, person_t),
