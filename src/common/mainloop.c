@@ -709,7 +709,7 @@ void mrp_del_timer(mrp_timer_t *t)
      *        dispatch_timers().
      */
 
-    if (t != NULL) {
+    if (t != NULL && !is_deleted(t)) {
         mrp_debug("marking timer %p deleted", t);
 
         mark_deleted(t);
@@ -761,7 +761,7 @@ void mrp_del_deferred(mrp_deferred_t *d)
      *        in the dispatching loop.
      */
 
-    if (d != NULL) {
+    if (d != NULL && !is_deleted(d)) {
         mrp_debug("marking deferred %p deleted", d);
         mark_deleted(d);
     }
@@ -903,13 +903,11 @@ static void recalc_sigmask(mrp_mainloop_t *ml)
 
 void mrp_del_sighandler(mrp_sighandler_t *h)
 {
-    if (h != NULL) {
-        if (!is_deleted(h)) {
-            mrp_debug("marking sighandler %p deleted", h);
+    if (h != NULL && !is_deleted(h)) {
+        mrp_debug("marking sighandler %p deleted", h);
 
-            mark_deleted(h);
-            recalc_sigmask(h->ml);
-        }
+        mark_deleted(h);
+        recalc_sigmask(h->ml);
     }
 }
 
@@ -1006,7 +1004,7 @@ void mrp_del_wakeup(mrp_wakeup_t *w)
      *        in the dispatching loop.
      */
 
-    if (w != NULL) {
+    if (w != NULL && !is_deleted(w)) {
         mrp_debug("marking wakeup %p deleted", w);
         mark_deleted(w);
     }
