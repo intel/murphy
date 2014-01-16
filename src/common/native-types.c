@@ -200,8 +200,8 @@ static inline uint32_t map_type(uint32_t id, mrp_typemap_t *idmap)
     if (id < MRP_TYPE_STRUCT || idmap == NULL)
         mapped = id;
     else {
-        while (idmap->typeid != MRP_INVALID_TYPE) {
-            if (idmap->typeid == id) {
+        while (idmap->type_id != MRP_INVALID_TYPE) {
+            if (idmap->type_id == id) {
                 mapped = MRP_TYPE_STRUCT + idmap->mapped;
                 break;
             }
@@ -221,9 +221,9 @@ static inline uint32_t mapped_type(uint32_t mapped, mrp_typemap_t *idmap)
     if (mapped < MRP_TYPE_STRUCT || idmap == NULL)
         id = mapped;
     else {
-        while (idmap->typeid != MRP_INVALID_TYPE) {
+        while (idmap->type_id != MRP_INVALID_TYPE) {
             if (MRP_TYPE_STRUCT + idmap->mapped == mapped) {
-                id = idmap->typeid;
+                id = idmap->type_id;
                 break;
             }
             else

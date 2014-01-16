@@ -125,14 +125,14 @@ typedef union {
  */
 
 typedef struct {
-    uint32_t typeid;                     /* native type id */
+    uint32_t type_id;                    /* native type id */
     uint32_t mapped;                     /* mapped type id */
 } mrp_typemap_t;
 
 
 /** Macro to initialize a typemap entry. */
 #define MRP_TYPEMAP(_mapped_id, _type_id)               \
-    { .typeid = _type_id, .mapped = _mapped_id }
+    { .type_id = _type_id, .mapped = _mapped_id }
 
 /** Macro to set a typemap termination entry. */
 #define MRP_TYPEMAP_END                                 \
