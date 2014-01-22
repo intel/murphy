@@ -30,6 +30,8 @@
 #ifndef __MURPHY_LUA_OBJECT_H__
 #define __MURPHY_LUA_OBJECT_H__
 
+#include <stdbool.h>
+
 #include <lualib.h>
 #include <lauxlib.h>
 
