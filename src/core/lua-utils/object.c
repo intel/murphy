@@ -1851,16 +1851,16 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
                           u->def->class_name, m->name);
         goto setfn;
 
-    case MRP_LUA_FUNC:
+    case MRP_LUA_LFUNC:
         if (vtype != LUA_TFUNCTION && vtype != LUA_TNIL)
             return seterr(L, err, esize, "%s.%s expects function, got %s",
                           u->def->class_name, m->name, lua_typename(L, vtype));
         if (lua_iscfunction(L, -1))
-            return seterr(L, err, esize, "%s.%s expects Lua C-function.",
+            return seterr(L, err, esize, "%s.%s expects pure Lua function.",
                           u->def->class_name, m->name);
         goto setfn;
 
-    case MRP_LUA_LFUNC:
+    case MRP_LUA_FUNC:
         if (vtype != LUA_TFUNCTION && vtype != LUA_TNIL)
             return seterr(L, err, esize, "%s.%s expects function, got %s",
                           u->def->class_name, m->name, lua_typename(L, vtype));
