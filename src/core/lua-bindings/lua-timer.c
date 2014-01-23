@@ -238,9 +238,9 @@ static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
     default:
-        return snprintf(buf, size, "{%s%s timer %p @ %d msecs}",
-                        t->t        ? "disabled " : "",
-                        t->oneshot  ? "oneshot"   : "",
+        return snprintf(buf, size, "{%s%stimer %p @ %d msecs}",
+                        t->t        ? ""         : "disabled ",
+                        t->oneshot  ? "oneshot " : "",
                         t->t, t->msecs);
     }
 }
