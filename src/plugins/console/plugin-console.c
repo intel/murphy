@@ -56,6 +56,14 @@
 #    define DEFAULT_HTTPDIR "/usr/share/murphy/webconsole"
 #endif
 
+enum {
+    DEBUG_NONE    = 0x0,
+    DEBUG_FUNC    = 0x1,
+    DEBUG_FILE    = 0x2,
+    DEBUG_LINE    = 0x4,
+    DEBUG_DEFAULT = DEBUG_FUNC
+};
+
 
 /*
  * an active console instance
@@ -67,6 +75,7 @@ typedef struct {
     mrp_sockaddr_t   addr;               /* for temp. datagram 'connection' */
     socklen_t        alen;               /* address length if any */
     int              id;                 /* console ID for log redirection */
+    int              dbgmeta;            /* debug metadata to show */
 } console_t;
 
 
@@ -77,8 +86,6 @@ typedef struct {
 typedef struct {
     const char      *address;            /* console address */
     mrp_transport_t *t;                  /* transport we're listening on */
-    int              sock;               /* main socket for new connections */
-    mrp_io_watch_t  *iow;                /* main socket I/O watch */
     mrp_context_t   *ctx;                /* murphy context */
     mrp_list_hook_t  clients;            /* active console clients */
     mrp_sockaddr_t   addr;               /* resolved transport address */
@@ -123,6 +130,7 @@ static void logger(void *data, mrp_log_level_t level, const char *file,
     console_t  *c = (console_t *)data;
     va_list     cp;
     const char *prefix;
+    char        buf[256], lnstr[64];
 
     MRP_UNUSED(file);
     MRP_UNUSED(line);
@@ -132,7 +140,21 @@ static void logger(void *data, mrp_log_level_t level, const char *file,
     case MRP_LOG_ERROR:   prefix = "[log] E: "; break;
     case MRP_LOG_WARNING: prefix = "[log] W: "; break;
     case MRP_LOG_INFO:    prefix = "[log] I: "; break;
-    case MRP_LOG_DEBUG:   prefix = "[log] D: "; break;
+    case MRP_LOG_DEBUG:
+        if (c->dbgmeta & DEBUG_LINE)
+            snprintf(lnstr, sizeof(lnstr), ":%d", line);
+        else
+            lnstr[0] = '\0';
+        snprintf(buf, sizeof(buf), "[log] D: %s%s%s%s%s%s%s",
+                 c->dbgmeta ? "[" : "",
+                 c->dbgmeta & DEBUG_FUNC ? func  : "",
+                 c->dbgmeta & DEBUG_FILE ? "@"   : "",
+                 c->dbgmeta & DEBUG_FILE ? file  : "",
+                 c->dbgmeta & DEBUG_LINE ? lnstr : "",
+                 c->dbgmeta ? "]" : "",
+                 c->dbgmeta ? " " : "");
+        prefix = buf;
+        break;
     default:              prefix = "[log] ?: ";
     }
 
@@ -141,6 +163,43 @@ static void logger(void *data, mrp_log_level_t level, const char *file,
     mrp_console_vprintf(c->mc, format, cp);
     mrp_console_printf(c->mc, "\n");
     va_end(cp);
+}
+
+
+static void debug_cb(mrp_console_t *mc, void *user_data, int argc, char **argv)
+{
+    console_t  *c = (console_t *)mc->backend_data;
+    int         debug;
+    const char *p, *n;
+    int         i, l;
+
+    MRP_UNUSED(user_data);
+
+    debug = 0;
+    for (i = 2; i < argc; i++) {
+        p = argv[i];
+        while (p && *p) {
+            if ((n = strchr(p, ',')) != NULL)
+                l = n - p;
+            else
+                l = strlen(p);
+
+            if      (!strncmp(p, "function", l) ||
+                     !strncmp(p, "func"    , l)) debug |= DEBUG_FUNC;
+            else if (!strncmp(p, "file"    , l)) debug |= DEBUG_FILE;
+            else if (!strncmp(p, "line"    , l)) debug |= DEBUG_LINE;
+            else
+                mrp_log_warning("Unknown console debug flag '%*.*s'.", l, l, p);
+
+            if ((p = n) != NULL)
+                p++;
+        }
+    }
+
+    c->dbgmeta = debug & ((debug & ~DEBUG_LINE) ? -1 : ~DEBUG_LINE);
+
+    if (c->dbgmeta != debug)
+        mrp_log_warning("Orphan console debug flag 'line' forced off.");
 }
 
 
@@ -310,7 +369,8 @@ static void stream_connection_cb(mrp_transport_t *lt, void *user_data)
             c->mc = mrp_create_console(data->ctx, &req, c);
 
             if (c->mc != NULL) {
-                c->id = next_id++;
+                c->id      = next_id++;
+                c->dbgmeta = DEBUG_DEFAULT;
                 register_logger(c);
 
                 return;
@@ -745,9 +805,17 @@ static mrp_plugin_arg_t console_args[] = {
     MRP_PLUGIN_ARGIDX(ARG_SSLCA   , STRING, "sslca"  , NULL)
 };
 
+
+MRP_CONSOLE_GROUP(console_commands, "console", NULL, NULL, {
+        MRP_TOKENIZED_CMD("debug", debug_cb, FALSE,
+                          "debug [function] [file] [line]",
+                          "set debug metadata to show",
+                          "Set what metadata to show for debug messages."),
+});
+
 MURPHY_REGISTER_CORE_PLUGIN("console",
                             CONSOLE_VERSION, CONSOLE_DESCRIPTION,
                             CONSOLE_AUTHORS, CONSOLE_HELP, MRP_MULTIPLE,
                             console_init, console_exit,
                             console_args, MRP_ARRAY_SIZE(console_args),
-                            NULL, 0, NULL, 0, NULL);
+                            NULL, 0, NULL, 0, &console_commands);
