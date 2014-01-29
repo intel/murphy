@@ -341,13 +341,19 @@ void mrp_log_msgv(mrp_log_level_t level, const char *file,
                   int line, const char *func, const char *format,
                   va_list ap)
 {
+    static int    busy   = 0;
     mrp_logger_t  logger = log_target->logger;
     void         *data   = log_target->data;
+
+    if (MRP_UNLIKELY(busy != 0))
+        return;
 
     if (!(log_mask & (1 << level)))
         return;
 
+    busy++;
     logger(data, level, file, line, func, format, ap);
+    busy--;
 }
 
 
