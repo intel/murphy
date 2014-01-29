@@ -766,7 +766,7 @@ static int update_single_row(mdb_table_t       *tbl,
     changed = mdb_row_update(tbl, row, cds, data, index_update, &cmask);
 
     if (changed <= 0) {
-        mdb_row_delete(tbl, row, 0, 1);
+        mdb_row_delete(tbl, before, 0, 1);
         return changed;
     }
 
