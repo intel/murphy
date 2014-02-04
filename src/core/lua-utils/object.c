@@ -2073,6 +2073,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
     userdata_t *u = userdata_get(data, CHECK);
     const char *n;
     size_t      l;
+    int         top;
 
     if (idx < 0)
         idx = lua_gettop(L) + idx + 1;
@@ -2085,6 +2086,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
         mrp_log_warning("object %s marked for NOINIT.", u->def->class_name);
     }
 
+    top = lua_gettop(L);
     u->initializing = true;
     MRP_LUA_FOREACH_FIELD(L, idx, n, l) {
         mrp_debug("initializing %s.%s", u->def->class_name, n);
@@ -2094,7 +2096,6 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
 
         switch (mrp_lua_set_member(data, L, err, esize)) {
         case -1:
-            lua_pop(L, 2 + 1);
             goto error;
         case 0:
             if (u->def->flags & MRP_LUA_CLASS_EXTENSIBLE) {
@@ -2105,7 +2106,6 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
                 seterr(L, err, esize,
                        "trying toinitialize unknown member %s.%s",
                        u->def->class_name, n);
-                lua_pop(L, 2 + 1);
                 goto error;
             }
             break;
@@ -2114,10 +2114,12 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
         }
     }
     u->initializing = false;
+    lua_settop(L, top);
     return 1;
 
  error:
     u->initializing = false;
+    lua_settop(L, top);
     return -1;
 
 }
