@@ -184,9 +184,9 @@ bool mrp_resource_lua_veto(mrp_zone_t *zone,
 
     if (L && zone && rset && owners && methods &&
         (sref = find_in_id_hash(rset->id)) &&
-        (oref = owners_get(L, zone->id)) &&
-        (rref = find_in_id_hash(reqset->id)))
+        (oref = owners_get(L, zone->id)))
     {
+        rref = reqset ? find_in_id_hash(reqset->id) : NULL;
         oref->owners = owners;
 
         if ((veto = methods->veto)) {
