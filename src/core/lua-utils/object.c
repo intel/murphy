@@ -2104,7 +2104,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
             }
             else {
                 seterr(L, err, esize,
-                       "trying toinitialize unknown member %s.%s",
+                       "trying to initialize unknown member %s.%s",
                        u->def->class_name, n);
                 goto error;
             }
