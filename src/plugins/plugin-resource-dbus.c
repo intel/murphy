@@ -502,6 +502,9 @@ static void trigger_property_changed_signal(dbus_data_t *ctx,
     sig = mrp_dbus_msg_signal(ctx->dbus, NULL, prop->path,
                     prop->interface, SIG_PROPERTYCHANGED);
 
+    if (!sig)
+        return;
+
     get_property_entry(prop, sig);
 
     mrp_dbus_send_msg(ctx->dbus, sig);
