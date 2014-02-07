@@ -46,6 +46,10 @@
 #include <murphy/common/fragbuf.h>
 #include <murphy/common/transport.h>
 
+#ifndef UNIX_PATH_MAX
+#    define UNIX_PATH_MAX sizeof(((struct sockaddr_un *)NULL)->sun_path)
+#endif
+
 #define TCP4  "tcp4"
 #define TCP4L 4
 #define TCP6  "tcp6"
