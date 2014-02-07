@@ -209,7 +209,7 @@ int parse_signature(const char *signature, char **sigp, mrp_lua_type_t **typep)
                 goto fail;
             }
 
-            signature++;
+            signature += 2;
 
             l = 0;
             while (*signature && *signature != ')' && l < sizeof(type) - 1) {
@@ -388,9 +388,14 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 success = fb->c.func(L, fb->c.data, signature, args, ret_type,
                                      ret_value);
             else {
+                char errmsg[256];
+
+                snprintf(errmsg, sizeof(errmsg),
+                         "mismatching signature @ C invocation ('%s' != '%s')",
+                         signature, fb->c.signature);
+
                 *ret_type = MRP_FUNCBRIDGE_STRING;
-                ret_value->string = mrp_strdup("mismatching signature "
-                                               "@ C invocation");
+                ret_value->string = mrp_strdup(errmsg);
                 success = false;
             }
             break;
@@ -416,6 +421,9 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                     lua_pushboolean(L, a->boolean);
                     break;
                 case MRP_FUNCBRIDGE_OBJECT:
+                    mrp_lua_push_object(L, a->pointer);
+                    break;
+                case MRP_FUNCBRIDGE_MRPLUATYPE:
                     mrp_lua_push_object(L, a->pointer);
                     break;
                 default:
