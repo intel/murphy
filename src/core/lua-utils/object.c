@@ -2075,6 +2075,9 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
     size_t      l;
     int         top;
 
+    if (err != NULL)
+        *err = '\0';
+
     if (idx < 0)
         idx = lua_gettop(L) + idx + 1;
 
