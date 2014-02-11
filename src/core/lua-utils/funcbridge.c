@@ -895,6 +895,9 @@ static int make_lua_call(lua_State *L, mrp_funcbridge_t *fb, int f)
             case MRP_FUNCBRIDGE_OBJECT:
                 a->pointer = mrp_lua_check_object(L, NULL, i);
                 break;
+            case MRP_FUNCBRIDGE_BOOLEAN:
+                a->boolean = lua_toboolean(L, i);
+                break;
             case MRP_FUNCBRIDGE_ARRAY:
                 if (fb->c.sigtypes == NULL ||
                     (type = fb->c.sigtypes[tidx++]) == MRP_LUA_NONE) {
