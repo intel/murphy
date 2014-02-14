@@ -351,6 +351,9 @@ mrp_funcbridge_t *mrp_funcbridge_ref(lua_State *L, mrp_funcbridge_t *fb)
 
 void mrp_funcbridge_unref(lua_State *L, mrp_funcbridge_t *fb)
 {
+    if (fb == NULL)
+        return;
+
     if (fb->refcnt > 1)
         fb->refcnt--;
     else {
