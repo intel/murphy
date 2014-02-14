@@ -42,6 +42,10 @@
 #include <murphy/common/msg.h>
 #include <murphy/common/transport.h>
 
+#ifndef UNIX_PATH_MAX
+#    define UNIX_PATH_MAX sizeof(((struct sockaddr_un *)NULL)->sun_path)
+#endif
+
 #define UDP4  "udp4"
 #define UDP4L 4
 #define UDP6  "udp6"
@@ -180,7 +184,7 @@ static int parse_address(const char *str, int *familyp, char *nodep,
         nl      = strlen(node);
     }
 
-    if (nl > nsize) {
+    if (nl >= nsize) {
         errno = ENOMEM;
         return -1;
     }
@@ -201,7 +205,7 @@ static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
 {
     struct addrinfo    *ai, hints;
     struct sockaddr_un *un;
-    char                node[512], *port;
+    char                node[UNIX_PATH_MAX], *port;
     socklen_t           len;
 
     mrp_clear(&hints);
@@ -219,7 +223,7 @@ static socklen_t dgrm_resolve(const char *str, mrp_sockaddr_t *addr,
             errno = ENOMEM;
         else {
             un->sun_family = AF_UNIX;
-            strcpy(un->sun_path, node);
+            strncpy(un->sun_path, node, UNIX_PATH_MAX-1);
             if (un->sun_path[0] == '@')
                 un->sun_path[0] = '\0';
         }

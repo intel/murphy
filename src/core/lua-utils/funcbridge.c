@@ -549,8 +549,10 @@ mrp_funcarray_t *mrp_funcarray_check(lua_State *L, int t)
         fa = mrp_funcarray_create(L);
 
         fa->funcs = calloc(1, sizeof(mrp_funcbridge_t *));
-        fa->nfunc = 1;
+        if (!fa->funcs)
+            return NULL;
 
+        fa->nfunc = 1;
         fa->funcs[0] = mrp_funcbridge_create_luafunc(L, t);
 
         break;
