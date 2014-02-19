@@ -59,6 +59,24 @@ static int plugin_exists(lua_State *L)
 }
 
 
+static int plugin_loaded(lua_State *L)
+{
+    mrp_context_t *ctx;
+    const char    *name;
+
+    ctx = mrp_lua_check_murphy_context(L, 1);
+    luaL_checktype(L, 2, LUA_TSTRING);
+
+    name = lua_tostring(L, 2);
+
+    mrp_debug("lua: check if plugin '%s' is loaded", name);
+
+    lua_pushboolean(L, mrp_plugin_running(ctx, name));
+
+    return 1;
+}
+
+
 static int ensure_buffer(char **bufp, int *sizep, int *offsp, int len)
 {
     int spc, size, diff;
@@ -405,5 +423,6 @@ static int try_load_plugin(lua_State *L)
 
 MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
                              { "plugin_exists"  , plugin_exists   },
+                             { "plugin_loaded"  , plugin_loaded   },
                              { "load_plugin"    , load_plugin     },
                              { "try_load_plugin", try_load_plugin });
