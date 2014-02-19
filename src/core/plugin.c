@@ -271,6 +271,38 @@ int mrp_plugin_exists(mrp_context_t *ctx, const char *name)
 }
 
 
+int mrp_plugin_loaded(mrp_context_t *ctx, const char *name)
+{
+    mrp_list_hook_t *p, *n;
+    mrp_plugin_t    *plugin;
+
+    mrp_list_foreach(&ctx->plugins, p, n) {
+        plugin = mrp_list_entry(p, typeof(*plugin), hook);
+
+        if (!strcmp(plugin->instance, name))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+
+int mrp_plugin_running(mrp_context_t *ctx, const char *name)
+{
+    mrp_list_hook_t *p, *n;
+    mrp_plugin_t    *plugin;
+
+    mrp_list_foreach(&ctx->plugins, p, n) {
+        plugin = mrp_list_entry(p, typeof(*plugin), hook);
+
+        if (!strcmp(plugin->instance, name))
+            return (plugin->state == MRP_PLUGIN_RUNNING);
+    }
+
+    return FALSE;
+}
+
+
 static inline int check_plugin_version(mrp_plugin_descr_t *descr)
 {
     int major, minor;

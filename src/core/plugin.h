@@ -425,8 +425,10 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
                               int narg);
 int mrp_load_all_plugins(mrp_context_t *ctx);
 int mrp_unload_plugin(mrp_plugin_t *plugin);
+int mrp_plugin_loaded(mrp_context_t *ctx, const char *name);
 int mrp_start_plugins(mrp_context_t *ctx);
 int mrp_start_plugin(mrp_plugin_t *plugin);
+int mrp_plugin_running(mrp_context_t *ctx, const char *name);
 int mrp_stop_plugin(mrp_plugin_t *plugin);
 int mrp_request_plugin(mrp_context_t *ctx, const char *name,
                        const char *instance);
