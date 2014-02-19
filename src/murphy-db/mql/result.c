@@ -219,6 +219,36 @@ const char *mql_result_error_get_message(mql_result_t *r)
     return msg;
 }
 
+mqi_event_type_t mql_result_event_get_type(mql_result_t *r)
+{
+    result_event_t *ev;
+
+    if (!r || r->type != mql_result_event)
+        return mqi_event_unknown;
+
+    ev = (result_event_t *) r;
+
+    return ev->event;
+}
+
+mql_result_t *mql_result_event_get_changed_rows(mql_result_t *r)
+{
+    result_event_t *ev;
+    result_event_rowchg_t *rowchg_ev;
+
+    if (!r || r->type != mql_result_event)
+        return NULL;
+
+    ev = (result_event_t *) r;
+
+    if (ev->event != mqi_row_deleted && ev->event != mqi_row_inserted)
+        return NULL;
+
+    rowchg_ev = (result_event_rowchg_t *) ev;
+
+    return rowchg_ev->select;
+}
+
 mql_result_t *mql_result_event_column_change_create(mqi_handle_t        table,
                                                     int                 column,
                                                     mqi_change_value_t *value,

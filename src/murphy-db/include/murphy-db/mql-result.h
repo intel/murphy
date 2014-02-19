@@ -95,6 +95,9 @@ int32_t          mql_result_list_get_integer(mql_result_t *, int);
 int32_t          mql_result_list_get_unsigned(mql_result_t *, int);
 double           mql_result_list_get_floating(mql_result_t *, int);
 
+mqi_event_type_t mql_result_event_get_type(mql_result_t *);
+mql_result_t    *mql_result_event_get_changed_rows(mql_result_t *);
+
 void             mql_result_free(mql_result_t *);
 
 
