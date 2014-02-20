@@ -28,6 +28,7 @@
  */
 
 #include <unistd.h>
+#include <errno.h>
 
 #include <lualib.h>
 #include <lauxlib.h>
@@ -50,10 +51,22 @@ static int include_lua(lua_State *L, const char *file, int try, int once)
     dirs[0] = mrp_lua_get_murphy_lua_config_dir();
     dirs[1] = NULL;
 
-    if (mrp_lua_include_file(L, file, &dirs[0], files) == 0 || try)
+    if (mrp_lua_include_file(L, file, &dirs[0], files) == 0)
         return 0;
-    else
-        return -1;
+
+    if (try) {
+        if (errno == EINVAL) {
+            if (lua_type(L, -1) == LUA_TSTRING) {
+                mrp_log_warning("inclusion of '%s' failed with error '%s'",
+                                file, lua_tostring(L, -1));
+            }
+        }
+
+        return 0;
+    }
+
+    return -1;
+
 }
 
 
@@ -84,15 +97,18 @@ static int include_lua_file(lua_State *L, int try, int once)
     file = lua_tostring(L, -1);
 
     status = include_lua(L, file, try, once);
-    lua_settop(L, 0);
 
-    if (status == 0 || try)
+    if (status == 0 || try) {
+        lua_settop(L, 0);
         return 0;
+    }
     else {
         mrp_log_error("failed to include%s Lua file '%s'.",
                       once ? "_once" : "", file);
 
-        return luaL_error(L, "failed to include file '%s'.", file);
+        return luaL_error(L, "failed to include file '%s' (%s)", file,
+                          lua_type(L, -1) == LUA_TSTRING ?
+                          lua_tostring(L, -1) : "<unknown error>");
     }
 }
 
