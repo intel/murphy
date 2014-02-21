@@ -123,19 +123,32 @@ static int reftbl = LUA_NOREF;
 /**
  * Macros to convert between userdata and user-visible data addresses.
  */
+
 #define USERDATA_SIZE                                                   \
     (cfg.track?MRP_OFFSET(userdata_t, hook[1]):MRP_OFFSET(userdata_t, hook[0]))
 
-#define USER_TO_DATA(u)                                                 \
-    ((void *)(cfg.track ?                                               \
-              &((userdata_t *)(u))->hook[1] : &((userdata_t *)(u))->hook[0]))
+#define USER_TO_DATA(u) user_to_data(u)
+#define DATA_TO_USER(d) data_to_user(d)
 
-#define DATA_TO_USER(d) ((userdata_t *)(((void *)d) - USERDATA_SIZE))
+static inline void *user_to_data(userdata_t *u)
+{
+    if (u != NULL) {
+        if (cfg.track)
+            return &((userdata_t *)(u))->hook[1];
+        else
+            return &((userdata_t *)(u))->hook[0];
+    }
+    else
+        return NULL;
+}
 
-#if 0
-#define USER_TO_DATA(u) ((void *)(((userdata_t *)(u)) + 1))
-#define DATA_TO_USER(d) (((userdata_t *)(d)) - 1)
-#endif
+static inline userdata_t *data_to_user(void *d)
+{
+    if (d != NULL)
+        return ((userdata_t *)(((void *)d) - USERDATA_SIZE));
+    else
+        return NULL;
+}
 
 
 /** Check our configuration from the environment. */
@@ -167,9 +180,9 @@ static inline void *userdata_getself(userdata_t *u)
 {
 #ifdef __MURPHY_MANGLE_CLASS_SELF__
     void *data = USER_TO_DATA(u);
-    void *self = (void *)(((ptrdiff_t)u->selfish) ^ ((ptrdiff_t)data));
+    void *self = u ? (void *)(((ptrdiff_t)u->selfish) ^ ((ptrdiff_t)data)):NULL;
 #else
-    void *self = u->selfish;
+    void *self = u ? u->selfish : NULL;
 #endif
 
     if (u == self)
@@ -215,6 +228,8 @@ static inline void *object_get(userdata_t *u, bool check)
 int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 {
     static bool chkconfig = true;
+
+    mrp_debug("registering Lua object class '%s'", def->class_name);
 
     if (def->constructor == NULL) {
         mrp_log_error("Classes with NULL constructor not allowed.");
@@ -2287,15 +2302,24 @@ static int override_tostring(lua_State *L)
     data = mrp_lua_check_object(L, NULL, 1);
     u    = DATA_TO_USER(data);
 
-    if (u->def->tostring == NULL ||
-        u->def->tostring(MRP_LUA_TOSTR_LUA, buf, sizeof(buf), L, data) <= 0) {
-        snprintf(buf, sizeof(buf), "<object %s(%s)>@%p(%p)",
-                 u->def->class_id, u->def->type_name, data, u);
+    if (u != NULL) {
+        if (u->def->tostring == NULL ||
+            u->def->tostring(MRP_LUA_TOSTR_LUA, buf, sizeof(buf),
+                             L, data) <= 0) {
+            snprintf(buf, sizeof(buf), "<object %s(%s)>@%p(%p)",
+                     u->def->class_id, u->def->type_name, data, u);
+        }
+
+        lua_pushstring(L, buf);
+
+        return 1;
+    }
+    else {
+        snprintf(buf, sizeof(buf),
+                 "<tostring called for invalid Murphy Lua object %p>", data);
+        return luaL_error(L, buf);
     }
 
-    lua_pushstring(L, buf);
-
-    return 1;
 }
 
 
