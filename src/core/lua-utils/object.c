@@ -78,7 +78,7 @@ static int override_tostring(lua_State *L);
 static int  object_setup_bridges(userdata_t *u, lua_State *L);
 
 static void invalid_destructor(void *data);
-
+static inline int is_native(userdata_t *u, const char *name);
 
 /**
  * A static non-NULL class definition we return for failed lookups.
@@ -1101,6 +1101,8 @@ static int patch_overrides(mrp_lua_classdef_t *def)
         overrides[i].func = override_setfield;
         i++;
     }
+    else
+        def->setfield = set.func;
 
     if (get.func == NULL) {
         mrp_debug("overriding __index for class %s", def->class_name);
@@ -1108,6 +1110,8 @@ static int patch_overrides(mrp_lua_classdef_t *def)
         overrides[i].func = override_getfield;
         i++;
     }
+    else
+        def->getfield = get.func;
 
     if (!tostring) {
         mrp_debug("overriding __tostring for class %s", def->class_name);
@@ -2088,7 +2092,7 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
     userdata_t *u = userdata_get(data, CHECK);
     const char *n;
     size_t      l;
-    int         top;
+    int         top, set;
 
     if (err != NULL)
         *err = '\0';
@@ -2116,16 +2120,31 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
         case -1:
             goto error;
         case 0:
-            if (u->def->flags & MRP_LUA_CLASS_EXTENSIBLE) {
-                if (object_setext(data, L, n, -1, err, esize) < 0)
-                    goto error;
-            }
-            else {
-                seterr(L, err, esize,
-                       "trying to initialize unknown member %s.%s",
-                       u->def->class_name, n);
+            /*
+             * Okay, this was not an ordinary predefined member, so
+             *     - pass this to setfield if we have one and this field is
+             *       declared native, or no native fields have been declared
+             *     - if there is no setfield or setfield said it does not
+             *       handle this field, pass this to setext if the class is
+             *       extensible
+             *
+             * Note that, in principle, we probably should treat it an error
+             * if setfield does not handle a field that has been declared
+             * native but currently we don't.
+             */
+
+            if (u->def->setfield && (!u->def->natives || is_native(u, n)))
+                set = u->def->setfield(L);
+            else
+                set = 0;
+
+            if (set == 0 && (u->def->flags & MRP_LUA_CLASS_EXTENSIBLE))
+                set = object_setext(data, L, n, -1, NULL, 0);
+            else
+                set = 0;
+
+            if (set <= 0)
                 goto error;
-            }
             break;
         case 1:
             break;
@@ -2197,30 +2216,33 @@ static int override_setfield(lua_State *L)
     luaL_checkany(L, 3);
 
     /*
-     * if the class is not extensible call user setfield if we have one
-     * if it is extensible
-     *    - for string keys
-     *        - if the field is whitelisted call setfield, if we have one
-     *        - otherwise set extension
-     *    - for numeric indices set extended array element
+     * Okay, this was not an ordinary predefined member, so
+     *     - if this is a field (named vs. indexed member)
+     *         * pass this to setfield if we have one and this field is
+     *           declared native, or no native fields have been declared
+     *         * if there is no setfield or setfield said it does not handle
+     *           this field, pass this to setext if the class is extensible
+     *     - otherwise (IOW an indexed member) pass this to setixet if the
+     *       class is extensible
+     *
+     * Note that, in principle, we probably should treat it an error if
+     * setfield does not handle a field that has been declared native but
+     * currently we don't.
      */
 
-    if (!(u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)) {
-        if (name != NULL && u->def->setfield)
-            return u->def->setfield(L);
+    if (name != NULL) {
+        if (u->def->setfield && (!u->def->natives || is_native(u, name)))
+            status = u->def->setfield(L);
         else
-            status = -1;
-    }
-    else {
-        if (name != NULL) {
-            if (u->def->setfield && is_native(u, name))
-                return u->def->setfield(L);
-            else
-                status = object_setext(data, L, name, 3, NULL, 0);
-        }
+            status = 0;
+
+        if (status == 0 && u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)
+            status = object_setext(data, L, name, 3, NULL, 0);
         else
-            status = object_setiext(data, L, lua_tointeger(L, 2), 3);
+            status = 0;
     }
+    else
+        status = object_setiext(data, L, lua_tointeger(L, 2), 3);
 
  out:
     lua_pop(L, 3);
@@ -2261,30 +2283,33 @@ static int override_getfield(lua_State *L)
     }
 
     /*
-     * if the class is not extensible call user getfield if we have one
-     * if it is extensible
-     *    - for string keys
-     *        - if the field is whitelisted call getfield, if we have one
-     *        - otherwise get extension
-     *    - for numeric indices get extended array element
+     * Okay, this was not an ordinary predefined member, so
+     *     - if this is a field (named vs. indexed member)
+     *         * pass this to setfield if we have one and this field is
+     *           declared native, or no native fields have been declared
+     *         * if there is no setfield or setfield said it does not handle
+     *           this field, pass this to setext if the class is extensible
+     *     - otherwise (IOW an indexed member) pass this to setixet if the
+     *       class is extensible
+     *
+     * Note that, in principle, we probably should treat it an error if
+     * setfield does not handle a field that has been declared native but
+     * currently we don't.
      */
 
-    if (!(u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)) {
-        if (name != NULL && u->def->getfield)
-            return u->def->getfield(L);
+    if (name != NULL) {
+        if (u->def->getfield && (!u->def->natives || is_native(u, name)))
+            status = u->def->getfield(L);
         else
-            status = -1;
-    }
-    else {
-        if (name != NULL) {
-            if (u->def->getfield && is_native(u, name))
-                return u->def->getfield(L);
-            else
-                status = object_getext(data, L, name);
-        }
+            status = 0;
+
+        if (status == 0 && u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)
+            status = object_getext(data, L, name);
         else
-            status = object_getiext(data, L, 2);
+            status = 0;
     }
+    else
+        status = object_getiext(data, L, 2);
 
  out:
     lua_remove(L, status < 1 ? -1 : -2);
