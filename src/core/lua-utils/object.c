@@ -2133,15 +2133,17 @@ int mrp_lua_init_members(void *data, lua_State *L, int idx,
              * native but currently we don't.
              */
 
-            if (u->def->setfield && (!u->def->natives || is_native(u, n)))
+            set = 0;
+
+            if (u->def->setfield && (!u->def->natives || is_native(u, n))) {
+                mrp_lua_push_object(L, data);
+                lua_insert(L, -3);
                 set = u->def->setfield(L);
-            else
-                set = 0;
+                lua_remove(L, -3);
+            }
 
             if (set == 0 && (u->def->flags & MRP_LUA_CLASS_EXTENSIBLE))
                 set = object_setext(data, L, n, -1, NULL, 0);
-            else
-                set = 0;
 
             if (set <= 0)
                 goto error;
@@ -2230,16 +2232,18 @@ static int override_setfield(lua_State *L)
      * currently we don't.
      */
 
+    status = 0;
+
     if (name != NULL) {
-        if (u->def->setfield && (!u->def->natives || is_native(u, name)))
+        if (u->def->setfield && (!u->def->natives || is_native(u, name))) {
+            mrp_lua_push_object(L, data);
+            lua_insert(L, -3);
             status = u->def->setfield(L);
-        else
-            status = 0;
+            lua_remove(L, -3);
+        }
 
         if (status == 0 && u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)
             status = object_setext(data, L, name, 3, NULL, 0);
-        else
-            status = 0;
     }
     else
         status = object_setiext(data, L, lua_tointeger(L, 2), 3);
@@ -2297,23 +2301,22 @@ static int override_getfield(lua_State *L)
      * currently we don't.
      */
 
+    status = 0;
+
     if (name != NULL) {
-        if (u->def->getfield && (!u->def->natives || is_native(u, name)))
+        if (u->def->getfield && (!u->def->natives || is_native(u, name))) {
+            mrp_lua_push_object(L, data);
+            lua_insert(L, -2);
             status = u->def->getfield(L);
-        else
-            status = 0;
+        }
 
         if (status == 0 && u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)
             status = object_getext(data, L, name);
-        else
-            status = 0;
     }
     else
         status = object_getiext(data, L, 2);
 
  out:
-    lua_remove(L, status < 1 ? -1 : -2);
-
     return status;
 }
 
