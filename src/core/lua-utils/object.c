@@ -2235,12 +2235,8 @@ static int override_setfield(lua_State *L)
     status = 0;
 
     if (name != NULL) {
-        if (u->def->setfield && (!u->def->natives || is_native(u, name))) {
-            mrp_lua_push_object(L, data);
-            lua_insert(L, -3);
+        if (u->def->setfield && (!u->def->natives || is_native(u, name)))
             status = u->def->setfield(L);
-            lua_remove(L, -3);
-        }
 
         if (status == 0 && u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)
             status = object_setext(data, L, name, 3, NULL, 0);
@@ -2249,8 +2245,6 @@ static int override_setfield(lua_State *L)
         status = object_setiext(data, L, lua_tointeger(L, 2), 3);
 
  out:
-    lua_pop(L, 3);
-
     return status;
 }
 
@@ -2304,11 +2298,8 @@ static int override_getfield(lua_State *L)
     status = 0;
 
     if (name != NULL) {
-        if (u->def->getfield && (!u->def->natives || is_native(u, name))) {
-            mrp_lua_push_object(L, data);
-            lua_insert(L, -2);
+        if (u->def->getfield && (!u->def->natives || is_native(u, name)))
             status = u->def->getfield(L);
-        }
 
         if (status == 0 && u->def->flags & MRP_LUA_CLASS_EXTENSIBLE)
             status = object_getext(data, L, name);
