@@ -1,0 +1,67 @@
+-- -*- mode: lua -*-
+
+if not loaded('system-monitor') then
+   return
+end
+
+-- get and configure system-monitor
+sm = m:get_system_monitor()
+
+sm.polling = 1000                        -- poll 1 / second
+
+--
+-- monitor overall CPU load (load of the virtual combined CPU)
+--
+sm:CpuWatch({
+         cpu    = 'cpu',                          -- virtual 'combined' CPU
+         sample = 'load',                         -- monitor 'load'
+         limits = {                               -- load threshold %'s
+             [1] = { label = 'idle'    , limit =  5 },
+             [2] = { label = 'low'     , limit = 20 },
+             [2] = { label = 'moderate', limit = 40 },
+             [3] = { label = 'medium'  , limit = 50 },
+             [4] = { label = 'high'    , limit = 80 },
+             [5] = { label = 'critical'             }
+         },
+         window = 15000,                          -- use an EWMA of 15 secs
+         notify = function (w, prev, curr)        -- threshold change callback
+            print('CPU load change: ' .. prev .. ' -> ' .. curr)
+         end
+    })
+
+
+--
+-- monitor length of the writeback queue
+--
+sm:MemWatch({
+         sample = 'Writeback',
+         limits = {                               -- pressure thresholds
+             [1] = { label = 'none'    , limit =  1024 },
+             [2] = { label = 'low'     , limit =  8192 },
+             [3] = { label = 'medium'  , limit =  '1M' },
+             [4] = { label = 'high'    , limit =  '4M' },
+             [5] = { label = 'critical', limit = '16M' }
+         },
+         window = 0,                              -- don't average/integrate
+         notify = function (w, prev, curr)        -- threshold change callback
+            print(w.sample .. ' change: ' .. prev .. ' -> ' .. curr)
+         end
+     })
+
+--
+-- monitor the amount of dirty memory
+--
+sm:MemWatch({
+         sample = 'Dirty',
+         limits = {                               -- pressure thresholds
+             [1] = { label = 'none'    , limit =  1024 },
+             [2] = { label = 'low'     , limit =  8192 },
+             [3] = { label = 'medium'  , limit =  '1M' },
+             [4] = { label = 'high'    , limit =  '4M' },
+             [5] = { label = 'critical', limit = '16M' }
+         },
+         window = 10000,                           -- use an EWMA of 10 secs
+         notify = function (w, prev, curr)         -- threshold change callback
+            print(w.sample .. ' change: ' .. prev .. ' -> ' .. curr)
+         end
+     })

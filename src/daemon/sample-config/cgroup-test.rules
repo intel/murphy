@@ -1,0 +1,33 @@
+-- -*- mode: lua -*-
+
+if not loaded('system-monitor') then
+    return
+end
+
+cg = m:CGroupOpen({ type = 'cpuacct',
+                    name = 'murphy-test',
+                    mode = 'readonly',
+                    foo = 3,
+                    bar = 'foobar',
+                    foobar = 9.81         })
+
+print('cg: ' .. tostring(cg))
+print('cg.mode: ' .. tostring(cg.mode))
+print('cg.foo: ' .. tostring(cg.foo))
+print('cg.bar: ' .. tostring(cg.bar))
+print('cg.foobar: ' .. tostring(cg.foobar))
+
+--status = cg:add_process(4214)
+--cg.tasks = 4214
+print('cg.tasks: ' .. cg.tasks)
+
+
+cg1 = m:CGroupOpen({ type = 'cpu',
+                     name = 'test',
+                     mode = 'readwrite,create',
+                     Shares = 2048              })
+
+print('cg1: ' .. tostring(cg1))
+print('cg1.mode: ' .. cg1.mode)
+print('cg1.shares: ' .. cg1.Shares)
+print('cg1.tasks: ' .. cg1.tasks)
