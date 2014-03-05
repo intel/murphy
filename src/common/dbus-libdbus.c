@@ -1072,6 +1072,28 @@ mrp_dbus_msg_t *mrp_dbus_msg_ref(mrp_dbus_msg_t *m)
 }
 
 
+static void rewind_message(mrp_dbus_msg_t *m)
+{
+    mrp_list_hook_t *p, *n;
+    msg_iter_t      *it;
+    msg_array_t     *a;
+
+    mrp_list_foreach(&m->iterators, p, n) {
+        it = mrp_list_entry(p, typeof(*it), hook);
+
+        mrp_list_delete(&it->hook);
+        mrp_free(it->peeked);
+        mrp_free(it);
+    }
+
+    mrp_list_foreach(&m->arrays, p, n) {
+        a = mrp_list_entry(p, typeof(*a), hook);
+
+        free_msg_array(a);
+    }
+}
+
+
 static void free_message(mrp_dbus_msg_t *m)
 {
     mrp_list_hook_t *p, *n;
@@ -1206,6 +1228,8 @@ static DBusHandlerResult dispatch_signal(DBusConnection *c,
 
                 h->handler(dbus, m, h->user_data);
                 handled = TRUE;
+
+                rewind_message(m);
             }
         }
     }
