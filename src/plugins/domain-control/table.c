@@ -248,7 +248,7 @@ int create_proxy_table(pep_table_t *t, int *errcode, const char **errmsg)
         if (t->mql_index && t->mql_index[0]) {
             if (!exec_mql(mql_result_dontcare, NULL,
                           "create index on %s (%s)", t->name, t->mql_index))
-                FAIL(EINVAL, "failed to table index");
+                FAIL(EINVAL, "DB error: failed to create table index");
         }
 
         if (!get_table_description(t))
