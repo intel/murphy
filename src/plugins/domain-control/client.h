@@ -30,8 +30,11 @@
 #ifndef __MURPHY_DOMAIN_CONTROL_CLIENT_H__
 #define __MURPHY_DOMAIN_CONTROL_CLIENT_H__
 
-#include <murphy-db/mqi.h>
+#include <murphy/common/macros.h>
 #include <murphy/common/mainloop.h>
+#include <murphy-db/mqi.h>
+
+MRP_CDECL_BEGIN
 
 #define MRP_DEFAULT_DOMCTL_ADDRESS "unxs:@murphy-domctrl"
 
@@ -146,5 +149,7 @@ void mrp_domctl_disconnect(mrp_domctl_t *dc);
 /** Set the content of the given tables to the provided data. */
 int mrp_domctl_set_data(mrp_domctl_t *dc, mrp_domctl_data_t *tables, int ntable,
                         mrp_domctl_status_cb_t status_cb, void *user_data);
+
+MRP_CDECL_END
 
 #endif /* __MURPHY_DOMAIN_CONTROL_CLIENT_H__ */
