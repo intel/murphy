@@ -323,7 +323,7 @@ static int owners_getfield(lua_State *L)
     switch (lua_type(L, 2)) {
 
     case LUA_TSTRING:
-        if (luaL_findtable(L, LUA_GLOBALSINDEX, "resource.class", 0)) {
+        if (mrp_lua_findtable(L, MRP_LUA_GLOBALTABLE, "resource.class", 0)) {
             lua_pushnil(L);
             break;
         }
