@@ -157,6 +157,7 @@ libmurphy_lua_utils_ladir =					\
 		$(includedir)/murphy/core/lua-utils
 
 libmurphy_lua_utils_la_HEADERS =				\
+		core/lua-utils/lua-utils.h			\
 		core/lua-utils/strarray.h			\
 		core/lua-utils/funcbridge.h			\
 		core/lua-utils/object.h				\
@@ -164,6 +165,7 @@ libmurphy_lua_utils_la_HEADERS =				\
 		core/lua-utils/include.h
 
 libmurphy_lua_utils_la_REGULAR_SOURCES =			\
+		core/lua-utils/lua-utils.c			\
 		core/lua-utils/strarray.c			\
 		core/lua-utils/funcbridge.c			\
 		core/lua-utils/object.c				\

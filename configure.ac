@@ -46,6 +46,9 @@ AC_PROG_YACC
 AM_PROG_LEX
 AC_SUBST(LEXLIB)
 
+# Make first invocation of PKG_CHECK_MODULES 'if-then-else-fi'-safe.
+PKG_PROG_PKG_CONFIG
+
 # Don't require ctags (we keep linker scripts and debug files in the repo now).
 #AC_CHECK_PROG(CTAGS, ctags, "ctags")
 #if test "$CTAGS" != "ctags" ; then
@@ -109,13 +112,17 @@ fi
 
 AC_SUBST(WARNING_CFLAGS)
 
-# check for Lua
-PKG_CHECK_MODULES(LUA, lua >= 5.1.1, [try_lua51=no], [try_lua51=yes])
+# By default use the system default Lua (assumed to be called lua(.pc).
+# You can override this using the --with-lua option. For instance
+# on Ubuntu you'd need to use --with-lua=lua5.1.
+AC_ARG_WITH(lua,
+            [  --with-lua                build with specified Lua (pkgconfig filename without .pc suffix)],
+	    [with_lua=$withval], [with_lua=lua])
 
-# At least Ubuntu packages lua 5.1 as lua5.1... try that if needed.
-if test "$try_lua51" = "yes"; then
-    PKG_CHECK_MODULES(LUA, lua5.1 >= 5.1.1)
-fi
+# Check for Lua.
+AC_MSG_NOTICE([Compiling with Lua package $with_lua.])
+PKG_CHECK_MODULES(LUA, $with_lua >= 5.1.1)
+
 AC_SUBST(LUA_CFLAGS)
 AC_SUBST(LUA_LIBS)
 
@@ -622,6 +629,9 @@ AC_OUTPUT
 # Display the configuration.
 echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
+echo "Lua (pkgconfig file) to use: $with_lua"
+echo "    * cflags: $LUA_CFLAGS"
+echo "    * libs: $LUA_LIBS"
 echo "D-Bus (libdbus) support: $enable_libdbus"
 echo "D-Bus (systemd-bus) support: $enable_sdbus"
 echo "PulseAudio mainloop support: $enable_pulse"
