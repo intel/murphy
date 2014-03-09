@@ -1,0 +1,62 @@
+*** rpmbuild/SPECS/lua.spec.orig	2013-10-23 19:30:44.000000000 +0300
+--- rpmbuild/SPECS/lua.spec	2014-03-09 23:28:23.064213927 +0200
+***************
+*** 1,4 ****
+--- 1,6 ----
+  %global major_version 5.2
++ %global lua_version 5.2.2
++ %global _prefix /usr/local/lua-%{lua_version}
+  
+  Name:           lua
+  Version:        %{major_version}.2
+***************
+*** 65,70 ****
+--- 67,74 ----
+  # hack so that only /usr/bin/lua gets linked with readline as it is the
+  # only one which needs this and otherwise we get License troubles
+  make %{?_smp_mflags} LIBS="-lm -ldl" luac_LDADD="liblua.la -lm -ldl"
++ # add path to %_libdir to lua.pc
++ sed -i 's#^Libs: #Libs: -L${libdir} #g' src/lua.pc
+  
+  
+  %install
+***************
+*** 73,78 ****
+--- 77,102 ----
+  mkdir -p $RPM_BUILD_ROOT%{_libdir}/lua/%{major_version}
+  mkdir -p $RPM_BUILD_ROOT%{_datadir}/lua/%{major_version}
+  
++ # construct a config file to help the dynamic linker find us
++ mkdir -p $RPM_BUILD_ROOT/etc/ld.so.conf.d
++ echo "%{_libdir}" > $RPM_BUILD_ROOT/etc/ld.so.conf.d/lua-%{lua_version}.conf
++ 
++ # add a version-specific symlink for pkgconfig to find us
++ case %{_libdir} in
++     *lib64*) lib=lib64;;
++           *) lib=lib
++ esac
++ mkdir -p $RPM_BUILD_ROOT/usr/$lib/pkgconfig
++ ln -sf %_libdir/pkgconfig/lua.pc \
++     $RPM_BUILD_ROOT/usr/$lib/pkgconfig/lua-%{lua_version}.pc
++ 
++ 
++ %post
++ ldconfig
++ 
++ %postun
++ ldconfig
++ 
+  
+  %files
+  %doc README doc/*.html doc/*.css doc/*.gif doc/*.png
+***************
+*** 90,95 ****
+--- 114,121 ----
+  %{_includedir}/l*.hpp
+  %{_libdir}/liblua.so
+  %{_libdir}/pkgconfig/*.pc
++ /usr/lib*/pkgconfig/lua-*.pc
++ /etc/ld.so.conf.d/lua-%{lua_version}.conf
+  
+  %files static
+  %{_libdir}/*.a

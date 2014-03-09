@@ -1,0 +1,79 @@
+*** rpmbuild/SPECS/lua.spec.orig	2014-03-09 23:16:11.119234628 +0200
+--- rpmbuild/SPECS/lua.spec	2014-03-09 23:16:20.243251349 +0200
+***************
+*** 1,3 ****
+--- 1,6 ----
++ %global lua_version 5.1.4
++ %global _prefix /usr/local/lua-%{lua_version}
++ 
+  Name:           lua
+  Version:        5.1.4
+  Release:        12%{?dist}
+***************
+*** 63,68 ****
+--- 65,72 ----
+  make %{?_smp_mflags} LIBS="-lm -ldl" luac_LDADD="liblua.la -lm -ldl"
+  # also remove readline from lua.pc
+  sed -i 's/-lreadline -lncurses //g' etc/lua.pc
++ # add path to %_libdir to lua.pc
++ sed -i 's#^Libs: #Libs: -L${libdir} #g' etc/lua.pc
+  
+  
+  %install
+***************
+*** 72,81 ****
+--- 76,102 ----
+  mkdir -p $RPM_BUILD_ROOT%{_libdir}/lua/5.1
+  mkdir -p $RPM_BUILD_ROOT%{_datadir}/lua/5.1
+  
++ # construct a config file to help the dynamic linker find us
++ mkdir -p $RPM_BUILD_ROOT/etc/ld.so.conf.d
++ echo "%{_libdir}" > $RPM_BUILD_ROOT/etc/ld.so.conf.d/lua-%{lua_version}.conf
++ 
++ # add a version-specific symlink for pkgconfig to find us
++ case %{_libdir} in
++     *lib64*) lib=lib64;;
++           *) lib=lib
++ esac
++ mkdir -p $RPM_BUILD_ROOT/usr/$lib/pkgconfig
++ ln -sf %_libdir/pkgconfig/lua.pc \
++     $RPM_BUILD_ROOT/usr/$lib/pkgconfig/lua-%{lua_version}.pc
+  
+  %clean
+  rm -rf $RPM_BUILD_ROOT
+  
++ %post
++ ldconfig
++ 
++ %postun
++ ldconfig
+  
+  %files
+  %defattr(-,root,root,-)
+***************
+*** 87,93 ****
+  %dir %{_libdir}/lua/5.1
+  %dir %{_datadir}/lua
+  %dir %{_datadir}/lua/5.1
+! 
+  
+  %files devel
+  %defattr(-,root,root,-)
+--- 108,114 ----
+  %dir %{_libdir}/lua/5.1
+  %dir %{_datadir}/lua
+  %dir %{_datadir}/lua/5.1
+! /etc/ld.so.conf.d/lua-%{lua_version}.conf
+  
+  %files devel
+  %defattr(-,root,root,-)
+***************
+*** 95,100 ****
+--- 116,122 ----
+  %{_includedir}/l*.hpp
+  %{_libdir}/liblua.so
+  %{_libdir}/pkgconfig/*.pc
++ /usr/lib*/pkgconfig/lua-*.pc
+  
+  %files static
+  %defattr(-,root,root,-)
