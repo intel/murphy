@@ -250,7 +250,7 @@ void mrp_lua_create_mdb_class(lua_State *L)
 
     define_constants(L);
 
-    luaL_findtable(L, LUA_GLOBALSINDEX, "builtin.table", 20);
+    mrp_lua_findtable(L, MRP_LUA_GLOBALTABLE, "builtin.table", 20);
 }
 
 mrp_lua_mdb_table_t *mrp_lua_create_builtin_table(lua_State    *L,

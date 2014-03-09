@@ -45,6 +45,8 @@
 
 #include <murphy/core/lua-bindings/murphy.h>
 #include <murphy/core/lua-utils/object.h>
+#include <murphy/core/lua-utils/error.h>
+
 
 #undef  __MURPHY_MANGLE_CLASS_SELF__     /* extra self-mangling if defined */
 #define CHECK    true                    /* do type/self-checking */
@@ -318,6 +320,7 @@ int mrp_lua_create_object_class(lua_State *L, mrp_lua_classdef_t *def)
 /** Traverse a dott global name and push the table it resolves to, or nil. */
 void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
 {
+#if 0
     const char *p;
     char *q;
     char tag[256];
@@ -342,6 +345,42 @@ void mrp_lua_get_class_table(lua_State *L, mrp_lua_classdef_t *def)
 
     lua_getfield(L, -1, tag);
     lua_remove(L, -2);
+#else
+    const char *p;
+    char *q;
+    char tag[256];
+    int  idx;
+
+    for (p = def->constructor, q = tag, idx = 0; *p;  p++) {
+        if ((*q++ = *p) == '.') {
+            q[-1] = '\0';
+            if (idx++ == 0) {
+                lua_pushnil(L);
+                mrp_lua_getglobal(L, tag);
+            }
+            else
+                lua_getfield(L, -1, tag);
+            if (lua_type(L, -1) != LUA_TTABLE) {
+                lua_pop(L, 2);
+                lua_pushnil(L);
+                return;
+            }
+            lua_remove(L, -2);
+            q = tag;
+        }
+    } /* for */
+
+    *q = '\0';
+
+    if (idx++ == 0) {
+        lua_pushnil(L);
+        mrp_lua_getglobal(L, tag);
+    }
+    else
+        lua_getfield(L, -1, tag);
+
+    lua_remove(L, -2);
+#endif
 }
 
 

@@ -36,6 +36,7 @@
 #include <lauxlib.h>
 
 #include "murphy/common/list.h"
+#include "murphy/core/lua-utils/lua-utils.h"
 
 #define MRP_LUA_CONFIG_ENVVAR "__MURPHY_LUA_CONFIG"
 
@@ -160,11 +161,6 @@
 enum mrp_lua_event_type_e {
     MRP_LUA_OBJECT_DESTRUCTION = 1,
 };
-
-
-static inline int mrp_lua_absidx(lua_State *L, int idx) {
-    return ((idx < 0) ? lua_gettop(L) + idx + 1 : idx);
-}
 
 
 /*

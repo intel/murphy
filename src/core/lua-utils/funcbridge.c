@@ -274,7 +274,7 @@ mrp_funcbridge_t *mrp_funcbridge_create_cfunc(lua_State *L, const char *name,
 
     top = lua_gettop(L);
 
-    if (luaL_findtable(L, LUA_GLOBALSINDEX, "builtin.method", 20))
+    if (mrp_lua_findtable(L, MRP_LUA_GLOBALTABLE, "builtin.method", 20))
         fb = NULL;
     else {
         builtin = lua_gettop(L);

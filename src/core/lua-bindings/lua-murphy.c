@@ -323,20 +323,28 @@ static void lua_debug(lua_State *L, lua_Debug *ar)
         mrp_debug(ALIGNFMT"<= return", ALIGNARG);
         break;
 
+#ifdef LUA_HOOKTAILRET
     case LUA_HOOKTAILRET:
         depth--;
         mrp_debug(ALIGNFMT"<= tail return", ALIGNARG);
         break;
+#endif
 
     case LUA_HOOKCALL:
+#ifdef LUA_HOOKTAILCALL
+    case LUA_HOOKTAILCALL:
+#endif
+
         mrp_clear(&f);
         if (lua_getstack(L, 1, &f) && lua_getinfo(L, "Snl", &f)) {
             if      (RUNNING(&f, "C"))    type = "Lua-C";
             else if (RUNNING(&f, "Lua"))  type = "Lua";
             else if (RUNNING(&f, "main")) type = "Lua-main";
             else if (RUNNING(&f, "tail")) {
-                mrp_debug(ALIGNFMT"=> %*.*stail-call", ALIGNARG);
+                mrp_debug(ALIGNFMT"<=> %*.*stail-call", ALIGNARG);
+#ifndef LUA_HOOKTAILRET
                 depth++;
+#endif
                 return;
             }
             else

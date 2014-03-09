@@ -36,6 +36,7 @@
 #include <lauxlib.h>
 
 #include <murphy/core/lua-utils/strarray.h>
+#include <murphy/core/lua-utils/lua-utils.h>
 
 
 mrp_lua_strarray_t *mrp_lua_check_strarray(lua_State *L, int t)
