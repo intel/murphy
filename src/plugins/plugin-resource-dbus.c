@@ -1341,7 +1341,7 @@ static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         if (strcmp(name, PROP_MANDATORY) == 0) {
             uint32_t v = 0;
             bool *value;
-            sig = "s";
+            sig = "b";
 
             value = mrp_allocz(sizeof(bool));
             if (!value) {
@@ -1361,7 +1361,7 @@ static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         else if (strcmp(name, PROP_SHARED) == 0) {
             uint32_t v = 0;
             bool *value;
-            sig = "s";
+            sig = "b";
             value = mrp_allocz(sizeof(bool));
 
             if (!value) {
