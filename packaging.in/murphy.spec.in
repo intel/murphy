@@ -329,6 +329,9 @@ cp packaging.in/murphy.lua      $RPM_BUILD_ROOT%{_sysconfdir}/murphy/murphy.lua
 mkdir -p $RPM_BUILD_ROOT%{systemddir}/system
 cp packaging.in/murphyd.service $RPM_BUILD_ROOT%{systemddir}/system
 
+# Make sure we have %{_datadir}/murphy
+mkdir -p $RPM_BUILD_ROOT%{_datadir}/murphy
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -423,7 +426,7 @@ ldconfig
 
 %files doc
 %defattr(-,root,root,-)
-%doc %{_docdir}/%{name}/*
+%doc %{_pkgdocdir}
 
 %if %{?_with_pulse:1}%{!?_with_pulse:0}
 %files pulse
