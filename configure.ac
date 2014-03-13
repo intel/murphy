@@ -401,10 +401,13 @@ MURPHY_LIBS=""
 AC_SUBST(MURPHY_CFLAGS)
 AC_SUBST(MURPHY_LIBS)
 
-# Add LIBDIR to config.h.
+# Allow substitution for LIBDIR and SYSCONFDIR.
 AC_MSG_CHECKING([libdir])
 AC_MSG_RESULT([$libdir])
 AC_SUBST(LIBDIR, [$libdir])
+AC_MSG_CHECKING([sysconfdir])
+AC_MSG_RESULT([$sysconfdir])
+AC_SUBST(SYSCONFDIR, [$sysconfdir])
 
 #Check whether we build resources or not
 AC_ARG_WITH(resources,

@@ -5,7 +5,8 @@ SUBDIRS         = murphy-db . \
 
 BUILT_SOURCES   =
 
-AM_CFLAGS       = $(WARNING_CFLAGS) $(INCLUDES) -DLIBDIR=\"@LIBDIR@\"
+AM_CFLAGS       = $(WARNING_CFLAGS) $(INCLUDES) \
+		  -DSYSCONFDIR=\"@SYSCONFDIR@\" -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   =
 pkgconfigdir    = ${libdir}/pkgconfig
 
