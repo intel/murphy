@@ -18,10 +18,10 @@ sm:CpuWatch({
          limits = {                               -- load threshold %'s
              [1] = { label = 'idle'    , limit =  5 },
              [2] = { label = 'low'     , limit = 20 },
-             [2] = { label = 'moderate', limit = 40 },
-             [3] = { label = 'medium'  , limit = 50 },
-             [4] = { label = 'high'    , limit = 80 },
-             [5] = { label = 'critical'             }
+             [3] = { label = 'moderate', limit = 40 },
+             [4] = { label = 'medium'  , limit = 50 },
+             [5] = { label = 'high'    , limit = 80 },
+             [6] = { label = 'critical'             }
          },
          window = 15000,                          -- use an EWMA of 15 secs
          notify = function (w, prev, curr)        -- threshold change callback
