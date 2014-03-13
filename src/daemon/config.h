@@ -34,7 +34,7 @@
 #include <murphy/core/context.h>
 
 #ifndef MRP_DEFAULT_CONFIG_DIR
-#    define MRP_DEFAULT_CONFIG_DIR  "/etc/murphy"
+#    define MRP_DEFAULT_CONFIG_DIR  SYSCONFDIR"/murphy"
 #endif
 
 #ifndef MRP_DEFAULT_CONFIG_FILE
