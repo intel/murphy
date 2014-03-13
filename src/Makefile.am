@@ -1491,7 +1491,7 @@ endif
 bin_PROGRAMS += murphyd
 EXTRA_DIST   += $(config_DATA)
 configdir     = $(sysconfdir)/murphy
-config_DATA   = daemon/murphy.conf
+config_DATA   = $(shell ls daemon/sample-config/*.{cfg,rules})
 
 murphyd_SOURCES =			\
 		daemon/daemon.c		\
@@ -1516,7 +1516,10 @@ murphyd_LDADD  =				\
 
 murphyd_LDFLAGS = -rdynamic
 
-
+install-data-hook::
+	rm -f $(DESTDIR)/$(sysconfdir)/murphy/murphy.cfg
+	echo "load-plugin lua config=\"$(sysconfdir)/murphy/main.cfg\"" \
+	    > $(DESTDIR)/$(sysconfdir)/murphy/murphy.conf
 
 ###################################
 # linkedin (DSO) loader generation
