@@ -322,8 +322,9 @@ pushd $RPM_BUILD_ROOT >& /dev/null && \
 popd >& /dev/null
 
 # Replace the default sample/test config files with the packaging ones.
-cp packaging.in/murphy-lua.conf $RPM_BUILD_ROOT%{_sysconfdir}/murphy/murphy.conf
-cp packaging.in/murphy.lua      $RPM_BUILD_ROOT%{_sysconfdir}/murphy/murphy.lua
+# rm -f $RPM_BUILD_ROOT%{_sysconfdir}/murphy/*
+# cp packaging.in/murphy-lua.conf packaging.in/murphy-lua.conf \
+#     $RPM_BUILD_ROOT%{_sysconfdir}/murphy
 
 # Copy the systemd service file in place.
 mkdir -p $RPM_BUILD_ROOT%{systemddir}/system
