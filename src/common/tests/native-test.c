@@ -42,17 +42,25 @@ typedef enum {
 
 
 typedef struct {
-    char          *name;
-    gender_t       gender;
-    int            age;
-    char         **languages;
-    unsigned int   height;
-    float          weight;
-    char           nationality[32];
-    hand_t         hand;
-    bool           glasses;
-    art_t         *favourites;
-    size_t         nfavourite;
+    const char      *item;
+    mrp_list_hook_t  hook;
+} item_t;
+
+
+
+typedef struct {
+    char            *name;
+    gender_t         gender;
+    int              age;
+    char           **languages;
+    unsigned int     height;
+    float            weight;
+    char             nationality[32];
+    hand_t           hand;
+    bool             glasses;
+    art_t           *favourites;
+    size_t           nfavourite;
+    mrp_list_hook_t  items;
 } person_t;
 
 
@@ -91,6 +99,23 @@ char *paps_languages[] = {
     "english", "swedish", "finnish", NULL
 };
 
+
+item_t pap_item_0 = {
+    .item = "Pap's list item #1",
+    .hook = MRP_LIST_INIT(pap_item_0.hook),
+};
+
+item_t pap_item_1 = {
+    .item = "Pap's list item #2",
+    .hook = MRP_LIST_INIT(pap_item_1.hook),
+};
+
+item_t pap_item_2 = {
+    .item = "Pap's list item #3",
+    .hook = MRP_LIST_INIT(pap_item_2.hook),
+};
+
+
 person_t pap = {
     .name        = "Pap",
     .gender      = MALE,
@@ -103,6 +128,7 @@ person_t pap = {
     .glasses     = false,
     .favourites  = paps_favourites,
     .nfavourite  = MRP_ARRAY_SIZE(paps_favourites),
+    .items       = MRP_LIST_INIT(pap.items),
 };
 
 
@@ -146,6 +172,7 @@ person_t mom = {
     .glasses     = true,
     .favourites  = moms_favourites,
     .nfavourite  = MRP_ARRAY_SIZE(moms_favourites),
+    .items       = MRP_LIST_INIT(mom.items),
 };
 
 
@@ -166,6 +193,7 @@ person_t tom_dick_and_harry[] = {
         .glasses     = false,
         .favourites  = NULL,
         .nfavourite  = 0,
+        .items       = MRP_LIST_INIT(tom_dick_and_harry[0].items),
     },
     {
         .name        = "Dick",
@@ -179,6 +207,7 @@ person_t tom_dick_and_harry[] = {
         .glasses     = true,
         .favourites  = paps_favourites + 1,
         .nfavourite  = MRP_ARRAY_SIZE(paps_favourites) - 2,
+        .items       = MRP_LIST_INIT(tom_dick_and_harry[1].items)
     },
     {
         .name        = "Harry",
@@ -192,6 +221,7 @@ person_t tom_dick_and_harry[] = {
         .glasses     = false,
         .favourites  = moms_favourites + 1,
         .nfavourite  = MRP_ARRAY_SIZE(moms_favourites) - 2,
+        .items       = MRP_LIST_INIT(tom_dick_and_harry[2].items)
     },
     {
         .name        = NULL,
@@ -211,6 +241,9 @@ int main(int argc, char *argv[])
                     MRP_UINT16(art_t, year    , DEFAULT),
                     MRP_STRING(art_t, location, DEFAULT),
                     MRP_DOUBLE(art_t, price   , DEFAULT));
+    MRP_NATIVE_TYPE(item_type, item_t,
+                    MRP_STRING(item_t, item   , DEFAULT),
+                    MRP_HOOK  (item_t, hook            ));
     MRP_NATIVE_TYPE(person_type, person_t,
                     MRP_STRING(person_t, name       , DEFAULT),
                     MRP_UINT32(person_t, gender     , DEFAULT),
@@ -224,15 +257,17 @@ int main(int argc, char *argv[])
                     MRP_BOOL  (person_t, glasses    , DEFAULT),
                     MRP_ARRAY (person_t, favourites , DEFAULT, SIZED,
                                art_t, nfavourite),
-                    MRP_SIZET (person_t, nfavourite , DEFAULT));
+                    MRP_SIZET (person_t, nfavourite , DEFAULT),
+                    MRP_LIST  (person_t, items      , item_t, hook));
+
     MRP_NATIVE_TYPE(family_type, family_t,
                     MRP_STRUCT(family_t, father  , DEFAULT, person_t),
                     MRP_STRUCT(family_t, mother  , DEFAULT, person_t),
                     MRP_ARRAY (family_t, children, DEFAULT, GUARDED,
                                person_t, name, .strp = NULL));
-    mrp_typemap_t map[4];
+    mrp_typemap_t map[5];
 
-    uint32_t  art_type_id, person_type_id, family_type_id;
+    uint32_t  art_type_id, item_type_id, person_type_id, family_type_id;
     void     *ebuf;
     size_t    esize;
     int       fd;
@@ -245,12 +280,23 @@ int main(int argc, char *argv[])
 
     mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_INFO));
 
+    mrp_list_append(&pap.items, &pap_item_0.hook);
+    mrp_list_append(&pap.items, &pap_item_1.hook);
+    mrp_list_append(&pap.items, &pap_item_2.hook);
+
     art_type_id = mrp_register_native(&art_type);
 
     if (art_type_id == MRP_INVALID_TYPE)
         mrp_log_error("Failed to register art_t type.");
     else
         mrp_log_info("Type art_t sucessfully registered.");
+
+    item_type_id = mrp_register_native(&item_type);
+
+    if (item_type_id == MRP_INVALID_TYPE)
+        mrp_log_error("Failed to register item_t type.");
+    else
+        mrp_log_info("Type item_t sucessfully registered.");
 
     person_type_id = mrp_register_native(&person_type);
 
@@ -269,9 +315,10 @@ int main(int argc, char *argv[])
     ebuf = NULL;
 
     map[0] = (mrp_typemap_t)MRP_TYPEMAP(1, art_type_id   );
-    map[1] = (mrp_typemap_t)MRP_TYPEMAP(2, person_type_id);
-    map[2] = (mrp_typemap_t)MRP_TYPEMAP(3, family_type_id);
-    map[3] = (mrp_typemap_t)MRP_TYPEMAP_END;
+    map[1] = (mrp_typemap_t)MRP_TYPEMAP(2, item_type_id  );
+    map[2] = (mrp_typemap_t)MRP_TYPEMAP(3, person_type_id);
+    map[3] = (mrp_typemap_t)MRP_TYPEMAP(4, family_type_id);
+    map[4] = (mrp_typemap_t)MRP_TYPEMAP_END;
 
     if (mrp_encode_native(&family, family_type_id, 0, &ebuf, &esize, map) < 0) {
         mrp_log_error("Failed to encode test data.");
