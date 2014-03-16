@@ -68,6 +68,8 @@ typedef enum {
     MRP_TYPE_STRING,
     MRP_TYPE_BLOB,
     MRP_TYPE_ARRAY,
+    MRP_TYPE_LIST,
+    MRP_TYPE_HOOK,
     MRP_TYPE_STRUCT,
     MRP_TYPE_MAX
 } mrp_type_t;
@@ -115,8 +117,10 @@ typedef union {
     size_t         *szp;
     ssize_t         ssz;
     ssize_t        *sszp;
-    void     *ptr;
-    void    **ptrp;
+    void            *ptr;
+    void           **ptrp;
+    mrp_list_hook_t  hook;
+    mrp_list_hook_t *hookp;
 } mrp_value_t;
 
 
@@ -192,6 +196,18 @@ typedef struct {                         /* an array member */
     mrp_value_t sentinel;                /* sentinel value, if guarded */
 } mrp_native_array_t;
 
+typedef struct {
+    MRP_NATIVE_COMMON_FIELDS;            /* common member fields */
+    union {                              /* contained element type */
+        char     *name;                  /*     name */
+        uint32_t  id;                    /*     or tpye id */
+    } elem;
+    union {                              /* hook member */
+        char     *name;                  /*     name */
+        uint32_t  idx;                   /*     or index */
+    } hook;
+} mrp_native_list_t;
+
 typedef struct {                         /* member of type struct */
     MRP_NATIVE_COMMON_FIELDS;            /* common member fields */
     union {                              /* struct type */
@@ -205,6 +221,7 @@ typedef union {
     mrp_native_string_t str;
     mrp_native_blob_t   blob;
     mrp_native_array_t  array;
+    mrp_native_list_t   list;
     mrp_native_struct_t strct;
 } mrp_native_member_t;
 
@@ -291,6 +308,20 @@ typedef struct {
         }                                                               \
     }
 
+/** Declare an explicitly sized array member of the native typet. */
+#define MRP_LIST(_objtype, _member, _type, _hook)                       \
+    {                                                                   \
+        .list = {                                                       \
+            __MRP_MEMBER_INIT(_objtype, _member, MRP_TYPE_LIST),        \
+            .layout  = MRP_LAYOUT_DEFAULT,                              \
+            .elem    = { .name = #_type, },                             \
+            .hook    = { .name = #_hook, },                             \
+        }                                                               \
+    }
+
+/** Declare a hook member of the native type. */
+#define MRP_HOOK(_ot, _m) __MRP_MEMBER(_ot, MRP_TYPE_HOOK, _m, DEFAULT)
+
 /** Declare a struct member of the native type. */
 #define MRP_STRUCT(_objtype, _member, _layout, _type)                   \
     {                                                                   \
@@ -299,6 +330,8 @@ typedef struct {
             .data_type = { .name = #_type },                            \
         }                                                               \
     }
+
+
 
 /** Macros for declaring basic members of the native type. */
 #define MRP_INT8(_ot, _m, _l)   __MRP_MEMBER(_ot, MRP_TYPE_INT8  , _m, _l)
