@@ -47,7 +47,8 @@ typedef enum {
     TAG_STRUCT,                          /* a native structure */
     TAG_MEMBER,                          /* a native structure member */
     TAG_ARRAY,                           /* an array */
-    TAG_NELEM,                           /* size of an array (in elements) */
+    TAG_LIST,                            /* a list */
+    TAG_NELEM,                           /* number of elements in array/list */
 } tag_t;
 
 
@@ -311,6 +312,8 @@ static void register_default_types(void)
     DECLARE_TYPE(char *       , STRING);
     DECLARE_TYPE(void *       , BLOB  );
     DECLARE_TYPE(void *       , ARRAY );
+    DECLARE_TYPE(mrp_list_hook_t *, LIST);
+    DECLARE_TYPE(mrp_list_hook_t *, HOOK);
     DECLARE_TYPE(void *       , STRUCT);
 
     REGISTER_TYPE(&INT8_type);
@@ -333,6 +336,8 @@ static void register_default_types(void)
     REGISTER_TYPE(&STRING_type);
     REGISTER_TYPE(&BLOB_type);
     REGISTER_TYPE(&ARRAY_type);
+    REGISTER_TYPE(&LIST_type);
+    REGISTER_TYPE(&HOOK_type);
     REGISTER_TYPE(&STRUCT_type);
 
     ntype = DEFAULT_NTYPE;
@@ -479,6 +484,31 @@ uint32_t mrp_register_native(mrp_native_type_t *type)
                 }
             }
 
+            break;
+
+        case MRP_TYPE_LIST:
+            d = t->members + t->nmember;
+
+            if (copy_member(t, s) < 0)
+                goto fail;
+
+            d->list.elem.id = mrp_type_id(s->list.elem.name);
+
+            if (d->list.elem.id == MRP_INVALID_TYPE)
+                goto fail;
+
+            elemt = lookup_type(d->list.elem.id);
+
+            if (elemt == NULL)
+                goto fail;
+
+            if (elemt->id < MRP_TYPE_STRUCT)
+                goto fail;
+
+            d->list.hook.idx = member_index(elemt, s->list.hook.name);
+
+            if (d->list.hook.idx == (uint32_t)-1)
+                goto fail;
             break;
 
         case MRP_TYPE_STRUCT:
@@ -815,6 +845,48 @@ static int encode_array(mrp_tlv_t *tlv, void *arrp, mrp_native_array_t *m,
 }
 
 
+static int encode_list(mrp_tlv_t *tlv, mrp_list_hook_t *list,
+                       mrp_native_list_t *m, mrp_typemap_t *idmap)
+{
+    mrp_native_type_t   *t;
+    mrp_native_member_t *h;
+    mrp_list_hook_t     *p, *n;
+    void                *elem;
+    int                  nelem;
+
+    if ((t = lookup_type(m->elem.id)) == NULL)
+        return -1;
+
+    if (t->id < MRP_TYPE_STRUCT)
+        return -1;
+
+    if ((h = native_member(t, m->hook.idx)) == NULL)
+        return -1;
+
+    nelem = 0;
+    mrp_list_foreach(list, p, n) {
+        nelem++;
+    }
+
+    if (mrp_tlv_push_uint32(tlv, TAG_LIST, map_type(m->elem.id, idmap)) < 0)
+        return -1;
+
+    if (mrp_tlv_push_uint32(tlv, TAG_NELEM, nelem) < 0)
+        return -1;
+
+    mrp_list_foreach(list, p, n) {
+        if (nelem == 0)
+            break;
+
+        elem = (void *)(((char *)p) - h->any.offs);
+        if (encode_struct(tlv, elem, t, idmap) < 0)
+            return -1;
+    }
+
+    return 0;
+}
+
+
 static int encode_struct(mrp_tlv_t *tlv, void *data, mrp_native_type_t *t,
                          mrp_typemap_t *idmap)
 {
@@ -873,6 +945,15 @@ static int encode_struct(mrp_tlv_t *tlv, void *data, mrp_native_type_t *t,
             if (encode_array(tlv, v->ptr, &m->array, nelem,
                              size, idmap) < 0)
                 return -1;
+            break;
+
+        case MRP_TYPE_LIST:
+            if (encode_list(tlv, &v->hook, &m->list, idmap) < 0)
+                return -1;
+            break;
+
+        case MRP_TYPE_HOOK:
+            mrp_list_init(&v->hook);
             break;
 
         case MRP_TYPE_STRUCT:
@@ -1144,6 +1225,49 @@ static int decode_array(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
 }
 
 
+static int decode_list(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
+                       mrp_list_hook_t *hook, mrp_native_list_t *m,
+                       mrp_typemap_t *idmap)
+{
+    mrp_native_type_t   *t;
+    mrp_native_member_t *h;
+    mrp_list_hook_t     *p;
+    uint32_t             id, nelem, i;
+    void                *data;
+
+    if (mrp_tlv_pull_uint32(tlv, TAG_LIST, &id) < 0)
+        return -1;
+
+    if ((id = mapped_type(id, idmap)) != m->elem.id)
+        return -1;
+
+    if (mrp_tlv_pull_uint32(tlv, TAG_NELEM, &nelem) < 0)
+        return -1;
+
+    if ((t = lookup_type(m->elem.id)) == NULL)
+        return -1;
+
+    if (t->id < MRP_TYPE_STRUCT)
+        return -1;
+
+    if ((h = native_member(t, m->hook.idx)) == NULL)
+        return -1;
+
+    id = m->elem.id;
+
+    for (i = 0; i < nelem; i++) {
+        data = NULL;
+        if (decode_struct(tlv, chunks, &data, &id, idmap) < 0)
+            return -1;
+
+        p = (mrp_list_hook_t *)(((char *)data) + h->any.offs);
+        mrp_list_append(hook, p);
+    }
+
+    return 0;
+}
+
+
 static int decode_struct(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
                          void **datap, uint32_t *idp, mrp_typemap_t *idmap)
 {
@@ -1235,6 +1359,16 @@ static int decode_struct(mrp_tlv_t *tlv, mrp_list_hook_t **chunks,
             if (decode_array(tlv, chunks, &v->ptr, &m->array,
                              *datap, t, idmap) < 0)
                 return -1;
+            break;
+
+        case MRP_TYPE_LIST:
+            mrp_list_init(&v->hook);
+            if (decode_list(tlv, chunks, &v->hook, &m->list, idmap) < 0)
+                return -1;
+            break;
+
+        case MRP_TYPE_HOOK:
+            mrp_list_init(&v->hook);
             break;
 
         case MRP_TYPE_STRUCT:
@@ -1472,6 +1606,40 @@ static int print_array(char **bufp, size_t *sizep, int level,
 }
 
 
+static int print_list(char **bufp, size_t *sizep, int level,
+                      mrp_list_hook_t *list, mrp_native_list_t *m)
+{
+    mrp_native_type_t   *mt;
+    mrp_native_member_t *mh;
+    mrp_list_hook_t     *p, *n;
+    void                *item;
+
+    if ((mt = lookup_type(m->elem.id)) == NULL)
+        return -1;
+
+    if (mt->id < MRP_TYPE_STRUCT)
+        return -1;
+
+    if ((mh = native_member(mt, m->hook.idx)) == NULL)
+        return -1;
+
+    if (!mrp_list_empty(list)) {
+        PRINT(level, *bufp, *sizep, "list: (\n");
+        mrp_list_foreach(list, p, n) {
+            item = (void*)(((char *)p) - mh->any.offs);
+
+            if (print_struct(bufp, sizep, level + 1, item, mt) < 0)
+                return -1;
+        }
+        PRINT(level, *bufp, *sizep, ")\n");
+    }
+    else
+        PRINT(level, *bufp, *sizep, "()\n");
+
+    return 0;
+}
+
+
 static int print_struct(char **bufp, size_t *sizep, int level,
                         void *data, mrp_native_type_t *t)
 {
@@ -1536,6 +1704,14 @@ static int print_struct(char **bufp, size_t *sizep, int level,
             if (print_array(&p, &size, level, v->ptr, &m->array,
                             nelem, esize) < 0)
                 return -1;
+            break;
+
+        case MRP_TYPE_LIST:
+            if (print_list(&p, &size, level, &v->hook, &m->list) < 0)
+                return -1;
+            break;
+
+        case MRP_TYPE_HOOK:
             break;
 
         case MRP_TYPE_STRUCT:
