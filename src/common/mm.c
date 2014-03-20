@@ -817,6 +817,17 @@ void mrp_mm_dump(FILE *fp)
     sort_blocks(buckets, &sorted);
     dump_blocks(fp, &sorted);
     relink_blocks(&sorted);
+
+    fprintf(fp, "Max: %llu bytes (%.2f M, %.2f G), %ld blocks\n",
+            (unsigned long long)__mm.max_alloc,
+            1.0 * __mm.max_alloc / (1024 * 1024),
+            1.0 * __mm.max_alloc / (1024 * 1024 * 1024),
+            (unsigned long)__mm.max_blocks);
+    fprintf(fp, "Current: %llu bytes (%.2f M, %.2f G) in %ld blocks.\n",
+            (unsigned long long)__mm.cur_alloc,
+            1.0 * __mm.cur_alloc / (1024 * 1024),
+            1.0 * __mm.cur_alloc / (1024 * 1024 * 1024),
+            (unsigned long)__mm.cur_blocks);
 }
 
 
