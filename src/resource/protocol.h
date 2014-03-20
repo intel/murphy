@@ -32,10 +32,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include <murphy/common/msg.h>
 
 #define RESPROTO_DEFAULT_ADDRESS      "unxs:@murphy-resource-native"
+#define RESPROTO_DEFAULT_ADDRVAR      "MURPHY_RESOURCE_ADDRESS"
 
 
 #define RESPROTO_BIT(n)               ((uint32_t)1 << (n))
@@ -86,6 +88,16 @@ typedef enum {
     RESPROTO_ACQUIRE,
 } mrp_resproto_state_t;
 
+
+static inline const char *mrp_resource_get_default_address(void)
+{
+    const char *addr;
+
+    if ((addr = getenv(RESPROTO_DEFAULT_ADDRVAR)) == NULL)
+        return RESPROTO_DEFAULT_ADDRESS;
+    else
+        return addr;
+}
 
 #endif  /* __MURPHY_RESOURCE_PROTOCOL_H__ */
 
