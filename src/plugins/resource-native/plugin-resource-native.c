@@ -1004,6 +1004,9 @@ static int initiate_transport(mrp_plugin_t *plugin)
     int               flags = MRP_TRANSPORT_REUSEADDR;
     bool              stream;
 
+    if (addr == NULL)
+        addr = mrp_resource_get_default_address();
+
     data->alen = mrp_transport_resolve(NULL, addr, &data->saddr,
                                        sizeof(data->saddr), &data->atyp);
 
@@ -1169,7 +1172,7 @@ static void resource_exit(mrp_plugin_t *plugin)
 #define RESOURCE_AUTHORS     "Janos Kovacs <jankovac503@gmail.com>"
 
 #define DEF_CONFIG_FILE      "/etc/murphy/resource.conf"
-#define DEF_ADDRESS          RESPROTO_DEFAULT_ADDRESS
+#define DEF_ADDRESS          NULL
 
 static mrp_plugin_arg_t args[] = {
     MRP_PLUGIN_ARGIDX( ARG_ADDRESS, STRING, "address", DEF_ADDRESS ),

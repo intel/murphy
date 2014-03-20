@@ -522,7 +522,7 @@ mrp_res_context_t *mrp_res_create(mrp_mainloop_t *ml,
 
     /* connect to Murphy */
 
-    alen = mrp_transport_resolve(NULL, RESPROTO_DEFAULT_ADDRESS,
+    alen = mrp_transport_resolve(NULL, mrp_resource_get_default_address(),
             &cx->priv->saddr, sizeof(cx->priv->saddr), &type);
 
     cx->priv->transp = mrp_transport_create(cx->priv->ml, type,
