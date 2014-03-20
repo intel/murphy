@@ -380,7 +380,10 @@ int mrp_application_class_print(char *buf, int len, bool with_rsets)
     int width, l;
     int clcnt, rscnt;
 
-    MRP_ASSERT(buf && len > 0, "invalid argument");
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(buf, "invalid argument");
 
     e = (p = buf) + len;
     clcnt = rscnt = 0;

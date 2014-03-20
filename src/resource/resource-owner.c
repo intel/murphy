@@ -412,7 +412,10 @@ int mrp_resource_owner_print(char *buf, int len)
     uint32_t zcnt, zid;
     char *p, *e;
 
-    MRP_ASSERT(buf && len > 0, "invalid argument");
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(buf, "invalid argument");
 
     rcnt = mrp_resource_definition_count();
     zcnt = mrp_zone_count();

@@ -430,7 +430,10 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
     char gap[] = "                         ";
     char *p, *e;
 
-    MRP_ASSERT(rset && indent < sizeof(gap)-1 && buf && len > 0,
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(rset && indent < sizeof(gap)-1 && buf,
                "invalid argument");
 
     gap[indent] = '\0';
@@ -452,6 +455,14 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
     mrp_list_foreach(&rset->resource.list, resen, n) {
         res = mrp_list_entry(resen, mrp_resource_t, list);
         p  += mrp_resource_print(res, mandatory, indent+6, p, e-p);
+    }
+
+    if (p >= e) {
+        if (len >= 5) {
+            e[-5] = e[-4] = e[-3] = '.';
+            e[-2] = '\n';
+            e[-1] = '\0';
+        }
     }
 
     return p - buf;

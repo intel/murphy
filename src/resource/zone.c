@@ -256,7 +256,10 @@ mrp_attr_t *mrp_zone_read_all_attributes(mrp_zone_t *zone,
 
 int mrp_zone_attribute_print(mrp_zone_t *zone, char *buf, int len)
 {
-    MRP_ASSERT(zone && buf && len > 0, "invalid argument");
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(zone && buf, "invalid argument");
 
     return mrp_attribute_print(zone_def->nattr, zone_def->attrdefs,
                                zone->attrs, buf,len);

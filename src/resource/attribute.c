@@ -200,7 +200,10 @@ int mrp_attribute_print(uint32_t          nattr,
     uint32_t i;
     char *p, *e;
 
-    MRP_ASSERT(adefs && avals && buf && len > 0, "invalid argument");
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(adefs && avals && buf, "invalid argument");
 
     e = (p = buf) + len;
 

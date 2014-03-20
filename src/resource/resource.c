@@ -491,7 +491,10 @@ int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
     char *p, *e;
     uint32_t m;
 
-    MRP_ASSERT(res && indent < sizeof(gap)-1 && buf && len > 0,
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(res && indent < sizeof(gap)-1 && buf,
                "invalid argument");
 
     rdef = res->def;
@@ -521,7 +524,10 @@ int mrp_resource_attribute_print(mrp_resource_t *res, char *buf, int len)
 {
     mrp_resource_def_t *rdef;
 
-    MRP_ASSERT(res && buf && len > 0, "invalid argument");
+    if (len <= 0)
+        return 0;
+
+    MRP_ASSERT(res && buf, "invalid argument");
 
     rdef = res->def;
 
