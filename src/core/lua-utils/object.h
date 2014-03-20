@@ -701,6 +701,10 @@ mrp_lua_type_t mrp_lua_class_type(const char *type_name);
 int mrp_lua_object_of_type(lua_State *L, int idx, mrp_lua_type_t type);
 /** Check if the given (known to be murphy Lua) object is of given type. */
 int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type);
+/** Enable/disable per-class Murphy Lua object tracking. */
+void mrp_lua_track_objects(bool enable);
+/** Dump all active murphy Lua objects. */
+void mrp_lua_dump_objects(mrp_lua_tostr_mode_t mode, lua_State *L, FILE *fp);
 
 #endif  /* __MURPHY_LUA_OBJECT_H__ */
 

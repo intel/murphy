@@ -110,6 +110,8 @@ static mrp_lua_classdef_t invalid_classdef = {
  */
 static struct {
     bool track;                          /* track objects per classdef */
+    bool set;                            /* whether already set */
+    bool busy;                           /* whether taken into use */
 } cfg;
 
 
@@ -158,10 +160,8 @@ static void check_config(void)
 {
     char *config = getenv(MRP_LUA_CONFIG_ENVVAR);
 
-    cfg.track = mrp_env_config_bool(config, "track", false);
-
-    if (cfg.track)
-        mrp_log_info("Murphy Lua object tracking enabled.");
+    if (mrp_env_config_bool(config, "track", false))
+        mrp_lua_track_objects(true);
 }
 
 
@@ -2455,8 +2455,6 @@ ssize_t mrp_lua_object_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
     char       *p = buf;
     ssize_t     n = 0;;
 
-    MRP_UNUSED(L);
-
     if (u == NULL)
         return snprintf(p, size, "<non-object %p>", u);
 
@@ -2537,6 +2535,25 @@ void mrp_lua_dump_objects(mrp_lua_tostr_mode_t mode, lua_State *L, FILE *fp)
                 fprintf(fp, "    failed to dump object %p(%p)\n", u, d);
             cnt++;
         }
+    }
+}
+
+
+void mrp_lua_track_objects(bool enable)
+{
+    if (cfg.busy) {
+        if (cfg.track != enable)
+            mrp_log_warning("Can't %s Murphy Lua object tracking, "
+                            "already in use.", enable ? "enable" : "disable");
+        return;
+    }
+
+    if (!cfg.set) {
+        cfg.track = enable;
+        cfg.set   = true;
+
+        mrp_log_info("Murphy Lua object tracking is now %s.",
+                     enable ? "enabled" : "disabled");
     }
 }
 
