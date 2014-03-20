@@ -28,6 +28,7 @@
  */
 
 #include <unistd.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <alloca.h>
@@ -148,6 +149,134 @@ static void debug_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 }
 
 
+static void dump_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    lua_State            *L = mrp_lua_get_lua_state();
+    mrp_lua_tostr_mode_t  mode;
+
+    MRP_UNUSED(c);
+    MRP_UNUSED(user_data);
+
+    switch (argc) {
+    case 2:
+        mode = MRP_LUA_TOSTR_CHECKDUMP;
+        break;
+
+    case 3:
+        if      (!strcmp(argv[2], "default"))   mode = MRP_LUA_TOSTR_DEFAULT;
+        else if (!strcmp(argv[2], "stackdump")) mode = MRP_LUA_TOSTR_STACKDUMP;
+        else if (!strcmp(argv[2], "errordump")) mode = MRP_LUA_TOSTR_ERRORDUMP;
+        else if (!strcmp(argv[2], "checkdump")) mode = MRP_LUA_TOSTR_CHECKDUMP;
+        else {
+            printf("Unknown dump mode '%s', using default.\n", argv[2]);
+            mode = MRP_LUA_TOSTR_DEFAULT;
+        }
+        break;
+
+    case 4:
+#define MAP(var, name, value) if (!strcmp(var, name)) mode |= value
+        mode = 0;
+        MAP(argv[2], "lua"    , MRP_LUA_TOSTR_LUA    );
+        MAP(argv[2], "minimal", MRP_LUA_TOSTR_MINIMAL);
+        MAP(argv[2], "compact", MRP_LUA_TOSTR_COMPACT);
+        MAP(argv[2], "oneline", MRP_LUA_TOSTR_ONELINE);
+        MAP(argv[2], "short"  , MRP_LUA_TOSTR_SHORT  );
+        MAP(argv[2], "medium" , MRP_LUA_TOSTR_MEDIUM );
+        MAP(argv[2], "full"   , MRP_LUA_TOSTR_FULL   );
+        MAP(argv[2], "verbose", MRP_LUA_TOSTR_VERBOSE);
+        MAP(argv[2], "meta"   , MRP_LUA_TOSTR_META   );
+        MAP(argv[2], "data"   , MRP_LUA_TOSTR_DATA   );
+        MAP(argv[2], "both"   , MRP_LUA_TOSTR_BOTH   );
+
+        MAP(argv[3], "lua"    , MRP_LUA_TOSTR_LUA    );
+        MAP(argv[3], "minimal", MRP_LUA_TOSTR_MINIMAL);
+        MAP(argv[3], "compact", MRP_LUA_TOSTR_COMPACT);
+        MAP(argv[3], "oneline", MRP_LUA_TOSTR_ONELINE);
+        MAP(argv[3], "short"  , MRP_LUA_TOSTR_SHORT  );
+        MAP(argv[3], "medium" , MRP_LUA_TOSTR_MEDIUM );
+        MAP(argv[3], "full"   , MRP_LUA_TOSTR_FULL   );
+        MAP(argv[3], "verbose", MRP_LUA_TOSTR_VERBOSE);
+        MAP(argv[3], "meta"   , MRP_LUA_TOSTR_META   );
+        MAP(argv[3], "data"   , MRP_LUA_TOSTR_DATA   );
+        MAP(argv[3], "both"   , MRP_LUA_TOSTR_BOTH   );
+#undef MAP
+        break;
+
+    default:
+        printf("Invalid dump command.\n");
+        return;
+    }
+
+    if (L != NULL)
+        mrp_lua_dump_objects(MRP_LUA_TOSTR_CHECKDUMP, L, stdout);
+}
+
+
+static void gc_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    lua_State *L = mrp_lua_get_lua_state();
+    int        pause, step;
+    char      *e;
+
+    MRP_UNUSED(c);
+    MRP_UNUSED(argc);
+    MRP_UNUSED(argv);
+    MRP_UNUSED(user_data);
+
+    if (L == NULL)
+        return;
+
+    switch (argc) {
+    case 2:
+        goto full;
+
+    case 3:
+        if (!strcmp(argv[2], "full")) {
+        full:
+            printf("Performing a full Lua garbage collection cycle...\n");
+            lua_gc(L, LUA_GCCOLLECT, 0);
+        }
+        else if (!strcmp(argv[2], "stop")) {
+            lua_gc(L, LUA_GCSTOP, 0);
+            printf("Lua garbage collector stopped...\n");
+        }
+        else if (!strcmp(argv[2], "start")) {
+            lua_gc(L, LUA_GCRESTART, 0);
+            printf("Lua garbage collector restarted...\n");
+        }
+        else
+        invalid:
+            printf("Invalid Lua garbage collector command.\n");
+        break;
+
+    case 5:
+        if (strcmp(argv[2], "set"))
+            goto invalid;
+
+        pause = (int)strtoul(argv[3], &e, 10);
+        if (*e) {
+            printf("Invalid Lua garbage collector pause '%s'.\n", argv[3]);
+            return;
+        }
+
+        step = strtoul(argv[4], &e, 10);
+        if (*e) {
+            printf("Invalid Lua garbage collector step '%s'.\n", argv[4]);
+            return;
+        }
+
+        printf("Setting Lua garbage collector pause=%d, step=%d...\n",
+               pause, step);
+
+        lua_gc(L, LUA_GCSETPAUSE, pause);
+        lua_gc(L, LUA_GCSETSTEPMUL, step);
+        break;
+
+    default:
+        goto invalid;
+    }
+}
+
 #define LUA_GROUP_DESCRIPTION                                    \
     "Lua commands allows one to evaluate Lua code either from\n" \
     "the console command line itself, or from sourced files.\n"
@@ -166,8 +295,29 @@ static void debug_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
 #define SOURCE_DESCRIPTION "Read and evaluate the contents of <lua-file>.\n"
 
 #define DEBUG_SYNTAX       "debug {disable, enable, detailed}"
-#define DEBUG_SUMMARY      "configure Murphy Lua debugging."
+#define DEBUG_SUMMARY      "configure Murphy Lua debugging"
 #define DEBUG_DESCRIPTION  "Configure Murphy Lua debugging."
+
+#define DUMP_SYNTAX        "dump [dump-flags]"
+#define DUMP_SUMMARY       "dump active Murphy Lua objects"
+#define DUMP_DESCRIPTION                                                     \
+    "Dump unfreed Murphy Lua objects per object class. You need to enable\n" \
+    "object tracking for this to work. The easiest way to do this is to\n"   \
+    "set the environment variable__MURPHY_MM_CONFIG=\"lua:true\" before\n"   \
+    "starting the daemon. dump-flags control how much information gets\n"    \
+    "printed about a single object. If you use a single dump-flag, it can\n" \
+    "be one of default, stackdump, errordump, or checkdump. If omitted,\n"   \
+    "default is used. You can also give a pair of dump flags, the first\n"   \
+    "of lua, minimal, compact, oneline, short, medium, full, or verbose\n"   \
+    "and the second one of meta, data, or both. These correspond directly\n" \
+    "to the object to string conversion mode flags of the Murphy Lua\n"      \
+    "object infrastructure. At the moment these flags have very little\n"    \
+    "practical effect on the actual dump as most of the dump modes have\n"   \
+    "not been implemented yet so now they are just aliased to the default.\n"
+
+#define GC_SYNTAX        "gc [full|stop|start|set <pause> <step>"
+#define GC_SUMMARY       "trigger or configure the Lua garbage collector"
+#define GC_DESCRIPTION   "Trigger or configure the Lua garbage collector."
 
 MRP_CORE_CONSOLE_GROUP(lua_group, "lua", LUA_GROUP_DESCRIPTION, NULL, {
         MRP_TOKENIZED_CMD("source", source_cb, FALSE,
@@ -177,4 +327,8 @@ MRP_CORE_CONSOLE_GROUP(lua_group, "lua", LUA_GROUP_DESCRIPTION, NULL, {
                          EVAL_SYNTAX, EVAL_SUMMARY, EVAL_DESCRIPTION),
         MRP_TOKENIZED_CMD("debug", debug_cb, FALSE,
                           DEBUG_SYNTAX, DEBUG_SUMMARY, DEBUG_DESCRIPTION),
+        MRP_TOKENIZED_CMD("dump", dump_cb, FALSE,
+                          DUMP_SYNTAX, DUMP_SUMMARY, DUMP_DESCRIPTION),
+        MRP_TOKENIZED_CMD("gc", gc_cb, FALSE,
+                          GC_SYNTAX, GC_SUMMARY, GC_DESCRIPTION),
     });
