@@ -47,7 +47,7 @@ static int debug_level;
 static char *config_file;
 static char *config_dir;
 
-static void setup_allocator(lua_State *L);
+static lua_Alloc setup_allocator(void);
 
 
 static int create_murphy_object(lua_State *L)
@@ -139,11 +139,15 @@ static void init_lua_decision(lua_State *L)
 
 static lua_State *init_lua(void)
 {
-    lua_State *L = luaL_newstate();
+    lua_Alloc  A = setup_allocator();
+    lua_State *L;
+
+    if (A == NULL)
+        L = luaL_newstate();
+    else
+        L = lua_newstate(A, NULL);
 
     if (L != NULL) {
-        setup_allocator(L);
-
         luaopen_base(L);
         init_lua_utils(L);
         init_lua_decision(L);
@@ -442,38 +446,10 @@ int mrp_lua_set_debug(mrp_lua_debug_t level)
  * Lua memory allocation tracking
  *
  * This is intended for debugging and diagnostic purposes. By default
- * tracking Lua allocations follows the murphy memory management debug
- * settings which in turn is controlled by either clearing or setting
- * the __MURPHY_MM_CONFIG environment variable to 'debug'.
- *
- * Lua provides a well-defined interface for overriding its default
- * memory allocator. Unfortunately it seems that Lua does not keep
- * track of which allocator was used to allocate memory on a per chunk
- * basis. In practice this means that Lua always calls the current
- * memory allocator (with its registered used data) for freeing and
- * resizing a chunk of memory even if that chunk was allocated by a
- * previously active allocator (typically the built-in default one).
- *
- * Now without special care, if at least one of the current and the
- * originally active allocators does not pass pointers transparently
- * back and forth between Lua and the real memory allocator, this causes
- * severe memory corruption and crashes. IOW, if an allocator does more
- * than just update a few diagnostic counters before passing the allocation
- * request on to the real allocator things go haywire.
- *
- * To overcome this, we need to keep track of all block of memory that
- * originated from our allocator and pass requests involving all other
- * pointers on to the previously active allocator.
+ * tracking Lua allocations is off. Lua allocation tracking can be
+ * enabled by including lua=true in the environment variable controlling
+ * Murphy memory management (__MURPHY_MM_CONFIG).
  */
-
-
-#define NBUCKET  256                     /* number of hash buckets */
-#define PTRSHIFT 3                       /* low bits useless for hashing */
-
-#if ((1 << PTRSHIFT) != MRP_MM_ALIGN)
-#    error "lua-murphy.c: PTRSHIFT do not match MRP_MM_ALIGN"
-#endif
-
 
 /*
  * a tracked block of memory allocated for Lua by us
@@ -487,47 +463,43 @@ typedef struct {
     char            mem[0];              /* memory passed on to Lua */
 } memblk_t;
 
-
-static mrp_list_hook_t buckets[NBUCKET]; /* memblk hash buckets */
-static lua_Alloc       orig_alloc;       /* original allocator */
-static void           *orig_ud;          /* and its user data */
+static MRP_LIST_HOOK(memblks);           /* allocated blocks */
 
 
-
-static void *memblk_store(memblk_t *blk)
+static inline void *memblk_store(memblk_t *blk)
 {
-    ptrdiff_t h = (&blk->mem[0] - (char *)NULL) >> PTRSHIFT;
-    uint32_t  i = h & (NBUCKET - 1);
-
     mrp_list_init(&blk->hook);
-    mrp_list_append(&buckets[i], &blk->hook);
+    mrp_list_append(&memblks, &blk->hook);
 
     return &blk->mem[0];
-}
-
-
-static memblk_t *memblk_fetch(void *ptr)
-{
-    ptrdiff_t h = (ptr - NULL) >> PTRSHIFT;
-    uint32_t  i = h & (NBUCKET - 1);
-
-    mrp_list_hook_t *p, *n;
-    memblk_t        *blk;
-
-    mrp_list_foreach(&buckets[i], p, n) {
-        blk = mrp_list_entry(p, typeof(*blk), hook);
-
-        if (&blk->mem[0] == ptr)
-            return blk;
-    }
-
-    return NULL;
 }
 
 
 static void memblk_clear(memblk_t *blk)
 {
     mrp_list_delete(&blk->hook);
+}
+
+
+static inline memblk_t *ptr_to_memblk(void *ptr)
+{
+    memblk_t *blk;
+
+    if (ptr != NULL)
+        blk = (memblk_t *)(((char *)ptr) - MRP_OFFSET(typeof(*blk), mem[0]));
+    else
+        blk = NULL;
+
+    return blk;
+}
+
+
+static inline void *memblk_to_ptr(memblk_t *blk)
+{
+    if (blk != NULL)
+        return (void *)&blk->mem[0];
+    else
+        return NULL;
 }
 
 
@@ -578,18 +550,7 @@ static void *lua_alloc(void *ud, void *optr, size_t olsize, size_t nlsize)
 
     mrp_debug("Lua allocation request <%p, %zd, %zd>", optr, olsize, nlsize);
 
-    if (optr != NULL) {
-        oblk = memblk_fetch(optr);
-
-        if (oblk == NULL) {
-            mrp_debug("not allocated by us, passing to old allocator");
-            nptr = orig_alloc(orig_ud, optr, olsize, nlsize);
-
-            goto out;
-        }
-    }
-    else
-        oblk = NULL;
+    oblk = ptr_to_memblk(optr);
 
     if (nlsize > 0) {
         nbsize = MEMBLK_SIZE(nlsize);
@@ -606,30 +567,29 @@ static void *lua_alloc(void *ud, void *optr, size_t olsize, size_t nlsize)
         nptr = NULL;
     }
 
- out:
     mrp_debug("Lua allocation reply %p", nptr);
 
     return nptr;
 }
 
 
-static void setup_allocator(lua_State *L)
+static lua_Alloc setup_allocator(void)
 {
-    int debug, i;
+    int debug;
 
     debug = mrp_mm_config_bool("lua", FALSE);
 
     if (!debug) {
         mrp_debug("%s not set to debug*, using native Lua allocator",
                   MRP_MM_CONFIG_ENVVAR);
+        return NULL;
     }
     else {
         mrp_debug("Lua memory tracking enabled, overriding native allocator");
 
-        for (i = 0; i < (int)MRP_ARRAY_SIZE(buckets); i++)
-            mrp_list_init(buckets + i);
+        mrp_list_init(&memblks);
+        mrp_lua_track_objects(true);
 
-        orig_alloc = lua_getallocf(L, &orig_ud);
-        lua_setallocf(L, lua_alloc, NULL);
+        return lua_alloc;
     }
 }
