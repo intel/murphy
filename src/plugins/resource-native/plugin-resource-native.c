@@ -176,14 +176,16 @@ static void print_classes_cb(mrp_console_t *c, void *user_data,
 static void print_sets_cb(mrp_console_t *c, void *user_data,
                           int argc, char **argv)
 {
-    char buf[8192];
+    static int size = 8192;
+    char       buf[size];
 
     MRP_UNUSED(c);
     MRP_UNUSED(user_data);
     MRP_UNUSED(argc);
     MRP_UNUSED(argv);
 
-    mrp_application_class_print(buf, sizeof(buf), true);
+    if (mrp_application_class_print(buf, sizeof(buf), true) >= size)
+        size *= 2;
 
     printf("%s", buf);
 }
