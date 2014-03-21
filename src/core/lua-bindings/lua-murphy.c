@@ -413,27 +413,40 @@ static void clear_debug_hook(void)
 
 int mrp_lua_set_debug(mrp_lua_debug_t level)
 {
-    int success;
+    const char *cfg;
+    int         ena, mask, success;
 
     if (debug_level)
         clear_debug_hook();
 
+    mask = 0;
+
     switch (level) {
     case MRP_LUA_DEBUG_DISABLED:
-        success = TRUE;
-        break;
-
-    case MRP_LUA_DEBUG_ENABLED:
-        success = setup_debug_hook(LUA_MASKCALL | LUA_MASKRET);
+        ena = FALSE;
+        cfg = "-lua_debug";
         break;
 
     case MRP_LUA_DEBUG_DETAILED:
-        success = setup_debug_hook(LUA_MASKCALL | LUA_MASKRET | LUA_MASKLINE);
+        mask |= LUA_MASKLINE;
+    case MRP_LUA_DEBUG_ENABLED:
+        mask |= LUA_MASKCALL | LUA_MASKRET;
+        ena   = TRUE;
+        cfg   = "+lua_debug";
         break;
 
     default:
-        success = FALSE;
+        return FALSE;
     }
+
+    if (ena) {
+        success = setup_debug_hook(mask);
+        mrp_debug_enable(TRUE);
+    }
+    else
+        success = TRUE;
+
+    mrp_debug_set_config(cfg);
 
     if (success)
         debug_level = level;
