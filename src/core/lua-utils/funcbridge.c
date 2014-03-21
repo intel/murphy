@@ -39,6 +39,7 @@
 #include <murphy/core/lua-utils/error.h>
 #include <murphy/core/lua-utils/funcbridge.h>
 #include <murphy/core/lua-utils/object.h>
+#include <murphy/core/lua-utils/lua-utils.h>
 
 #define FUNCBRIDGE_METATABLE             "LuaBook.funcbridge"
 #define FUNCBRIDGE_USERDATA_METATABLE    "LuaBook.funcbridge.userdata"
@@ -384,6 +385,8 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
     if (!fb)
         success = false;
     else {
+        mrp_lua_checkstack(L, -1);
+
         switch (fb->type) {
 
         case MRP_C_FUNCTION:
@@ -433,6 +436,9 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                     success = false;
                     goto done;
                 }
+
+                if (!(i % 20) && i)
+                    mrp_lua_checkstack(L, -1);
             }
 
             sts = lua_pcall(L, i, 1, 0);

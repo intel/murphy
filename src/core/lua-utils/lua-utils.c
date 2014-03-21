@@ -124,3 +124,29 @@ const char *mrp_lua_findtable(lua_State *L, int t, const char *field, int size)
     lua_remove(L, -2);
     return NULL;
 }
+
+
+void mrp_lua_checkstack(lua_State *L, int extra)
+{
+    /*
+     * Notes:
+     *
+     *   We have a systematic bug throughout our codebase. We never ever
+     *   grow the Lua stack according to our needs. We simply rely on the
+     *   available space to be enough. When we occasionally do run out of
+     *   stack space, this causes severe memory corruption.
+     *
+     *   This is relatively easy to trigger with Lua 5.1.x but much harder
+     *   with Lua 5.2.x (I could not reproduce this with 5.2.x at all).
+     *
+     *   This function is merely a desperate kludgish attemp to try and
+     *   hide the damage caused by the bug. In a couple of commonly used
+     *   functions we call this to make sure there's plenty of space in the
+     *   stack and hope that it will be enough also for those who do not
+     *   ensure this themselves.
+     *
+     * XXX TODO: Eventually we'll need to fix this properly.
+     */
+
+    lua_checkstack(L, extra > 0 ? extra : 40);
+}

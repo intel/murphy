@@ -73,4 +73,7 @@ void mrp_lua_getglobal_idx(lua_State *L, int idx);
 #define MRP_LUA_GLOBALTABLE 0            /* use as t for globals */
 const char *mrp_lua_findtable(lua_State *L, int t, const char *field, int size);
 
+/** Make sure there's space for at least extra values in the stack. */
+void mrp_lua_checkstack(lua_State *L, int extra);
+
 #endif /* __MURPHY_LUA_UTILS_H__ */

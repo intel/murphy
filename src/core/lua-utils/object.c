@@ -505,6 +505,8 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
 
     MRP_UNUSED(class_by_userdata_id);
 
+    mrp_lua_checkstack(L, -1);
+
     if (name || idx) {
         if (name && !valid_id(name))
             return NULL;
@@ -819,6 +821,8 @@ int mrp_lua_push_object(lua_State *L, void *data)
 {
     userdata_t *userdata = userdata_get(data, CHECK);
 
+    mrp_lua_checkstack(L, -1);
+
     if (!userdata || userdata->dead)
         lua_pushnil(L);
     else
@@ -892,6 +896,8 @@ static int default_setter(void *data, lua_State *L, int member,
     mrp_lua_value_t        *vptr;
     void                  **itemsp;
     size_t                 *nitemp;
+
+    mrp_lua_checkstack(L, -1);
 
     m    = u->def->members + member;
     vptr = data + m->offs;
@@ -1013,6 +1019,8 @@ static int default_getter(void *data, lua_State *L, int member,
     mrp_lua_value_t        *vptr;
 
     MRP_UNUSED(L);
+
+    mrp_lua_checkstack(L, -1);
 
     m    = u->def->members + member;
     vptr = data + m->offs;
@@ -1840,6 +1848,8 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
     if (midx < 0)
         goto notfound;
 
+    mrp_lua_checkstack(L, -1);
+
     m     = u->def->members + midx;
     vtype = lua_type(L, -1);
 
@@ -2032,6 +2042,8 @@ int mrp_lua_get_member(void *data, lua_State *L, char *err, size_t esize)
     mrp_lua_value_t         v;
     void                  **items;
     size_t                 *nitem;
+
+    mrp_lua_checkstack(L, -1);
 
     if ((midx = class_member(u, L, -1)) >= 0)
         m = u->def->members + midx;
