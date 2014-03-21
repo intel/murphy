@@ -628,6 +628,8 @@ struct mrp_lua_classdef_s {
 
     mrp_lua_tostr_t tostring;            /* stringification handler */
     mrp_list_hook_t objects;             /* instances of this class */
+    int             nactive;             /* number of active objects */
+    int             ndead;               /* nuber of dead objects */
 
     /* pre-declared members */
     mrp_lua_class_member_t  *members;    /* pre-declared members */

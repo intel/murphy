@@ -570,6 +570,8 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
     if (cfg.track)
         mrp_list_append(&def->objects, &userdata->hook[0]);
 
+    def->nactive++;
+
     return USER_TO_DATA(userdata);
 }
 
@@ -612,6 +614,8 @@ void mrp_lua_destroy_object(lua_State *L, const char *name, int idx, void *data)
     if (userdata && !userdata->dead) {
         userdata->dead = true;
         def = userdata->def;
+        def->nactive--;
+        def->ndead++;
 
         object_delete_reftbl(userdata, L);
         object_delete_exttbl(userdata, L);
@@ -866,6 +870,8 @@ static int userdata_destructor(lua_State *L)
 
         if (cfg.track)
             mrp_list_delete(&userdata->hook[0]);
+
+        def->ndead--;
 
         lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
         if (!lua_rawequal(L, -1, -2))
@@ -2515,14 +2521,14 @@ void mrp_lua_dump_objects(mrp_lua_tostr_mode_t mode, lua_State *L, FILE *fp)
     for (i = 0; i < nclassdef; i++) {
         def = classdefs[i];
 
-        if (mrp_list_empty(&def->objects)) {
-            fprintf(fp, "No objects active for Lua class <%s> (%s).\n",
+        if (def->nactive == 0 && def->ndead == 0) {
+            fprintf(fp, "No active or dead objects for Lua class <%s> (%s).\n",
                     def->class_name, def->type_name);
             continue;
         }
-        else
-            fprintf(fp, "Active/zombie objects for Lua class <%s> (%s):\n",
-                    def->class_name, def->type_name);
+
+        fprintf(fp, "%d active, %d dead objects for Lua class <%s> (%s)\n",
+                def->nactive, def->ndead,def->class_name, def->type_name);
 
         cnt = 0;
         mrp_list_foreach(&def->objects, p, n) {
