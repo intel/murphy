@@ -215,6 +215,32 @@ AC_SUBST(PULSE_ENABLED)
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 
+# Check if Wayland server mainloop support was enabled.
+AC_ARG_ENABLE(wayland-server,
+              [  --enable-wayland-server enable Wayland server event loop support],
+	      [enable_wl_server=$enableval], [enable_wl_server=auto])
+
+if test "$enable_wl_server" != "no"; then
+    PKG_CHECK_MODULES(WAYLAND_SERVER, wayland-server pixman-1 xkbcommon,
+                      [have_wl_server=yes], [have_wl_server=no])
+    if test "$have_wl_server" = "no" -a "$enable_wl_server" = "yes"; then
+        AC_MSG_ERROR([Wayland server development libraries not found.])
+    fi
+
+    enable_wl_server="$have_wl_server"
+else
+    AC_MSG_NOTICE([Wayland server event loop support is disabled.])
+fi
+
+if test "$enable_wl_server" = "yes"; then
+    AC_DEFINE([WAYLAND_SERVER_ENABLED], 1, [Enable Wayland server event loop support ?])
+fi
+AM_CONDITIONAL(WAYLAND_SERVER_ENABLED, [test "$enable_wl_server" = "yes"])
+AC_SUBST(WAYLAND_SERVER_ENABLED)
+AC_SUBST(WAYLAND_SERVER_CFLAGS)
+AC_SUBST(WAYLAND_SERVER_LIBS)
+
+
 # Check if EFL/ecore mainloop support was enabled.
 AC_ARG_ENABLE(ecore,
               [  --enable-ecore          enable EFL/ecore mainloop support],
@@ -601,6 +627,7 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-dbus-libdbus.pc
 		 src/common/murphy-dbus-sdbus.pc
 		 src/common/murphy-pulse.pc
+		 src/common/murphy-wayland-server.pc
 		 src/common/murphy-ecore.pc
 		 src/common/murphy-glib.pc
                  src/common/murphy-qt.pc
@@ -638,6 +665,7 @@ echo "    * libs: $LUA_LIBS"
 echo "D-Bus (libdbus) support: $enable_libdbus"
 echo "D-Bus (systemd-bus) support: $enable_sdbus"
 echo "PulseAudio mainloop support: $enable_pulse"
+echo "Wayland server event loop support: $enable_wl_server"
 echo "EFL/ecore mainloop support: $enable_ecore"
 echo "glib mainloop support: $enable_glib"
 echo "Qt mainloop support: $enable_qt"

@@ -3,6 +3,9 @@ AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
                  internal-transport-test process-watch-test native-test
 
+plugin_LTLIBRARIES =
+plugindir = $(libdir)/weston
+
 if LIBDBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
 endif
@@ -124,3 +127,19 @@ endif
 fragbuf_test_SOURCES = fragbuf-test.c
 fragbuf_test_CFLAGS  = $(AM_CFLAGS)
 fragbuf_test_LDADD   = ../../libmurphy-common.la
+
+if WAYLAND_SERVER_ENABLED
+wayland_server_test_la_SOURCES = wayland-server-test.c
+wayland_server_test_la_CFLAGS  = $(AM_CFLAGS) $(WAYLAND_SERVER_CFLAGS)
+wayland_server_test_la_LDFLAGS = -module -avoid-version
+wayland_server_test_la_LIBADD  = \
+			../../libmurphy-wayland-server.la \
+			../../libmurphy-common.la
+
+plugin_LTLIBRARIES += wayland-server-test.la
+
+test-wayland-server:
+	LD_LIBRARY_PATH=$(shell pwd)/../../../.libs \
+	    weston --backend=x11-backend.so \
+	    --modules=$(shell pwd)/.libs/wayland-server-test.so
+endif

@@ -625,6 +625,53 @@ clean-linker-script::
 
 generate-linker-scripts: linker-script.pulse
 
+
+###################################
+# murphy Wayland server glue library
+#
+
+murphy_wayland_server_headers =			\
+		common/wayland-server-glue.h
+
+if WAYLAND_SERVER_ENABLED
+lib_LTLIBRARIES += libmurphy-wayland-server.la
+EXTRA_DIST      += common/murphy-wayland-server.pc
+pkgconfig_DATA  += common/murphy-wayland-server.pc
+
+libmurphy_wayland_server_ladir      =		\
+		$(includedir)/murphy/common
+
+libmurphy_wayland_server_la_HEADERS = $(murphy_wayland_server_headers)
+
+libmurphy_wayland_server_la_SOURCES =		\
+		common/wayland-server-glue.c
+
+libmurphy_wayland_server_la_CFLAGS  =		\
+		$(AM_CFLAGS)		\
+		$(WAYLAND_SERVER_CFLAGS)
+
+libmurphy_wayland_server_la_LDFLAGS =		\
+		-Wl,-version-script=linker-script.wayland-server \
+		-version-info @MURPHY_VERSION_INFO@
+
+libmurphy_wayland_server_la_LIBADD  = $(WAYLAND_SERVER_LIBS)
+
+libmurphy_wayland_server_la_DEPENDENCIES = linker-script.wayland-server
+
+libwayland_serverincludedir      = $(includedir)/murphy/wayland-server
+libwayland_serverinclude_HEADERS = $(libmurphy_wayland_server_la_HEADERS)
+endif
+
+# linker script generation
+linker-script.wayland-server: $(murphy_wayland_server_headers)
+	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+		-c "$(libmurphy_wayland_server_la_CFLAGS)" -o $@ $^
+
+clean-linker-script::
+	-rm -f linker-script.wayland-server
+
+generate-linker-scripts: linker-script.wayland-server
+
 ###################################
 # murphy ecore glue library
 #
