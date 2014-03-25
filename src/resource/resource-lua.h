@@ -35,6 +35,7 @@
 #include <murphy/common/hashtbl.h>
 
 #include "data-types.h"
+#include "resource-mask.h"
 
 struct mrp_resource_ownersref_s {
     uint32_t              zoneid;
@@ -45,11 +46,14 @@ struct mrp_resource_setref_s {
     mrp_resource_set_t   *rset;
 };
 
+struct mrp_resource_maskref_s {
+    mrp_resource_mask_t mask;
+};
 
 void mrp_resource_lua_init(lua_State *);
 
 bool mrp_resource_lua_veto(mrp_zone_t *, mrp_resource_set_t *,
-                           mrp_resource_owner_t *, mrp_resource_mask_t,
+                           mrp_resource_owner_t *, mrp_resource_mask_t *,
                            mrp_resource_set_t *);
 void mrp_resource_lua_set_owners(mrp_zone_t *, mrp_resource_owner_t *);
 

@@ -51,6 +51,7 @@
 #include "resource-set.h"
 #include "resource-owner.h"
 #include "attribute.h"
+#include "resource-mask.h"
 
 #define ZONE_CLASS             MRP_LUA_CLASS_SIMPLE(zone)
 #define APPCLASS_CLASS         MRP_LUA_CLASS_SIMPLE(application_class)
@@ -1051,10 +1052,10 @@ static int resclass_create_from_lua(lua_State *L)
 
     id = mrp_resource_definition_create(name, shareable, attrs,ftbl,mgrdata);
 
-    MRP_ASSERT(id < MRP_RESOURCE_MAX, "resource id is out of range");
-
     if (id == MRP_RESOURCE_ID_INVALID)
         luaL_error(L, "failed to register resource class '%s'", name);
+
+    MRP_ASSERT(id < MRP_RESOURCE_MAX, "resource id is out of range");
 
     resclass = (resclass_t *)mrp_lua_create_object(L, RESCLASS_CLASS, name,0);
     adef = mrp_allocz(sizeof(attr_def_t));
@@ -1142,7 +1143,7 @@ static int resource_getfield(lua_State *L)
     field_t fld = field_check(L, 2, &name);
     mrp_resource_set_t *s;
     mrp_resource_t *r;
-    mrp_resource_mask_t m;
+    int m;
 
     MRP_LUA_ENTER;
 
@@ -1161,17 +1162,17 @@ static int resource_getfield(lua_State *L)
         break;
 
     default:
-        if (!(s = mrp_resource_set_find_by_id(res->rsetid)))
-            m = 0;
-        else
-            m = ((mrp_resource_mask_t)1) << res->resid;
-
+        s = mrp_resource_set_find_by_id(res->rsetid);
         switch (fld) {
         case MANDATORY:
-            lua_pushboolean(L, s->resource.mask.mandatory & m ? true : false);
+            m = s ? mrp_resource_mask_test_bit(&s->resource.mask.mandatory,
+                                               res->resid) : 0;
+            lua_pushboolean(L, m ? true : false);
             break;
         case GRANT:
-            lua_pushboolean(L, s->resource.mask.grant & m ? true : false);
+            m = s ? mrp_resource_mask_test_bit(&s->resource.mask.grant,
+                                               res->resid) : 0;
+            lua_pushboolean(L, m ? true : false);
             break;
         default:
             lua_pushnil(L);

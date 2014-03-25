@@ -48,10 +48,12 @@
 #include <murphy-db/mql.h>
 #include <murphy-db/mqi.h>
 
+#include <murphy/resource/resource.h>
 #include <murphy/resource/client-api.h>
 #include <murphy/resource/config-api.h>
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
+#include <murphy/resource/resource-mask.h>
 
 #define ATTRIBUTE_MAX MRP_ATTRIBUTE_MAX
 
@@ -904,24 +906,25 @@ static void resource_event_handler(uint32_t reqid, mrp_resource_set_t *rset,
 {
 #define FIELD(tag, typ, val)      \
     RESPROTO_##tag, MRP_MSG_FIELD_##typ, val
+#define ARRAY(tag, typ, cnt, val)                \
+    RESPROTO_##tag, MRP_MSG_FIELD_##typ | MRP_MSG_FIELD_ARRAY, cnt, val
 #define PUSH(m, tag, typ, val)    \
     mrp_msg_append(m, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
 
-    client_t           *client = (client_t *)userdata;
-    resource_data_t    *data;
-    mrp_plugin_t       *plugin;
-    uint16_t            reqtyp;
-    uint16_t            state;
-    mrp_resource_mask_t grant;
-    mrp_resource_mask_t advice;
-    mrp_resource_mask_t mask;
-    mrp_resource_mask_t all;
-    mrp_msg_t          *msg;
-    mrp_resource_t     *res;
-    uint32_t            id;
-    const char         *name;
-    void               *curs;
-    mrp_attr_t          attrs[ATTRIBUTE_MAX + 1];
+    client_t            *client = (client_t *)userdata;
+    resource_data_t     *data;
+    mrp_plugin_t        *plugin;
+    uint16_t             reqtyp;
+    uint16_t             state;
+    mrp_resource_mask_t *grant;
+    mrp_resource_mask_t *advice;
+    mrp_resource_mask_t  all = MRP_RESOURCE_MASK_EMPTY_INIT;
+    mrp_msg_t           *msg;
+    mrp_resource_t      *res;
+    uint32_t             id;
+    const char          *name;
+    void                *curs;
+    mrp_attr_t           attrs[ATTRIBUTE_MAX + 1];
 
     MRP_ASSERT(rset && client, "invalid argument");
 
@@ -942,23 +945,26 @@ static void resource_event_handler(uint32_t reqid, mrp_resource_set_t *rset,
                          FIELD( REQUEST_TYPE   , UINT16, reqtyp ),
                          FIELD( RESOURCE_SET_ID, UINT32, id     ),
                          FIELD( RESOURCE_STATE , UINT16, state  ),
-                         FIELD( RESOURCE_GRANT , UINT32, grant  ),
-                         FIELD( RESOURCE_ADVICE, UINT32, advice ),
+                         ARRAY( RESOURCE_GRANT , UINT32,
+                                grant->n, grant->w              ),
+                         ARRAY( RESOURCE_ADVICE, UINT32,
+                                advice->n, advice->w            ),
                          RESPROTO_MESSAGE_END                   );
 
     if (!msg)
         goto failed;
 
-    all = grant | advice;
+    mrp_resource_mask_init(&all, mrp_resource_definition_count());
+    mrp_resource_mask_set_mask(&all, grant);
+    mrp_resource_mask_set_mask(&all, advice);
     curs = NULL;
 
     while ((res = mrp_resource_set_iterate_resources(rset, &curs))) {
-        mask = mrp_resource_get_mask(res);
+        id = mrp_resource_get_id(res);
 
-        if (!(all & mask))
+        if (!mrp_resource_mask_test_bit(&all, id))
             continue;
 
-        id = mrp_resource_get_id(res);
         name = mrp_resource_get_name(res);
 
          if (!PUSH(msg, RESOURCE_ID  , UINT32, id  ) ||
@@ -977,12 +983,15 @@ static void resource_event_handler(uint32_t reqid, mrp_resource_set_t *rset,
 
     mrp_msg_unref(msg);
 
+    mrp_resource_mask_cleanup(&all);
+
     return;
 
     failed:
          mrp_log_error("%s: failed to build/send message for resource event",
                        plugin->instance);
          mrp_msg_unref(msg);
+         mrp_resource_mask_cleanup(&all);
 
 #undef PUSH
 #undef FIELD

@@ -48,6 +48,7 @@
 #include "resource.h"
 #include "zone.h"
 #include "resource-lua.h"
+#include "resource-mask.h"
 
 #define NAME_LENGTH          24
 
@@ -181,8 +182,7 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     mrp_resource_def_t *rdef;
     mrp_resource_mgr_ftbl_t *ftbl;
     mrp_resource_owner_t *owner, *old, *owners;
-    mrp_resource_mask_t mask;
-    mrp_resource_mask_t mandatory;
+    mrp_resource_mask_t *mandatory;
     mrp_resource_mask_t grant;
     mrp_resource_mask_t advice;
     void *clc, *rsc, *rc;
@@ -216,14 +216,17 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     rcnt = mrp_resource_definition_count();
     clc  = NULL;
 
+    mrp_resource_mask_init(&grant, rcnt);
+    mrp_resource_mask_init(&advice, rcnt);
+
     while ((class = mrp_application_class_iterate_classes(&clc))) {
         rsc = NULL;
 
         while ((rset=mrp_application_class_iterate_rsets(class,zoneid,&rsc))) {
             force_release = false;
-            mandatory = rset->resource.mask.mandatory;
-            grant = 0;
-            advice = 0;
+            mandatory = &rset->resource.mask.mandatory;
+            mrp_resource_mask_reset(&grant);
+            mrp_resource_mask_reset(&advice);
             rc = NULL;
 
             switch (rset->state) {
@@ -237,17 +240,17 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     backup[rid] = *owner;
 
                     if (grant_ownership(owner, zone, class, rset, res))
-                        grant |= ((mrp_resource_mask_t)1 << rid);
+                        mrp_resource_mask_set_bit(&grant, rid);
                     else {
                         if (owner->rset != rset)
                             force_release |= owner->modal;
                     }
                 }
                 owners = get_owner(zoneid, 0);
-                if ((grant & mandatory) == mandatory &&
-                    mrp_resource_lua_veto(zone, rset, owners, grant, reqset))
+                if (mrp_resource_mask_test_mask(mandatory, &grant) &&
+                    mrp_resource_lua_veto(zone, rset, owners, &grant, reqset))
                 {
-                    advice = grant;
+                    mrp_resource_mask_copy(&advice, &grant);
                 }
                 else {
                     /* rollback, ie. restore the backed up state */
@@ -255,23 +258,22 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     while ((res=mrp_resource_set_iterate_resources(rset,&rc))){
                         rdef = res->def;
                         rid = rdef->id;
-                        mask = (mrp_resource_mask_t)1 << rid;
                         owner = get_owner(zoneid, rid);
                         *owner = backup[rid];
 
-                        if ((grant & mask)) {
+                        if (mrp_resource_mask_test_bit(&grant, rid)) {
                             if ((ftbl = rdef->manager.ftbl) && ftbl->free)
                                 ftbl->free(zone, res, rdef->manager.userdata);
                         }
 
                         if (advice_ownership(owner, zone, class, rset, res))
-                            advice |= mask;
+                            mrp_resource_mask_set_bit(&advice, rid);
                     }
 
-                    grant = 0;
+                    mrp_resource_mask_reset(&grant);
 
-                    if ((advice & mandatory) != mandatory)
-                        advice = 0;
+                    if (!mrp_resource_mask_test_mask(mandatory, &advice))
+                        mrp_resource_mask_reset(&advice);
 
                     mrp_resource_lua_set_owners(zone, owners);
                 }
@@ -284,10 +286,10 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     owner = get_owner(zoneid, rid);
 
                     if (advice_ownership(owner, zone, class, rset, res))
-                        advice |= ((mrp_resource_mask_t)1 << rid);
+                        mrp_resource_mask_set_bit(&advice, rid);
                 }
-                if ((advice & mandatory) != mandatory)
-                    advice = 0;
+                if (!mrp_resource_mask_test_mask(mandatory, &advice))
+                    mrp_resource_mask_reset(&advice);
                 break;
 
             default:
@@ -303,14 +305,17 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             if (force_release) {
                 move = (rset->state != mrp_resource_release);
                 notify = move ? MRP_RESOURCE_EVENT_RELEASE : 0;
-                changed = move || rset->resource.mask.grant;
+                changed = move ||
+                    !mrp_resource_mask_empty(&rset->resource.mask.grant);
                 rset->state = mrp_resource_release;
-                rset->resource.mask.grant = 0;
+                mrp_resource_mask_reset(&rset->resource.mask.grant);
             }
             else {
-                if (grant == rset->resource.mask.grant) {
+                if (mrp_resource_mask_same(&grant,
+                                           &rset->resource.mask.grant)) {
                     if (rset->state == mrp_resource_acquire &&
-                        !grant && rset->dont_wait.current)
+                        mrp_resource_mask_empty(&grant) &&
+                        rset->dont_wait.current)
                     {
                         rset->state = mrp_resource_release;
                         rset->dont_wait.current = rset->dont_wait.client;
@@ -320,11 +325,12 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     }
                 }
                 else {
-                    rset->resource.mask.grant = grant;
+                    mrp_resource_mask_copy(&rset->resource.mask.grant, &grant);
                     changed = true;
 
                     if (rset->state != mrp_resource_release &&
-                        !grant && rset->auto_release.current)
+                        mrp_resource_mask_empty(&grant) &&
+                        rset->auto_release.current)
                     {
                         rset->state = mrp_resource_release;
                         rset->auto_release.current = rset->auto_release.client;
@@ -339,8 +345,8 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                 mrp_resource_set_notify(rset, notify);
             }
 
-            if (advice != rset->resource.mask.advice) {
-                rset->resource.mask.advice = advice;
+            if (!mrp_resource_mask_same(&advice, &rset->resource.mask.advice)) {
+                mrp_resource_mask_copy(&rset->resource.mask.advice, &advice);
                 changed = true;
             }
 
@@ -353,6 +359,9 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             }
         } /* while rset */
     } /* while class */
+
+    mrp_resource_mask_cleanup(&grant);
+    mrp_resource_mask_cleanup(&advice);
 
     manager_end_transaction(zone);
 
@@ -367,14 +376,14 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
         /* first we send out the revoke/deny events
          * followed by the grants (in the next for loop)
          */
-        if (rset->event && !rset->resource.mask.grant)
+        if (rset->event && mrp_resource_mask_empty(&rset->resource.mask.grant))
             rset->event(ev->replyid, rset, rset->user_data);
     }
 
     for (lastev = (ev = events) + nevent;     ev < lastev;     ev++) {
         rset = ev->rset;
 
-        if (rset->event && rset->resource.mask.grant)
+        if (rset->event && !mrp_resource_mask_empty(&rset->resource.mask.grant))
             rset->event(ev->replyid, rset, rset->user_data);
     }
 

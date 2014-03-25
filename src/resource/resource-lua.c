@@ -49,9 +49,11 @@
 #include "resource-owner.h"
 #include "application-class.h"
 #include "client-api.h"
+#include "resource-mask.h"
 
 #define OWNERS_CLASS         MRP_LUA_CLASS(resource, owners)
 #define SETREF_CLASS         MRP_LUA_CLASS(resource, sets)
+#define MASKREF_CLASS        MRP_LUA_CLASS(resource, mask)
 
 #define OWNERREF_CLASSID     MRP_LUA_CLASSID_ROOT "resource.ownerref"
 #define OWNERREF_USERDATA    MRP_LUA_CLASSID_ROOT "resource.ownerref.userdata"
@@ -78,6 +80,7 @@ struct ownerref_s {
 static void owners_class_create(lua_State *);
 static void ownerref_class_create(lua_State *);
 static void setref_class_create(lua_State *);
+static void maskref_class_create(lua_State *);
 
 static mrp_resource_ownersref_t *owners_get(lua_State *, uint32_t);
 static int  owners_create(lua_State *);
@@ -97,6 +100,14 @@ static int  setref_setfield(lua_State *);
 static void setref_destroy(void *);
 static mrp_resource_setref_t *setref_check(lua_State *, int);
 
+static int maskref_create(lua_State *L);
+static mrp_resource_maskref_t *maskref_get(lua_State *, mrp_resource_mask_t *);
+static int  maskref_getfield(lua_State *);
+static int  maskref_setfield(lua_State *);
+static void maskref_destroy(void *);
+static mrp_resource_maskref_t *maskref_check(lua_State *, int);
+static int maskref_includes(lua_State *L);
+
 static void init_id_hash(void);
 static int  add_to_id_hash(mrp_resource_setref_t *);
 static mrp_resource_setref_t *remove_from_id_hash(uint32_t);
@@ -113,6 +124,10 @@ MRP_LUA_METHOD_LIST_TABLE (
 
 MRP_LUA_METHOD_LIST_TABLE (
     setref_methods            /* methodlist name */
+);
+
+MRP_LUA_METHOD_LIST_TABLE (
+    maskref_methods           /* methodlist name */
 );
 
 MRP_LUA_METHOD_LIST_TABLE (
@@ -134,6 +149,15 @@ MRP_LUA_METHOD_LIST_TABLE (
     MRP_LUA_OVERRIDE_SETFIELD   (setref_setfield)
 );
 
+MRP_LUA_METHOD_LIST_TABLE (
+    maskref_overrides,        /* methodlist name */
+    MRP_LUA_OVERRIDE_CALL       (maskref_create)
+    MRP_LUA_OVERRIDE_GETFIELD   (maskref_getfield)
+    MRP_LUA_OVERRIDE_SETFIELD   (maskref_setfield)
+    MRP_LUA_METHOD    (includes, maskref_includes)
+);
+
+
 MRP_LUA_CLASS_DEF (
     resource,                 /* main class name */
     owners,                   /* constructor name */
@@ -152,6 +176,15 @@ MRP_LUA_CLASS_DEF (
     setref_overrides          /* class overrides */
 );
 
+MRP_LUA_CLASS_DEF (
+    resource,                 /* main class name */
+    mask,                     /* constructor name */
+    mrp_resource_maskref_t,   /* userdata type */
+    maskref_destroy,          /* userdata destructor */
+    maskref_methods,          /* class methods */
+    maskref_overrides         /* class overrides */
+);
+
 static mrp_resource_ownersref_t *resource_owners[MRP_ZONE_MAX];
 static mrp_htbl_t *id_hash;
 
@@ -163,6 +196,7 @@ void mrp_resource_lua_init(lua_State *L)
         owners_class_create(L);
         ownerref_class_create(L);
         setref_class_create(L);
+        maskref_class_create(L);
 
         init_id_hash();
     }
@@ -171,7 +205,7 @@ void mrp_resource_lua_init(lua_State *L)
 bool mrp_resource_lua_veto(mrp_zone_t *zone,
                            mrp_resource_set_t *rset,
                            mrp_resource_owner_t *owners,
-                           mrp_resource_mask_t grant,
+                           mrp_resource_mask_t *grant,
                            mrp_resource_set_t *reqset)
 {
     lua_State *L = mrp_lua_get_lua_state();
@@ -179,12 +213,14 @@ bool mrp_resource_lua_veto(mrp_zone_t *zone,
     mrp_funcarray_t *veto;
     mrp_resource_setref_t *sref, *rref;
     mrp_resource_ownersref_t *oref;
+    mrp_resource_maskref_t *gref;
     mrp_funcbridge_value_t args[16];
     int i;
 
     if (L && zone && rset && owners && methods &&
         (sref = find_in_id_hash(rset->id)) &&
-        (oref = owners_get(L, zone->id)))
+        (oref = owners_get(L, zone->id)) &&
+        (gref = maskref_get(L, grant)))
     {
         rref = reqset ? find_in_id_hash(reqset->id) : NULL;
         oref->owners = owners;
@@ -192,11 +228,11 @@ bool mrp_resource_lua_veto(mrp_zone_t *zone,
         if ((veto = methods->veto)) {
             args[i=0].string  = zone->name;
             args[++i].pointer = sref;
-            args[++i].integer = grant;
+            args[++i].pointer = gref;
             args[++i].pointer = oref;
             args[++i].pointer = rref;
 
-            return mrp_funcarray_call_from_c(L, veto, "sodoo", args);
+            return mrp_funcarray_call_from_c(L, veto, "soooo", args);
         }
     }
 
@@ -288,6 +324,13 @@ static void setref_class_create(lua_State *L)
 {
     mrp_lua_create_object_class(L, SETREF_CLASS);
 }
+
+
+static void maskref_class_create(lua_State *L)
+{
+    mrp_lua_create_object_class(L, MASKREF_CLASS);
+}
+
 
 static mrp_resource_ownersref_t *owners_get(lua_State *L, uint32_t zoneid)
 {
@@ -565,6 +608,90 @@ static void setref_destroy(void *data)
 static mrp_resource_setref_t *setref_check(lua_State *L, int idx)
 {
     return (mrp_resource_setref_t *)mrp_lua_check_object(L, SETREF_CLASS, idx);
+}
+
+
+static int maskref_create(lua_State *L)
+{
+    luaL_error(L, "can't create resource mask from LUA");
+    return 0;
+}
+
+
+static mrp_resource_maskref_t *maskref_get(lua_State *L, mrp_resource_mask_t *m)
+{
+    mrp_resource_maskref_t *mask;
+
+    mask = mrp_lua_create_object(L, MASKREF_CLASS, NULL, 0);
+    mrp_resource_mask_init(&mask->mask, mrp_resource_definition_count());
+    mrp_resource_mask_copy(&mask->mask, m);
+
+    return mask;
+}
+
+
+static int maskref_getfield(lua_State *L)
+{
+    mrp_resource_maskref_t *mask = maskref_check(L, 1);
+
+    MRP_UNUSED(mask);
+
+    MRP_LUA_ENTER;
+
+    lua_pushnil(L);
+
+    MRP_LUA_LEAVE(1);
+}
+
+static int maskref_setfield(lua_State *L)
+{
+    mrp_resource_maskref_t *mask = maskref_check(L, 1);
+
+    MRP_UNUSED(mask);
+
+    MRP_LUA_ENTER;
+
+    MRP_LUA_LEAVE(0);
+}
+
+static int maskref_includes(lua_State *L)
+{
+    mrp_resource_maskref_t *mask = maskref_check(L, 1);
+    const char *resname;
+    uint32_t id;
+
+    MRP_LUA_ENTER;
+
+    resname = luaL_checkstring(L, 2);
+
+    id = mrp_resource_definition_get_resource_id_by_name(resname);
+
+    if (id == MRP_RESOURCE_ID_INVALID &&
+        !mrp_resource_mask_test_bit(&mask->mask, id))
+        lua_pushboolean(L, false);
+    else
+        lua_pushboolean(L, true);
+
+    MRP_LUA_LEAVE(1);
+}
+
+
+static void maskref_destroy(void *data)
+{
+    mrp_resource_maskref_t *mask = (mrp_resource_maskref_t *)data;
+
+    MRP_LUA_ENTER;
+
+    mrp_resource_mask_cleanup(&mask->mask);
+
+    MRP_LUA_LEAVE_NOARG;
+}
+
+
+static mrp_resource_maskref_t *maskref_check(lua_State *L, int idx)
+{
+    return (mrp_resource_maskref_t *)
+        mrp_lua_check_object(L, MASKREF_CLASS, idx);
 }
 
 

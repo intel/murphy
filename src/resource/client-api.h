@@ -39,11 +39,12 @@ void mrp_resource_client_destroy(mrp_resource_client_t *client);
 mrp_resource_set_t *mrp_resource_client_find_set(mrp_resource_client_t *client,
                                                  uint32_t resource_set_id);
 
-
 const char **mrp_zone_get_all_names(uint32_t buflen, const char **buf);
 
 const char **mrp_resource_definition_get_all_names(uint32_t buflen,
                                                    const char **buf);
+
+uint32_t mrp_resource_definition_count(void);
 
 uint32_t mrp_resource_definition_get_resource_id_by_name(const char *name);
 
@@ -73,10 +74,10 @@ uint32_t mrp_get_resource_set_id(mrp_resource_set_t *resource_set);
 mrp_resource_state_t
 mrp_get_resource_set_state(mrp_resource_set_t *resource_set);
 
-mrp_resource_mask_t
+mrp_resource_mask_t *
 mrp_get_resource_set_grant(mrp_resource_set_t *resource_set);
 
-mrp_resource_mask_t
+mrp_resource_mask_t *
 mrp_get_resource_set_advice(mrp_resource_set_t *resource_set);
 
 mrp_resource_client_t *
@@ -116,9 +117,10 @@ mrp_resource_set_iterate_resources(mrp_resource_set_t *resource_set,void **it);
 
 uint32_t mrp_resource_get_id(mrp_resource_t *resource);
 const char *mrp_resource_get_name(mrp_resource_t *resource);
+#if 0
 mrp_resource_mask_t mrp_resource_get_mask(mrp_resource_t *resource);
+#endif
 bool mrp_resource_is_shared(mrp_resource_t *resource);
-
 
 #endif  /* __MURPHY_RESOURCE_CLIENT_API_H__ */
 

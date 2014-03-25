@@ -46,6 +46,7 @@
 #include "resource-client.h"
 #include "resource-owner.h"
 #include "resource-lua.h"
+#include "resource-mask.h"
 
 
 #define STAMP_MAX     ((uint32_t)1 << MRP_KEY_STAMP_BITS)
@@ -83,6 +84,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
     static uint32_t our_id;
 
     mrp_resource_set_t *rset;
+    uint32_t rcnt;
 
     MRP_ASSERT(client, "invlaid argument");
 
@@ -96,7 +98,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
 
         rset->dont_wait.current = dont_wait;
         rset->dont_wait.client  = dont_wait;
- 
+
         rset->auto_release.current = auto_release;
         rset->auto_release.client  = auto_release;
 
@@ -116,6 +118,12 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
         rset->user_data = user_data;
 
         resource_set_count++;
+
+        rcnt = mrp_resource_definition_count();
+        mrp_resource_mask_init(&rset->resource.mask.all, rcnt);
+        mrp_resource_mask_init(&rset->resource.mask.mandatory, rcnt);
+        mrp_resource_mask_init(&rset->resource.mask.grant, rcnt);
+        mrp_resource_mask_init(&rset->resource.mask.advice, rcnt);
 
         add_to_id_hash(rset);
         mrp_resource_lua_register_resource_set(rset);
@@ -177,18 +185,18 @@ mrp_resource_state_t mrp_get_resource_set_state(mrp_resource_set_t *rset)
     return rset->state;
 }
 
-mrp_resource_mask_t mrp_get_resource_set_grant(mrp_resource_set_t *rset)
+mrp_resource_mask_t *mrp_get_resource_set_grant(mrp_resource_set_t *rset)
 {
     MRP_ASSERT(rset, "invalid argument");
 
-    return rset->resource.mask.grant;
+    return &rset->resource.mask.grant;
 }
 
-mrp_resource_mask_t mrp_get_resource_set_advice(mrp_resource_set_t *rset)
+mrp_resource_mask_t *mrp_get_resource_set_advice(mrp_resource_set_t *rset)
 {
     MRP_ASSERT(rset, "invalid argument");
 
-    return rset->resource.mask.advice;
+    return &rset->resource.mask.advice;
 }
 
 mrp_resource_client_t *mrp_get_resource_set_client(mrp_resource_set_t *rset)
@@ -240,7 +248,7 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
                                   mrp_attr_t         *attrs,
                                   bool                mandatory)
 {
-    uint32_t mask;
+    uint32_t id;
     mrp_resource_t *res;
     uint32_t rsetid;
     bool autorel;
@@ -256,12 +264,12 @@ int mrp_resource_set_add_resource(mrp_resource_set_t *rset,
         return -1;
     }
 
-    mask = mrp_resource_get_mask(res);
+    id = mrp_resource_get_id(res);
 
-    rset->resource.mask.all       |= mask;
-    rset->resource.mask.mandatory |= mandatory ? mask : 0;
-    rset->resource.share          |= mrp_resource_is_shared(res);
-
+    mrp_resource_mask_set_bit(&rset->resource.mask.all, id);
+    if (mandatory)
+        mrp_resource_mask_set_bit(&rset->resource.mask.mandatory, id);
+    rset->resource.share |= mrp_resource_is_shared(res);
 
     mrp_list_append(&rset->resource.list, &res->list);
 
@@ -376,7 +384,6 @@ void mrp_resource_set_updated(mrp_resource_set_t *rset)
     mrp_resource_t *res;
     mrp_resource_def_t *def;
     mrp_list_hook_t *resen, *n;
-    mrp_resource_mask_t mask;
     bool grant;
 
     MRP_ASSERT(rset, "invalid argument");
@@ -385,8 +392,7 @@ void mrp_resource_set_updated(mrp_resource_set_t *rset)
         res = mrp_list_entry(resen, mrp_resource_t, list);
         def = res->def;
 
-        mask = ((mrp_resource_mask_t)1) << def->id;
-        grant =  (mask & rset->resource.mask.grant) ? true : false;
+        grant = mrp_resource_mask_test_bit(&rset->resource.mask.grant, def->id);
 
         mrp_resource_user_update(res, rset->state, grant);
     }
@@ -426,7 +432,7 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
 
     mrp_resource_t *res;
     mrp_list_hook_t *resen, *n;
-    uint32_t mandatory;
+    mrp_resource_mask_t *mandatory;
     char gap[] = "                         ";
     char *p, *e;
 
@@ -440,8 +446,9 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
 
     e = (p = buf) + len;
 
-    mandatory = rset->resource.mask.mandatory;
+    mandatory = &rset->resource.mask.mandatory;
 
+#if 0
     PRINT("%s%3u - 0x%02x/0x%02x 0x%02x/0x%02x 0x%08x %d %s%s%s %s\n",
           gap, rset->id,
           rset->resource.mask.all, mandatory,
@@ -451,6 +458,15 @@ int mrp_resource_set_print(mrp_resource_set_t *rset, size_t indent,
           rset->auto_release.client ? ",autorelease" : "",
           rset->dont_wait.client ? ",dontwait" : "",
           state_str(rset->state));
+#endif
+    PRINT("%s%3u - 0x%08x %d %s%s%s %s\n",
+          gap, rset->id,
+          mrp_application_class_get_sorting_key(rset), rset->class.priority,
+          rset->resource.share ? "shared   ":"exclusive",
+          rset->auto_release.client ? ",autorelease" : "",
+          rset->dont_wait.client ? ",dontwait" : "",
+          state_str(rset->state));
+
 
     mrp_list_foreach(&rset->resource.list, resen, n) {
         res = mrp_list_entry(resen, mrp_resource_t, list);

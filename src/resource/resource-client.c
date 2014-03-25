@@ -103,6 +103,7 @@ mrp_resource_set_t *mrp_resource_client_find_set(mrp_resource_client_t *client,
     return NULL;
 }
 
+
 /*
  * Local Variables:
  * c-basic-offset: 4

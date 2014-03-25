@@ -33,7 +33,7 @@
 #include <murphy/common/list.h>
 
 #include "data-types.h"
-
+#include "resource-mask.h"
 
 struct mrp_resource_set_s {
     mrp_list_hook_t                 list;

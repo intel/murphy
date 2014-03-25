@@ -45,6 +45,7 @@
 #include <murphy/resource/config-api.h>
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
+#include <murphy/resource/resource-mask.h>
 
 #include "resource-wrt.h"
 #include "config.h"
@@ -597,20 +598,28 @@ static int resource_set_events_blocked(wrt_client_t *c, mrp_resource_set_t *rs)
 }
 
 
+static mrp_json_t *add_resource_mask(mrp_json_t *msg, const char *key,
+                                     mrp_resource_mask_t *mask)
+{
+    /* hmm... we assume sizeof(uint32_t) == sizeof(int) */
+    return mrp_json_add_int_array(msg, key, mask->w, mask->n);
+}
+
+
 static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
                                     mrp_resource_set_t *rset, int force_all)
 {
-    const char     *type = RESWRT_EVENT;
-    int             seq  = (int)reqid;
-    mrp_json_t     *msg, *rarr, *r;
-    int             rsid;
-    const char     *state;
-    int             grant, advice, all, mask;
-    errbuf_t        e;
-    mrp_resource_t *res;
-    void           *it;
-    const char     *name;
-    mrp_attr_t      attrs[ATTRIBUTE_MAX + 1];
+    const char          *type = RESWRT_EVENT;
+    int                  seq  = (int)reqid;
+    mrp_json_t          *msg, *rarr, *r;
+    int                  rsid, rid;
+    const char          *state;
+    errbuf_t             e;
+    mrp_resource_t      *res;
+    mrp_resource_mask_t *grant, *advice, all;
+    void                *it;
+    const char          *name;
+    mrp_attr_t           attrs[ATTRIBUTE_MAX + 1];
 
     mrp_debug("event for resource set %p of client %p", rset, c);
 
@@ -625,8 +634,8 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
         state = RESWRT_STATE_RELEASE;
 
     rsid   = (int)mrp_get_resource_set_id(rset);
-    grant  = (int)mrp_get_resource_set_grant(rset);
-    advice = (int)mrp_get_resource_set_advice(rset);
+    grant  = mrp_get_resource_set_grant(rset);
+    advice = mrp_get_resource_set_advice(rset);
 
     msg = alloc_reply(type, seq);
 
@@ -637,17 +646,22 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
 
     if (mrp_json_add_integer(msg, "id"    , rsid ) &&
         mrp_json_add_string (msg, "state" , state) &&
-        mrp_json_add_integer(msg, "grant" , grant) &&
-        mrp_json_add_integer(msg, "advice", advice)) {
+        add_resource_mask   (msg, "grant" , grant) &&
+        add_resource_mask   (msg, "advice", advice)) {
 
-        all = grant | advice;
+        mrp_resource_mask_init(&all, mrp_resource_definition_count());
+        mrp_resource_mask_set_mask(&all, grant);
+        mrp_resource_mask_set_mask(&all, advice);
+
         it  = NULL;
 
         while ((res = mrp_resource_set_iterate_resources(rset, &it)) != NULL) {
-            mask = mrp_resource_get_mask(res);
 
-            if (!(mask & all) && !force_all)
+            rid = mrp_resource_get_id(res);
+
+            if (!mrp_resource_mask_test_bit(&all, rid) && !force_all)
                 continue;
+
 
             name = mrp_resource_get_name(res);
 
@@ -666,7 +680,7 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
                 goto fail;
 
             if (!mrp_json_add_string (r, "name", name) ||
-                (force_all && !mrp_json_add_integer(r, "mask", mask)))
+                (force_all && !mrp_json_add_integer(r, "resid", rid)))
                 goto fail;
 
             if (append_attributes(r, attrs, &e) != 0)

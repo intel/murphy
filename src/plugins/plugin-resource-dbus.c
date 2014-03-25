@@ -43,6 +43,7 @@
 #include <murphy/common/dbus-libdbus.h>
 
 #include <murphy/resource/client-api.h>
+#include <murphy/resource/resource-mask.h>
 
 
 #define MURPHY_PATH_BASE "/org/murphy/resource"
@@ -656,13 +657,10 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
     mrp_resource_t *resource;
     void *iter = NULL;
 
-    mrp_resource_mask_t grant = mrp_get_resource_set_grant(set);
-    mrp_resource_mask_t advice = mrp_get_resource_set_advice(set);
+    mrp_resource_mask_t *grant = mrp_get_resource_set_grant(set);
+    mrp_resource_mask_t *advice = mrp_get_resource_set_advice(set);
 
     MRP_UNUSED(request_id);
-
-    mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
-        rset->path, grant, advice);
 
     if (!rset->set || !rset->acquired) {
         /* We haven't yet returned from the create_set call, and this is before
@@ -676,11 +674,11 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
     /* the resource API is bit awkward here */
 
     while ((resource = mrp_resource_set_iterate_resources(set, &iter))) {
-        mrp_resource_mask_t mask;
+        uint32_t rid;
         const char *name;
         resource_o_t *res;
 
-        mask = mrp_resource_get_mask(resource);
+        rid  = mrp_resource_get_id(resource);
         name = mrp_resource_get_name(resource);
 
         /* search the matching resource set object */
@@ -692,10 +690,10 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
             continue;
         }
 
-        if (mask & grant) {
+        if (mrp_resource_mask_test_bit(grant, rid)) {
             update_property(res->status_prop, "acquired");
         }
-        else if (mask & advice) {
+        else if (mrp_resource_mask_test_bit(advice, rid)) {
             update_property(res->status_prop, "available");
         }
         else {
@@ -703,10 +701,10 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
         }
     }
 
-    if (grant) {
+    if (!mrp_resource_mask_empty(grant)) {
         update_property(rset->status_prop, "acquired");
     }
-    else if (advice) {
+    else if (!mrp_resource_mask_empty(advice)) {
         update_property(rset->status_prop, "available");
     }
     else {

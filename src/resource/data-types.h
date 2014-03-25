@@ -51,7 +51,12 @@
 #define MRP_RESOURCE_ID_INVALID    (~(uint32_t)0)
 #define MRP_RESOURCE_REQNO_INVALID (~(uint32_t)0)
 
+
+#if 0
 #define MRP_RESOURCE_MAX  (sizeof(mrp_resource_mask_t) * 8)
+#endif
+
+#define MRP_RESOURCE_MAX  1024
 #define MRP_ATTRIBUTE_MAX (sizeof(mrp_attribute_mask_t) * 8)
 
 typedef enum   mrp_resource_state_e     mrp_resource_state_t;
@@ -75,8 +80,12 @@ typedef struct mrp_resource_mgr_s       mrp_resource_mgr_t;
 
 typedef struct mrp_resource_ownersref_s mrp_resource_ownersref_t;
 typedef struct mrp_resource_setref_s    mrp_resource_setref_t;
+typedef struct mrp_resource_maskref_s   mrp_resource_maskref_t;
 
+#if 0
 typedef uint32_t                        mrp_resource_mask_t;
+#endif
+typedef struct mrp_resource_mask_s      mrp_resource_mask_t;
 typedef uint32_t                        mrp_attribute_mask_t;
 typedef uint32_t                        mrp_zone_mask_t;
 

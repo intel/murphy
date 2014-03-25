@@ -39,6 +39,7 @@
 #include <errno.h>
 
 #include <murphy/common.h>
+#include <murphy/resource/resource-mask.h>
 #include <murphy/resource/protocol.h>
 
 #define ARRAY_MAX      1024
@@ -101,6 +102,7 @@ typedef struct {
     uint32_t              rsetf;
     uint32_t              priority;
     resource_def_array_t *resources;
+    int                   nresource;
     string_array_t       *class_names;
     string_array_t       *zone_names;
     uint32_t              rset_id;
@@ -581,7 +583,7 @@ static bool fetch_resource_set_state(mrp_msg_t *msg, void **pcursor,
 
 
 static bool fetch_resource_set_mask(mrp_msg_t *msg, void **pcursor,
-                                    int mask_type, mrp_resproto_state_t *pmask)
+                                    int mask_type, mrp_resource_mask_t *pmask)
 {
     uint16_t expected_tag;
     uint16_t tag;
@@ -596,13 +598,14 @@ static bool fetch_resource_set_mask(mrp_msg_t *msg, void **pcursor,
     }
 
     if (!mrp_msg_iterate(msg, pcursor, &tag, &type, &value, &size) ||
-        tag != expected_tag || type != MRP_MSG_FIELD_UINT32)
+        tag != expected_tag || type != MRP_MSG_FIELD_ARRAY_OF(UINT32))
     {
-        *pmask = 0;
+        mrp_resource_mask_reset(pmask);
         return false;
     }
 
-    *pmask = value.u32;
+    mrp_resource_mask_adopt(pmask, value.au32, (int)size);
+
     return true;
 }
 
@@ -747,6 +750,7 @@ static void resource_query_response(client_t *client, uint32_t seqno,
         resource_def_array_free(client->resources);
 
         client->resources = arr = mrp_allocz(size);
+        client->nresource = dim;
 
         arr->dim = dim;
 
@@ -903,7 +907,8 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
                            void **pcursor)
 {
     uint32_t rset;
-    uint32_t grant, advice;
+    mrp_resource_mask_t grant, advice;
+    int g, a;
     mrp_resproto_state_t state;
     const char *str_state;
     uint16_t tag;
@@ -915,7 +920,6 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
     attribute_t attrs[ATTRIBUTE_MAX + 1];
     attribute_array_t *list;
     char buf[4096];
-    uint32_t mask;
     int cnt;
 
     printf("\nResource event (request no %u):\n", seqno);
@@ -934,8 +938,10 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
 
     printf("   resource-set ID  : %u\n"  , rset);
     printf("   state            : %s\n"  , str_state);
+#if 0
     printf("   grant mask       : 0x%x\n", grant);
     printf("   advice mask      : 0x%x\n", advice);
+#endif
     printf("   resources        :");
 
     cnt = 0;
@@ -946,16 +952,16 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
             goto malformed;
 
         resid = value.u32;
-        mask  = (1UL <<  resid);
 
         if (!cnt++)
             printf("\n");
 
+        g = mrp_resource_mask_test_bit(&grant, resid);
+        a = mrp_resource_mask_test_bit(&advice, resid);
+
         printf("      %02u name       : %s\n", resid, resnam);
-        printf("         mask       : 0x%x\n", mask);
-        printf("         grant      : %s\n", (grant & mask)  ? "yes" : "no");
-        printf("         advice     : %savailable\n",
-               (advice & mask)  ? "" : "not ");
+        printf("         grant      : %s\n", g ? "yes" : "no");
+        printf("         advice     : %savailable\n", a ? "" : "not ");
 
         if (!fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs))
             goto malformed;
@@ -1604,10 +1610,11 @@ static void sighandler(mrp_sighandler_t *h, int signum, void *user_data)
 static void usage(client_t *client, int exit_code)
 {
     printf("Usage: "
-           "%s [-h] [-v] [-r] [-a] [-w] [-p pri] [class zone resources]\n"
+           "%s [-h] [-v] [-d <site>] [-r] [-a] [-w] [-p pri] [class zone resources]\n"
            "\nwhere\n"
            "\t-h\t\tprints this help\n"
            "\t-v\t\tverbose mode (dumps the transport messages)\n"
+           "\t-d\t\tenable the given debug site\n"
            "\t-a\t\tautoacquire mode\n"
            "\t-w\t\tdont wait for resources if they were not available\n"
            "\t-r\t\tautorelease mode\n"
@@ -1643,7 +1650,7 @@ static void parse_arguments(client_t *client, int argc, char **argv)
     char *e;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hvrawp:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvrawp:d:")) != -1) {
         switch (opt) {
         case 'h':
             usage(client, 0);
@@ -1665,6 +1672,10 @@ static void parse_arguments(client_t *client, int argc, char **argv)
                 usage(client, EINVAL);
             else
                 client->priority = pri;
+            break;
+        case 'd':
+            mrp_debug_set_config(optarg);
+            mrp_debug_enable(TRUE);
             break;
         default:
             usage(client, EINVAL);

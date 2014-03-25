@@ -45,9 +45,14 @@
 #include "resource-set.h"
 #include "application-class.h"
 #include "zone.h"
+#include "resource-mask.h"
 
-
+#if 0
 #define RESOURCE_MAX        (sizeof(mrp_resource_mask_t) * 8)
+#else
+#define RESOURCE_MAX        MRP_RESOURCE_MAX
+#endif
+
 #define ATTRIBUTE_MAX       (sizeof(mrp_attribute_mask_t) * 8)
 #define NAME_LENGTH          24
 
@@ -345,6 +350,7 @@ const char *mrp_resource_get_name(mrp_resource_t *res)
     return "<unknown resource>";
 }
 
+#if 0
 mrp_resource_mask_t mrp_resource_get_mask(mrp_resource_t *res)
 {
     mrp_resource_def_t *def;
@@ -360,6 +366,7 @@ mrp_resource_mask_t mrp_resource_get_mask(mrp_resource_t *res)
 
     return mask;
 }
+#endif
 
 bool mrp_resource_is_shared(mrp_resource_t *res)
 {
@@ -481,7 +488,7 @@ void mrp_resource_notify(mrp_resource_t *res,
     }
 }
 
-int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
+int mrp_resource_print(mrp_resource_t *res, mrp_resource_mask_t *mandatory,
                        size_t indent, char *buf, int len)
 {
 #define PRINT(fmt, args...)  if (p<e) { p += snprintf(p, e-p, fmt , ##args); }
@@ -489,7 +496,7 @@ int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
     mrp_resource_def_t *rdef;
     char gap[] = "                         ";
     char *p, *e;
-    uint32_t m;
+    int m;
 
     if (len <= 0)
         return 0;
@@ -504,11 +511,10 @@ int mrp_resource_print(mrp_resource_t *res, uint32_t mandatory,
     gap[indent] = '\0';
 
     e = (p = buf) + len;
-    m = ((mrp_resource_mask_t)1 << rdef->id);
+    m = mrp_resource_mask_test_bit(mandatory, rdef->id);
 
-    PRINT("%s%s: 0x%02x %s %s", gap, rdef->name, m,
-          (m & mandatory) ? "mandatory":"optional ",
-          res->shared ? "shared  ":"exlusive");
+    PRINT("%s%s: id:%u %s %s", gap, rdef->name, rdef->id,
+          m ? "mandatory":"optional ", res->shared ? "shared  ":"exlusive");
 
     p += mrp_resource_attribute_print(res, p, e-p);
 

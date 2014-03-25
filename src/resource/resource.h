@@ -71,7 +71,7 @@ void                mrp_resource_destroy(mrp_resource_t *);
 void                mrp_resource_notify(mrp_resource_t *, mrp_resource_set_t *,
                                         mrp_resource_event_t);
 
-int                 mrp_resource_print(mrp_resource_t*, uint32_t,
+int                 mrp_resource_print(mrp_resource_t*, mrp_resource_mask_t *,
                                        size_t, char *, int);
 int                 mrp_resource_attribute_print(mrp_resource_t *, char *,int);
 

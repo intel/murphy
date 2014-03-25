@@ -42,6 +42,7 @@
 #include <murphy/core/lua-bindings/murphy.h>
 
 #include <murphy/resource/client-api.h>
+#include <murphy/resource/resource-mask.h>
 
 #define MAX_ATTRS 128
 
@@ -409,7 +410,7 @@ static int resource_set_release(lua_State *L)
 void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_data)
 {
     resource_set_lua_t *rset = (resource_set_lua_t *) user_data;
-    mrp_resource_mask_t grant, advice;
+    mrp_resource_mask_t *grant, *advice;
 
     MRP_UNUSED(request_id);
     MRP_UNUSED(resource_set);
@@ -420,8 +421,8 @@ void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_
     advice = mrp_get_resource_set_advice(rset->resource_set);
 
     /* update resource set */
-    rset->acquired = !!grant;
-    rset->available = !!advice;
+    rset->acquired = !mrp_resource_mask_empty(grant);
+    rset->available = !mrp_resource_mask_empty(advice);
 
     if (mrp_lua_object_deref_value(rset, rset->L, rset->callback, false)) {
         mrp_lua_push_object(rset->L, rset);
@@ -559,7 +560,7 @@ static int resource_set_get_resources(void *data, lua_State *L, int member, mrp_
     resource_set_lua_t *rset;
     void *iter = NULL;
     mrp_resource_t *resource;
-    mrp_resource_mask_t grant, advice;
+    mrp_resource_mask_t *grant, *advice;
 
     MRP_UNUSED(member);
     MRP_UNUSED(v);
@@ -580,7 +581,7 @@ static int resource_set_get_resources(void *data, lua_State *L, int member, mrp_
 
     while ((resource = mrp_resource_set_iterate_resources(rset->resource_set, &iter))) {
         const char *name = mrp_resource_get_name(resource);
-        mrp_resource_mask_t mask = mrp_resource_get_mask(resource);
+        uint32_t    id = mrp_resource_get_id(resource);
 
         /* fetch and update the resource object */
 
@@ -591,8 +592,8 @@ static int resource_set_get_resources(void *data, lua_State *L, int member, mrp_
             continue;
         }
 
-        res->acquired = !!(mask & grant);
-        res->available = !!(mask & advice);
+        res->acquired = mrp_resource_mask_test_bit(grant, id);
+        res->available = mrp_resource_mask_test_bit(advice, id);
 
         /* TODO: update attributes */
 
