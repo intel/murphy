@@ -112,6 +112,7 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
             (_f) = mrp_allocz(MRP_OFFSET(typeof(*_f), size[1]));          \
                                                                           \
             if ((_f) != NULL) {                                           \
+                mrp_list_init(&(_f)->hook);                               \
                 (_f)->tag  = _tag;                                        \
                 (_f)->type = _type | MRP_MSG_FIELD_ARRAY;                 \
                 _base      = _type & ~MRP_MSG_FIELD_ARRAY;                \
@@ -120,7 +121,7 @@ static inline mrp_msg_field_t *create_field(uint16_t tag, va_list *ap)
                 _f->_fld    = mrp_allocz_array(typeof(*_f->_fld),         \
                                                _f->size[0]);              \
                                                                           \
-                if (_f->_fld == NULL)                                     \
+                if (_f->_fld == NULL && _f->size[0] != 0)                 \
                     goto _errlbl;                                         \
                 else                                                      \
                     memcpy(_f->_fld, va_arg(*ap, typeof(_f->_fld)),       \
