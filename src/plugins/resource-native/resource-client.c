@@ -54,6 +54,15 @@
 #define GRANT           0
 #define ADVICE          1
 
+enum {
+    VERBOSE_NONE = 0,
+    VERBOSE_NORMAL,
+    VERBOSE_RESOURCES,
+    VERBOSE_MESSAGES
+};
+
+
+#define VERBOSE(client, limit) if (client->verbosity >= limit)
 
 typedef struct {
     uint32_t        dim;
@@ -95,7 +104,7 @@ typedef struct {
     const char           *atype;
     uint32_t              seqno;
     bool                  prompt;
-    bool                  msgdump;
+    int                   verbosity;
     char *                class;
     char *                zone;
     char *                rsetd;
@@ -106,6 +115,11 @@ typedef struct {
     string_array_t       *class_names;
     string_array_t       *zone_names;
     uint32_t              rset_id;
+    int                   test;
+    mrp_resproto_state_t  asked;
+    mrp_resproto_state_t  state;
+    bool                  granted;
+    bool                  available;
 } client_t;
 
 typedef struct {
@@ -123,7 +137,7 @@ static uint64_t           totaltime;
 static uint32_t           reqcount;
 
 static void print_prompt(client_t *, bool);
-
+static uint32_t acquire_resource_set(client_t *client, bool acquire);
 
 static uint64_t reqstamp_current_time(void)
 {
@@ -146,18 +160,20 @@ static void reqstamp_start(uint32_t seqno)
     }
 }
 
-static void reqstamp_intermediate(uint32_t seqno)
+static void reqstamp_intermediate(client_t *client, uint32_t seqno)
 {
     reqstamp_t *rs   = reqstamps + HASH_FUNC(seqno);
     uint64_t    now  = reqstamp_current_time();
 
     if (rs->seqno == seqno && rs->time && now > rs->time) {
-        printf("request %u was responded in %.2lf msec\n",
-               seqno, (double)(now - rs->time) / 1000.0);
+        VERBOSE(client, VERBOSE_NORMAL) {
+            printf("request %u was responded in %.2lf msec\n",
+                   seqno, (double)(now - rs->time) / 1000.0);
+        }
     }
 }
 
-static void reqstamp_end(uint32_t seqno)
+static void reqstamp_end(client_t *client, uint32_t seqno)
 {
     reqstamp_t *rs   = reqstamps + HASH_FUNC(seqno);
     uint64_t    now  = reqstamp_current_time();
@@ -168,8 +184,10 @@ static void reqstamp_end(uint32_t seqno)
             diff = now - rs->time;
         }
 
-        printf("request %u was processed in %.2lf msec\n",
-               seqno, (double)diff / 1000.0);
+        VERBOSE(client, VERBOSE_NORMAL) {
+            printf("request %u was processed in %.2lf msec\n",
+                   seqno, (double)diff / 1000.0);
+        }
 
         rs->seqno = 0;
         rs->time = 0ULL;
@@ -762,14 +780,20 @@ static void resource_query_response(client_t *client, uint32_t seqno,
             dst->attrs = src->attrs;
         }
 
-        resource_def_array_print(client->resources,
-                                 "Resource definitions:", "\n   ", "\n",
-                                 NULL, "\n      ", NULL,
-                                 buf, sizeof(buf));
-        printf("\n%s", buf);
+        VERBOSE(client, VERBOSE_RESOURCES) {
+            if (client->verbosity >= VERBOSE_RESOURCES) {
+                resource_def_array_print(client->resources,
+                                         "Resource definitions:", "\n   ", "\n",
+                                         NULL, "\n      ", NULL,
+                                         buf, sizeof(buf));
+                printf("\n%s", buf);
+            }
+        }
 
-        client->prompt = true;
-        print_prompt(client, true);
+        VERBOSE(client, VERBOSE_NORMAL) {
+            client->prompt = true;
+            print_prompt(client, true);
+        }
     }
 
     return;
@@ -802,13 +826,17 @@ static void class_query_response(client_t *client, uint32_t seqno,
     str_array_free(client->class_names);
     client->class_names = arr;
 
-    str_array_print(arr, "Application class names:", "\n   ", "\n",
-                    buf, sizeof(buf));
+    VERBOSE(client, VERBOSE_RESOURCES) {
+        str_array_print(arr, "Application class names:", "\n   ", "\n",
+                        buf, sizeof(buf));
 
-    printf("\n%s", buf);
+        printf("\n%s", buf);
+    }
 
-    client->prompt = true;
-    print_prompt(client, true);
+    VERBOSE(client, VERBOSE_NORMAL) {
+        client->prompt = true;
+        print_prompt(client, true);
+    }
 }
 
 static void zone_query_response(client_t *client, uint32_t seqno,
@@ -835,13 +863,17 @@ static void zone_query_response(client_t *client, uint32_t seqno,
     str_array_free(client->zone_names);
     client->zone_names = arr;
 
-    str_array_print(arr, "Zone names:", "\n   ", "\n",
-                    buf, sizeof(buf));
+    VERBOSE(client, VERBOSE_RESOURCES) {
+        str_array_print(arr, "Zone names:", "\n   ", "\n",
+                        buf, sizeof(buf));
 
-    printf("\n%s", buf);
+        printf("\n%s", buf);
+    }
 
-    client->prompt = true;
-    print_prompt(client, true);
+    VERBOSE(client, VERBOSE_NORMAL) {
+        client->prompt = true;
+        print_prompt(client, true);
+    }
 }
 
 static void create_resource_set_response(client_t *client, uint32_t seqno,
@@ -866,10 +898,14 @@ static void create_resource_set_response(client_t *client, uint32_t seqno,
 
     client->rset_id = rset_id;
 
-    printf("\nresource set %u created\n", rset_id);
+    VERBOSE(client, VERBOSE_RESOURCES) {
+        printf("\nresource set %u created\n", rset_id);
+    }
 
-    client->prompt = true;
-    print_prompt(client, true);
+    VERBOSE(client, VERBOSE_NORMAL) {
+        client->prompt = true;
+        print_prompt(client, true);
+    }
 }
 
 static void acquire_resource_set_response(client_t *client, uint32_t seqno,
@@ -892,14 +928,18 @@ static void acquire_resource_set_response(client_t *client, uint32_t seqno,
                "error code %u", op, rset_id, seqno, status);
     }
     else {
-        printf("\nSuccessful %s of resource set %u. request no %u\n",
-               op, rset_id, seqno);
+        VERBOSE(client, VERBOSE_RESOURCES) {
+            printf("\nSuccessful %s of resource set %u. request no %u\n",
+                   op, rset_id, seqno);
+        }
     }
 
-    client->prompt = true;
+    VERBOSE(client, VERBOSE_NORMAL) {
+        client->prompt = true;
 
-    if (status)
-        print_prompt(client, true);
+        if (status)
+            print_prompt(client, true);
+    }
 }
 
 
@@ -907,7 +947,8 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
                            void **pcursor)
 {
     uint32_t rset;
-    mrp_resource_mask_t grant, advice;
+    mrp_resource_mask_t grant = MRP_RESOURCE_MASK_EMPTY_INIT;
+    mrp_resource_mask_t advice = MRP_RESOURCE_MASK_EMPTY_INIT;
     int g, a;
     mrp_resproto_state_t state;
     const char *str_state;
@@ -922,7 +963,9 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
     char buf[4096];
     int cnt;
 
-    printf("\nResource event (request no %u):\n", seqno);
+    VERBOSE(client, VERBOSE_RESOURCES) {
+        printf("\nResource event (request no %u):\n", seqno);
+    }
 
     if (!fetch_resource_set_id(msg, pcursor, &rset) ||
         !fetch_resource_set_state(msg, pcursor, &state) ||
@@ -936,13 +979,23 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
     default:                 str_state = "<unknown>";  break;
     }
 
-    printf("   resource-set ID  : %u\n"  , rset);
-    printf("   state            : %s\n"  , str_state);
+    client->state = state;
+    client->granted = !mrp_resource_mask_empty(&grant);
+    client->available = !mrp_resource_mask_empty(&advice); /* not quite right */
+
+    VERBOSE(client, VERBOSE_RESOURCES) {
+        printf("   resource-set ID  : %u\n"  , rset);
+        printf("   state            : %s\n"  , str_state);
+        printf("   grant mask:      : %s\n"  ,
+               !mrp_resource_mask_empty(&grant)  ? "non-empty" : "empty");
+        printf("   advice mask:     : %s\n"  ,
+               !mrp_resource_mask_empty(&advice) ? "non-empty" : "empty");
 #if 0
-    printf("   grant mask       : 0x%x\n", grant);
-    printf("   advice mask      : 0x%x\n", advice);
+        printf("   grant mask       : 0x%x\n", grant);
+        printf("   advice mask      : 0x%x\n", advice);
 #endif
-    printf("   resources        :");
+        printf("   resources        :");
+    }
 
     cnt = 0;
 
@@ -954,34 +1007,45 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
         resid = value.u32;
 
         if (!cnt++)
-            printf("\n");
+            VERBOSE(client, VERBOSE_RESOURCES) {
+                printf("\n");
+            }
 
         g = mrp_resource_mask_test_bit(&grant, resid);
         a = mrp_resource_mask_test_bit(&advice, resid);
 
-        printf("      %02u name       : %s\n", resid, resnam);
-        printf("         grant      : %s\n", g ? "yes" : "no");
-        printf("         advice     : %savailable\n", a ? "" : "not ");
+
+        VERBOSE(client, VERBOSE_RESOURCES) {
+            printf("   %5.5u name       : %s\n", resid, resnam);
+            printf("         grant      : %s\n", g ? "yes" : "no");
+            printf("         advice     : %savailable\n", a ? "some " : "not ");
+        }
 
         if (!fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs))
             goto malformed;
 
-        if (!(list = attribute_array_dup(0, attrs))) {
-            mrp_log_error("failed to duplicate attribute list");
-            exit(ENOMEM);
+        VERBOSE(client, VERBOSE_RESOURCES) {
+            if (!(list = attribute_array_dup(0, attrs))) {
+                mrp_log_error("failed to duplicate attribute list");
+                exit(ENOMEM);
+            }
+
+            attribute_array_print(list, "         attributes :", " ", "\n",
+                                  buf, sizeof(buf));
+            printf("%s", buf);
+
+            attribute_array_free(list);
         }
-
-        attribute_array_print(list, "         attributes :", " ", "\n",
-                              buf, sizeof(buf));
-        printf("%s", buf);
-
-        attribute_array_free(list);
     }
 
     if (!cnt)
-        printf(" <none>\n");
+        VERBOSE(client, VERBOSE_RESOURCES) {
+            printf(" <none>\n");
+        }
 
-    print_prompt(client, true);
+    VERBOSE(client, VERBOSE_NORMAL) {
+        print_prompt(client, true);
+    }
 
     return;
 
@@ -1003,7 +1067,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
 
-    if (client->msgdump) {
+    VERBOSE(client, VERBOSE_MESSAGES) {
         mrp_log_info("received a message");
         mrp_msg_dump(msg, stdout);
     }
@@ -1018,35 +1082,60 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
 
     switch (request) {
     case RESPROTO_QUERY_RESOURCES:
-        reqstamp_end(seqno);
+        reqstamp_end(client, seqno);
         resource_query_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_QUERY_CLASSES:
-        reqstamp_end(seqno);
+        reqstamp_end(client, seqno);
         class_query_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_QUERY_ZONES:
-        reqstamp_end(seqno);
+        reqstamp_end(client, seqno);
         zone_query_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_CREATE_RESOURCE_SET:
-        reqstamp_end(seqno);
+        reqstamp_end(client, seqno);
         create_resource_set_response(client, seqno, msg, &cursor);
         break;
     case RESPROTO_ACQUIRE_RESOURCE_SET:
-        reqstamp_intermediate(seqno);
+        reqstamp_intermediate(client, seqno);
         acquire_resource_set_response(client, seqno, true, msg, &cursor);
         break;
     case RESPROTO_RELEASE_RESOURCE_SET:
-        reqstamp_intermediate(seqno);
+        reqstamp_intermediate(client, seqno);
         acquire_resource_set_response(client, seqno, false, msg, &cursor);
         break;
     case RESPROTO_RESOURCES_EVENT:
-        reqstamp_end(seqno);
+        reqstamp_end(client, seqno);
         resource_event(client, seqno, msg, &cursor);
         break;
     default:
         mrp_log_error("ignoring unsupported request type %u", request);
+        break;
+    }
+
+    if (client->test <= 0)
+        return;
+
+    switch (client->state) {
+    case RESPROTO_ACQUIRE:
+        if (client->asked == RESPROTO_ACQUIRE && client->granted) {
+            client->test--;
+            VERBOSE(client, VERBOSE_NORMAL) {
+                printf("Automatic acquire tests left: %d...\n", client->test);
+            }
+
+            if (client->test == 0)
+                mrp_mainloop_quit(client->ml, 0);
+            else
+                acquire_resource_set(client, false);
+        }
+        break;
+    case RESPROTO_RELEASE:
+        if (client->asked == RESPROTO_RELEASE && client->available)
+            acquire_resource_set(client, true);
+        break;
+    default:
         break;
     }
 }
@@ -1412,8 +1501,9 @@ static void create_resource_set(client_t   *client,
         while (c == ',')
             p = parse_resource(req, p, &c);
 
-        if (client->msgdump)
+        VERBOSE(client, VERBOSE_MESSAGES) {
             mrp_msg_dump(req, stdout);
+        }
 
         send_message(client, req);
 
@@ -1445,11 +1535,14 @@ static uint32_t acquire_resource_set(client_t *client, bool acquire)
     if (!PUSH(req, RESOURCE_SET_ID, UINT32, client->rset_id))
         mrp_msg_unref(req);
     else {
-        if (client->msgdump)
+        VERBOSE(client, VERBOSE_MESSAGES) {
             mrp_msg_dump(req, stdout);
+        }
 
         send_message(client, req);
     }
+
+    client->asked = acquire ? RESPROTO_ACQUIRE : RESPROTO_RELEASE;
 
     return reqno;
 
@@ -1610,11 +1703,12 @@ static void sighandler(mrp_sighandler_t *h, int signum, void *user_data)
 static void usage(client_t *client, int exit_code)
 {
     printf("Usage: "
-           "%s [-h] [-v] [-d <site>] [-r] [-a] [-w] [-p pri] [class zone resources]\n"
+           "%s [-h] [-v] [-d <site>] [-t <count>] [-r] [-a] [-w] [-p pri] [class zone resources]\n"
            "\nwhere\n"
            "\t-h\t\tprints this help\n"
            "\t-v\t\tverbose mode (dumps the transport messages)\n"
            "\t-d\t\tenable the given debug site\n"
+           "\t-t\t\trun automatic acquire/release loop\n"
            "\t-a\t\tautoacquire mode\n"
            "\t-w\t\tdont wait for resources if they were not available\n"
            "\t-r\t\tautorelease mode\n"
@@ -1650,12 +1744,16 @@ static void parse_arguments(client_t *client, int argc, char **argv)
     char *e;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hvrawp:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "hvrawp:d:t:")) != -1) {
         switch (opt) {
         case 'h':
             usage(client, 0);
         case 'v':
-            client->msgdump = true;
+            client->verbosity++;
+            break;
+        case 'd':
+            mrp_debug_set_config(optarg);
+            mrp_debug_enable(TRUE);
             break;
         case 'a':
             client->rsetf |= RESPROTO_RSETFLAG_AUTOACQUIRE;
@@ -1673,9 +1771,20 @@ static void parse_arguments(client_t *client, int argc, char **argv)
             else
                 client->priority = pri;
             break;
-        case 'd':
-            mrp_debug_set_config(optarg);
-            mrp_debug_enable(TRUE);
+        case 't': {
+            char *end;
+
+            client->test = (int)strtol(optarg, &end, 10);
+
+            if ((end && *end) || client->test < 0) {
+                fprintf(stderr, "invalid test loop count '%s'\n", optarg);
+                exit(1);
+            }
+
+            printf("Going to run %d automatic acquire tests.\n", client->test);
+            client->verbosity -= 2;
+        }
+
             break;
         default:
             usage(client, EINVAL);
@@ -1701,6 +1810,7 @@ int main(int argc, char **argv)
     mrp_log_set_mask(MRP_LOG_UPTO(MRP_LOG_DEBUG));
     mrp_log_set_target(MRP_LOG_TO_STDOUT);
 
+    client->verbosity = VERBOSE_RESOURCES;
     client->name    = mrp_strdup(basename(argv[0]));
     client->ml      = mrp_mainloop_create();
     client->seqno   = 1;
