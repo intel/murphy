@@ -32,6 +32,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdarg.h>
+#include <syslog.h>
 
 #include <murphy/common/mm.h>
 #include <murphy/common/list.h>

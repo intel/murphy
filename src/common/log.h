@@ -34,7 +34,6 @@
  * Logging functions and macros.
  */
 
-#include <syslog.h>
 #include <stdarg.h>
 
 #include <murphy/common/macros.h>
