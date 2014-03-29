@@ -30,7 +30,10 @@
 #ifndef __MURPHY_DEBUG_INFO_H__
 #define __MURPHY_DEBUG_INFO_H__
 
+#include <murphy/common/macros.h>
 #include <murphy/common/list.h>
+
+MRP_CDECL_BEGIN
 
 /*
  * line number information for a single function
@@ -52,5 +55,6 @@ typedef struct {
     mrp_debug_info_t *info;              /* function information */
 } mrp_debug_file_t;
 
+MRP_CDECL_END
 
 #endif /* __MURPHY_DEBUG_INFO_H__ */
