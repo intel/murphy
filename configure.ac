@@ -121,7 +121,7 @@ AC_ARG_WITH(lua,
 
 # Check for Lua.
 AC_MSG_NOTICE([Compiling with Lua package $with_lua.])
-PKG_CHECK_MODULES(LUA, $with_lua >= 5.1.1)
+PKG_CHECK_MODULES(LUA, $with_lua >= 5.1.1 $with_lua < 5.2)
 
 AC_SUBST(LUA_CFLAGS)
 AC_SUBST(LUA_LIBS)
