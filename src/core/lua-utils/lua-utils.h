@@ -45,6 +45,10 @@ static inline int luaL_typerror (lua_State *L, int arg, const char *type) {
     return luaL_argerror(L, arg, lua_pushfstring(L, "%s expected, got %s",
                                                  type, luaL_typename(L, arg)));
 }
+
+#    ifndef lua_objlen
+#        define lua_objlen(L, i) lua_rawlen(L, (i))
+#    endif
 #endif
 
 /** Convert the given stack index to an absolute one. */
