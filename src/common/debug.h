@@ -41,7 +41,7 @@ MRP_CDECL_BEGIN
 
 /** Macro to generate a debug site string. */
 #define MRP_DEBUG_SITE(file, line, func)                                  \
-    "__DEBUG_SITE_"file":"MRP_STRINGIFY(line)
+    "__DEBUG_SITE_" file ":" MRP_STRINGIFY(line)
 
 /** Log a debug message if the invoking debug site is enabled. */
 #define mrp_debug(fmt, args...)        do {                               \
