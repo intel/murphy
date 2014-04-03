@@ -63,7 +63,7 @@ void print_resource(mrp_res_resource_t *res)
             res->priv->shared ? "" : "not ");
 }
 
-
+#if 0
 void print_resource_set(mrp_res_resource_set_t *rset)
 {
     uint32_t i;
@@ -78,7 +78,7 @@ void print_resource_set(mrp_res_resource_set_t *rset)
         print_resource(res);
     }
 }
-
+#endif
 
 void increase_ref(mrp_res_context_t *cx,
         mrp_res_resource_set_t *rset)
@@ -794,8 +794,9 @@ int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
 
     update_library_resource_set(cx, original, rset);
 
+#if 0
     print_resource_set(rset);
-
+#endif
     if (rset->priv->id) {
         /* the set has been already created on server */
 

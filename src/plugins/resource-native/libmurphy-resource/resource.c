@@ -221,8 +221,9 @@ static void resource_event(mrp_msg_t *msg,
      * callback before that. Otherwise, if this is a real event, call the
      * callback right away. */
 
+#if 0
     print_resource_set(rset);
-
+#endif
     if (!rset->priv->seqno) {
         if (rset->priv->cb) {
             increase_ref(cx, rset);
