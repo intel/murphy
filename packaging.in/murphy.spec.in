@@ -427,7 +427,7 @@ ldconfig
 
 %files doc
 %defattr(-,root,root,-)
-%doc %{_pkgdocdir}
+%doc %{_docdir}/murphy*
 
 %if %{?_with_pulse:1}%{!?_with_pulse:0}
 %files pulse
