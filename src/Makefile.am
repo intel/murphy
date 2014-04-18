@@ -64,7 +64,8 @@ libmurphy_common_la_HEADERS =		\
 		common/tlv.h		\
 		common/native-types.h	\
 		common/mask.h		\
-		common/hash-table.h
+		common/hash-table.h	\
+		common/types.h
 
 libmurphy_common_la_REGULAR_SOURCES =		\
 		common/log.c			\
@@ -86,7 +87,8 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/dgram-transport.c	\
 		common/tlv.c			\
 		common/native-types.c		\
-		common/hash-table.c
+		common/hash-table.c		\
+		common/types.c
 
 libmurphy_common_la_SOURCES =				\
 		$(libmurphy_common_la_REGULAR_SOURCES)
