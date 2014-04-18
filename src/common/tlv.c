@@ -28,6 +28,7 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 
 #include <murphy/common/macros.h>
 #include <murphy/common/debug.h>
@@ -155,6 +156,19 @@ static void *tlv_consume(mrp_tlv_t *tlv, size_t size)
 }
 
 
+static void *tlv_peek(mrp_tlv_t *tlv, size_t size)
+{
+    char *p;
+
+    if (tlv_data(tlv) < size)
+        return NULL;
+
+    p = tlv->p;
+
+    return p;
+}
+
+
 void mrp_tlv_trim(mrp_tlv_t *tlv)
 {
     size_t left;
@@ -225,6 +239,8 @@ int mrp_tlv_push_int8(mrp_tlv_t *tlv, uint32_t tag, int8_t v)
 {
     int8_t *p;
 
+    mrp_debug("<0x%x>%d", tag, v);
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -241,6 +257,8 @@ int mrp_tlv_push_int8(mrp_tlv_t *tlv, uint32_t tag, int8_t v)
 int mrp_tlv_push_uint8(mrp_tlv_t *tlv, uint32_t tag, uint8_t v)
 {
     uint8_t *p;
+
+    mrp_debug("<0x%x>%u", tag, v);
 
     if (push_tag(tlv, tag) < 0)
         return -1;
@@ -259,6 +277,8 @@ int mrp_tlv_push_int16(mrp_tlv_t *tlv, uint32_t tag, int16_t v)
 {
     int16_t *p;
 
+    mrp_debug("<0x%x>%d", tag, v);
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -275,6 +295,8 @@ int mrp_tlv_push_int16(mrp_tlv_t *tlv, uint32_t tag, int16_t v)
 int mrp_tlv_push_uint16(mrp_tlv_t *tlv, uint32_t tag, uint16_t v)
 {
     uint16_t *p;
+
+    mrp_debug("<0x%x>%u", tag, v);
 
     if (push_tag(tlv, tag) < 0)
         return -1;
@@ -293,6 +315,8 @@ int mrp_tlv_push_int32(mrp_tlv_t *tlv, uint32_t tag, int32_t v)
 {
     int32_t *p;
 
+    mrp_debug("<0x%x>%d", tag, v);
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -309,6 +333,8 @@ int mrp_tlv_push_int32(mrp_tlv_t *tlv, uint32_t tag, int32_t v)
 int mrp_tlv_push_uint32(mrp_tlv_t *tlv, uint32_t tag, uint32_t v)
 {
     uint32_t *p;
+
+    mrp_debug("<0x%x>%u", tag, v);
 
     if (push_tag(tlv, tag) < 0)
         return -1;
@@ -327,6 +353,8 @@ int mrp_tlv_push_int64(mrp_tlv_t *tlv, uint32_t tag, int64_t v)
 {
     int64_t *p;
 
+    mrp_debug("<0x%x>%lld", tag, (long long)v);
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -343,6 +371,8 @@ int mrp_tlv_push_int64(mrp_tlv_t *tlv, uint32_t tag, int64_t v)
 int mrp_tlv_push_uint64(mrp_tlv_t *tlv, uint32_t tag, uint64_t v)
 {
     uint64_t *p;
+
+    mrp_debug("<0x%x>%llu", tag, (unsigned long long)v);
 
     if (push_tag(tlv, tag) < 0)
         return -1;
@@ -361,6 +391,8 @@ int mrp_tlv_push_float(mrp_tlv_t *tlv, uint32_t tag, float v)
 {
     float *p;
 
+    mrp_debug("<0x%x>%f", tag, v);
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -378,6 +410,8 @@ int mrp_tlv_push_double(mrp_tlv_t *tlv, uint32_t tag, double v)
 {
     double *p;
 
+    mrp_debug("<0x%x>%f", tag, v);
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -394,6 +428,8 @@ int mrp_tlv_push_double(mrp_tlv_t *tlv, uint32_t tag, double v)
 int mrp_tlv_push_bool(mrp_tlv_t *tlv, uint32_t tag, bool v)
 {
     bool *p;
+
+    mrp_debug("<0x%x>%s", tag, v ? "true" : "false");
 
     if (push_tag(tlv, tag) < 0)
         return -1;
@@ -414,6 +450,8 @@ int mrp_tlv_push_string(mrp_tlv_t *tlv, uint32_t tag, const char *str)
     char     *strp;
     size_t    len = str ? strlen(str) + 1 : 0;
 
+    mrp_debug("<0x%x>'%s'", tag, str ? str : "");
+
     if (push_tag(tlv, tag) < 0)
         return -1;
 
@@ -433,16 +471,188 @@ int mrp_tlv_push_string(mrp_tlv_t *tlv, uint32_t tag, const char *str)
 }
 
 
+int mrp_tlv_push_short(mrp_tlv_t *tlv, uint32_t tag, short v)
+{
+    int16_t *p;
+
+    mrp_debug("<0x%x>%d", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe16((int16_t)v);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+
+int mrp_tlv_push_ushort(mrp_tlv_t *tlv, uint32_t tag, unsigned short v)
+{
+    uint16_t *p;
+
+    mrp_debug("<0x%x>%u", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe16((uint16_t)v);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+
+int mrp_tlv_push_int(mrp_tlv_t *tlv, uint32_t tag, int v)
+{
+    int32_t *p;
+
+    mrp_debug("<0x%x>%d", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe32((int32_t)v);
+
+        return 0;
+    }
+
+    return -1;
+}
+
+
+int mrp_tlv_push_uint(mrp_tlv_t *tlv, uint32_t tag, unsigned int v)
+{
+    uint32_t *p;
+
+    mrp_debug("<0x%x>%u", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe32((uint32_t)v);
+
+        return 0;
+    }
+
+    return -1;
+
+}
+
+
+int mrp_tlv_push_long(mrp_tlv_t *tlv, uint32_t tag, long v)
+{
+    int64_t *p;
+
+    mrp_debug("<0x%x>%ld", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe64((int64_t)v);
+
+        return 0;
+    }
+
+    return -1;
+
+}
+
+
+int mrp_tlv_push_ulong(mrp_tlv_t *tlv, uint32_t tag, unsigned long v)
+{
+    uint64_t *p;
+
+    mrp_debug("<0x%x>%lu", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe64((uint64_t)v);
+
+        return 0;
+    }
+
+    return -1;
+
+}
+
+
+int mrp_tlv_push_ssize(mrp_tlv_t *tlv, uint32_t tag, ssize_t v)
+{
+    int64_t *p;
+
+    mrp_debug("<0x%x>%zd", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe64((int64_t)v);
+
+        return 0;
+    }
+
+    return -1;
+
+}
+
+
+int mrp_tlv_push_size(mrp_tlv_t *tlv, uint32_t tag, size_t v)
+{
+    uint64_t *p;
+
+    mrp_debug("<0x%x>%zu", tag, v);
+
+    if (push_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = mrp_tlv_reserve(tlv, sizeof(*p), 1)) != NULL) {
+        *p = htobe64((uint64_t)v);
+
+        return 0;
+    }
+
+    return -1;
+
+}
+
+
+int mrp_tlv_peek_tag(mrp_tlv_t *tlv, uint32_t *tag)
+{
+    uint32_t *tagp;
+
+    if ((tagp = tlv_peek(tlv, sizeof(*tagp))) == NULL)
+        return -1;
+
+    *tag = be32toh(*tagp);
+
+    return 0;
+}
+
+
 int pull_tag(mrp_tlv_t *tlv, uint32_t tag)
 {
     uint32_t *tagp;
 
     if (tag) {
-        if ((tagp = tlv_consume(tlv, sizeof(*tagp))) == NULL)
+        if ((tagp = tlv_peek(tlv, sizeof(*tagp))) == NULL)
             return -1;
 
         if (be32toh(*tagp) != tag)
             return -1;
+        else
+            tlv_consume(tlv, sizeof(*tagp));
     }
 
     return 0;
@@ -660,3 +870,236 @@ int mrp_tlv_pull_string(mrp_tlv_t *tlv, uint32_t tag, char **v, size_t max,
 
     return 0;
 }
+
+
+int mrp_tlv_pull_short(mrp_tlv_t *tlv, uint32_t tag, short *v)
+{
+    int16_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    *v = be16toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_ushort(mrp_tlv_t *tlv, uint32_t tag, unsigned short *v)
+{
+    uint16_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    *v = be16toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_int(mrp_tlv_t *tlv, uint32_t tag, int *v)
+{
+    int32_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    *v = be32toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_uint(mrp_tlv_t *tlv, uint32_t tag, unsigned int *v)
+{
+    uint16_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    *v = be32toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_long(mrp_tlv_t *tlv, uint32_t tag, long *v)
+{
+    int64_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    if (*p > LONG_MAX) {
+        errno = ERANGE;
+        return -1;
+    }
+
+    *v = (long)be64toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_ulong(mrp_tlv_t *tlv, uint32_t tag, unsigned long *v)
+{
+    uint64_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    if (*p > ULONG_MAX) {
+        errno = ERANGE;
+        return -1;
+    }
+
+    *v = (unsigned long)be64toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_ssize(mrp_tlv_t *tlv, uint32_t tag, ssize_t *v)
+{
+    int64_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    if (*p > SSIZE_MAX) {
+        errno = ERANGE;
+        return -1;
+    }
+
+    *v = (ssize_t)be64toh(*p);
+
+    return 0;
+}
+
+
+int mrp_tlv_pull_size(mrp_tlv_t *tlv, uint32_t tag, size_t *v)
+{
+    uint64_t *p;
+
+    if (pull_tag(tlv, tag) < 0)
+        return -1;
+
+    if ((p = tlv_consume(tlv, sizeof(*p))) == NULL)
+        return -1;
+
+    if (*p > SIZE_MAX) {
+        errno = ERANGE;
+        return -1;
+    }
+
+    *v = (size_t)be64toh(*p);
+
+    return 0;
+}
+
+
+static inline int8_t int8v(int8_t v)
+{
+    return v;
+}
+
+static inline float floatv(float v)
+{
+    return v;
+}
+
+static inline double doublev(double v)
+{
+    return v;
+}
+
+static inline bool boolv(bool v)
+{
+    return v;
+}
+
+
+#define TYPE_PEEKER(_type_name, _type, _endconv)                      \
+int mrp_tlv_peek_##_type_name(mrp_tlv_t *tlv, uint32_t tag, _type *v) \
+{                                                                     \
+    uint32_t *tagp;                                                   \
+    _type    *p;                                                      \
+                                                                      \
+    if ((tagp = tlv_peek(tlv, sizeof(*tagp) + sizeof(*p))) == NULL) { \
+        errno = ENODATA;                                              \
+        return -1;                                                    \
+    }                                                                 \
+                                                                      \
+    if (be32toh(*tagp) == tag) {                                      \
+        p = (void *)tagp + sizeof(*tagp);                             \
+        *v = (_type)_endconv(*p);                                     \
+        return 1;                                                     \
+    }                                                                 \
+    else                                                              \
+        return 0;                                                     \
+}
+
+
+#define HOST_PEEKER(_type_name, _htype, _type, _endconv)               \
+int mrp_tlv_peek_##_type_name(mrp_tlv_t *tlv, uint32_t tag, _htype *v) \
+{                                                                     \
+    uint32_t *tagp;                                                   \
+    _type    *p;                                                      \
+                                                                      \
+    if ((tagp = tlv_peek(tlv, sizeof(*tagp) + sizeof(*p))) == NULL) { \
+        errno = ENODATA;                                              \
+        return -1;                                                    \
+    }                                                                 \
+                                                                      \
+    if (be32toh(*tagp) == tag) {                                      \
+        p = (void *)tagp + sizeof(*tagp);                             \
+        *v = (_htype)_endconv(*p);                                    \
+        return 1;                                                     \
+    }                                                                 \
+    else                                                              \
+        return 0;                                                     \
+}
+
+
+TYPE_PEEKER(int8  , int8_t        , int8v  );
+TYPE_PEEKER(uint8 , uint8_t       , int8v  );
+TYPE_PEEKER(int16 , int16_t       , be16toh);
+TYPE_PEEKER(uint16, uint16_t      , be16toh);
+TYPE_PEEKER(int32 , int32_t       , be32toh);
+TYPE_PEEKER(uint32, uint32_t      , be32toh);
+TYPE_PEEKER(int64 , int64_t       , be64toh);
+TYPE_PEEKER(uint64, uint64_t      , be64toh);
+TYPE_PEEKER(float , float         , floatv );
+TYPE_PEEKER(double, double        , doublev);
+TYPE_PEEKER(bool  , bool          , boolv  );
+
+HOST_PEEKER(short , short         , int16_t  , be16toh);
+HOST_PEEKER(ushort, unsigned short, uint16_t , be16toh);
+HOST_PEEKER(int   , int           , int32_t  , be32toh);
+HOST_PEEKER(uint  , unsigned int  , uint32_t , be32toh);
+HOST_PEEKER(long  , long          , int64_t  , be64toh);
+HOST_PEEKER(ulong , unsigned long , uint64_t , be64toh);
+HOST_PEEKER(ssize , ssize_t       , int64_t  , be64toh);
+HOST_PEEKER(size  , size_t        , uint64_t , be64toh);

@@ -50,6 +50,12 @@ typedef struct {
     int     write : 1;                   /* whether set up for writing */
 } mrp_tlv_t;
 
+/** Macro to initialize a read-only buffer with the given data and size. */
+#define MRP_TLV_READ(_b, _sz) { .buf = _b, .p = _b, .size = _sz, .write = 0 }
+
+/** Macro to initialize an empty (read-only) buffer. */
+#define MRP_TLV_EMPTY MRP_TLV_READ(NULL, 0)
+
 /** Set up the given TLV buffer for encoding. */
 int mrp_tlv_setup_write(mrp_tlv_t *tlv, size_t prealloc);
 
@@ -110,7 +116,31 @@ int mrp_tlv_push_bool(mrp_tlv_t *tlv, uint32_t tag, bool v);
 /** Add a string with an optional tag to the TLV buffer. */
 int mrp_tlv_push_string(mrp_tlv_t *tlv, uint32_t tag, const char *str);
 
+/** Add a short with an optional tag to the TLV buffer. */
+int mrp_tlv_push_short(mrp_tlv_t *tlv, uint32_t tag, short v);
 
+/** Add an unsigned short with an optional tag to the TLV buffer. */
+int mrp_tlv_push_ushort(mrp_tlv_t *tlv, uint32_t tag, unsigned short v);
+
+/** Add an int with an optional tag to the TLV buffer. */
+int mrp_tlv_push_int(mrp_tlv_t *tlv, uint32_t tag, int v);
+
+/** Add an unsigned int with an optional tag to the TLV buffer. */
+int mrp_tlv_push_uint(mrp_tlv_t *tlv, uint32_t tag, unsigned int v);
+
+/** Add an long with an optional tag to the TLV buffer. */
+int mrp_tlv_push_long(mrp_tlv_t *tlv, uint32_t tag, long v);
+
+/** Add an unsigned long with an optional tag to the TLV buffer. */
+int mrp_tlv_push_ulong(mrp_tlv_t *tlv, uint32_t tag, unsigned long v);
+
+/** Add a size_t with an optional tag to the TLV buffer. */
+int mrp_tlv_push_size(mrp_tlv_t *tlv, uint32_t tag, size_t v);
+
+/** Add an unsigned long with an optional tag to the TLV buffer. */
+int mrp_tlv_push_ssize(mrp_tlv_t *tlv, uint32_t tag, ssize_t v);
+
+int mrp_tlv_peek_tag(mrp_tlv_t *tlv, uint32_t *tag);
 int mrp_tlv_pull_int8(mrp_tlv_t *tlv, uint32_t tag, int8_t *v);
 int mrp_tlv_pull_uint8(mrp_tlv_t *tlv, uint32_t tag, uint8_t *v);
 int mrp_tlv_pull_int16(mrp_tlv_t *tlv, uint32_t tag, int16_t *v);
@@ -124,6 +154,43 @@ int mrp_tlv_pull_double(mrp_tlv_t *tlv, uint32_t tag, double *v);
 int mrp_tlv_pull_bool(mrp_tlv_t *tlv, uint32_t tag, bool *v);
 int mrp_tlv_pull_string(mrp_tlv_t *tlv, uint32_t tag, char **v, size_t max,
                         void *(alloc)(size_t, void *), void *alloc_data);
+int mrp_tlv_pull_short(mrp_tlv_t *tlv, uint32_t tag, short *v);
+int mrp_tlv_pull_ushort(mrp_tlv_t *tlv, uint32_t tag, unsigned short *v);
+int mrp_tlv_pull_int(mrp_tlv_t *tlv, uint32_t tag, int *v);
+int mrp_tlv_pull_uint(mrp_tlv_t *tlv, uint32_t tag, unsigned int *v);
+int mrp_tlv_pull_long(mrp_tlv_t *tlv, uint32_t tag, long *v);
+int mrp_tlv_pull_ulong(mrp_tlv_t *tlv, uint32_t tag, unsigned long *v);
+int mrp_tlv_pull_size(mrp_tlv_t *tlv, uint32_t tag, size_t *v);
+int mrp_tlv_pull_ssize(mrp_tlv_t *tlv, uint32_t tag, ssize_t *v);
+
+#define DECLARE_TYPE_PEEKER(_type_name, _type)                          \
+int mrp_tlv_peek_##_type_name(mrp_tlv_t *tlv, uint32_t tag, _type *v)
+
+#define DECLARE_HOST_PEEKER(_type_name, _htype)                         \
+int mrp_tlv_peek_##_type_name(mrp_tlv_t *tlv, uint32_t tag, _htype *v)
+
+
+DECLARE_TYPE_PEEKER(int8  , int8_t        );
+DECLARE_TYPE_PEEKER(uint8 , uint8_t       );
+DECLARE_TYPE_PEEKER(int16 , int16_t       );
+DECLARE_TYPE_PEEKER(uint16, uint16_t      );
+DECLARE_TYPE_PEEKER(int32 , int32_t       );
+DECLARE_TYPE_PEEKER(uint32, uint32_t      );
+DECLARE_TYPE_PEEKER(int64 , int64_t       );
+DECLARE_TYPE_PEEKER(uint64, uint64_t      );
+DECLARE_TYPE_PEEKER(float , float         );
+DECLARE_TYPE_PEEKER(double, double        );
+DECLARE_TYPE_PEEKER(bool  , bool          );
+
+DECLARE_HOST_PEEKER(short , short         );
+DECLARE_HOST_PEEKER(ushort, unsigned short);
+DECLARE_HOST_PEEKER(int   , int           );
+DECLARE_HOST_PEEKER(uint  , unsigned int  );
+DECLARE_HOST_PEEKER(long  , long          );
+DECLARE_HOST_PEEKER(ulong , unsigned long );
+DECLARE_HOST_PEEKER(ssize , ssize_t       );
+DECLARE_HOST_PEEKER(size  , size_t        );
+
 
 MRP_CDECL_END
 
