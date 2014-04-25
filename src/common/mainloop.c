@@ -248,6 +248,7 @@ struct mrp_mainloop_s {
 
 
 static void dump_pollfds(const char *prefix, struct pollfd *fds, int nfd);
+static void adjust_superloop_timer(mrp_mainloop_t *ml);
 
 
 /*
@@ -619,7 +620,12 @@ static void insert_timer(mrp_timer_t *t)
     if (!inserted)
         mrp_list_append(&ml->timers, &t->hook);
 
-    ml->next_timer = next ? next : t;
+    if (next)
+        ml->next_timer = next;
+    else {
+        ml->next_timer = t;
+        adjust_superloop_timer(ml);
+    }
 }
 
 
@@ -714,8 +720,10 @@ void mrp_del_timer(mrp_timer_t *t)
 
         mark_deleted(t);
 
-        if (t->ml->next_timer == t)
+        if (t->ml->next_timer == t) {
             find_next_timer(t->ml);
+            adjust_superloop_timer(t->ml);
+        }
     }
 }
 
@@ -1198,6 +1206,20 @@ static void super_work_cb(void *super_data, void *id, void *user_data)
         ml->timer = NULL;
         ml->work  = NULL;
     }
+}
+
+
+static void adjust_superloop_timer(mrp_mainloop_t *ml)
+{
+    mrp_superloop_ops_t *ops = ml->super_ops;
+    unsigned int         timeout;
+
+    if (ops == NULL)
+        return;
+
+    mrp_mainloop_prepare(ml);
+    timeout = mrp_list_empty(&ml->deferred) ? ml->poll_timeout : 0;
+    ops->mod_timer(ml->super_data, ml->timer, timeout);
 }
 
 
