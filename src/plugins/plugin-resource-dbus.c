@@ -159,6 +159,9 @@ typedef struct {
     bool locked; /* if the library allows the settings to be changed */
     bool acquired; /* set to true when we are starting the acquisition */
     mrp_resource_set_t *set;
+
+    /* whether we have encountered an error in the library calls */
+    bool error;
 } resource_set_o_t;
 
 typedef struct {
@@ -1047,6 +1050,8 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
         goto error;
     }
 
+    rset->error = FALSE;
+
     return rset;
 
 error:
@@ -1635,6 +1640,10 @@ static int add_resource_cb(void *key, void *object, void *user_data)
                 >= 0) {
         update_attributes(name, rset->set, r->conf_prop->value);
     }
+    else {
+        mrp_log_error("Error adding the resource to resource set!");
+        rset->error = TRUE;
+    }
 
     return MRP_HTBL_ITER_MORE;
 }
@@ -1748,6 +1757,13 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         if (!rset->locked) {
             /* add the resources */
             mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
+            if (rset->error) {
+                /* could not add the resource to resource set */
+                rset->error = FALSE;
+                error_msg = "Could not add resource to resource set; "
+                        "possibly an unknown resource";
+                goto error_reply;
+            }
 
             if (mrp_application_class_add_resource_set(
                     (char *) rset->class_prop->value,
@@ -1757,7 +1773,7 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
                  * The resource library is known to crash if the rset->set
                  * pointer is used for acquiring.
                  */
-                goto error;
+                goto error_reply;
             }
         }
 
@@ -1860,7 +1876,6 @@ error_reply:
             mrp_dbus_msg_unref(reply);
         }
     }
-    return TRUE;
 
 error:
     return TRUE;
