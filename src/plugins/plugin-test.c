@@ -35,6 +35,7 @@
 #include <murphy/core/console.h>
 #include <murphy/core/event.h>
 #include <murphy/core/auth.h>
+#include <murphy/core/domain.h>
 
 
 typedef struct {
@@ -63,6 +64,8 @@ void three_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void four_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void resolve_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 void auth_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void ping_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
+void invoke_cb(mrp_console_t *c, void *user_data, int argc, char **argv);
 
 MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
         MRP_TOKENIZED_CMD("one"  , one_cb  , TRUE,
@@ -77,7 +80,14 @@ MRP_CONSOLE_GROUP(test_group, "test", NULL, NULL, {
                           "update <target>", "update target", "update target"),
         MRP_TOKENIZED_CMD("auth-test", auth_cb, TRUE,
                           "auth-test [@backend] target mode id [token]",
-                          "test authentication", "test authentication")
+                          "test authentication", "test authentication"),
+        MRP_TOKENIZED_CMD("ping", ping_cb, FALSE,
+                          "ping domain",
+                          "ping the given domain", "ping a domain"),
+        MRP_TOKENIZED_CMD("invoke", invoke_cb, TRUE,
+                          "invoke domain method [ərguments]",
+                          "invoke the given domain method",
+                          "invoke a domain method")
 });
 
 
@@ -219,6 +229,209 @@ void auth_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     status = mrp_authenticate(ctx, backend, target, mode, id, token);
 
     printf("authentication status: %d\n", status);
+}
+
+
+void pong_cb(int error, int retval, int narg, mrp_domctl_arg_t *args,
+             void *user_data)
+{
+    mrp_console_t *c = (mrp_console_t *)user_data;
+    int            i;
+
+    MRP_UNUSED(c);
+
+    if (error) {
+        printf("ping failed with error code %d\n", error);
+    }
+
+    printf("pong (return value %d)\n", retval);
+
+    for (i = 0; i < narg; i++) {
+        switch (args[i].type) {
+        case MRP_DOMCTL_STRING:
+            printf("    #%d: %s\n", i, args[i].str);
+            break;
+        case MRP_DOMCTL_UINT32:
+            printf("    #%d: %u\n", i, args[i].u32);
+            break;
+        default:
+            if (MRP_DOMCTL_IS_ARRAY(args[i].type)) {
+                uint32_t j;
+
+                printf("    #%d: array of %u items:\n", i, args[i].size);
+                for (j = 0; j < args[i].size; j++) {
+                    switch (MRP_DOMCTL_ARRAY_TYPE(args[i].type)) {
+                    case MRP_DOMCTL_STRING:
+                        printf("        #%d: '%s'\n", j,
+                               ((char **)args[i].arr)[j]);
+                        break;
+                    case MRP_DOMCTL_UINT32:
+                        printf("        #%d: %u\n", j,
+                               ((uint32_t *)args[i].arr)[j]);
+                        break;
+                    default:
+                        printf("        #%d: <type 0x%x\n", j,
+                               MRP_DOMCTL_ARRAY_TYPE(args[i].type));
+                        break;
+                    }
+                }
+            }
+            else
+                printf("    <type 0x%x>\n", args[i].type);
+        }
+    }
+}
+
+
+void ping_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    static uint32_t   cnt = 1;
+    const char       *domain;
+    char             *strings[] = { "foo", "bar", "foobar", "barfoo" };
+    uint32_t          uints[]   = { 69, 96, 696, 969 };
+    mrp_domctl_arg_t  args[32];
+    int               narg, i;
+
+    MRP_UNUSED(user_data);
+
+    if (argc < 3) {
+        printf("Usage: %s domain\n", argv[0]);
+        return;
+    }
+
+    domain = argv[2];
+    narg   = MRP_ARRAY_SIZE(args);
+
+    args[0].type = MRP_DOMCTL_UINT32;
+    args[0].u32  = cnt++;
+    args[1].type = MRP_DOMCTL_ARRAY(STRING);
+    args[1].arr  = strings;
+    args[1].size = MRP_ARRAY_SIZE(strings);
+    args[2].type = MRP_DOMCTL_ARRAY(UINT32);
+    args[2].arr  = uints;
+    args[2].size = MRP_ARRAY_SIZE(uints);
+
+    for (i = 3; i < narg; i++) {
+        if (i + 2 < argc) {
+            args[i].type = MRP_DOMCTL_STRING;
+            args[i].str  = argv[i + 2];
+        }
+        else {
+            args[i].type = MRP_DOMCTL_UINT32;
+            args[i].u32  = i;
+        }
+    }
+
+    if (!mrp_invoke_domain(c->ctx, domain, "ping", narg, args, pong_cb, c))
+        printf("Failed to ping domain '%s'.\n", domain);
+}
+
+
+void invoke_reply(int error, int retval, int narg, mrp_domctl_arg_t *args,
+                  void *user_data)
+{
+    mrp_console_t *c = (mrp_console_t *)user_data;
+    int            i;
+
+    if (error) {
+        mrp_console_printf(c, "invoked method failed with error code %d\n",
+                           error);
+        return;
+    }
+
+    mrp_console_printf(c, "invoked method returned (return value %d)\n", retval);
+
+    for (i = 0; i < narg; i++) {
+        switch (args[i].type) {
+        case MRP_DOMCTL_STRING:
+            mrp_console_printf(c, "    #%d: %s\n", i, args[i].str);
+            break;
+        case MRP_DOMCTL_UINT16:
+            mrp_console_printf(c, "    #%d: %u\n", i, args[i].u16);
+            break;
+        case MRP_DOMCTL_INT16:
+            mrp_console_printf(c, "    #%d: %u\n", i, args[i].s16);
+            break;
+        case MRP_DOMCTL_UINT32:
+            mrp_console_printf(c, "    #%d: %u\n", i, args[i].u32);
+            break;
+        case MRP_DOMCTL_INT32:
+            mrp_console_printf(c, "    #%d: %u\n", i, args[i].s32);
+            break;
+        default:
+            mrp_console_printf(c, "    #%d: <type 0x%x\n", i, args[i].type);
+            break;
+        }
+    }
+}
+
+
+void invoke_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
+{
+    const char       *domain, *method, *type, *value;
+    mrp_domctl_arg_t  args[32];
+    int               tlen, narg, i;
+
+    MRP_UNUSED(user_data);
+
+    if (argc < 4) {
+        printf("Usage: %s %s <domain> <method> [args]\n", argv[0], argv[1]);
+        return;
+    }
+
+    domain = argv[2];
+    method = argv[3];
+    narg   = MRP_ARRAY_SIZE(args);
+
+    for (i = 4, narg = 0; i < argc && narg < MRP_ARRAY_SIZE(args); i++, narg++) {
+        type  = argv[i];
+        value = strchr(type, ':');
+
+        if (value == NULL) {
+            value = type;
+            type  = "string";
+            tlen  = 6;
+        }
+        else {
+            tlen  = value - type;
+            value++;
+        }
+
+        if (!strncmp(type, "string", tlen)) {
+            args[narg].type = MRP_DOMCTL_STRING;
+            args[narg].str  = value;
+        }
+        else if (!strncmp(type, "u16"     , tlen) ||
+                 !strncmp(type, "uint16_t", tlen)) {
+            args[narg].type = MRP_DOMCTL_UINT16;
+            args[narg].u16  = (uint16_t)strtoul(value, NULL, 0);
+        }
+        else if (!strncmp(type, "u16"     , tlen) ||
+                 !strncmp(type, "uint16_t", tlen)) {
+            args[narg].type = MRP_DOMCTL_INT16;
+            args[narg].s16  = (int16_t)strtol(value, NULL, 0);
+        }
+        else if (!strncmp(type, "u32"     , tlen) ||
+                 !strncmp(type, "uint32_t", tlen)) {
+            args[narg].type = MRP_DOMCTL_UINT32;
+            args[narg].u32  = (uint32_t)strtoul(value, NULL, 0);
+        }
+        else if (!strncmp(type, "u32"     , tlen) ||
+                 !strncmp(type, "uint32_t", tlen)) {
+            args[narg].type = MRP_DOMCTL_INT32;
+            args[narg].s32  = (int32_t)strtol(value, NULL, 0);
+        }
+        else {
+            printf("invalid typecast in %s\n", argv[i]);
+            return;
+        }
+    }
+
+    printf("Invoking domain method '%s.%s' with %d args...\n", domain, method,
+           narg);
+
+    if (!mrp_invoke_domain(c->ctx, domain, method, narg, args, invoke_reply, c))
+        printf("Failed to invoke '%s.%s'.\n", domain, method);
 }
 
 
