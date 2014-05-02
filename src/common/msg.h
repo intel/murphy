@@ -46,27 +46,29 @@ MRP_CDECL_BEGIN
 
 #define A(t) MRP_MSG_FIELD_##t
 typedef enum {
-    MRP_MSG_FIELD_INVALID = 0x00,        /* defined invalid type */
-    MRP_MSG_FIELD_STRING  = 0x01,        /* string */
-    MRP_MSG_FIELD_BOOL    = 0x02,        /* boolean */
-    MRP_MSG_FIELD_UINT8   = 0x03,        /* unsigned 8-bit integer */
-    MRP_MSG_FIELD_SINT8   = 0x04,        /* signed 8-bit integer */
-    MRP_MSG_FIELD_INT8    = A(SINT8),    /* alias for SINT8 */
-    MRP_MSG_FIELD_UINT16  = 0x05,        /* unsigned 16-bit integer */
-    MRP_MSG_FIELD_SINT16  = 0x06,        /* signed 16-bit integer */
-    MRP_MSG_FIELD_INT16   = A(SINT16),   /* alias for SINT16 */
-    MRP_MSG_FIELD_UINT32  = 0x07,        /* unsigned 32-bit integer */
-    MRP_MSG_FIELD_SINT32  = 0x08,        /* signed 32-bit integer */
-    MRP_MSG_FIELD_INT32   = A(SINT32),   /* alias for SINT32 */
-    MRP_MSG_FIELD_UINT64  = 0x09,        /* unsigned 64-bit integer */
-    MRP_MSG_FIELD_SINT64  = 0x0a,        /* signed 64-bit integer */
-    MRP_MSG_FIELD_INT64   = A(SINT64),   /* alias for SINT64 */
-    MRP_MSG_FIELD_DOUBLE  = 0x0b,        /* double-prec. floating point */
-    MRP_MSG_FIELD_BLOB    = 0x0c,        /* a blob (not allowed in arrays) */
-    MRP_MSG_FIELD_MAX     = 0x0c,
-    MRP_MSG_FIELD_ANY     = 0xd,         /* any type of field when querying */
+    MRP_MSG_FIELD_INVALID  = 0x00,       /* defined invalid type */
+    MRP_MSG_FIELD_STRING   = 0x01,       /* mqi_varchar */
+    MRP_MSG_FIELD_INTEGER  = 0x02,       /* mqi_integer */
+    MRP_MSG_FIELD_UNSIGNED = 0x03,       /* mqi_unsignd */
+    MRP_MSG_FIELD_DOUBLE   = 0x04,       /* mqi_floating */
+    MRP_MSG_FIELD_BOOL     = 0x05,       /* boolean */
+    MRP_MSG_FIELD_UINT8    = 0x06,       /* unsigned 8-bit integer */
+    MRP_MSG_FIELD_SINT8    = 0x07,       /* signed 8-bit integer */
+    MRP_MSG_FIELD_INT8     = A(SINT8),   /* alias for SINT8 */
+    MRP_MSG_FIELD_UINT16   = 0x08,       /* unsigned 16-bit integer */
+    MRP_MSG_FIELD_SINT16   = 0x09,       /* signed 16-bit integer */
+    MRP_MSG_FIELD_INT16    = A(SINT16),  /* alias for SINT16 */
+    MRP_MSG_FIELD_UINT32   = 0x0a,       /* unsigned 32-bit integer */
+    MRP_MSG_FIELD_SINT32   = 0x0b,       /* signed 32-bit integer */
+    MRP_MSG_FIELD_INT32    = A(SINT32),  /* alias for SINT32 */
+    MRP_MSG_FIELD_UINT64   = 0x0c,       /* unsigned 64-bit integer */
+    MRP_MSG_FIELD_SINT64   = 0x0d,       /* signed 64-bit integer */
+    MRP_MSG_FIELD_INT64    = A(SINT64),  /* alias for SINT64 */
+    MRP_MSG_FIELD_BLOB     = 0x0e,       /* a blob (not allowed in arrays) */
+    MRP_MSG_FIELD_MAX      = 0x0e,
+    MRP_MSG_FIELD_ANY      = 0x0f,       /* any type of field when querying */
 
-    MRP_MSG_FIELD_ARRAY   = 0x80,        /* bit-mask to mark arrays */
+    MRP_MSG_FIELD_ARRAY    = 0x80,       /* bit-mask to mark arrays */
 } mrp_msg_field_type_t;
 #undef A
 
