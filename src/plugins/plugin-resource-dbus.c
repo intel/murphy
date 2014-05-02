@@ -352,7 +352,7 @@ static int dbus_value_cb(void *key, void *object, void *user_data)
         goto end;
     }
 
-    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, dsig)) {
+    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, NULL)) {
         mrp_log_error("failed to open dict container with sig '%s'", dsig);
         goto end;
     }
@@ -482,7 +482,7 @@ static bool get_property_dict_entry(property_o_t *prop, mrp_dbus_msg_t *reply)
 {
     bool ret;
 
-    mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, "sv");
+    mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, NULL);
 
     ret = get_property_entry(prop, reply);
 
