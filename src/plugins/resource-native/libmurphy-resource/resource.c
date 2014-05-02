@@ -118,20 +118,9 @@ static void resource_event(mrp_msg_t *msg,
     rset = mrp_htbl_lookup(cx->priv->rset_mapping, u_to_p(rset_id));
 
     if (!rset) {
-        mrp_res_error("resource event outside the resource set lifecycle");
+        mrp_res_info("resource event outside the resource set lifecycle");
         goto malformed;
     }
-
-#if 0
-    switch (state) {
-        case RESPROTO_RELEASE:
-            rset->state = MRP_RES_RESOURCE_LOST;
-            break;
-        case RESPROTO_ACQUIRE:
-            rset->state = MRP_RES_RESOURCE_ACQUIRED;
-            break;
-    }
-#endif
 
     while (mrp_msg_iterate(msg, pcursor, &tag, &type, &value, &size)) {
 
@@ -232,8 +221,9 @@ static void resource_event(mrp_msg_t *msg,
      * callback before that. Otherwise, if this is a real event, call the
      * callback right away. */
 
+#if 0
     print_resource_set(rset);
-
+#endif
     if (!rset->priv->seqno) {
         if (rset->priv->cb) {
             increase_ref(cx, rset);

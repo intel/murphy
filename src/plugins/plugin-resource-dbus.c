@@ -159,6 +159,9 @@ typedef struct {
     bool locked; /* if the library allows the settings to be changed */
     bool acquired; /* set to true when we are starting the acquisition */
     mrp_resource_set_t *set;
+
+    /* whether we have encountered an error in the library calls */
+    bool error;
 } resource_set_o_t;
 
 typedef struct {
@@ -349,7 +352,7 @@ static int dbus_value_cb(void *key, void *object, void *user_data)
         goto end;
     }
 
-    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, dsig)) {
+    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, NULL)) {
         mrp_log_error("failed to open dict container with sig '%s'", dsig);
         goto end;
     }
@@ -479,7 +482,8 @@ static bool get_property_dict_entry(property_o_t *prop, mrp_dbus_msg_t *reply)
 {
     bool ret;
 
-    mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, "sv");
+    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, NULL))
+        return FALSE;
 
     ret = get_property_entry(prop, reply);
 
@@ -1047,6 +1051,8 @@ static resource_set_o_t * create_rset(manager_o_t *mgr, uint32_t id,
         goto error;
     }
 
+    rset->error = FALSE;
+
     return rset;
 
 error:
@@ -1266,8 +1272,7 @@ static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
     const char *iface = mrp_dbus_msg_interface(msg);
     const char *path = mrp_dbus_msg_path(msg);
     char *error_msg = "Received invalid message";
-
-    mrp_dbus_msg_t *reply;
+    mrp_dbus_msg_t *reply = NULL;
     char buf[MAX_PATH_LENGTH];
 
     dbus_data_t *ctx = data;
@@ -1315,12 +1320,14 @@ static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 
         mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "{sv}");
 
-        get_property_dict_entry(resource->name_prop, reply);
-        get_property_dict_entry(resource->status_prop, reply);
-        get_property_dict_entry(resource->mandatory_prop, reply);
-        get_property_dict_entry(resource->shared_prop, reply);
-        get_property_dict_entry(resource->arguments_prop, reply);
-        get_property_dict_entry(resource->conf_prop, reply);
+        if (!(get_property_dict_entry(resource->name_prop, reply) &&
+                get_property_dict_entry(resource->status_prop, reply) &&
+                get_property_dict_entry(resource->mandatory_prop, reply) &&
+                get_property_dict_entry(resource->shared_prop, reply) &&
+                get_property_dict_entry(resource->arguments_prop, reply) &&
+                get_property_dict_entry(resource->conf_prop, reply))) {
+            goto error_reply;
+        }
 
         mrp_dbus_msg_close_container(reply);
 
@@ -1601,6 +1608,11 @@ error_reply:
         mrp_dbus_error_init(&err);
         mrp_dbus_error_set(&err, "org.freedesktop.DBus.Error.Failed", error_msg);
 
+        if (reply) {
+            /* something was already done -- free some memory */
+            mrp_dbus_msg_unref(reply);
+        }
+
         reply = mrp_dbus_msg_error(dbus, msg, &err);
 
         if (reply) {
@@ -1634,6 +1646,10 @@ static int add_resource_cb(void *key, void *object, void *user_data)
     if (mrp_resource_set_add_resource(rset->set, name, shared, NULL, mandatory)
                 >= 0) {
         update_attributes(name, rset->set, r->conf_prop->value);
+    }
+    else {
+        mrp_log_error("Error adding the resource to resource set!");
+        rset->error = TRUE;
     }
 
     return MRP_HTBL_ITER_MORE;
@@ -1748,6 +1764,13 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         if (!rset->locked) {
             /* add the resources */
             mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
+            if (rset->error) {
+                /* could not add the resource to resource set */
+                rset->error = FALSE;
+                error_msg = "Could not add resource to resource set; "
+                        "possibly an unknown resource";
+                goto error_reply;
+            }
 
             if (mrp_application_class_add_resource_set(
                     (char *) rset->class_prop->value,
@@ -1757,7 +1780,7 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
                  * The resource library is known to crash if the rset->set
                  * pointer is used for acquiring.
                  */
-                goto error;
+                goto error_reply;
             }
         }
 
@@ -1860,7 +1883,6 @@ error_reply:
             mrp_dbus_msg_unref(reply);
         }
     }
-    return TRUE;
 
 error:
     return TRUE;
