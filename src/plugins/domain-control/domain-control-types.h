@@ -70,6 +70,7 @@ struct mrp_domctl_s {
     int                      destroyed:1;/* non-zero if destroy pending */
     uint32_t                 seqno;      /* request sequence number */
     mrp_list_hook_t          pending;    /* queue of outstanding requests */
+    mrp_list_hook_t          methods;    /* registered proxied methods */
 };
 
 
@@ -133,6 +134,8 @@ struct pep_proxy_s {
     int                ntable;           /* number of tables */
     mrp_list_hook_t    watches;          /* tables watched by this */
     proxy_ops_t       *ops;              /* transport/messaging operations */
+    uint32_t           seqno;            /* request sequence number */
+    mrp_list_hook_t    pending;          /* pending method invocations */
     int                notify_update;    /* whether needs notification */
     void              *notify_msg;       /* notification being built */
     int                notify_ntable;    /* number of changed tables */

@@ -44,6 +44,8 @@ typedef enum {
     MSG_TYPE_NOTIFY,
     MSG_TYPE_ACK,
     MSG_TYPE_NAK,
+    MSG_TYPE_INVOKE,
+    MSG_TYPE_RETURN,
 } msg_type_t;
 
 typedef enum {
@@ -72,16 +74,32 @@ typedef enum {
     MSGTAG_NROW    = 0x6,            /* number of table rows */
     MSGTAG_NCOL    = 0x7,            /* number of columns in a row */
     MSGTAG_DATA    = 0x8,            /* a data column */
+
+    /* fixed tags in invoke and return messages */
+    MSGTAG_METHOD  = 0x3,            /* method name */
+    MSGTAG_NORET   = 0x4,            /* whether return values ignored */
+    MSGTAG_NARG    = 0x5,            /* number of arguments */
+    MSGTAG_ARG     = 0x6,            /* argument */
+    MSGTAG_ERROR   = 0x7,            /* invocation error */
+    MSGTAG_RETVAL  = 0x8,            /* invocation return value */
 } msgtag_t;
 
 
+#define MSG_UINT8(tag, val) MRP_MSG_TAG_UINT8(MSGTAG_##tag, val)
+#define MSG_SINT8(tag, val) MRP_MSG_TAG_SINT8(MSGTAG_##tag, val)
 #define MSG_UINT16(tag, val) MRP_MSG_TAG_UINT16(MSGTAG_##tag, val)
 #define MSG_SINT16(tag, val) MRP_MSG_TAG_SINT16(MSGTAG_##tag, val)
 #define MSG_UINT32(tag, val) MRP_MSG_TAG_UINT32(MSGTAG_##tag, val)
 #define MSG_SINT32(tag, val) MRP_MSG_TAG_SINT32(MSGTAG_##tag, val)
+#define MSG_UINT64(tag, val) MRP_MSG_TAG_UINT64(MSGTAG_##tag, val)
+#define MSG_SINT64(tag, val) MRP_MSG_TAG_SINT64(MSGTAG_##tag, val)
 #define MSG_DOUBLE(tag, val) MRP_MSG_TAG_DOUBLE(MSGTAG_##tag, val)
 #define MSG_STRING(tag, val) MRP_MSG_TAG_STRING(MSGTAG_##tag, val)
+#define MSG_BOOL(tag, val) MRP_MSG_TAG_BOOL(MSGTAG_##tag, val)
 #define MSG_ANY(tag, typep, valp) MRP_MSG_TAG_ANY(MSGTAG_##tag, typep, valp)
+#define MSG_ARRAY(tag, type, size, arr) \
+    MRP_MSG_TAGGED(MSGTAG_##tag, type, size, arr)
+
 #define MSG_END MRP_MSG_END
 
 #define COMMON_MSG_FIELDS                /* common message fields */      \
@@ -132,6 +150,25 @@ typedef struct {
     const char *msg;
 } nak_msg_t;
 
+
+typedef struct {
+    COMMON_MSG_FIELDS;
+    const char       *name;
+    int               noret;
+    uint32_t          narg;
+    mrp_domctl_arg_t *args;
+} invoke_msg_t;
+
+
+typedef struct {
+    COMMON_MSG_FIELDS;
+    uint32_t          error;
+    int32_t           retval;
+    uint32_t          narg;
+    mrp_domctl_arg_t *args;
+} return_msg_t;
+
+
 typedef struct {
     COMMON_MSG_FIELDS;
 } any_msg_t;
@@ -145,6 +182,8 @@ union msg_u {
     notify_msg_t     notify;
     ack_msg_t        ack;
     nak_msg_t        nak;
+    invoke_msg_t     invoke;
+    return_msg_t     ret;
 };
 
 

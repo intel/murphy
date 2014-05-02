@@ -33,6 +33,8 @@
 #include <murphy/common/log.h>
 #include <murphy/common/wsck-transport.h>
 
+#include <murphy/core/domain.h>
+
 #include "proxy.h"
 #include "message.h"
 #include "table.h"
@@ -41,6 +43,13 @@
 
 static mrp_transport_t *create_transport(pdp_t *pdp, const char *address);
 static void destroy_transport(mrp_transport_t *t);
+
+static int invoke_handler(void *handler_data, const char *id,
+                          const char *method, int narg,
+                          mrp_domctl_arg_t *args,
+                          mrp_domain_return_cb_t return_cb,
+                          void *user_data);
+
 
 pdp_t *create_domain_control(mrp_context_t *ctx,
                              const char *extaddr, const char *intaddr,
@@ -79,8 +88,10 @@ pdp_t *create_domain_control(mrp_context_t *ctx,
 
             if ((!extaddr || !*extaddr || pdp->extt != NULL) &&
                 (!intaddr || !*intaddr || pdp->intt != NULL) &&
-                (!wrtaddr || !*wrtaddr || pdp->wrtt != NULL))
+                (!wrtaddr || !*wrtaddr || pdp->wrtt != NULL)) {
+                mrp_set_domain_invoke_handler(ctx, invoke_handler, pdp);
                 return pdp;
+            }
         }
 
         destroy_domain_control(pdp);
@@ -207,6 +218,79 @@ static void process_set(pep_proxy_t *proxy, set_msg_t *set)
 }
 
 
+static void process_invoke(pep_proxy_t *proxy, invoke_msg_t *invoke)
+{
+    mrp_context_t          *ctx = proxy->pdp->ctx;
+    mrp_domain_invoke_cb_t  cb;
+    void                   *user_data;
+    int                     max_out;
+    mrp_domctl_arg_t       *args;
+    int                     narg;
+    return_msg_t            ret;
+    mrp_msg_t              *msg;
+    int                     i;
+
+    mrp_clear(&ret);
+
+    ret.type = MSG_TYPE_RETURN;
+    ret.seq  = invoke->seq;
+    args     = NULL;
+    narg     = 0;
+
+    if (!mrp_lookup_domain_method(ctx, invoke->name, &cb, &max_out,&user_data)) {
+        ret.error = MRP_DOMCTL_NOTFOUND;
+    }
+    else {
+        ret.error = MRP_DOMCTL_OK;
+
+        narg = ret.narg = max_out;
+
+        if (narg > 0) {
+            args = ret.args = alloca(narg * sizeof(args[0]));
+            memset(args, 0, narg * sizeof(args[0]));
+        }
+
+        ret.retval = cb(invoke->narg, invoke->args,
+                        &ret.narg, ret.args, user_data);
+    }
+
+    msg = msg_encode_message((msg_t *)&ret);
+
+    if (msg != NULL) {
+        mrp_transport_send(proxy->t, msg);
+        mrp_msg_unref(msg);
+    }
+
+    narg = ret.narg;
+    for (i = 0; i < narg; i++) {
+        if (args[i].type == MRP_DOMCTL_STRING)
+            mrp_free((char *)args[i].str);
+        else if (MRP_DOMCTL_IS_ARRAY(args[i].type)) {
+            uint32_t j;
+
+            for (j = 0; j < args[i].size; j++)
+                if (MRP_DOMCTL_ARRAY_TYPE(args[i].type) == MRP_DOMCTL_STRING)
+                    mrp_free(((char **)args[i].arr)[j]);
+
+            mrp_free(args[i].arr);
+        }
+    }
+}
+
+
+static void process_return(pep_proxy_t *proxy, return_msg_t *ret)
+{
+    uint32_t                id = ret->seq;
+    mrp_domain_return_cb_t  cb;
+    void                   *user_data;
+
+    if (!proxy_dequeue_pending(proxy, id, &cb, &user_data))
+        return;
+
+    cb(ret->error, ret->retval, ret->narg, ret->args, user_data);
+}
+
+
 static void process_message(pep_proxy_t *proxy, msg_t *msg)
 {
     char *name  = proxy->name ? proxy->name : "<unknown>";
@@ -221,11 +305,49 @@ static void process_message(pep_proxy_t *proxy, msg_t *msg)
     case MSG_TYPE_SET:
         process_set(proxy, &msg->set);
         break;
+    case MSG_TYPE_INVOKE:
+        process_invoke(proxy, &msg->invoke);
+        break;
+    case MSG_TYPE_RETURN:
+        process_return(proxy, &msg->ret);
+        break;
     default:
         mrp_log_error("Unexpected message 0x%x from client %s.",
                       msg->any.type, name);
         break;
     }
+}
+
+
+static int invoke_handler(void *handler_data, const char *domain,
+                          const char *method, int narg,
+                          mrp_domctl_arg_t *args,
+                          mrp_domain_return_cb_t return_cb,
+                          void *user_data)
+{
+    pdp_t        *pdp   = (pdp_t *)handler_data;
+    pep_proxy_t  *proxy = find_proxy(pdp, domain);
+    uint32_t      id;
+    invoke_msg_t  invoke;
+
+    if (proxy == NULL)
+        return FALSE;
+
+    id = proxy_queue_pending(proxy, return_cb, user_data);
+
+    if (!id)
+        return FALSE;
+
+    mrp_clear(&invoke);
+
+    invoke.type  = MSG_TYPE_INVOKE;
+    invoke.seq   = id;
+    invoke.name  = method;
+    invoke.noret = (return_cb == NULL);
+    invoke.narg  = narg;
+    invoke.args  = args;
+
+    return msg_send_message(proxy, (msg_t *)&invoke);
 }
 
 

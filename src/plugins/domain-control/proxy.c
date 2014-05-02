@@ -38,6 +38,20 @@
 #include "proxy.h"
 
 
+/*
+ * a pending proxied invocation
+ */
+
+typedef struct {
+    mrp_list_hook_t         hook;        /* to pending list */
+    uint32_t                id;          /* request id */
+    mrp_domain_return_cb_t  cb;          /* return callback */
+    void                   *user_data;   /* opaque callback data */
+} pending_t;
+
+static void purge_pending(pep_proxy_t *proxy);
+
+
 int init_proxies(pdp_t *pdp)
 {
     mrp_list_init(&pdp->proxies);
@@ -63,8 +77,10 @@ pep_proxy_t *create_proxy(pdp_t *pdp)
     if (proxy != NULL) {
         mrp_list_init(&proxy->hook);
         mrp_list_init(&proxy->watches);
+        mrp_list_init(&proxy->pending);
 
-        proxy->pdp = pdp;
+        proxy->pdp   = pdp;
+        proxy->seqno = 1;
 
         mrp_list_append(&pdp->proxies, &proxy->hook);
     }
@@ -84,6 +100,8 @@ void destroy_proxy(pep_proxy_t *proxy)
             destroy_proxy_table(proxy->tables + i);
 
         destroy_proxy_watches(proxy);
+
+        purge_pending(proxy);
 
         mrp_free(proxy);
     }
@@ -154,4 +172,83 @@ int unregister_proxy(pep_proxy_t *proxy)
     destroy_proxy(proxy);
 
     return TRUE;
+}
+
+
+pep_proxy_t *find_proxy(pdp_t *pdp, const char *name)
+{
+    mrp_list_hook_t *p, *n;
+    pep_proxy_t     *proxy;
+
+    mrp_list_foreach(&pdp->proxies, p, n) {
+        proxy = mrp_list_entry(p, typeof(*proxy), hook);
+
+        if (!strcmp(proxy->name, name))
+            return proxy;
+    }
+
+    return NULL;
+}
+
+
+uint32_t proxy_queue_pending(pep_proxy_t *proxy,
+                             mrp_domain_return_cb_t return_cb, void *user_data)
+{
+    pending_t *pending;
+
+    if (return_cb == NULL)
+        return proxy->seqno++;
+
+    pending = mrp_allocz(sizeof(*pending));
+
+    if (pending == NULL)
+        return 0;
+
+    mrp_list_init(&pending->hook);
+
+    pending->id        = proxy->seqno++;
+    pending->cb        = return_cb;
+    pending->user_data = user_data;
+
+    mrp_list_append(&proxy->pending, &pending->hook);
+
+    return pending->id;
+}
+
+
+int proxy_dequeue_pending(pep_proxy_t *proxy, uint32_t id,
+                          mrp_domain_return_cb_t *cbp, void **user_datap)
+{
+    mrp_list_hook_t *p, *n;
+    pending_t       *pending;
+
+    mrp_list_foreach(&proxy->pending, p, n) {
+        pending = mrp_list_entry(p, typeof(*pending), hook);
+
+        if (pending->id == id) {
+            mrp_list_delete(&pending->hook);
+            *cbp        = pending->cb;
+            *user_datap = pending->user_data;
+
+            mrp_free(pending);
+
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+
+static void purge_pending(pep_proxy_t *proxy)
+{
+    mrp_list_hook_t *p, *n;
+    pending_t       *pending;
+
+    mrp_list_foreach(&proxy->pending, p, n) {
+        pending = mrp_list_entry(p, typeof(*pending), hook);
+
+        mrp_list_delete(&pending->hook);
+        mrp_free(pending);
+    }
 }

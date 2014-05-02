@@ -285,7 +285,9 @@ libmurphy_core_la_HEADERS =		\
 		core/scripting.h	\
 		core/method.h		\
 		core/event.h		\
-		core/auth.h
+		core/auth.h		\
+		core/domain.h		\
+		core/domain-types.h
 
 libmurphy_core_la_REGULAR_SOURCES =	\
 		core/context.c		\
@@ -296,6 +298,7 @@ libmurphy_core_la_REGULAR_SOURCES =	\
 		core/event.c		\
 		core/auth.c		\
 		core/auth-deny.c	\
+		core/domain.c		\
 		$(LUA_BINDINGS_SOURCES)
 
 if SMACK_ENABLED

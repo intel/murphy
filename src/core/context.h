@@ -78,6 +78,26 @@ struct mrp_context_s {
     mrp_resolver_t  *r;                    /* resolver context */
     void            *lua_state;            /* state for Lua bindings */
     mrp_list_hook_t  auth;                 /* authenticator backends */
+
+    /*
+     * Hmm, this is not very nice.  Most of the domain handling code (in
+     * practice all) used to live in the domain-control plugin. To avoid
+     * loading order dependencies on plugin-domain-control we now started
+     * collecting registered handlers of proxied functions here. Calls by
+     * the core to proxied functions of domain controllers and by domain-
+     * controllers to the core are still handled in the domain-control
+     * plugin (and in the domain-controller client library).
+     *
+     * It would be perhaps the cleanest not to have a domain-controller
+     * specific function export mechanism at all. Instead the various
+     * import/export mechanisms (at least plugins, resolver, and this) should
+     * be replaced by / built on a single core implementation that is flexible
+     * enough to handle all the needs of all these.
+     */
+
+    mrp_list_hook_t  domain_methods;       /* functions for domain controllers */
+    void            *domain_invoke;        /* domain invoke handler */
+    void            *domain_data;          /* domain invoke handler data */
 };
 
 /** Create a new murphy context. */

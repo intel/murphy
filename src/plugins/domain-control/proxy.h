@@ -30,6 +30,8 @@
 #ifndef __MURPHY_DOMAIN_CONTROL_PROXY_H__
 #define __MURPHY_DOMAIN_CONTROL_PROXY_H__
 
+#include <murphy/core/domain.h>
+
 #include "domain-control-types.h"
 
 int init_proxies(pdp_t *pdp);
@@ -43,5 +45,12 @@ int register_proxy(pep_proxy_t *proxy, char *name,
                    mrp_domctl_watch_t *watches, int nwatch,
                    int *error, const char **errmsg);
 int unregister_proxy(pep_proxy_t *proxy);
+
+pep_proxy_t *find_proxy(pdp_t *pdp, const char *name);
+
+uint32_t proxy_queue_pending(pep_proxy_t *proxy,
+                             mrp_domain_return_cb_t return_cb, void *user_data);
+int proxy_dequeue_pending(pep_proxy_t *proxy, uint32_t id,
+                          mrp_domain_return_cb_t *cb, void **user_datap);
 
 #endif /* __MURPHY_DOMAIN_CONTROL_PROXY_H__ */

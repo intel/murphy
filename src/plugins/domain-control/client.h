@@ -33,6 +33,7 @@
 #include <murphy/common/macros.h>
 #include <murphy/common/mainloop.h>
 #include <murphy-db/mqi.h>
+#include <murphy/core/domain-types.h>
 
 MRP_CDECL_BEGIN
 
@@ -73,28 +74,6 @@ typedef struct {
 
 
 /*
- * table column types and values
- */
-
-typedef enum {
-    MRP_DOMCTL_STRING   = mqi_varchar,
-    MRP_DOMCTL_INTEGER  = mqi_integer,
-    MRP_DOMCTL_UNSIGNED = mqi_unsignd,
-    MRP_DOMCTL_DOUBLE   = mqi_floating
-} mrp_domctl_type_t;
-
-typedef struct {
-    mrp_domctl_type_t  type;             /* data type */
-    union {
-        const char *str;                 /* MRP_DOMCTL_STRING */
-        uint32_t    u32;                 /* MRP_DOMCTL_UNSIGNED */
-        int32_t     s32;                 /* MRP_DOMCTL_INTEGER */
-        double      dbl;                 /* MRP_DOMCTL_DOUBLE */
-    };
-} mrp_domctl_value_t;
-
-
-/*
  * table data
  */
 
@@ -105,7 +84,6 @@ typedef struct {
     mrp_domctl_value_t **rows;           /* row data */
     int                  nrow;           /* number of rows */
 } mrp_domctl_data_t;
-
 
 
 /** Opaque policy domain controller type. */
@@ -124,6 +102,39 @@ typedef void (*mrp_domctl_status_cb_t)(mrp_domctl_t *dc, int errcode,
 typedef void (*mrp_domctl_watch_cb_t)(mrp_domctl_t *dc,
                                       mrp_domctl_data_t *tables, int ntable,
                                       void *user_data);
+
+/** Callback type for return of/reply to a proxied method invocation. */
+typedef void (*mrp_domctl_return_cb_t)(mrp_domctl_t *dc, int error, int retval,
+                                       int narg, mrp_domctl_arg_t *args,
+                                       void *user_data);
+
+/** Callback type for a proxied method invocation. */
+typedef int (*mrp_domctl_invoke_cb_t)(mrp_domctl_t *dc, int narg,
+                                      mrp_domctl_arg_t *args,
+                                      int *nout, mrp_domctl_arg_t *outs,
+                                      void *user_data);
+
+/*
+ * proxied invocation errors
+ */
+
+typedef enum {
+    MRP_DOMCTL_OK       = MRP_DOMAIN_OK,
+    MRP_DOMCTL_NOTFOUND = MRP_DOMAIN_NOTFOUND,
+    MRP_DOMCTL_NOMETHOD = MRP_DOMAIN_NOMETHOD,
+} mrp_domctl_error_t;
+
+/*
+ * a domain controller method definition
+ */
+
+typedef struct {
+    const char             *name;
+    size_t                  max_out;
+    mrp_domctl_invoke_cb_t  cb;
+    void                   *user_data;
+} mrp_domctl_method_def_t;
+
 
 /** Create a new policy domain controller. */
 mrp_domctl_t *mrp_domctl_create(const char *name, mrp_mainloop_t *ml,
@@ -149,6 +160,15 @@ void mrp_domctl_disconnect(mrp_domctl_t *dc);
 /** Set the content of the given tables to the provided data. */
 int mrp_domctl_set_data(mrp_domctl_t *dc, mrp_domctl_data_t *tables, int ntable,
                         mrp_domctl_status_cb_t status_cb, void *user_data);
+
+/** Invoke a proxied method. */
+int mrp_domctl_invoke(mrp_domctl_t *dc, const char *method, int narg,
+                      mrp_domctl_arg_t *args, mrp_domctl_return_cb_t return_cb,
+                      void *user_data);
+
+/** Register a proxied method handler. */
+int mrp_domctl_register_methods(mrp_domctl_t *dc, mrp_domctl_method_def_t *defs,
+                                size_t ndef);
 
 MRP_CDECL_END
 

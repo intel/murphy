@@ -60,10 +60,26 @@
 typedef struct {
     mrp_list_hook_t         hook;        /* hook to pending request queue */
     uint32_t                seqno;       /* sequence number/request id */
-    mrp_domctl_status_cb_t  cb;          /* callback to call upon completion */
+    int                     invoke : 1;  /* whether a pending invocation */
+    union {
+        mrp_domctl_status_cb_t  status;  /* request completion callback */
+        mrp_domctl_return_cb_t  ret;     /* invocation return cb */
+    } cb;
     void                   *user_data;   /* opaque callback data */
 } pending_request_t;
 
+
+/*
+ * a registered proxied method
+ */
+
+typedef struct {
+    mrp_list_hook_t         hook;        /* to list of methods */
+    char                   *name;        /* method name */
+    size_t                  max_out;     /* max return arguments */
+    mrp_domctl_invoke_cb_t  cb;          /* handler callback */
+    void                   *user_data;   /* opaque handler data */
+} method_t;
 
 static void recv_cb(mrp_transport_t *t, mrp_msg_t *msg, void *user_data);
 static void recvfrom_cb(mrp_transport_t *t, mrp_msg_t *msg,
@@ -74,8 +90,11 @@ static void closed_cb(mrp_transport_t *t, int error, void *user_data);
 
 static int queue_pending(mrp_domctl_t *dc, uint32_t seq,
                          mrp_domctl_status_cb_t cb, void *user_data);
-static int notify_pending(mrp_domctl_t *dc, uint32_t seq, int error,
-                          const char *msg);
+static int notify_pending(mrp_domctl_t *dc, msg_t *msg);
+static int queue_invoke(mrp_domctl_t *dc, uint32_t seq,
+                        mrp_domctl_return_cb_t cb, void *user_data);
+static int notify_invoke(mrp_domctl_t *dc, uint32_t seq, int error,
+                         int status, int narg, mrp_domctl_arg_t *args);
 static void purge_pending(mrp_domctl_t *dc);
 
 
@@ -138,6 +157,8 @@ mrp_domctl_t *mrp_domctl_create(const char *name, mrp_mainloop_t *ml,
             dc->watch_cb   = watch_cb;
             dc->user_data  = user_data;
             dc->seqno      = 1;
+
+            mrp_list_init(&dc->methods);
 
             return dc;
         }
@@ -376,10 +397,97 @@ int mrp_domctl_set_data(mrp_domctl_t *dc, mrp_domctl_data_t *tables, int ntable,
 }
 
 
+int mrp_domctl_invoke(mrp_domctl_t *dc, const char *name, int narg,
+                      mrp_domctl_arg_t *args, mrp_domctl_return_cb_t reply_cb,
+                      void *user_data)
+{
+    invoke_msg_t  invoke;
+    mrp_msg_t    *msg;
+    uint32_t      seq = dc->seqno++;
+    int           success;
+
+    if (!dc->connected)
+        return FALSE;
+
+    if (reply_cb == NULL && user_data != NULL)
+        return FALSE;
+
+    mrp_clear(&invoke);
+    invoke.type  = MSG_TYPE_INVOKE;
+    invoke.seq   = seq;
+    invoke.name  = name;
+    invoke.noret = reply_cb ? TRUE : FALSE;
+    invoke.narg  = narg;
+    invoke.args  = args;
+
+    msg = msg_encode_message((msg_t *)&invoke);
+
+    if (msg != NULL) {
+        success = mrp_transport_send(dc->t, msg);
+        mrp_msg_unref(msg);
+
+        if (success)
+            queue_invoke(dc, seq, reply_cb, user_data);
+
+        return success;
+    }
+    else
+        return FALSE;
+}
+
+
+int mrp_domctl_register_methods(mrp_domctl_t *dc, mrp_domctl_method_def_t *defs,
+                                size_t ndef)
+{
+    mrp_domctl_method_def_t *def;
+    method_t                *m;
+    size_t                   i;
+
+    for (i = 0, def = defs; i < ndef; i++, def++) {
+        m = mrp_allocz(sizeof(*m));
+
+        if (m == NULL)
+            return FALSE;
+
+        mrp_list_init(&m->hook);
+
+        m->name      = mrp_strdup(def->name);
+        m->max_out   = def->max_out;
+        m->cb        = def->cb;
+        m->user_data = def->user_data;
+
+        if (m->name == NULL) {
+            mrp_free(m);
+            return FALSE;
+        }
+
+        mrp_list_append(&dc->methods, &m->hook);
+    }
+
+    return TRUE;
+}
+
+
+static method_t *find_method(mrp_domctl_t *dc, const char *name)
+{
+    mrp_list_hook_t *p, *n;
+    method_t        *m;
+
+    mrp_list_foreach(&dc->methods, p, n) {
+        m = mrp_list_entry(p, typeof(*m), hook);
+
+        if (!strcmp(m->name, name))
+            return m;
+    }
+
+    return NULL;
+}
+
+
 static void process_ack(mrp_domctl_t *dc, ack_msg_t *ack)
 {
     if (ack->seq != 0)
-        notify_pending(dc, ack->seq, 0, NULL);
+        notify_pending(dc, (msg_t *)ack);
     else
         notify_connect(dc);
 }
@@ -388,7 +496,7 @@ static void process_ack(mrp_domctl_t *dc, ack_msg_t *ack)
 static void process_nak(mrp_domctl_t *dc, nak_msg_t *nak)
 {
     if (nak->seq != 0)
-        notify_pending(dc, nak->seq, nak->error, nak->msg);
+        notify_pending(dc, (msg_t *)nak);
     else
         notify_disconnect(dc, nak->error, nak->msg);
 }
@@ -397,6 +505,82 @@ static void process_nak(mrp_domctl_t *dc, nak_msg_t *nak)
 static void process_notify(mrp_domctl_t *dc, notify_msg_t *notify)
 {
     dc->watch_cb(dc, notify->tables, notify->ntable, dc->user_data);
+}
+
+
+static void process_invoke(mrp_domctl_t *dc, invoke_msg_t *invoke)
+{
+    method_t         *m;
+    mrp_domctl_arg_t *args, error;
+    int               narg;
+    return_msg_t      ret;
+    mrp_msg_t        *msg;
+    int               i;
+
+    mrp_clear(&ret);
+
+    m = find_method(dc, invoke->name);
+
+    ret.type = MSG_TYPE_RETURN;
+    ret.seq  = invoke->seq;
+
+    if (m == NULL) {
+        ret.error = MRP_DOMCTL_NOTFOUND;
+    }
+    else {
+        ret.error = MRP_DOMCTL_OK;
+
+        narg = ret.narg = m->max_out;
+
+        if (narg > 0) {
+            args = ret.args = alloca(narg * sizeof(args[0]));
+            memset(args, 0, narg * sizeof(args[0]));
+        }
+
+        ret.retval = m->cb(dc, invoke->narg, invoke->args,
+                           &ret.narg, ret.args, m->user_data);
+    }
+
+    msg = msg_encode_message((msg_t *)&ret);
+
+    if (msg == NULL) {
+        error.type = MRP_DOMCTL_STRING;
+        error.str  = "failed to encode return message (arguments)";
+        ret.error  = MRP_DOMAIN_FAILED;
+        ret.narg   = 1;
+        ret.args   = &error;
+
+        msg = msg_encode_message((msg_t *)&ret);
+
+        ret.narg = 0;
+        ret.args = NULL;
+    }
+
+    if (msg != NULL) {
+        mrp_transport_send(dc->t, msg);
+        mrp_msg_unref(msg);
+    }
+
+    narg = ret.narg;
+    for (i = 0; i < narg; i++) {
+        if (args[i].type == MRP_DOMCTL_STRING)
+            mrp_free((char *)args[i].str);
+        else if (MRP_DOMCTL_IS_ARRAY(args[i].type)) {
+            uint32_t j;
+
+            for (j = 0; j < args[i].size; j++)
+                if (MRP_DOMCTL_ARRAY_TYPE(args[i].type) == MRP_DOMCTL_STRING)
+                    mrp_free(((char **)args[i].arr)[j]);
+
+            mrp_free(args[i].arr);
+        }
+    }
+}
+
+
+static void process_return(mrp_domctl_t *dc, return_msg_t *ret)
+{
+    notify_pending(dc, (msg_t *)ret);
 }
 
 
@@ -424,6 +608,12 @@ static void recv_cb(mrp_transport_t *t, mrp_msg_t *tmsg, void *user_data)
             break;
         case MSG_TYPE_NAK:
             process_nak(dc, &msg->nak);
+            break;
+        case MSG_TYPE_INVOKE:
+            process_invoke(dc, &msg->invoke);
+            break;
+        case MSG_TYPE_RETURN:
+            process_return(dc, &msg->ret);
             break;
         default:
             mrp_domctl_disconnect(dc);
@@ -493,8 +683,9 @@ static int queue_pending(mrp_domctl_t *dc, uint32_t seq,
     if (pending != NULL) {
         mrp_list_init(&pending->hook);
 
+        pending->invoke    = false;
         pending->seqno     = seq;
-        pending->cb        = cb;
+        pending->cb.status = cb;
         pending->user_data = user_data;
 
         mrp_list_append(&dc->pending, &pending->hook);
@@ -506,27 +697,97 @@ static int queue_pending(mrp_domctl_t *dc, uint32_t seq,
 }
 
 
-static int notify_pending(mrp_domctl_t *dc, uint32_t seq, int error,
-                          const char *msg)
+static int notify_pending(mrp_domctl_t *dc, msg_t *msg)
 {
     mrp_list_hook_t   *p, *n;
     pending_request_t *pending;
+    uint32_t           seq;
+    int                error, status;
+    const char        *message;
+    int                narg;
+    mrp_domctl_arg_t  *args;
+    int                success;
+
+    seq = msg->any.seq;
 
     mrp_list_foreach(&dc->pending, p, n) {
         pending = mrp_list_entry(p, typeof(*pending), hook);
 
-        if (pending->seqno == seq) {
-            DOMCTL_MARK_BUSY(dc, {
-                    pending->cb(dc, error, msg, pending->user_data);
-                    mrp_list_delete(&pending->hook);
-                    mrp_free(pending);
-                });
+        if (pending->seqno != seq)
+            continue;
 
-            return TRUE;
+        if (!pending->invoke) {
+            switch (msg->any.type) {
+            case MSG_TYPE_ACK:
+                error   = 0;
+                message = NULL;
+                goto notify;
+            case MSG_TYPE_NAK:
+                error   = msg->nak.error;
+                message = msg->nak.msg;
+            notify:
+                DOMCTL_MARK_BUSY(dc, {
+                        pending->cb.status(dc, error, message,
+                                           pending->user_data);
+                    });
+                success = TRUE;
+                break;
+            default:
+                success = FALSE;
+                break;
+            }
         }
+        else {
+            if (msg->any.type == MSG_TYPE_RETURN) {
+                error  = msg->ret.error;
+                status = msg->ret.retval;
+                narg   = msg->ret.narg;
+                args   = msg->ret.args;
+
+                DOMCTL_MARK_BUSY(dc, {
+                        pending->cb.ret(dc, error, status, narg, args,
+                                        pending->user_data);
+                    });
+                success = TRUE;
+            }
+            else
+                success = FALSE;
+        }
+
+        mrp_list_delete(&pending->hook);
+        mrp_free(pending);
+
+        return success;
     }
 
     return FALSE;
+}
+
+
+static int queue_invoke(mrp_domctl_t *dc, uint32_t seq,
+                        mrp_domctl_return_cb_t cb, void *user_data)
+{
+    pending_request_t *pending;
+
+    if (cb == NULL)
+        return TRUE;
+
+    pending = mrp_allocz(sizeof(*pending));
+
+    if (pending != NULL) {
+        mrp_list_init(&pending->hook);
+
+        pending->invoke    = true;
+        pending->seqno     = seq;
+        pending->cb.ret    = cb;
+        pending->user_data = user_data;
+
+        mrp_list_append(&dc->pending, &pending->hook);
+
+        return TRUE;
+    }
+    else
+        return FALSE;
 }
 
 

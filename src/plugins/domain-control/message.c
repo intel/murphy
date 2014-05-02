@@ -742,6 +742,334 @@ msg_t *msg_decode_notify(mrp_msg_t *msg)
 }
 
 
+void msg_free_invoke(msg_t *msg)
+{
+    if (msg != NULL) {
+        mrp_free(msg->invoke.args);
+        mrp_free(msg);
+    }
+}
+
+
+mrp_msg_t *msg_encode_invoke(invoke_msg_t *invoke)
+{
+    mrp_msg_t        *msg;
+    mrp_domctl_arg_t *arg;
+    uint32_t          i;
+
+    msg = mrp_msg_create(MSG_UINT16(MSGTYPE, MSG_TYPE_INVOKE),
+                         MSG_UINT32(MSGSEQ , invoke->seq),
+                         MSG_STRING(METHOD , invoke->name),
+                         MSG_BOOL  (NORET  , invoke->noret),
+                         MSG_UINT32(NARG   , invoke->narg),
+                         MSG_END);
+
+    for (i = 0, arg = invoke->args; i < invoke->narg; i++, arg++) {
+        switch (arg->type) {
+        case MRP_DOMCTL_STRING:
+            if (!mrp_msg_append(msg, MSG_STRING(ARG, arg->str)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_DOUBLE:
+            if (!mrp_msg_append(msg, MSG_DOUBLE(ARG, arg->dbl)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_BOOL:
+            if (!mrp_msg_append(msg, MSG_BOOL(ARG, arg->bln)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT8:
+            if (!mrp_msg_append(msg, MSG_UINT8(ARG, arg->s8)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT8:
+            if (!mrp_msg_append(msg, MSG_SINT8(ARG, arg->u8)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT16:
+            if (!mrp_msg_append(msg, MSG_UINT16(ARG, arg->s16)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT16:
+            if (!mrp_msg_append(msg, MSG_SINT16(ARG, arg->u16)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT32:
+            if (!mrp_msg_append(msg, MSG_UINT32(ARG, arg->s32)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT32:
+            if (!mrp_msg_append(msg, MSG_SINT32(ARG, arg->u32)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT64:
+            if (!mrp_msg_append(msg, MSG_UINT64(ARG, arg->s64)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT64:
+            if (!mrp_msg_append(msg, MSG_SINT64(ARG, arg->u64)))
+                goto fail;
+            break;
+        default:
+            if (MRP_DOMCTL_IS_ARRAY(arg->type)) {
+                if (!mrp_msg_append(msg, MSG_ARRAY(ARG, arg->type,
+                                                   arg->size, arg->arr)))
+                    goto fail;
+            }
+            else
+                goto fail;
+            break;
+        }
+    }
+
+    return msg;
+
+ fail:
+    mrp_msg_unref(msg);
+    return NULL;
+}
+
+
+msg_t *msg_decode_invoke(mrp_msg_t *msg)
+{
+    invoke_msg_t     *invoke;
+    void             *it;
+    uint16_t          tag, type;
+    mrp_msg_value_t   val;
+    mrp_domctl_arg_t *arg;
+    uint32_t          i;
+    size_t            size;
+
+    mrp_debug_code({
+            mrp_debug("got domain invoke request:");
+            mrp_msg_dump(msg, stdout); });
+
+    it     = NULL;
+    invoke = mrp_allocz(sizeof(*invoke));
+
+    if (invoke == NULL)
+        goto fail;
+
+    invoke->type = MSG_TYPE_INVOKE;
+
+    if (!mrp_msg_iterate_get(msg, &it,
+                             MSG_UINT32(MSGSEQ, &invoke->seq),
+                             MSG_STRING(METHOD, &invoke->name),
+                             MSG_BOOL  (NORET , &invoke->noret),
+                             MSG_UINT32(NARG  , &invoke->narg),
+                             MSG_END))
+        goto fail;
+
+
+
+    if (invoke->narg > 0)
+        invoke->args = mrp_allocz(invoke->narg * sizeof(invoke->args[0]));
+
+    if (invoke->args == NULL && invoke->narg > 0)
+        goto fail;
+
+    for (i = 0, arg = invoke->args; i < invoke->narg; i++, arg++) {
+        if (!mrp_msg_iterate(msg, &it, &tag, &type, &val, &size))
+            goto fail;
+
+        arg->type = type;
+
+        switch (type) {
+        case MRP_DOMCTL_STRING:  arg->str = val.str; break;
+        case MRP_DOMCTL_BOOL:    arg->bln = val.bln; break;
+        case MRP_DOMCTL_UINT8:   arg->u8  = val.u8;  break;
+        case MRP_DOMCTL_INT8:    arg->s8  = val.s8;  break;
+        case MRP_DOMCTL_UINT16:  arg->u16 = val.u16; break;
+        case MRP_DOMCTL_INT16:   arg->s16 = val.s16; break;
+        case MRP_DOMCTL_UINT32:  arg->u32 = val.u32; break;
+        case MRP_DOMCTL_INT32:   arg->s32 = val.s32; break;
+        case MRP_DOMCTL_UINT64:  arg->u64 = val.u64; break;
+        case MRP_DOMCTL_INT64:   arg->s64 = val.s64; break;
+        case MRP_DOMCTL_DOUBLE:  arg->dbl = val.dbl; break;
+        default:
+            if (MRP_DOMCTL_IS_ARRAY(type)) {
+                arg->arr  = val.aany;
+                arg->size = size;
+            }
+            else
+                goto fail;
+        }
+    }
+
+    invoke->wire       = mrp_msg_ref(msg);
+    invoke->unref_wire = msg_unref_wire;
+
+    return (msg_t *)invoke;
+
+ fail:
+    msg_free_invoke((msg_t *)invoke);
+    return NULL;
+}
+
+
+void msg_free_return(msg_t *msg)
+{
+    if (msg != NULL) {
+        mrp_free(msg->ret.args);
+        mrp_free(msg);
+    }
+}
+
+
+mrp_msg_t *msg_encode_return(return_msg_t *ret)
+{
+    mrp_msg_t        *msg;
+    mrp_domctl_arg_t *arg;
+    uint32_t          i;
+
+    msg = mrp_msg_create(MSG_UINT16(MSGTYPE, MSG_TYPE_RETURN),
+                         MSG_UINT32(MSGSEQ , ret->seq),
+                         MSG_UINT32(ERROR  , ret->error),
+                         MSG_SINT32(RETVAL , ret->retval),
+                         MSG_UINT32(NARG   , ret->narg),
+                         MSG_END);
+
+    for (i = 0, arg = ret->args; i < ret->narg; i++, arg++) {
+        switch (arg->type) {
+        case MRP_DOMCTL_STRING:
+            if (!mrp_msg_append(msg, MSG_STRING(ARG, arg->str)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_DOUBLE:
+            if (!mrp_msg_append(msg, MSG_DOUBLE(ARG, arg->dbl)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_BOOL:
+            if (!mrp_msg_append(msg, MSG_BOOL(ARG, arg->bln)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT8:
+            if (!mrp_msg_append(msg, MSG_UINT8(ARG, arg->s8)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT8:
+            if (!mrp_msg_append(msg, MSG_SINT8(ARG, arg->u8)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT16:
+            if (!mrp_msg_append(msg, MSG_UINT16(ARG, arg->s16)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT16:
+            if (!mrp_msg_append(msg, MSG_SINT16(ARG, arg->u16)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT32:
+            if (!mrp_msg_append(msg, MSG_UINT32(ARG, arg->s32)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT32:
+            if (!mrp_msg_append(msg, MSG_SINT32(ARG, arg->u32)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_UINT64:
+            if (!mrp_msg_append(msg, MSG_UINT64(ARG, arg->s64)))
+                goto fail;
+            break;
+        case MRP_DOMCTL_INT64:
+            if (!mrp_msg_append(msg, MSG_SINT64(ARG, arg->u64)))
+                goto fail;
+            break;
+        default:
+            if (MRP_DOMCTL_IS_ARRAY(arg->type)) {
+                if (!mrp_msg_append(msg, MSG_ARRAY(ARG, arg->type,
+                                                   arg->size, arg->arr)))
+                    goto fail;
+            }
+            else
+                goto fail;
+            break;
+        }
+    }
+
+    return msg;
+
+ fail:
+    mrp_msg_unref(msg);
+    return NULL;
+}
+
+
+msg_t *msg_decode_return(mrp_msg_t *msg)
+{
+    return_msg_t     *ret;
+    void             *it;
+    uint16_t          tag, type;
+    mrp_msg_value_t   val;
+    mrp_domctl_arg_t *arg;
+    uint32_t          i;
+    size_t            size;
+
+    mrp_debug_code({
+            mrp_debug("got domain return (invoke reply):");
+            mrp_msg_dump(msg, stdout); });
+
+    it  = NULL;
+    ret = mrp_allocz(sizeof(*ret));
+
+    if (ret == NULL)
+        goto fail;
+
+    ret->type = MSG_TYPE_RETURN;
+
+    if (!mrp_msg_iterate_get(msg, &it,
+                             MSG_UINT32(MSGSEQ, &ret->seq),
+                             MSG_UINT32(ERROR , &ret->error),
+                             MSG_SINT32(RETVAL, &ret->retval),
+                             MSG_UINT32(NARG  , &ret->narg),
+                             MSG_END))
+        goto fail;
+
+    if (ret->narg > 0)
+        ret->args = mrp_allocz(ret->narg * sizeof(ret->args[0]));
+
+    if (ret->args == NULL && ret->narg > 0)
+        goto fail;
+
+    for (i = 0, arg = ret->args; i < ret->narg; i++, arg++) {
+        if (!mrp_msg_iterate(msg, &it, &tag, &type, &val, &size))
+            goto fail;
+
+        arg->type = type;
+
+        switch (type) {
+        case MRP_DOMCTL_STRING:  arg->str = val.str; break;
+        case MRP_DOMCTL_BOOL:    arg->bln = val.bln; break;
+        case MRP_DOMCTL_UINT8:   arg->u8  = val.u8;  break;
+        case MRP_DOMCTL_INT8:    arg->s8  = val.s8;  break;
+        case MRP_DOMCTL_UINT16:  arg->u16 = val.u16; break;
+        case MRP_DOMCTL_INT16:   arg->s16 = val.s16; break;
+        case MRP_DOMCTL_UINT32:  arg->u32 = val.u32; break;
+        case MRP_DOMCTL_INT32:   arg->s32 = val.s32; break;
+        case MRP_DOMCTL_UINT64:  arg->u64 = val.u64; break;
+        case MRP_DOMCTL_INT64:   arg->s64 = val.s64; break;
+        case MRP_DOMCTL_DOUBLE:  arg->dbl = val.dbl; break;
+        default:
+            if (MRP_DOMCTL_IS_ARRAY(type)) {
+                arg->arr  = val.aany;
+                arg->size = size;
+            }
+            else
+                goto fail;
+        }
+    }
+
+    ret->wire       = mrp_msg_ref(msg);
+    ret->unref_wire = msg_unref_wire;
+
+    return (msg_t *)ret;
+
+ fail:
+    msg_free_return((msg_t *)ret);
+    return NULL;
+}
+
+
 msg_t *msg_decode_message(mrp_msg_t *msg)
 {
     uint16_t type;
@@ -754,6 +1082,8 @@ msg_t *msg_decode_message(mrp_msg_t *msg)
         case MSG_TYPE_NOTIFY:     return msg_decode_notify(msg);
         case MSG_TYPE_ACK:        return msg_decode_ack(msg);
         case MSG_TYPE_NAK:        return msg_decode_nak(msg);
+        case MSG_TYPE_INVOKE:     return msg_decode_invoke(msg);
+        case MSG_TYPE_RETURN:     return msg_decode_return(msg);
         default:                  break;
         }
     }
@@ -771,6 +1101,8 @@ mrp_msg_t *msg_encode_message(msg_t *msg)
     case MSG_TYPE_NOTIFY:     return msg_encode_notify(&msg->notify);
     case MSG_TYPE_ACK:        return msg_encode_ack(&msg->ack);
     case MSG_TYPE_NAK:        return msg_encode_nak(&msg->nak);
+    case MSG_TYPE_INVOKE:     return msg_encode_invoke(&msg->invoke);
+    case MSG_TYPE_RETURN:     return msg_encode_return(&msg->ret);
     default:                  return NULL;
     }
 }
@@ -786,6 +1118,8 @@ void msg_free_message(msg_t *msg)
         case MSG_TYPE_NOTIFY:     msg_free_notify(msg);     break;
         case MSG_TYPE_ACK:        msg_free_ack(msg);        break;
         case MSG_TYPE_NAK:        msg_free_nak(msg);        break;
+        case MSG_TYPE_INVOKE:     msg_free_invoke(msg);     break;
+        case MSG_TYPE_RETURN:     msg_free_return(msg);     break;
         default:                                            break;
         }
     }
