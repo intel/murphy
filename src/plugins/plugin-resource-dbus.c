@@ -482,7 +482,8 @@ static bool get_property_dict_entry(property_o_t *prop, mrp_dbus_msg_t *reply)
 {
     bool ret;
 
-    mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, NULL);
+    if (!mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_DICT_ENTRY, NULL))
+        return FALSE;
 
     ret = get_property_entry(prop, reply);
 
@@ -1271,8 +1272,7 @@ static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
     const char *iface = mrp_dbus_msg_interface(msg);
     const char *path = mrp_dbus_msg_path(msg);
     char *error_msg = "Received invalid message";
-
-    mrp_dbus_msg_t *reply;
+    mrp_dbus_msg_t *reply = NULL;
     char buf[MAX_PATH_LENGTH];
 
     dbus_data_t *ctx = data;
@@ -1320,12 +1320,14 @@ static int resource_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 
         mrp_dbus_msg_open_container(reply, MRP_DBUS_TYPE_ARRAY, "{sv}");
 
-        get_property_dict_entry(resource->name_prop, reply);
-        get_property_dict_entry(resource->status_prop, reply);
-        get_property_dict_entry(resource->mandatory_prop, reply);
-        get_property_dict_entry(resource->shared_prop, reply);
-        get_property_dict_entry(resource->arguments_prop, reply);
-        get_property_dict_entry(resource->conf_prop, reply);
+        if (!(get_property_dict_entry(resource->name_prop, reply) &&
+                get_property_dict_entry(resource->status_prop, reply) &&
+                get_property_dict_entry(resource->mandatory_prop, reply) &&
+                get_property_dict_entry(resource->shared_prop, reply) &&
+                get_property_dict_entry(resource->arguments_prop, reply) &&
+                get_property_dict_entry(resource->conf_prop, reply))) {
+            goto error_reply;
+        }
 
         mrp_dbus_msg_close_container(reply);
 
@@ -1605,6 +1607,11 @@ error_reply:
         mrp_dbus_err_t err;
         mrp_dbus_error_init(&err);
         mrp_dbus_error_set(&err, "org.freedesktop.DBus.Error.Failed", error_msg);
+
+        if (reply) {
+            /* something was already done -- free some memory */
+            mrp_dbus_msg_unref(reply);
+        }
 
         reply = mrp_dbus_msg_error(dbus, msg, &err);
 
