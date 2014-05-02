@@ -78,6 +78,25 @@ MRP_CDECL_BEGIN
     } while (0)
 
 
+#define mrp_debug_code(...)         do {                                  \
+        static const char *__site =                                       \
+            MRP_DEBUG_SITE(__FILE__, __LINE__, __FUNCTION__);             \
+        static int __site_stamp = -1;                                     \
+        static int __site_enabled;                                        \
+                                                                          \
+        if (MRP_UNLIKELY(__site_stamp != mrp_debug_stamp)) {              \
+            __site_enabled = mrp_debug_check(__FUNCTION__,                \
+                                             __FILE__, __LINE__);         \
+            __site_stamp   = mrp_debug_stamp;                             \
+        }                                                                 \
+                                                                          \
+        MRP_UNUSED(__site);                                               \
+                                                                          \
+        if (MRP_UNLIKELY(__site_enabled)) {                               \
+            __VA_ARGS__;                                                  \
+        }                                                                 \
+    } while (0)
+
 /** Global debug configuration stamp, exported for minimum-overhead checking. */
 extern int mrp_debug_stamp;
 
