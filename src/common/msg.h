@@ -74,8 +74,9 @@ typedef enum {
 
 #define MRP_MSG_END ((char *)MRP_MSG_FIELD_INVALID) /* NULL */
 
-#define MRP_MSG_FIELD_ARRAY_OF(t) (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##t)
-#define MRP_MSG_FIELD_IS_ARRAY(t) ((t) & MRP_MSG_FIELD_ARRAY)
+#define MRP_MSG_FIELD_ARRAY_OF(t)   (MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##t)
+#define MRP_MSG_FIELD_IS_ARRAY(t)   ((t) & MRP_MSG_FIELD_ARRAY)
+#define MRP_MSG_FIELD_ARRAY_TYPE(t) ((t) & ~MRP_MSG_FIELD_ARRAY)
 
 #define MRP_MSG_TAG_STRING(tag, arg) (tag), MRP_MSG_FIELD_STRING, (arg)
 #define MRP_MSG_TAG_BOOL(tag, arg)   (tag), MRP_MSG_FIELD_BOOL  , (arg)
@@ -90,6 +91,7 @@ typedef enum {
 #define MRP_MSG_TAG_DOUBLE(tag, arg) (tag), MRP_MSG_FIELD_DOUBLE, (arg)
 #define MRP_MSG_TAG_BLOB(tag, arg)   (tag), MRP_MSG_FIELD_BLOB  , (arg)
 
+#define MRP_MSG_TAGGED(tag, type, ...) (tag), (type), __VA_ARGS__
 #define MRP_MSG_TAG_ARRAY(tag, type, cnt, arr)                        \
     (tag), MRP_MSG_FIELD_ARRAY | MRP_MSG_FIELD_##type, (cnt), (arr)
 #define MRP_MSG_TAG_STRING_ARRAY(tag, cnt, arr) \
