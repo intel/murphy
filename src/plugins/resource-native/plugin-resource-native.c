@@ -53,6 +53,8 @@
 #include <murphy/resource/manager-api.h>
 #include <murphy/resource/protocol.h>
 
+#include <murphy/resource/resource-set.h>
+
 #define ATTRIBUTE_MAX MRP_ATTRIBUTE_MAX
 
 
@@ -1130,6 +1132,16 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 }
 
 
+static void register_events(mrp_plugin_t *plugin)
+{
+    /* register the events that are sent on the resource state changes */
+
+    mrp_register_event(MURPHY_RESOURCE_EVENT_CREATED);
+    mrp_register_event(MURPHY_RESOURCE_EVENT_ACQUIRE);
+    mrp_register_event(MURPHY_RESOURCE_EVENT_RELEASE);
+    mrp_register_event(MURPHY_RESOURCE_EVENT_DESTROYED);
+}
+
 
 static int resource_init(mrp_plugin_t *plugin)
 {
@@ -1152,6 +1164,7 @@ static int resource_init(mrp_plugin_t *plugin)
 
     plugin->data = data;
 
+    register_events(plugin);
     subscribe_events(plugin);
     initiate_lua_configuration(plugin);
 

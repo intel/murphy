@@ -35,7 +35,7 @@
 #include <murphy/common/log.h>
 
 #include "attribute.h"
-
+#include "client-api.h"
 
 static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_t *, const char *,
                                                   mqi_data_type_t);
@@ -247,6 +247,48 @@ static mrp_attr_value_t *get_attr_value_from_list(mrp_attr_t     *list,
     return NULL;
 }
 
+void mrp_resource_set_free_attribute(mrp_attr_t *attr)
+{
+    if (!attr)
+        return;
+
+    mrp_free(attr);
+}
+
+mrp_attr_t *mrp_resource_set_get_attribute_by_name(
+        mrp_resource_set_t *resource_set, const char *resource_name,
+        const char *attribute_name)
+{
+    mrp_attr_t *attr = NULL, *attrs;
+    uint32_t res_id;
+    mrp_attr_t attr_buf[128];
+    uint32_t attr_idx = 0;
+
+    memset(attr_buf, 0, sizeof(attr_buf));
+
+    res_id = mrp_resource_definition_get_resource_id_by_name(resource_name);
+    attrs = mrp_resource_definition_read_all_attributes(res_id, 128, attr_buf);
+
+    if (!attrs)
+        return NULL;
+
+    while (attrs->name != NULL) {
+        if (strcmp(attrs->name, attribute_name) == 0) {
+
+            mrp_attr_t *buf = mrp_allocz(sizeof(mrp_attr_t));
+            mrp_resource_set_read_attribute(resource_set, resource_name,
+                    attr_idx, buf);
+
+            attr = buf;
+
+            break;
+        }
+        attr_idx++;
+        attrs++;
+    }
+
+    return attr;
+}
 
 /*
  * Local Variables:

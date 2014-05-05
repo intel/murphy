@@ -119,6 +119,16 @@ const char *mrp_resource_get_name(mrp_resource_t *resource);
 mrp_resource_mask_t mrp_resource_get_mask(mrp_resource_t *resource);
 bool mrp_resource_is_shared(mrp_resource_t *resource);
 
+/* Find a resource set given the resource set id. */
+mrp_resource_set_t *mrp_resource_set_find_by_id(uint32_t id);
+
+/* Get a single attribute object that contains the current value. */
+mrp_attr_t *mrp_resource_set_get_attribute_by_name(
+        mrp_resource_set_t *resource_set, const char *resource_name,
+        const char *attribute_name);
+
+/* Free the object obtained with mrp_resource_set_get_attribute_by_name. */
+void mrp_resource_set_free_attribute(mrp_attr_t *attr);
 
 #endif  /* __MURPHY_RESOURCE_CLIENT_API_H__ */
 

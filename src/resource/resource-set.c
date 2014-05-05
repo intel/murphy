@@ -30,6 +30,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <murphy/core/event.h>
+
 #include <murphy/common/mm.h>
 #include <murphy/common/hashtbl.h>
 #include <murphy/common/utils.h>
@@ -66,7 +68,8 @@ static mrp_resource_t *find_resource_by_id(mrp_resource_set_t *, uint32_t);
 
 static uint32_t get_request_stamp(void);
 static const char *state_str(mrp_resource_state_t);
-
+static void send_rset_event(mrp_resource_set_t *rset,
+        mrp_resource_event_t ev);
 
 uint32_t mrp_get_resource_set_count(void)
 {
@@ -96,7 +99,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
 
         rset->dont_wait.current = dont_wait;
         rset->dont_wait.client  = dont_wait;
- 
+
         rset->auto_release.current = auto_release;
         rset->auto_release.client  = auto_release;
 
@@ -119,6 +122,8 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
 
         add_to_id_hash(rset);
         mrp_resource_lua_register_resource_set(rset);
+
+        send_rset_event(rset, MRP_RESOURCE_EVENT_CREATED);
     }
 
     return rset;
@@ -134,6 +139,8 @@ void mrp_resource_set_destroy(mrp_resource_set_t *rset)
         state = rset->state;
 
         rset->event = NULL; /* make sure nothing is sent any more */
+
+        send_rset_event(rset, MRP_RESOURCE_EVENT_DESTROYED);
 
         mrp_resource_lua_unregister_resource_set(rset);
         remove_from_id_hash(rset);
@@ -392,12 +399,48 @@ void mrp_resource_set_updated(mrp_resource_set_t *rset)
     }
 }
 
+static void send_rset_event(mrp_resource_set_t *rset, mrp_resource_event_t ev)
+{
+    uint id;
+
+    MRP_ASSERT(rset, "invalid argument");
+
+    /* The resource set id is enough information, because the full resource
+     * set can be found by making a query with the id. */
+
+    uint16_t tag = MRP_RESOURCE_TAG_RSET_ID;
+
+    switch (ev) {
+        case MRP_RESOURCE_EVENT_CREATED:
+            id = mrp_get_event_id(MURPHY_RESOURCE_EVENT_CREATED, 0);
+            mrp_log_info("emit event %d for rset %u", id, rset->id);
+            mrp_emit_event(id, MRP_MSG_TAG_UINT32(tag, rset->id), MRP_MSG_END);
+            break;
+        case MRP_RESOURCE_EVENT_ACQUIRE:
+            id = mrp_get_event_id(MURPHY_RESOURCE_EVENT_ACQUIRE, 0);
+            mrp_emit_event(id, MRP_MSG_TAG_UINT32(tag, rset->id), MRP_MSG_END);
+            break;
+        case MRP_RESOURCE_EVENT_RELEASE:
+            id = mrp_get_event_id(MURPHY_RESOURCE_EVENT_RELEASE, 0);
+            mrp_emit_event(id, MRP_MSG_TAG_UINT32(tag, rset->id), MRP_MSG_END);
+            break;
+        case MRP_RESOURCE_EVENT_DESTROYED:
+            id = mrp_get_event_id(MURPHY_RESOURCE_EVENT_DESTROYED, 0);
+            mrp_emit_event(id, MRP_MSG_TAG_UINT32(tag, rset->id), MRP_MSG_END);
+            break;
+        default:
+            break;
+    }
+}
+
 void mrp_resource_set_notify(mrp_resource_set_t *rset, mrp_resource_event_t ev)
 {
     mrp_resource_t *res;
     void *cursor = NULL;
 
     MRP_ASSERT(rset, "invalid argument");
+
+    send_rset_event(rset, ev);
 
     while ((res = mrp_resource_set_iterate_resources(rset, &cursor)))
         mrp_resource_notify(res, rset, ev);
