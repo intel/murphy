@@ -1719,7 +1719,7 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
 
     if (ext_timeout != -1 && timeout != -1)
         ml->poll_timeout = MRP_MIN(timeout, ext_timeout);
-    if (ext_timeout == -1)
+    else if (ext_timeout == -1)
         ml->poll_timeout = timeout;
     else
         ml->poll_timeout = ext_timeout;
