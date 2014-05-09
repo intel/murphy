@@ -450,7 +450,7 @@ msg_t *msg_decode_set(mrp_msg_t *msg)
 
     values = mrp_allocz(sizeof(*values) * ntotal);
 
-    if (values == NULL)
+    if (values == NULL && ntotal > 0)
         goto fail;
 
     d = set->tables;
