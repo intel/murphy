@@ -106,6 +106,7 @@ typedef struct {
     manager_o_t *mgr;
 
     /* murphy integration */
+    mrp_mainloop_t *ml;
 } dbus_data_t;
 
 typedef struct property_o_s {
@@ -157,8 +158,13 @@ typedef struct {
 
     /* resource library */
     bool locked; /* if the library allows the settings to be changed */
-    bool acquired; /* set to true when we are starting the acquisition */
+    bool committed; /* set to true when we are committing the resource set */
     mrp_resource_set_t *set;
+
+    /* pending properties for events that have been received in wrong order */
+    bool update_needed;
+    mrp_resource_mask_t pending_grant;
+    mrp_resource_mask_t pending_advice;
 
     /* whether we have encountered an error in the library calls */
     bool error;
@@ -191,6 +197,10 @@ struct key_data_s {
     char **keys;
 };
 
+struct deferred_rset_data_s {
+    char *rset_path;
+    manager_o_t *mgr;
+};
 
 static int copy_keys_cb(void *key, void *object, void *user_data)
 {
@@ -653,33 +663,26 @@ static resource_o_t *get_resource_by_name(resource_set_o_t *rset,
     return s.resource;
 }
 
-
-static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
+static void update_resources(resource_set_o_t *rset, mrp_resource_mask_t grant,
+        mrp_resource_mask_t advice)
 {
-    resource_set_o_t *rset = data;
     mrp_resource_t *resource;
     void *iter = NULL;
 
-    mrp_resource_mask_t grant = mrp_get_resource_set_grant(set);
-    mrp_resource_mask_t advice = mrp_get_resource_set_advice(set);
-
-    MRP_UNUSED(request_id);
-
-    mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
-        rset->path, grant, advice);
-
-    if (!rset->set || !rset->acquired) {
-        /* We haven't yet returned from the create_set call, and this is before
-         * acquiring the set, or we haven't started the acquitision yet. Filter
-         * out! */
-        mrp_log_info("Filtering out the event");
-
+    if (!rset->set || !rset->committed) {
+        mrp_log_error("resource-dbus: update_resources with invalid rset");
         return;
     }
 
-    /* the resource API is bit awkward here */
+    if (rset->update_needed) {
+        /* process pending events first */
+        rset->update_needed = FALSE;
+        update_resources(rset, rset->pending_grant, rset->pending_advice);
+    }
 
-    while ((resource = mrp_resource_set_iterate_resources(set, &iter))) {
+    /* the resource API is "bit" awkward here */
+
+    while ((resource = mrp_resource_set_iterate_resources(rset->set, &iter))) {
         mrp_resource_mask_t mask;
         const char *name;
         resource_o_t *res;
@@ -716,6 +719,69 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
     else {
         update_property(rset->status_prop, "lost");
     }
+}
+
+static void update_later_cb(mrp_deferred_t *d, void *data)
+{
+    struct deferred_rset_data_s *r_data = (struct deferred_rset_data_s *) data;
+    manager_o_t *mgr = r_data->mgr;
+
+    resource_set_o_t *rset = mrp_htbl_lookup(mgr->rsets, r_data->rset_path);
+
+    if (rset && rset->update_needed)
+        update_resources(rset, rset->pending_grant, rset->pending_advice);
+
+    mrp_free(r_data->rset_path);
+    mrp_free(r_data);
+
+    mrp_del_deferred(d);
+}
+
+static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
+{
+    resource_set_o_t *rset = data;
+
+    mrp_resource_mask_t grant = mrp_get_resource_set_grant(set);
+    mrp_resource_mask_t advice = mrp_get_resource_set_advice(set);
+
+    MRP_UNUSED(request_id);
+
+    mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
+        rset->path, grant, advice);
+
+    if (!rset->set || !rset->committed) {
+
+        struct deferred_rset_data_s *r_data =
+                mrp_allocz(sizeof(struct deferred_rset_data_s));
+
+        if (!r_data) {
+            return;
+        }
+
+        r_data->mgr = rset->mgr;
+        r_data->rset_path = mrp_strdup(rset->path);
+
+        if (!r_data->rset_path) {
+            mrp_free(r_data);
+            return;
+        }
+
+        /* We haven't yet returned from the create_set call, and this is before
+         * acquiring the set, or we haven't started the acquitision yet. Filter
+         * out! */
+
+        mrp_log_info("Filtering out the event, trying again soon");
+
+        rset->update_needed = TRUE;
+        rset->pending_grant = grant;
+        rset->pending_advice = advice;
+
+        mrp_add_deferred(rset->mgr->ctx->ml, update_later_cb, r_data);
+
+        return;
+    }
+
+    update_resources(rset, grant, advice);
 }
 
 
@@ -1784,7 +1850,7 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
             }
         }
 
-        rset->acquired = TRUE;
+        rset->committed = TRUE;
         mrp_resource_set_acquire(rset->set, 0);
 
         /* Due to limitations in resource library, this resource set cannot
@@ -1802,7 +1868,9 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
     else if (strcmp(member, RSET_RELEASE) == 0) {
         mrp_log_info("Releasing rset %s", path);
 
+        rset->committed = TRUE;
         mrp_resource_set_release(rset->set, 0);
+        rset->locked = TRUE;
 
         reply = mrp_dbus_msg_method_return(dbus, msg);
         if (!reply)
@@ -2087,6 +2155,7 @@ static int dbus_resource_init(mrp_plugin_t *plugin)
     if (!ctx)
         goto error;
 
+    ctx->ml = plugin->ctx->ml;
     ctx->addr = args[ARG_DR_SERVICE].str;
     ctx->tracking = args[ARG_DR_TRACK_CLIENTS].bln;
     ctx->default_zone = args[ARG_DR_DEFAULT_ZONE].str;
