@@ -186,6 +186,7 @@ libmurphy_lua_utils_la_LDFLAGS =				\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_lua_utils_la_LIBADD =	    				\
+		libmurphy-common.la				\
 		$(LUA_LIBS)
 
 libmurphy_lua_utils_la_DEPENDENCIES = linker-script.lua-utils
@@ -238,7 +239,12 @@ libmurphy_lua_decision_la_LDFLAGS =				\
 		-Wl,-version-script=linker-script.lua-decision	\
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_lua_decision_la_LIBADD =	    			\
+libmurphy_lua_decision_la_LIBADD =	\
+		libmurphy-common.la	\
+		libmurphy-lua-utils.la  \
+		murphy-db/mql/libmql.la \
+		murphy-db/mqi/libmqi.la \
+		murphy-db/mdb/libmdb.la \
 		$(LUA_LIBS)
 
 libmurphy_lua_decision_la_DEPENDENCIES = linker-script.lua-decision
@@ -341,6 +347,9 @@ libmurphy_core_la_LIBADD  =			\
 		libmurphy-common.la 		\
 		libmurphy-lua-decision.la	\
 		libmurphy-lua-utils.la		\
+		murphy-db/mql/libmql.la 	\
+		murphy-db/mqi/libmqi.la 	\
+		murphy-db/mdb/libmdb.la		\
 		$(LUA_LIBS) 			\
 		$(SMACK_LIBS)			\
 		-ldl
@@ -436,7 +445,9 @@ libmurphy_libdbus_la_LDFLAGS =		\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_libdbus_la_LIBADD  = 		\
-		-lrt $(LIBDBUS_LIBS)
+		libmurphy-common.la	\
+		$(LIBDBUS_LIBS)		\
+		-lrt
 
 libmurphy_libdbus_la_DEPENDENCIES = linker-script.libdbus
 
@@ -495,6 +506,7 @@ libmurphy_dbus_libdbus_la_LDFLAGS =	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_dbus_libdbus_la_LIBADD  = 	\
+		libmurphy-common.la	\
 		-lrt $(LIBDBUS_LIBS)
 
 libmurphy_dbus_libdbus_la_DEPENDENCIES = linker-script.dbus-libdbus
@@ -607,7 +619,9 @@ libmurphy_pulse_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.pulse \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_pulse_la_LIBADD  =
+libmurphy_pulse_la_LIBADD  =		\
+		libmurphy-common.la	\
+		$(PULSE_LIBS)
 
 libmurphy_pulse_la_DEPENDENCIES = linker-script.pulse
 
@@ -653,7 +667,9 @@ libmurphy_ecore_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.ecore \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_ecore_la_LIBADD  =
+libmurphy_ecore_la_LIBADD  =		\
+		libmurphy-common.la	\
+		$(ECORE_LIBS)
 
 libmurphy_ecore_la_DEPENDENCIES = linker-script.ecore
 
@@ -699,7 +715,9 @@ libmurphy_glib_la_LDFLAGS =		\
 		-Wl,-version-script=linker-script.glib \
 		-version-info @MURPHY_VERSION_INFO@
 
-libmurphy_glib_la_LIBADD  =
+libmurphy_glib_la_LIBADD  =		\
+		libmurphy-common.la	\
+		$(GLIB_LIBS)
 
 libmurphy_glib_la_DEPENDENCIES = linker-script.glib
 
@@ -919,11 +937,12 @@ libmurphy_resource_backend_la_LDFLAGS =                        \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resource_backend_la_LIBADD =     \
-		libmurphy-core.la   \
-		libmurphy-common.la \
-		murphy-db/mql/libmql.la \
-		murphy-db/mqi/libmqi.la \
-		murphy-db/mdb/libmdb.la \
+		libmurphy-core.la          \
+		libmurphy-common.la        \
+		libmurphy-lua-utils.la     \
+		murphy-db/mql/libmql.la    \
+		murphy-db/mqi/libmqi.la    \
+		murphy-db/mdb/libmdb.la    \
 		$(LUA_LIBS)
 
 libmurphy_resource_backend_la_DEPENDENCIES = linker-script.resource_backend \
@@ -1005,7 +1024,9 @@ libbreedline_murphy_la_LDFLAGS =	\
 		-Wl,-version-script=linker-script.breedline-murphy	\
 		-version-info @MURPHY_VERSION_INFO@
 
-libbreedline_murphy_la_LIBADD = libmurphy-common.la
+libbreedline_murphy_la_LIBADD = 	\
+		libmurphy-common.la 	\
+		libbreedline.la
 
 libbreedline_murphy_la_DEPENDENCIES = linker-script.breedline-murphy \
 	$(filter %.la,$(libbreedline_murphy_la_LIBADD))
@@ -1045,7 +1066,9 @@ libbreedline_glib_la_LDFLAGS = \
 		-Wl,-version-script=linker-script.breedline-glib	\
 		-version-info @MURPHY_VERSION_INFO@
 
-libbreedline_glib_la_LIBADD = $(GLIB_LIBS)
+libbreedline_glib_la_LIBADD =		\
+		libbreedline.la 	\
+		$(GLIB_LIBS)
 
 libbreedline_glib_la_DEPENDENCIES = linker-script.breedline-glib
 
@@ -1210,7 +1233,7 @@ if LIBDBUS_ENABLED
 RESOURCE_DBUS_PLUGIN_SOURCES = plugins/plugin-resource-dbus.c
 RESOURCE_DBUS_PLUGIN_CFLAGS  = $(LIBDBUS_CFLAGS)
 RESOURCE_DBUS_PLUGIN_LIBS    =					\
-				libmurphy-dbus-libdbus.la		\
+				libmurphy-dbus-libdbus.la	\
 				libmurphy-core.la		\
 				libmurphy-common.la		\
 				$(RESOURCE_LIBRARY)
@@ -1404,10 +1427,12 @@ libmurphy_domain_controller_la_SOURCES = 		\
 		plugins/domain-control/message.c
 libmurphy_domain_controller_la_CFLAGS   =		\
 		$(JSON_CFLAGS)
-libmurphy_domain_controller_la_LIBADD   = libmurphy-common.la     \
-					  murphy-db/mql/libmql.la \
-					  murphy-db/mqi/libmqi.la \
-					  murphy-db/mdb/libmdb.la
+libmurphy_domain_controller_la_LIBADD   = 	\
+		libmurphy-common.la		\
+		murphy-db/mql/libmql.la		\
+		murphy-db/mqi/libmqi.la		\
+		murphy-db/mdb/libmdb.la		\
+		$(JSON_LIBS)
 
 if WEBSOCKETS_ENABLED
 EXTRA_DIST          += $(domain_control_DATA)
@@ -1513,6 +1538,13 @@ murphyd_LDADD  =				\
 		libmurphy-core.la		\
 		libmurphy-lua-utils.la		\
 		libmurphy-common.la
+
+if LIBDBUS_ENABLED
+murphyd_LDADD +=				\
+		libmurphy-dbus-libdbus.la	\
+		-lrt $(LIBDBUS_LIBS)
+endif
+
 
 murphyd_LDFLAGS = -rdynamic
 
