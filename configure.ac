@@ -320,6 +320,25 @@ if test "$have_json" = "no"; then
     PKG_CHECK_MODULES(JSON, [json-c >= 0.11])
 fi
 
+AC_MSG_CHECKING([if json-c has headers under json-c include path])
+saved_CFLAGS="$CFLAGS"
+saved_LIBS="$LIBS"
+CFLAGS="${JSON_CFLAGS}"
+LIBS="${JSON_LIBS}"
+AC_LINK_IFELSE(
+   [AC_LANG_PROGRAM(
+         [[#include <../json-c/json.h>]],
+         [[return 0;]])],
+    [json_include_jsonc=yes],
+    [json_include_jsonc=no])
+AC_MSG_RESULT([$json_include_jsonc])
+CFLAGS="$saved_CFLAGS"
+LIBS="$saved_LIBS"
+
+if test "$json_include_jsonc" = "yes"; then
+    AC_DEFINE([JSON_INCLUDE_PATH_JSONC], 1, [json headers under json-c ?])
+fi
+
 AC_MSG_CHECKING([for json_tokener_get_error()])
 saved_CFLAGS="$CFLAGS"
 saved_LIBS="$LIBS"

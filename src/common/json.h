@@ -32,10 +32,20 @@
 
 #include <stdarg.h>
 #include <stdbool.h>
-#include <json/json.h>
-#include <json/linkhash.h>
+
+#include "murphy/config.h"
+
+#ifndef JSON_INCLUDE_PATH_JSONC
+#    include <json/json.h>
+#    include <json/linkhash.h>
 /* workaround for older broken json-c not exposing json_object_iter */
-#include <json/json_object_private.h>
+#    include <json/json_object_private.h>
+#else
+#    include <json-c/json.h>
+#    include <json-c/linkhash.h>
+/* workaround for older broken json-c not exposing json_object_iter */
+#    include <json-c/json_object_private.h>
+#endif
 
 #include <murphy/common/macros.h>
 
