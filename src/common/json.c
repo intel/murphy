@@ -30,7 +30,6 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <string.h>
-#include <json/json.h>
 
 #include "murphy/config.h"
 #include <murphy/common/macros.h>
