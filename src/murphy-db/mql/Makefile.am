@@ -28,6 +28,8 @@ libmql_la_LDFLAGS =		\
 		-Wl,-version-script=$(LINKER_SCRIPT)
 #		-version-info @MURPHYDB_VERSION_INFO@
 
+libmql_la_LIBADD = ../mqi/libmqi.la ../mdb/libmdb.la
+
 libmql_la_DEPENDENCIES = $(LINKER_SCRIPT)
 
 
