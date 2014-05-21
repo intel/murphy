@@ -1,0 +1,143 @@
+Source: murphy
+Section: admin
+Priority: optional
+Maintainer: Krisztian Litkey <kli@iki.fi>
+Standards-Version: 3.8.0
+Build-Depends: cdbs, debhelper (>= 4.1.0), flex, bison, liblua5.2-dev, libpulse-dev, libglib2.0-dev, libdbus-1-dev, libecore-dev
+#libqt4-dev
+
+Package: murphy
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: Murphy resource policy framework.
+ Murphy resource policy framework.
+ .
+ Murphy resource policy framework.
+
+Package: murphy-dev
+Priority: optional
+Section: lib-devel
+Architecture: any
+Depends: murphy (= ${binary:Version})
+Description: Murphy resource policy framework development package.
+ Murphy resource policy framework development package.
+
+Package: murphy-dbg
+Priority: extra
+Section: admin
+Architecture: any
+Depends: murphy (= ${binary:Version})
+Description: Debug symbols for the Murphy resource policy framework.
+ Debug symbols for the Murphy resource policy framework.
+
+Package: murphy-tests
+Architecture: any
+Depends: ${shlibs:Depends}, murphy
+Description: Murphy resource policy framework testing and debugging tools.
+ Murphy resource policy framework testing and debugging tools.
+ .
+ Murphy resource policy framework testing and debugging tools.
+
+Package: murphy-tests-dbg
+Priority: extra
+Section: admin
+Architecture: any
+Depends: murphy-tests-dbg (= ${binary:Version})
+Description: Debug symbols for the Murphy test and debugging tools.
+ Debug symbols for the Murphy test and debugging tools.
+
+Package: murphy-pulse
+Priority: optional
+Section: libs
+Architecture: any
+Depends: murphy (= ${binary:Version}), ${shlibs:Depends}
+Description: Murphy PulseAudio mainloop integration.
+ Murphy PulseAudio mainloop integration.
+
+Package: murphy-pulse-dev
+Priority: optional
+Section: lib-devel
+Architecture: any
+Depends: murphy-pulse (= ${binary:Version})
+Description: Murphy PulseAudio mainloop integration development files.
+ Murphy PulseAudio mainloop integration development files.
+
+Package: murphy-pulse-dbg
+Priority: extra
+Section: admin
+Architecture: any
+Depends: murphy-pulse (= ${binary:Version})
+Description: Debug symbols for murphy-pulse.
+ Debug symbols for murphy-pulse.
+
+Package: murphy-glib
+Priority: optional
+Section: libs
+Architecture: any
+Depends: murphy (= ${binary:Version}), ${shlibs:Depends}
+Description: Murphy glib mainloop integration.
+ Murphy glib mainloop integration.
+
+Package: murphy-glib-dev
+Priority: optional
+Section: lib-devel
+Architecture: any
+Depends: murphy-glib (= ${binary:Version})
+Description: Murphy glib mainloop integration development files.
+ Murphy glib mainloop integration development files.
+
+Package: murphy-glib-dbg
+Priority: extra
+Section: admin
+Architecture: any
+Depends: murphy-glib (= ${binary:Version})
+Description: Debug symbols for murphy-glib.
+ Debug symbols for murphy-glib.
+
+Package: murphy-ecore
+Priority: optional
+Section: libs
+Architecture: any
+Depends: murphy (= ${binary:Version}), ${shlibs:Depends}
+Description: Murphy EFL/ecore mainloop integration.
+ Murphy EFL/ecore mainloop integration.
+
+Package: murphy-ecore-dev
+Priority: optional
+Section: lib-devel
+Architecture: any
+Depends: murphy-ecore (= ${binary:Version})
+Description: Murphy EFL/ecore mainloop integration development files.
+ Murphy EFL/ecore mainloop integration development files.
+
+Package: murphy-ecore-dbg
+Priority: extra
+Section: admin
+Architecture: any
+Depends: murphy-ecore (= ${binary:Version})
+Description: Debug symbols for murphy-ecore.
+ Debug symbols for murphy-ecore.
+
+#Package: murphy-qt
+#Priority: optional
+#Section: libs
+#Architecture: any
+#Depends: murphy (= ${binary:Version}), ${shlibs:Depends}
+#Description: Murphy Qt mainloop integration.
+# Murphy Qt mainloop integration.
+#
+#Package: murphy-qt-dev
+#Priority: optional
+#Section: lib-devel
+#Architecture: any
+#Depends: murphy-qt (= ${binary:Version})
+#Description: Murphy Qt mainloop integration development files.
+# Murphy Qt mainloop integration development files.
+#
+#Package: murphy-qt-dbg
+#Priority: extra
+#Section: admin
+#Architecture: any
+#Depends: murphy-qt (= ${binary:Version})
+#Description: Debug symbols for murphy-qt.
+# Debug symbols for murphy-qt.

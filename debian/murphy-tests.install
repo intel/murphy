@@ -1,0 +1,5 @@
+usr/bin/murphy-console
+usr/bin/resource-client
+usr/bin/test-domain-controller
+usr/bin/resource-api-test
+usr/bin/resource-api-fuzz

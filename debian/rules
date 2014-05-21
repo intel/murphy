@@ -1,0 +1,85 @@
+#!/usr/bin/make -f
+SHELL+= -e
+
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+
+GIT_VERSION := $(strip $(shell ./build-aux/git-version-gen .tarball-version || \
+                             echo "unknown"))
+
+DEB_DH_GENCONTROL_ARGS += -u-VGit-Id=$(GIT_VERSION)
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+# for dbg package
+CFLAGS += -g3 -O2
+DEB_DH_STRIP_ARGS += --dbg-package=murphy-dbg \
+                     --dbg-package=murphy-tests-dbg \
+                     --dbg-package=murphy-pulse-dbg \
+                     --dbg-package=murphy-glib-dbg \
+                     --dbg-package=murphy-ecore-dbg
+
+#                    --dbg-package=murphy-qt-dbg
+
+
+DEB_TAR_SRCDIR = ${DEB_SOURCE_PACKAGE}-${DEB_UPSTREAM_VERSION}
+DEB_DH_INSTALL_SOURCEDIR = debian/tmp
+
+DEB_CONFIGURE_USER_FLAGS = --disable-static \
+                           --enable-gpl \
+                           --enable-libdbus \
+                           --enable-console \
+                           --enable-pulse \
+                           --enable-glib \
+                           --enable-ecore \
+                           --disable-qt \
+                           --with-resources \
+                           --with-lua=lua5.2 \
+                           --with-dynamic-plugins=domain-control
+
+DEB_SHLIBDEPS_INCLUDE_murphy := debian/murphy/usr/lib \
+                                debian/murphy/usr/lib/murphy
+
+LDFLAGS += -Wl,--no-as-needed
+
+include /usr/share/cdbs/1/rules/debhelper.mk
+include /usr/share/cdbs/1/class/autotools.mk
+include /usr/share/cdbs/1/rules/utils.mk
+
+# Omit *.la files but warn about other missing things.
+binary-post-install/%::
+	find debian -name \*.la -exec rm -f {} \;
+
+common-binary-post-install-arch:: list-missing
+
+post-patches:: debian/stamp-autogen
+
+debian/stamp-autogen:
+	cd $(DEB_BUILDDIR) && ./bootstrap
+	touch $@
+
+common-install-arch:: murphy-install-config-files
+
+clean::
+	-rm -rf debian/stamp-autogen
+
+murphy-install-config-files:
+#	mkdir -p $(DEB_DESTDIR)/etc/murphy
+#	cp debian/murphy.conf $(DEB_DESTDIR)/etc/murphy
+#	cp debian/murphy.lua $(DEB_DESTDIR)/etc/murphy
+#	chmod 644 $(DEB_DESTDIR)/etc/murphy/murphy.conf
+#	chmod 644 $(DEB_DESTDIR)/etc/murphy/murphy.lua
+
+# do not include docs and changelogs in these packages
+DEB_INSTALL_DOCS_murphy := --no-act
+DEB_INSTALL_CHANGELOGS_murphy := --no-act
+DEB_INSTALL_DOCS_murphy-tests := --no-act
+DEB_INSTALL_CHANGELOGS_murphy-tests := --no-act
+DEB_INSTALL_DOCS_murphy-pulse := --no-act
+DEB_INSTALL_CHANGELOGS_murphy-pulse := --no-act
+DEB_INSTALL_DOCS_murphy-glib := --no-act
+DEB_INSTALL_CHANGELOGS_murphy-glib := --no-act
+DEB_INSTALL_DOCS_murphy-ecore := --no-act
+DEB_INSTALL_CHANGELOGS_murphy-ecore := --no-act
+
+#DEB_INSTALL_DOCS_murphy-qt := --no-act
+#DEB_INSTALL_CHANGELOGS_murphy-qt := --no-act
