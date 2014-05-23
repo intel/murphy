@@ -100,7 +100,9 @@ libmurphy_common_la_LIBADD  = 		\
 		$(JSON_LIBS)		\
 		-lrt
 
-libmurphy_common_la_DEPENDENCIES = linker-script.common
+libmurphy_common_la_DEPENDENCIES =	\
+		linker-script.common	\
+		$(filter %.la, $(libmurphy_common_la_LIBADD))
 
 libcommonincludedir      = $(includedir)/murphy/common
 libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
@@ -189,7 +191,9 @@ libmurphy_lua_utils_la_LIBADD =	    				\
 		libmurphy-common.la				\
 		$(LUA_LIBS)
 
-libmurphy_lua_utils_la_DEPENDENCIES = linker-script.lua-utils
+libmurphy_lua_utils_la_DEPENDENCIES =				\
+		linker-script.lua-utils				\
+		$(filter %.la, $(libmurphy_lua_utils_la_LIBADD))
 
 # debug file:line-function mapping generation
 lua-utils-func-info.c: $(libmurphy_lua_utils_la_REGULAR_SOURCES)
@@ -247,7 +251,10 @@ libmurphy_lua_decision_la_LIBADD =	\
 		murphy-db/mdb/libmdb.la \
 		$(LUA_LIBS)
 
-libmurphy_lua_decision_la_DEPENDENCIES = linker-script.lua-decision
+libmurphy_lua_decision_la_DEPENDENCIES =	\
+		linker-script.lua-decision	\
+		$(filter %.la, $(libmurphy_lua_decision_la_LIBADD))
+
 
 # debug file:line-function mapping generation
 lua-decision-func-info.c: $(libmurphy_lua_decision_la_REGULAR_SOURCES)
@@ -354,8 +361,9 @@ libmurphy_core_la_LIBADD  =			\
 		$(SMACK_LIBS)			\
 		-ldl
 
-libmurphy_core_la_DEPENDENCIES = linker-script.core        \
-	$(filter %.la, $(libmurphy_core_la_LIBADD))
+libmurphy_core_la_DEPENDENCIES =		\
+		linker-script.core        	\
+		$(filter %.la, $(libmurphy_core_la_LIBADD))
 
 # core linker script generation
 linker-script.core: $(libmurphy_core_la_HEADERS) \
@@ -449,7 +457,9 @@ libmurphy_libdbus_la_LIBADD  = 		\
 		$(LIBDBUS_LIBS)		\
 		-lrt
 
-libmurphy_libdbus_la_DEPENDENCIES = linker-script.libdbus
+libmurphy_libdbus_la_DEPENDENCIES =	\
+		linker-script.libdbus	\
+		$(filter %.la, $(libmurphy_libdbus_la_LIBADD))
 
 libmurphy_libdbusdir      = $(includedir)/murphy/dbus
 libmurphy_libdbus_HEADERS = $(libmurphy_libdbus_la_HEADERS)
@@ -509,7 +519,9 @@ libmurphy_dbus_libdbus_la_LIBADD  = 	\
 		libmurphy-common.la	\
 		-lrt $(LIBDBUS_LIBS)
 
-libmurphy_dbus_libdbus_la_DEPENDENCIES = linker-script.dbus-libdbus
+libmurphy_dbus_libdbus_la_DEPENDENCIES =	\
+		linker-script.dbus-libdbus	\
+		$(filter %.la, $(libmurphy_dbus_libdbus_la_LIBADD))
 
 libmurphy_dbus_libdbusdir      = $(includedir)/murphy/dbus
 libmurphy_dbus_libdbus_HEADERS = $(libmurphy_dbus_libdbus_la_HEADERS)
@@ -567,7 +579,9 @@ libmurphy_dbus_sdbus_la_LDFLAGS =		\
 libmurphy_dbus_sdbus_la_LIBADD  = 		\
 		-lrt $(SDBUS_LIBS)
 
-libmurphy_dbus_sdbus_la_DEPENDENCIES = linker-script.dbus-sdbus
+libmurphy_dbus_sdbus_la_DEPENDENCIES =		\
+		linker-script.dbus-sdbus	\
+		$(filter %.la, $(libmurphy_dbus_sdbus_la_LIBADD))
 
 libmurphy_dbus_sdbusdir      = $(includedir)/murphy/dbus
 libmurphy_dbus_sdbus_HEADERS = $(libmurphy_dbus_sdbus_la_HEADERS)
@@ -623,7 +637,9 @@ libmurphy_pulse_la_LIBADD  =		\
 		libmurphy-common.la	\
 		$(PULSE_LIBS)
 
-libmurphy_pulse_la_DEPENDENCIES = linker-script.pulse
+libmurphy_pulse_la_DEPENDENCIES =	\
+		linker-script.pulse	\
+		$(filter %.la, $(libmurphy_pulse_la_LIBADD))
 
 libpulseincludedir      = $(includedir)/murphy/pulse
 libpulseinclude_HEADERS = $(libmurphy_pulse_la_HEADERS)
@@ -671,7 +687,9 @@ libmurphy_ecore_la_LIBADD  =		\
 		libmurphy-common.la	\
 		$(ECORE_LIBS)
 
-libmurphy_ecore_la_DEPENDENCIES = linker-script.ecore
+libmurphy_ecore_la_DEPENDENCIES =	\
+		linker-script.ecore	\
+		$(filter %.la, $(libmurphy_ecore_la_LIBADD))
 
 libecoreincludedir      = $(includedir)/murphy/ecore
 libecoreinclude_HEADERS = $(libmurphy_ecore_la_HEADERS)
@@ -719,7 +737,9 @@ libmurphy_glib_la_LIBADD  =		\
 		libmurphy-common.la	\
 		$(GLIB_LIBS)
 
-libmurphy_glib_la_DEPENDENCIES = linker-script.glib
+libmurphy_glib_la_DEPENDENCIES =	\
+		linker-script.glib	\
+		$(filter %.la, $(libmurphy_glib_la_LIBADD))
 
 libglibincludedir      = $(includedir)/murphy/glib
 libglibinclude_HEADERS = $(libmurphy_glib_la_HEADERS)
@@ -767,7 +787,9 @@ libmurphy_qt_la_LDFLAGS =		\
 
 libmurphy_qt_la_LIBADD  = $(QTCORE_LIBS)
 
-libmurphy_qt_la_DEPENDENCIES = linker-script.qt
+libmurphy_qt_la_DEPENDENCIES =
+		linker-script.qt	\
+		$(filter %.la, $(libmurphy_qt_la_LIBADD))
 
 libqtincludedir      = $(includedir)/murphy/qt
 libqtinclude_HEADERS = $(libmurphy_qt_la_HEADERS)
@@ -840,8 +862,9 @@ libmurphy_resolver_la_LIBADD =	    	\
 		murphy-db/mqi/libmqi.la \
 		murphy-db/mdb/libmdb.la
 
-libmurphy_resolver_la_DEPENDENCIES = linker-script.resolver  \
-	$(filter %.la, $(libmurphy_resolver_la_LIBADD))
+libmurphy_resolver_la_DEPENDENCIES =	\
+		linker-script.resolver  \
+		$(filter %.la, $(libmurphy_resolver_la_LIBADD))
 
 # resolver lexical analyser and parser generation
 RESOLVER_PARSER_PREFIX = yy_res_
@@ -945,8 +968,9 @@ libmurphy_resource_backend_la_LIBADD =     \
 		murphy-db/mdb/libmdb.la    \
 		$(LUA_LIBS)
 
-libmurphy_resource_backend_la_DEPENDENCIES = linker-script.resource_backend \
-	$(filter %.la, $(libmurphy_resource_backend_la_LIBADD))
+libmurphy_resource_backend_la_DEPENDENCIES =	\
+		linker-script.resource_backend	\
+		$(filter %.la, $(libmurphy_resource_backend_la_LIBADD))
 
 # debug file:line-function mapping generation
 resource-func-info.c: $(libmurphy_resource_backend_la_REGULAR_SOURCES)
@@ -992,7 +1016,9 @@ libbreedline_la_LDFLAGS =					\
 
 libbreedline_la_LIBADD =
 
-libbreedline_la_DEPENDENCIES = linker-script.breedline
+libbreedline_la_DEPENDENCIES =			\
+		linker-script.breedline		\
+		$(filter %.la, $(libbreedline_la_LIBADD))
 
 libbreedlineincludedir      = $(includedir)/breedline
 libbreedlineinclude_HEADERS = $(libbreedline_la_HEADERS)
@@ -1028,8 +1054,9 @@ libbreedline_murphy_la_LIBADD = 	\
 		libmurphy-common.la 	\
 		libbreedline.la
 
-libbreedline_murphy_la_DEPENDENCIES = linker-script.breedline-murphy \
-	$(filter %.la,$(libbreedline_murphy_la_LIBADD))
+libbreedline_murphy_la_DEPENDENCIES =		\
+		linker-script.breedline-murphy	\
+		$(filter %.la,$(libbreedline_murphy_la_LIBADD))
 
 libbreedline_murphyincludedir      = $(includedir)/breedline
 libbreedline_murphyinclude_HEADERS = $(libbreedline_murphy_la_HEADERS)
@@ -1070,7 +1097,9 @@ libbreedline_glib_la_LIBADD =		\
 		libbreedline.la 	\
 		$(GLIB_LIBS)
 
-libbreedline_glib_la_DEPENDENCIES = linker-script.breedline-glib
+libbreedline_glib_la_DEPENDENCIES =		\
+		linker-script.breedline-glib	\
+		$(filter %.la, $(libmurphy_glib_la_LIBADD))
 
 libbreedline_glibincludedir      = $(includedir)/breedline
 libbreedline_glibinclude_HEADERS = $(libbreedline_glib_la_HEADERS)
@@ -1118,11 +1147,12 @@ libmurphy_resource_la_LDFLAGS =	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resource_la_LIBADD =      \
-        libmurphy-common.la
+		libmurphy-common.la
 
-libmurphy_resource_la_DEPENDENCIES =    \
-                     libmurphy-common.la \
-                     linker-script.resource
+libmurphy_resource_la_DEPENDENCIES =	\
+		libmurphy-common.la	\
+		linker-script.resource	\
+		$(filter %.la, $(libmurphy_resource_la_LIBADD))
 
 # linker script generation
 linker-script.resource: $(libmurphy_resource_la_HEADERS)
