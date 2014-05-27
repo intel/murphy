@@ -83,6 +83,8 @@ mrp_log_mask_t mrp_log_parse_levels(const char *levels)
                 mask |= MRP_LOG_MASK_ERROR;
             else if (MATCHES(p, "warning"))
                 mask |= MRP_LOG_MASK_WARNING;
+            else if (MATCHES(p, "none") || MATCHES(p, "off"))
+                mask = 0;
             else
                 return -1;
 
