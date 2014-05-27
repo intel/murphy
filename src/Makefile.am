@@ -787,7 +787,7 @@ libmurphy_qt_la_LDFLAGS =		\
 
 libmurphy_qt_la_LIBADD  = $(QTCORE_LIBS)
 
-libmurphy_qt_la_DEPENDENCIES =
+libmurphy_qt_la_DEPENDENCIES =		\
 		linker-script.qt	\
 		$(filter %.la, $(libmurphy_qt_la_LIBADD))
 

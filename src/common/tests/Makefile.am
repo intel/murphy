@@ -36,15 +36,13 @@ mainloop_test_CFLAGS += $(GLIB_CFLAGS)
 mainloop_test_LDADD  += ../../libmurphy-glib.la $(GLIB_LIBS)
 endif
 
+if QT_ENABLED
 noinst_LTLIBRARIES = libmainloop-qt-test.la
 libmainloop_qt_test_la_SOURCES  = mainloop-qt-test.cpp
 libmainloop_qt_test_la_CPPFLAGS = $(AM_CFLAGS) $(QTCORE_CFLAGS)
-libmainloop_qt_test_la_LIBADD   = ../../libmurphy-common.la
-mainloop_test_LDADD            += libmainloop-qt-test.la
-
-if QT_ENABLED
-libmainloop_qt_test_la_LIBADD  += ../../libmurphy-qt.la $(QTCORE_LIBS)
-mainloop_test_LDADD            += ../../libmurphy-qt.la $(QTCORE_LIBS)
+libmainloop_qt_test_la_LIBADD   = ../../libmurphy-common.la \
+				  ../../libmurphy-qt.la $(QTCORE_LIBS)
+mainloop_test_LDADD            += libmainloop-qt-test.la $(QTCORE_LIBS) -lstdc++
 endif
 
 # msg test

@@ -1608,9 +1608,11 @@ static mrp_mainloop_t *mainloop_create(test_config_t *cfg)
         glib_mainloop_create(cfg);
         break;
 
+#ifdef QT_ENABLED
     case MAINLOOP_QT:
         cfg->ml = qt_mainloop_create();
         break;
+#endif
 
     default:
         mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
@@ -1645,9 +1647,11 @@ static void mainloop_run(test_config_t *cfg)
         glib_mainloop_run(cfg);
         break;
 
+#ifdef QT_ENABLED
     case MAINLOOP_QT:
         qt_mainloop_run();
         break;
+#endif
 
     default:
         mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
@@ -1675,9 +1679,11 @@ static void mainloop_quit(test_config_t *cfg)
         glib_mainloop_quit(cfg);
         break;
 
+#ifdef QT_ENABLED
     case MAINLOOP_QT:
         qt_mainloop_quit();
         break;
+#endif
 
     default:
         mrp_log_error("Invalid mainloop type 0x%x.", cfg->mainloop_type);
@@ -1704,10 +1710,12 @@ void mainloop_cleanup(test_config_t *cfg)
         glib_mainloop_cleanup(cfg);
         break;
 
+#ifdef QT_ENABLED
     case MAINLOOP_QT:
         qt_mainloop_cleanup(cfg->ml);
         cfg->ml = NULL;
         break;
+#endif
 
     default:
         mrp_log_error("Unknown mainloop type (0x%x).", cfg->mainloop_type);

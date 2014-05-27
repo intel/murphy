@@ -34,7 +34,6 @@
 
 #include "mainloop-qt-test.h"
 
-#ifdef QT_ENABLED
 #include <QCoreApplication>
 #include <murphy/common/qt-glue.h>
 
@@ -108,33 +107,3 @@ int qt_mainloop_cleanup(mrp_mainloop_t *ml)
     else
         return FALSE;
 }
-
-#else // QT_ENABLED
-
-mrp_mainloop_t *qt_mainloop_create()
-{
-    mrp_log_error("Qt mainloop support is not available.");
-    exit(1);
-}
-
-int qt_mainloop_run()
-{
-    mrp_log_error("Qt mainloop support is not available.");
-    exit(1);
-}
-
-int qt_mainloop_quit()
-{
-    mrp_log_error("Qt mainloop support is not available.");
-    exit(1);
-}
-
-int qt_mainloop_cleanup(mrp_mainloop_t *ml)
-{
-    MRP_UNUSED(ml);
-
-    mrp_log_error("Qt mainloop support is not available.");
-    exit(1);
-}
-
-#endif // QT_ENABLED
