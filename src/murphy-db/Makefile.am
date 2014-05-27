@@ -17,10 +17,5 @@ murphy-db.pc: murphy-db.pc.in
             -e 's![@]PACKAGE_VERSION[@]!$(PACKAGE_VERSION)!g' \
         $< > $@
 
-generate-linker-scripts:
-	$(MAKE) -C mdb $@
-	$(MAKE) -C mqi $@
-	$(MAKE) -C mql $@
-
 clean-local:
 	rm -f *~ murphy-db.pc

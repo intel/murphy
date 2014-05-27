@@ -56,8 +56,6 @@ $(LINKER_SCRIPT): $(libmql_la_HEADERS)
 clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)
 
-generate-linker-scripts: $(LINKER_SCRIPT)
-
 # cleanup
 clean-local:: clean-parser clean-scanner # clean-$(LINKER_SCRIPT)
 	rm -f *~

@@ -139,8 +139,6 @@ linker-script.common: $(libmurphy_common_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.common
 
-generate-linker-scripts: linker-script.common
-
 # debug file:line-function mapping generation
 common-func-info.c: $(libmurphy_common_la_REGULAR_SOURCES)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
@@ -210,8 +208,6 @@ linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.lua-utils
 
-generate-linker-scripts: linker-script.lua-utils
-
 ###################################
 # murphy lua decision network
 #
@@ -270,8 +266,6 @@ linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.lua-decision
-
-generate-linker-scripts: linker-script.lua-decision
 
 ###################################
 # murphy core library
@@ -373,8 +367,6 @@ linker-script.core: $(libmurphy_core_la_HEADERS) \
 
 clean-linker-script::
 	-rm -f linker-script.core
-
-generate-linker-scripts: linker-script.core
 
 # debug file:line-function mapping generation
 core-func-info.c: $(libmurphy_core_la_REGULAR_SOURCES)
@@ -480,9 +472,6 @@ linker-script.libdbus: $(murphy_libdbus_headers)
 clean-linker-script::
 	-rm -f linker-script.libdbus
 
-generate-linker-scripts: linker-script.libdbus
-
-
 # libdbus-based library with full abstraction
 murphy_dbus_libdbus_headers =		\
 		common/dbus-libdbus.h	\
@@ -542,8 +531,6 @@ linker-script.dbus-libdbus: $(murphy_dbus_libdbus_headers)
 clean-linker-script::
 	-rm -f linker-script.dbus-libdbus
 
-generate-linker-scripts: linker-script.dbus-libdbus
-
 # systemd-bus based library
 murphy_dbus_sdbus_headers = 			\
 		common/dbus-sdbus.h		\
@@ -602,9 +589,6 @@ linker-script.dbus-sdbus: $(murphy_dbus_sdbus_headers)
 clean-linker-script::
 	-rm -f linker-script.sd-bus
 
-generate-linker-scripts: linker-script.sd-bus
-
-
 ###################################
 # murphy pulse glue library
 #
@@ -652,8 +636,6 @@ linker-script.pulse: $(murphy_pulse_headers)
 
 clean-linker-script::
 	-rm -f linker-script.pulse
-
-generate-linker-scripts: linker-script.pulse
 
 ###################################
 # murphy ecore glue library
@@ -703,8 +685,6 @@ linker-script.ecore: $(murphy_ecore_headers)
 clean-linker-script::
 	-rm -f linker-script.ecore
 
-generate-linker-scripts: linker-script.ecore
-
 ###################################
 # murphy glib glue library
 #
@@ -752,8 +732,6 @@ linker-script.glib: $(murphy_glib_headers)
 
 clean-linker-script::
 	-rm -f linker-script.glib
-
-generate-linker-scripts: linker-script.glib
 
 ###################################
 # murphy qt glue library
@@ -806,8 +784,6 @@ linker-script.qt: $(murphy_qt_headers)
 
 clean-linker-script::
 	-rm -f linker-script.qt
-
-generate-linker-scripts: linker-script.qt
 
 ###################################
 # murphy resolver library
@@ -891,8 +867,6 @@ linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.resolver
 
-
-generate-linker-scripts: linker-script.resolver
 # simple interpreter lexical analyser and parser generation
 SIMPLE_PARSER_PREFIX  = yy_smpl_
 BUILT_SOURCES        += resolver/scripting/simple/simple-scanner.c \
@@ -988,8 +962,6 @@ linker-script.resource_backend: $(libmurphy_resource_backend_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.resource_backend
 
-generate-linker-scripts: linker-script.resource_backend
-
 ##########################
 # readline replacement
 #
@@ -1031,8 +1003,6 @@ linker-script.breedline: $(libbreedline_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.breedline
 
-generate-linker-scripts: linker-script.breedline
-
 ##########################
 # breedline murphy glue library
 #
@@ -1068,8 +1038,6 @@ linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.breedline-murphy
-
-generate-linker-scripts: linker-script.breedline-murphy
 
 ##########################
 # breedline glib glue library
@@ -1112,8 +1080,6 @@ linker-script.breedline-glib: $(breedline_glib_headers)
 
 clean-linker-script::
 	-rm -f linker-script.breedline-glib
-
-generate-linker-scripts: linker-script.breedline-glib
 
 ###################################
 # murphy resource external library
@@ -1161,9 +1127,6 @@ linker-script.resource: $(libmurphy_resource_la_HEADERS)
 
 clean-linker-script::
 	-rm -f linker-script.resource
-
-generate-linker-scripts: linker-script.resource
-
 
 # resource-api-test
 bin_PROGRAMS += resource-api-test
@@ -1491,9 +1454,6 @@ linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
 clean-linker-script::
 	-rm -f linker-script.domain-control
 
-generate-linker-scripts: linker-script.domain-control
-
-
 # Lua plugin
 LUA_PLUGIN_SOURCES = plugins/plugin-lua.c
 LUA_PLUGIN_CFLAGS  = $(AM_CFLAGS) $(LUA_CFLAGS)
@@ -1629,9 +1589,6 @@ endif
 
 murphy_console_LDFLAGS = -rdynamic
 endif
-
-generate-linker-scripts:
-	$(MAKE) -C murphy-db $@
 
 # cleanup
 clean-local:: # clean-linker-script clean-func-infos

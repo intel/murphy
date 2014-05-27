@@ -42,10 +42,6 @@ check-git-hooks:
 	    done                                                             \
 	fi
 
-# linker script generation
-generate-linker-scripts:
-	$(MAKE) -C src $@
-
 # cleanup
 clean-local:
 	rm -f *~
