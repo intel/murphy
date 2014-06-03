@@ -71,19 +71,6 @@ static void debug_show(mrp_console_t *c, void *user_data,
 }
 
 
-static void debug_list(mrp_console_t *c, void *user_data,
-                       int argc, char **argv)
-{
-    MRP_UNUSED(user_data);
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argc);
-    MRP_UNUSED(argv);
-
-    fprintf(c->stdout, "Available debug sites:\n");
-    mrp_debug_dump_sites(c->stdout, 4);
-}
-
-
 static void debug_set(mrp_console_t *c, void *user_data,
                       int argc, char **argv)
 {
@@ -182,7 +169,5 @@ MRP_CORE_CONSOLE_GROUP(debug_group, "debug", DEBUG_GROUP_DESCRIPTION, NULL, {
         MRP_TOKENIZED_CMD("set", debug_set, FALSE,
                           SET_SYNTAX, SET_SUMMARY, SET_DESCRIPTION),
         MRP_TOKENIZED_CMD("reset", debug_reset, FALSE,
-                          RESET_SYNTAX, RESET_SUMMARY, RESET_DESCRIPTION),
-        MRP_TOKENIZED_CMD("list", debug_list, FALSE,
-                          LIST_SYNTAX, LIST_SUMMARY, LIST_DESCRIPTION)
+                          RESET_SYNTAX, RESET_SUMMARY, RESET_DESCRIPTION)
 });
