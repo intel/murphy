@@ -459,6 +459,124 @@ bool mrp_funcbridge_call_from_c(lua_State *L,
                 *ret_type = MRP_FUNCBRIDGE_BOOLEAN;
                 ret_value->boolean = lua_toboolean(L, -1);
                 break;
+            case LUA_TTABLE:
+            {
+                int size = 4; /* array size (initial) */
+                int item_size = 0; /* array item size (calculated) */
+                void *items = NULL;
+                int allowed_type = LUA_TNIL;
+                bool first = true;
+                int j = 0;
+
+                *ret_type = MRP_FUNCBRIDGE_ARRAY;
+
+                /* push NIL to stack as the first key */
+                lua_pushnil(L);
+
+                while (lua_next(L, -2)) {
+                    if (first == true) {
+                        first = false;
+                        allowed_type = lua_type(L, -1);
+                        switch (allowed_type) {
+                        case LUA_TNUMBER:
+                            ret_value->array.type = MRP_FUNCBRIDGE_FLOATING;
+                            item_size = sizeof(lua_Number);
+                            break;
+                        case LUA_TBOOLEAN:
+                            ret_value->array.type = MRP_FUNCBRIDGE_BOOLEAN;
+                            item_size = sizeof(int);
+                            break;
+                        case LUA_TSTRING:
+                            ret_value->array.type = MRP_FUNCBRIDGE_STRING;
+                            item_size = sizeof(char *);
+                            break;
+                        default:
+                            goto error;
+                        }
+                        items = mrp_allocz(size * item_size);
+                        if (!items) {
+                            goto error;
+                        }
+                    }
+                    else {
+                        /* check that all members of the table are of the same
+                         * type */
+                        if (lua_type(L, -1) != allowed_type) {
+                            goto error;
+                        }
+                    }
+
+                    if (size == j+1) {
+                        /* check size */
+                        size *= 2;
+                        items = mrp_realloc(items, size * item_size);
+                        if (!items) {
+                            goto error;
+                        }
+                    }
+
+                    switch (allowed_type) {
+                    case LUA_TNUMBER:
+                    {
+                        lua_Number *arr = (lua_Number *) items;
+                        arr[j] = lua_tonumber(L, -1);
+                        break;
+                    }
+                    case LUA_TBOOLEAN:
+                    {
+                        int *arr = (int *) items;
+                        arr[j] = lua_toboolean(L, -1);
+                        break;
+                    }
+                    case LUA_TSTRING:
+                    {
+                        char **arr = (char **) items;
+                        char *value = mrp_strdup(lua_tostring(L, -1));
+
+                        if (!value) {
+                            goto error;
+                        }
+
+                        arr[j] = value;
+                        break;
+                    }
+                    default:
+                        /* impossible */
+                        break;
+                    }
+
+                    j++;
+
+                    /* remove the value, keep key */
+                    lua_pop(L, 1);
+                }
+
+                ret_value->array.nitem = j;
+                ret_value->array.items = items;
+
+                break;
+            error:
+                if (allowed_type == LUA_TSTRING) {
+                    /* we need to free possibly allocated strings */
+                    int k;
+                    char **arr = items;
+
+                    if (items) {
+                        for (k = 0; k < j; k++) {
+                            mrp_free(arr[k]);
+                        }
+                    }
+                }
+
+                mrp_free(items);
+
+                *ret_type = MRP_FUNCBRIDGE_NO_DATA;
+                memset(ret_value, 0, sizeof(*ret_value));
+                sts = 1; /* success is later calculated from !sts */
+                mrp_log_error("funcbridge: error reading array from Lua");
+                break;
+            }
+
             default:
                 *ret_type = MRP_FUNCBRIDGE_NO_DATA;
                 memset(ret_value, 0, sizeof(*ret_value));
