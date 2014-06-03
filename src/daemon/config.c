@@ -229,7 +229,7 @@ static void config_set_defaults(mrp_context_t *ctx, char *argv0)
 
 void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
 {
-#   define OPTIONS "c:C:l:t:fP:a:vd:DhHqB:I:E:w:i:e:RpV"
+#   define OPTIONS "c:C:l:t:fP:a:vd:hHqB:I:E:w:i:e:RpV"
     struct option options[] = {
         { "config-file"      , required_argument, NULL, 'c' },
         { "config-dir"       , required_argument, NULL, 'C' },
@@ -238,7 +238,6 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
         { "log-target"       , required_argument, NULL, 't' },
         { "verbose"          , optional_argument, NULL, 'v' },
         { "debug"            , required_argument, NULL, 'd' },
-        { "list-debug"       , no_argument      , NULL, 'D' },
         { "foreground"       , no_argument      , NULL, 'f' },
         { "help"             , no_argument      , NULL, 'h' },
         { "more-help"        , no_argument      , NULL, 'H' },
@@ -324,13 +323,6 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
             ctx->log_mask |= MRP_LOG_MASK_DEBUG;
             mrp_debug_set_config(optarg);
             mrp_debug_enable(TRUE);
-            break;
-
-        case 'D':
-            SAVE_OPT("-D");
-            printf("Known debug sites:\n");
-            mrp_debug_dump_sites(stdout, 4);
-            exit(0);
             break;
 
         case 'f':
