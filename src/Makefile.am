@@ -85,8 +85,7 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/native-types.c
 
 libmurphy_common_la_SOURCES =				\
-		$(libmurphy_common_la_REGULAR_SOURCES)	\
-		common-func-info.c
+		$(libmurphy_common_la_REGULAR_SOURCES)
 
 libmurphy_common_la_CFLAGS  =		\
 		$(AM_CFLAGS)		\
@@ -139,13 +138,6 @@ linker-script.common: $(libmurphy_common_la_HEADERS)
 clean-linker-script::
 	-rm -f linker-script.common
 
-# debug file:line-function mapping generation
-common-func-info.c: $(libmurphy_common_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm common-func-info.c
-
 ###################################
 # murphy lua utilities
 #
@@ -174,8 +166,7 @@ libmurphy_lua_utils_la_REGULAR_SOURCES =			\
 		core/lua-utils/include.c
 
 libmurphy_lua_utils_la_SOURCES =				\
-		$(libmurphy_lua_utils_la_REGULAR_SOURCES)	\
-		lua-utils-func-info.c
+		$(libmurphy_lua_utils_la_REGULAR_SOURCES)
 
 libmurphy_lua_utils_la_CFLAGS =					\
 		$(AM_CFLAGS)					\
@@ -192,13 +183,6 @@ libmurphy_lua_utils_la_LIBADD =	    				\
 libmurphy_lua_utils_la_DEPENDENCIES =				\
 		linker-script.lua-utils				\
 		$(filter %.la, $(libmurphy_lua_utils_la_LIBADD))
-
-# debug file:line-function mapping generation
-lua-utils-func-info.c: $(libmurphy_lua_utils_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm lua-utils-func-info.c
 
 # lua-utils linker script generation
 linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
@@ -228,8 +212,7 @@ libmurphy_lua_decision_la_REGULAR_SOURCES =			\
 		core/lua-decision/element.c
 
 libmurphy_lua_decision_la_SOURCES =				\
-		$(libmurphy_lua_decision_la_REGULAR_SOURCES)	\
-		lua-decision-func-info.c
+		$(libmurphy_lua_decision_la_REGULAR_SOURCES)
 
 libmurphy_lua_decision_la_CFLAGS =				\
 		$(AM_CFLAGS)					\
@@ -250,14 +233,6 @@ libmurphy_lua_decision_la_LIBADD =	\
 libmurphy_lua_decision_la_DEPENDENCIES =	\
 		linker-script.lua-decision	\
 		$(filter %.la, $(libmurphy_lua_decision_la_LIBADD))
-
-
-# debug file:line-function mapping generation
-lua-decision-func-info.c: $(libmurphy_lua_decision_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm lua-decision-func-info.c
 
 # lua-decision linker script generation
 linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
@@ -331,8 +306,7 @@ libmurphy_core_la_REGULAR_SOURCES +=	\
 endif
 
 libmurphy_core_la_SOURCES =		\
-		$(libmurphy_core_la_REGULAR_SOURCES) \
-		core-func-info.c
+		$(libmurphy_core_la_REGULAR_SOURCES)
 
 libmurphy_core_la_CFLAGS  =		\
 		$(AM_CFLAGS)		\
@@ -367,13 +341,6 @@ linker-script.core: $(libmurphy_core_la_HEADERS) \
 
 clean-linker-script::
 	-rm -f linker-script.core
-
-# debug file:line-function mapping generation
-core-func-info.c: $(libmurphy_core_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm core-func-info.c
 
 ###################################
 # murphy dbus library
@@ -433,8 +400,7 @@ libmurphy_libdbus_la_REGULAR_SOURCES =		\
 		common/libdbus-glue.c
 
 libmurphy_libdbus_la_SOURCES =		\
-		$(libmurphy_libdbus_la_REGULAR_SOURCES) \
-		libdbus-func-info.c
+		$(libmurphy_libdbus_la_REGULAR_SOURCES)
 
 libmurphy_libdbus_la_CFLAGS = 		\
 		$(AM_CFLAGS)		\
@@ -455,13 +421,6 @@ libmurphy_libdbus_la_DEPENDENCIES =	\
 
 libmurphy_libdbusdir      = $(includedir)/murphy/dbus
 libmurphy_libdbus_HEADERS = $(libmurphy_libdbus_la_HEADERS)
-
-# debug file:line-function mapping generation
-libdbus-func-info.c: $(libmurphy_libdbus_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm libdbus-func-info.c
 endif
 
 # linker script generation
@@ -493,8 +452,7 @@ libmurphy_dbus_libdbus_la_REGULAR_SOURCES =	\
 		common/dbus-libdbus-transport.c
 
 libmurphy_dbus_libdbus_la_SOURCES =		\
-		$(libmurphy_dbus_libdbus_la_REGULAR_SOURCES) \
-		dbus-libdbus-func-info.c
+		$(libmurphy_dbus_libdbus_la_REGULAR_SOURCES)
 
 libmurphy_dbus_libdbus_la_CFLAGS = 	\
 		$(AM_CFLAGS)		\
@@ -514,13 +472,6 @@ libmurphy_dbus_libdbus_la_DEPENDENCIES =	\
 
 libmurphy_dbus_libdbusdir      = $(includedir)/murphy/dbus
 libmurphy_dbus_libdbus_HEADERS = $(libmurphy_dbus_libdbus_la_HEADERS)
-
-# debug file:line-function mapping generation
-dbus-libdbus-func-info.c: $(libmurphy_dbus_libdbus_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm dbus-libdbus-func-info.c
 endif
 
 # linker script generation
@@ -552,8 +503,7 @@ libmurphy_dbus_sdbus_la_REGULAR_SOURCES =	\
 		common/dbus-sdbus-transport.c
 
 libmurphy_dbus_sdbus_la_SOURCES =		\
-		$(libmurphy_dbus_sdbus_la_REGULAR_SOURCES) \
-		dbus-sdbus-func-info.c
+		$(libmurphy_dbus_sdbus_la_REGULAR_SOURCES)
 
 libmurphy_dbus_sdbus_la_CFLAGS  =	\
 		$(AM_CFLAGS)		\
@@ -572,13 +522,6 @@ libmurphy_dbus_sdbus_la_DEPENDENCIES =		\
 
 libmurphy_dbus_sdbusdir      = $(includedir)/murphy/dbus
 libmurphy_dbus_sdbus_HEADERS = $(libmurphy_dbus_sdbus_la_HEADERS)
-
-# debug file:line-function mapping generation
-dbus-sdbus-func-info.c: $(libmurphy_dbus_sdbus_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm dbus-sdbus-func-info.c
 endif
 
 # linker script generation
@@ -820,8 +763,7 @@ libmurphy_resolver_la_REGULAR_SOURCES =				\
 		$(SIMPLE_SCRIPT_SOURCES)
 
 libmurphy_resolver_la_SOURCES =			\
-		$(libmurphy_resolver_la_REGULAR_SOURCES)	\
-		resolver-func-info.c
+		$(libmurphy_resolver_la_REGULAR_SOURCES)
 
 libmurphy_resolver_la_CFLAGS =			\
 		$(AM_CFLAGS)			\
@@ -851,13 +793,6 @@ resolver/scanner.c: resolver/scanner.l resolver/parser.c
 
 resolver/parser.h resolver/parser.c: resolver/parser.y
 	$(YACCCOMPILE) -p $(RESOLVER_PARSER_PREFIX) $< -o resolver/parser.c
-
-# debug file:line-function mapping generation
-resolver-func-info.c: $(libmurphy_resolver_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm resolver-func-info.c
 
 # resolver linker script generation
 linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
@@ -922,8 +857,7 @@ libmurphy_resource_backend_la_REGULAR_SOURCES =                \
 		resource/lua-resource.c
 
 libmurphy_resource_backend_la_SOURCES =                        \
-		$(libmurphy_resource_backend_la_REGULAR_SOURCES)        \
-		resource-func-info.c
+		$(libmurphy_resource_backend_la_REGULAR_SOURCES)
 
 libmurphy_resource_backend_la_CFLAGS =		\
 		$(AM_CFLAGS)			\
@@ -945,13 +879,6 @@ libmurphy_resource_backend_la_LIBADD =     \
 libmurphy_resource_backend_la_DEPENDENCIES =	\
 		linker-script.resource_backend	\
 		$(filter %.la, $(libmurphy_resource_backend_la_LIBADD))
-
-# debug file:line-function mapping generation
-resource-func-info.c: $(libmurphy_resource_backend_la_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm resource-func-info.c
 endif
 
 # resource linker script generation
@@ -1280,8 +1207,7 @@ endif
 
 # console plugin
 CONSOLE_PLUGIN_REGULAR_SOURCES = plugins/console/plugin-console.c
-CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES) \
-				 plugin-console-func-info.c
+CONSOLE_PLUGIN_SOURCES         = $(CONSOLE_PLUGIN_REGULAR_SOURCES)
 CONSOLE_PLUGIN_CFLAGS  	       =
 CONSOLE_PLUGIN_LIBS    	       =
 
@@ -1301,12 +1227,6 @@ plugin_console_la_LIBADD  = $(CONSOLE_PLUGIN_LIBS)
 plugin_LTLIBRARIES    += plugin-console.la
 endif
 endif
-# debug file:line-function mapping generation
-plugin-console-func-info.c: $(CONSOLE_PLUGIN_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm plugin-console-func-info.c
 endif
 
 # native resource plugin
@@ -1314,8 +1234,7 @@ if BUILD_RESOURCES
 PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES = 				\
 		plugins/resource-native/plugin-resource-native.c
 PLUGIN_RESOURCE_NATIVE_SOURCES = 					\
-		$(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)		\
-                plugin-resource-native-func-info.c
+		$(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)
 PLUGIN_RESOURCE_NATIVE_CFLAGS =						\
 		$(LUA_CFLAGS)
 
@@ -1339,13 +1258,6 @@ bin_PROGRAMS += resource-client
 resource_client_SOURCES = plugins/resource-native/resource-client.c
 resource_client_CFLAGS  = $(AM_CFLAGS)
 resource_client_LDADD   =  libmurphy-common.la
-
-# debug file:line-function mapping generation
-plugin-resource-native-func-info.c: $(PLUGIN_RESOURCE_NATIVE_REGULAR_SOURCES)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-debug-table -o $@ $^
-
-clean-func-infos::
-	-rm plugin-resource-native-func-info.c
 endif
 
 # domain control plugin
@@ -1591,5 +1503,5 @@ murphy_console_LDFLAGS = -rdynamic
 endif
 
 # cleanup
-clean-local:: # clean-linker-script clean-func-infos
+clean-local:: # clean-linker-script
 	-rm -f *~
