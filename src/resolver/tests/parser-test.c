@@ -88,14 +88,13 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "f:l:t:d:vDh"
+#   define OPTIONS "f:l:t:d:vh"
     struct option options[] = {
         { "file"      , required_argument, NULL, 'f' },
         { "log-level" , required_argument, NULL, 'l' },
         { "log-target", required_argument, NULL, 't' },
         { "verbose"   , optional_argument, NULL, 'v' },
         { "debug"     , required_argument, NULL, 'd' },
-        { "list-debug", no_argument      , NULL, 'D' },
         { "help"      , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
@@ -130,12 +129,6 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
         case 'd':
             ctx->debug = TRUE;
             mrp_debug_set_config(optarg);
-            break;
-
-        case 'D':
-            printf("Known debug sites:\n");
-            mrp_debug_dump_sites(stdout, 4);
-            exit(0);
             break;
 
         case 'h':
