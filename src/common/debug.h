@@ -37,16 +37,8 @@
 
 MRP_CDECL_BEGIN
 
-#define MRP_DEBUG_SITE_PREFIX "__DEBUG_SITE"
-
-/** Macro to generate a debug site string. */
-#define MRP_DEBUG_SITE(file, line, func)                                  \
-    "__DEBUG_SITE_" file ":" MRP_STRINGIFY(line)
-
 /** Log a debug message if the invoking debug site is enabled. */
 #define mrp_debug(fmt, args...)        do {                               \
-        static const char *__site =                                       \
-            MRP_DEBUG_SITE(__FILE__, __LINE__, __FUNCTION__);             \
         static int __site_stamp = -1;                                     \
         static int __site_enabled;                                        \
                                                                           \
@@ -57,14 +49,12 @@ MRP_CDECL_BEGIN
         }                                                                 \
                                                                           \
         if (MRP_UNLIKELY(__site_enabled))                                 \
-            mrp_debug_msg(__site, __LOC__, fmt, ## args);                 \
+            mrp_debug_msg(__LOC__, fmt, ## args);                         \
     } while (0)
 
 
 /** mrp_debug varian with explicitly passed site info. */
 #define mrp_debug_at(_file, _line, _func, fmt, args...)        do {       \
-        static const char *__site =                                       \
-            MRP_DEBUG_SITE(_file, _line, _func);                          \
         static int __site_stamp = -1;                                     \
         static int __site_enabled;                                        \
                                                                           \
@@ -74,13 +64,11 @@ MRP_CDECL_BEGIN
         }                                                                 \
                                                                           \
         if (MRP_UNLIKELY(__site_enabled))                                 \
-            mrp_debug_msg(__site, _file, _line, _func, fmt, ## args);     \
+            mrp_debug_msg(_file, _line, _func, fmt, ## args);             \
     } while (0)
 
 
 #define mrp_debug_code(...)         do {                                  \
-        static const char *__site =                                       \
-            MRP_DEBUG_SITE(__FILE__, __LINE__, __FUNCTION__);             \
         static int __site_stamp = -1;                                     \
         static int __site_enabled;                                        \
                                                                           \
@@ -89,8 +77,6 @@ MRP_CDECL_BEGIN
                                              __FILE__, __LINE__);         \
             __site_stamp   = mrp_debug_stamp;                             \
         }                                                                 \
-                                                                          \
-        MRP_UNUSED(__site);                                               \
                                                                           \
         if (MRP_UNLIKELY(__site_enabled)) {                               \
             __VA_ARGS__;                                                  \
@@ -112,24 +98,12 @@ int mrp_debug_set_config(const char *cmd);
 /** Dump the active debug configuration. */
 int mrp_debug_dump_config(FILE *fp);
 
-/** Dump all known debug sites. */
-void mrp_debug_dump_sites(FILE *fp, int indent);
-
 /** Low-level log wrapper for debug messages. */
-void mrp_debug_msg(const char *site, const char *file, int line,
-                   const char *func, const char *format, ...);
+void mrp_debug_msg(const char *file, int line, const char *func,
+                   const char *format, ...);
 
 /** Check if the given debug site is enabled. */
 int mrp_debug_check(const char *func, const char *file, int line);
-
-/** Register line->funcion mapping for file. */
-int mrp_debug_register_file(mrp_debug_file_t *df);
-
-/** Unregister line->funcion mapping for file. */
-int mrp_debug_unregister_file(mrp_debug_file_t *df);
-
-/** Return the name of the function that corresponds to file:line. */
-const char *mrp_debug_site_function(const char *file, int line);
 
 MRP_CDECL_END
 

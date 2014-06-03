@@ -49,11 +49,6 @@ int mrp_debug_stamp = 0;     /* debug config stamp */
 static int         debug_enabled;           /* debug messages enabled */
 static mrp_htbl_t *rules_on;                /* enabling rules */
 static mrp_htbl_t *rules_off;               /* disabling rules */
-static mrp_htbl_t *files;                   /* table of per-file debug info */
-static MRP_LIST_HOOK(debug_files);
-
-static void populate_file_table(void);
-static void flush_file_table(void);
 
 static void free_rule_cb(void *key, void *entry)
 {
@@ -66,8 +61,6 @@ static void free_rule_cb(void *key, void *entry)
 static int init_rules(void)
 {
     mrp_htbl_config_t hcfg;
-
-    MRP_UNUSED(flush_file_table);
 
     mrp_clear(&hcfg);
     hcfg.comp = mrp_string_comp;
@@ -338,140 +331,11 @@ int mrp_debug_dump_config(FILE *fp)
     return TRUE;
 }
 
-#undef __DUMP_ELF_INFO__
 
-#ifdef __DUMP_ELF_IFDO__
-static const char *segment_type(uint32_t type)
-{
-#define T(type) case type: return #type
-    switch (type) {
-        T(PT_NULL);
-        T(PT_LOAD);
-        T(PT_DYNAMIC);
-        T(PT_INTERP);
-        T(PT_NOTE);
-        T(PT_SHLIB);
-        T(PT_PHDR);
-        T(PT_TLS);
-        T(PT_NUM);
-        T(PT_LOOS);
-        T(PT_GNU_EH_FRAME);
-        T(PT_GNU_STACK);
-        T(PT_GNU_RELRO);
-        T(PT_LOPROC);
-        T(PT_HIPROC);
-    default:
-        return "unknown";
-    }
-}
-
-
-static const char *segment_flags(uint32_t flags)
-{
-    static char buf[4];
-
-    buf[0] = (flags & PF_R) ? 'r' : '-';
-    buf[1] = (flags & PF_W) ? 'w' : '-';
-    buf[2] = (flags & PF_X) ? 'x' : '-';
-    buf[3] = '\0';
-
-    return buf;
-}
-
-#endif /* __DUMP_ELF_INFO__ */
-
-typedef struct {
-    FILE *fp;
-    int   indent;
-} list_opt_t;
-
-static int list_cb(struct dl_phdr_info *info, size_t size, void *data)
-{
-#define P(fmt, args...) fprintf(opt->fp, "%*.*s"fmt,                    \
-                                opt->indent, opt->indent, "" , ## args)
-#define RELOC(addr) (info->dlpi_addr + addr)
-
-    list_opt_t       *opt = (list_opt_t *)data;
-    const ElfW(Phdr) *h;
-    int               i;
-    const char       *beg, *end, *s, *func;
-    char              file[512], *p;
-    int               line;
-
-    MRP_UNUSED(size);
-
-#ifdef __DUMP_ELF_INFO__
-    P("%s (@%p)\n",
-      info->dlpi_name && *info->dlpi_name ? info->dlpi_name : "<none>",
-      info->dlpi_addr);
-    P("  %d segments\n", info->dlpi_phnum);
-#endif
-
-    file[sizeof(file) - 1] = '\0';
-
-    for (i = 0; i < info->dlpi_phnum; i++) {
-        h = &info->dlpi_phdr[i];
-#if __DUMP_ELF_INFO__
-        P("  #%d:\n", i);
-        P("       type: 0x%x (%s)\n", h->p_type, segment_type(h->p_type));
-        P("     offset: 0x%lx\n", h->p_offset);
-        P("      vaddr: 0x%lx (0x%lx)\n", h->p_vaddr, RELOC(h->p_vaddr));
-        P("      paddr: 0x%lx (0x%lx)\n", h->p_paddr, RELOC(h->p_paddr));
-        P("     filesz: 0x%lx\n", h->p_filesz);
-        P("      memsz: 0x%lx\n", h->p_memsz);
-        P("      flags: 0x%x (%s)\n", h->p_flags, segment_flags(h->p_flags));
-        P("      align: 0x%lx\n", h->p_align);
-#endif
-        if (h->p_flags & PF_W)
-            continue;
-
-        beg = (const char *)RELOC(h->p_vaddr);
-        end = (const char *)beg + h->p_memsz;
-
-#define PREFIX     "__DEBUG_SITE_"
-#define PREFIX_LEN 13
-        for (s = beg; s < end - PREFIX_LEN; s++) {
-            if (!strncmp(s, PREFIX, PREFIX_LEN)) {
-                s += PREFIX_LEN;
-                if (*s != '\0') {
-                    strncpy(file, s, sizeof(file) - 1);
-                    p = strchr(file, ':');
-
-                    if (p != NULL) {
-                        *p = '\0';
-                        line = (int)strtoul(p + 1, NULL, 10);
-                        func = mrp_debug_site_function(file, line);
-                    }
-                    else
-                        func = NULL;
-
-                    if (func != NULL)
-                        P("%s@%s\n", func, s);
-                    else
-                        P("%s\n", s);
-                }
-            }
-        }
-    }
-
-    return 0;
-}
-
-
-void mrp_debug_dump_sites(FILE *fp, int indent)
-{
-    list_opt_t opt = { .fp = fp, .indent = indent };
-
-    dl_iterate_phdr(list_cb, (void *)&opt);
-}
-
-
-void mrp_debug_msg(const char *site, const char *file, int line,
-                   const char *func, const char *format, ...)
+void mrp_debug_msg(const char *file, int line, const char *func,
+                   const char *format, ...)
 {
     va_list ap;
-
-    MRP_UNUSED(site);
 
     va_start(ap, format);
     mrp_log_msgv(MRP_LOG_DEBUG, file, line, func, format, ap);
@@ -549,85 +413,6 @@ int mrp_debug_check(const char *func, const char *file, int line)
         return FALSE;
 
     return TRUE;
-}
-
-
-int mrp_debug_register_file(mrp_debug_file_t *df)
-{
-    mrp_list_append(&debug_files, &df->hook);
-
-    return TRUE;
-}
-
-
-int mrp_debug_unregister_file(mrp_debug_file_t *df)
-{
-    mrp_list_delete(&df->hook);
-
-    if (files != NULL)
-        mrp_htbl_remove(files, (void *)df->file, FALSE);
-
-    return TRUE;
-}
-
-
-const char *mrp_debug_site_function(const char *file, int line)
-{
-    mrp_debug_info_t *info;
-    const char       *func;
-
-    if (files == NULL)
-        populate_file_table();
-
-    func = NULL;
-
-    if (files != NULL) {
-        info = mrp_htbl_lookup(files, (void *)file);
-
-        if (info != NULL) {
-            while (info->func != NULL) {
-                if (info->line < line) {
-                    func = info->func;
-                    info++;
-                }
-                else
-                    break;
-            }
-        }
-    }
-
-    return func;
-}
-
-
-static void populate_file_table(void)
-{
-    mrp_htbl_config_t  hcfg;
-    mrp_debug_file_t  *df;
-    mrp_list_hook_t   *p, *n;
-
-    if (files == NULL) {
-        mrp_clear(&hcfg);
-        hcfg.comp = mrp_string_comp;
-        hcfg.hash = mrp_string_hash;
-
-        files = mrp_htbl_create(&hcfg);
-    }
-
-    if (files != NULL) {
-        mrp_list_foreach(&debug_files, p, n) {
-            df = mrp_list_entry(p, typeof(*df), hook);
-
-            mrp_htbl_insert(files, (void *)df->file, df->info);
-        }
-    }
-}
-
-
-static void flush_file_table(void)
-{
-    if (files != NULL)
-        mrp_htbl_reset(files, FALSE);
 }
 
 
