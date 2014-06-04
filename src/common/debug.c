@@ -44,7 +44,7 @@
 
 #define WILDCARD  "*"
 
-int mrp_debug_stamp = 0;     /* debug config stamp */
+int mrp_debug_stamp = 0;                    /* debug config stamp */
 
 static int         debug_enabled;           /* debug messages enabled */
 static mrp_htbl_t *rules_on;                /* enabling rules */

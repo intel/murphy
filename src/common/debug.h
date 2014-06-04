@@ -53,7 +53,7 @@ MRP_CDECL_BEGIN
     } while (0)
 
 
-/** mrp_debug varian with explicitly passed site info. */
+/** mrp_debug variant with explicitly passed site info. */
 #define mrp_debug_at(_file, _line, _func, fmt, args...)        do {       \
         static int __site_stamp = -1;                                     \
         static int __site_enabled;                                        \
@@ -68,6 +68,7 @@ MRP_CDECL_BEGIN
     } while (0)
 
 
+/** Run a block of code if the invoking debug site is enabled. */
 #define mrp_debug_code(...)         do {                                  \
         static int __site_stamp = -1;                                     \
         static int __site_enabled;                                        \
