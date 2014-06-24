@@ -249,7 +249,7 @@ struct mrp_mainloop_s {
 
 static void dump_pollfds(const char *prefix, struct pollfd *fds, int nfd);
 static void adjust_superloop_timer(mrp_mainloop_t *ml);
-
+static size_t poll_events(void *id, mrp_mainloop_t *ml, void **bufp);
 
 /*
  * fd table manipulation
@@ -1230,6 +1230,9 @@ int mrp_set_superloop(mrp_mainloop_t *ml, mrp_superloop_ops_t *ops,
     int            timeout;
 
     if (ml->super_ops == NULL) {
+        if (ops->poll_io != NULL)
+            ops->poll_events = poll_events;
+
         ml->super_ops  = ops;
         ml->super_data = loop_data;
 
@@ -1738,17 +1741,60 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
 }
 
 
- int mrp_mainloop_poll(mrp_mainloop_t *ml, int may_block)
+static size_t poll_events(void *id, mrp_mainloop_t *ml, void **bufp)
+{
+    void *buf;
+    int   n;
+
+    if (MRP_UNLIKELY(id != ml->iow)) {
+        mrp_log_error("superloop polling with invalid I/O watch (%p != %p)",
+                      id, ml->iow);
+        *bufp = NULL;
+        return 0;
+    }
+
+    buf = mrp_allocz(ml->nevent * sizeof(ml->events[0]));
+
+    if (buf != NULL) {
+        n = epoll_wait(ml->epollfd, buf, ml->nevent, 0);
+
+        if (n < 0)
+            n = 0;
+    }
+    else
+        n = 0;
+
+    *bufp = buf;
+    return n * sizeof(ml->events[0]);
+}
+
+
+int mrp_mainloop_poll(mrp_mainloop_t *ml, int may_block)
 {
     int n, timeout;
 
     timeout = may_block ? ml->poll_timeout : 0;
 
     if (ml->nevent > 0) {
-        n = epoll_wait(ml->epollfd, ml->events, ml->nevent, timeout);
+        if (ml->super_ops == NULL || ml->super_ops->poll_io == NULL) {
+            n = epoll_wait(ml->epollfd, ml->events, ml->nevent, timeout);
 
-        if (n < 0 && errno == EINTR)
-            n = 0;
+            if (n < 0 && errno == EINTR)
+                n = 0;
+        }
+        else {
+            mrp_superloop_ops_t *super_ops  = ml->super_ops;
+            void                *super_data = ml->super_data;
+            void                *id         = ml->iow;
+            void                *buf        = ml->events;
+            size_t               size       = ml->nevent * sizeof(ml->events[0]);
+
+            size = super_ops->poll_io(super_data, id, buf, size);
+            n    = size / sizeof(ml->events[0]);
+
+            MRP_ASSERT(n * sizeof(ml->events[0]) == size,
+                       "superloop passed us a partial epoll_event");
+        }
 
         mrp_debug("mainloop %p has %d/%d I/O events waiting", ml, n,
                   ml->nevent);

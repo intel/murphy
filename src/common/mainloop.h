@@ -224,6 +224,38 @@ typedef struct {
     void  (*del_defer)(void *glue_data, void *id);
     void  (*mod_defer)(void *glue_data, void *id, int enabled);
     void  (*unregister)(void *glue_data);
+
+    /*
+     * Notes:
+     *
+     *     This is a band-aid attempt to get our mainloop run under the
+     *     threaded event loop of xwalk which has strict limitations about
+     *     what (type of) thread can access which functionality of the
+     *     event loop. In particular, the I/O watch equivalent is limited
+     *     for the I/O thread. In the current media element resource infra
+     *     integration code of xwalk, the related code is run in the UI
+     *     thread. This makes interacting from there with the daemon using
+     *     the stock resource libraries (in particular, pumping the mainloop)
+     *     non-straightforward.
+     *
+     *     The superloop glue code is supposed to use poll_events to trigger
+     *     a nonblocking epoll_wait on our epoll fd to retrieve (and cache)
+     *     pending epoll events from the kernel. poll_io is then used by us
+     *     to retrieve pending epoll events from the glue code. The glue code
+     *     needs to take care of any necessary locking to protect itself/us
+     *     from potentially concurrent invocations of poll_io and poll_events
+     *     from different threads.
+     *
+     *     The superloop abstraction now became really really ugly. poll_io
+     *     and poll_events implicitly assume/know that add_io/del_io is only
+     *     used for adding a single superloop I/O watch for our epoll fd.
+     *     The I/O watch id in the functions below is passed around only for
+     *     doublechecing this. Probably we should change the I/O watch part
+     *     of the superloop API to be actually less generic and only usable
+     *     for the epoll fd to avoid further confusion.
+     */
+    size_t (*poll_events)(void *id, mrp_mainloop_t *ml, void **events);
+    size_t (*poll_io)(void *glue_data, void *id, void *buf, size_t size);
 } mrp_superloop_ops_t;
 
 
