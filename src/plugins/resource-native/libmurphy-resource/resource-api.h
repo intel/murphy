@@ -349,10 +349,8 @@ bool mrp_res_delete_resource_by_name(mrp_res_resource_set_t *rs,
  *
  * @param cx murphy context.
  * @param res resource where the attributes are taken.
- * @param names pointer where the name array with content will
- * be allocated.
  *
- * @return murphy error code
+ * @return string array that needs to be freed with mrp_res_free_string_array
  */
 mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
         const mrp_res_resource_t *res);
@@ -363,9 +361,8 @@ mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
  * @param cx murphy context.
  * @param res resource where the attributes are taken.
  * @param name of the attribute that is fetched.
- * @param attribute pointer that will be allocated with the attribute.
  *
- * @return murphy error code.
+ * @return attribute pointer to the fetched attribute.
  */
 mrp_res_attribute_t * mrp_res_get_attribute_by_name(mrp_res_context_t *cx,
         mrp_res_resource_t *res, const char *name);
