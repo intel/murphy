@@ -59,7 +59,7 @@ void create_resources(my_app_data *app_data)
 
     /* if we already have a decent set, just re-acquire it */
     if (app_data->rs) {
-        mrp_res_acquire_resource_set(app_data->cx, app_data->rs);
+        mrp_res_acquire_resource_set(app_data->rs);
         return;
     }
 
@@ -74,40 +74,38 @@ void create_resources(my_app_data *app_data)
         return;
     }
 
-    if (!mrp_res_set_autorelease(app_data->cx, TRUE, app_data->rs)) {
+    if (!mrp_res_set_autorelease(TRUE, app_data->rs)) {
         printf("Could not set autorelease flag!\n");
         return;
     }
 
-    resource = mrp_res_create_resource(app_data->cx,
-                      app_data->rs,
+    resource = mrp_res_create_resource(app_data->rs,
                       "audio_playback",
                       true,
                       false);
 
     if (resource == NULL) {
         printf("Couldn't create audio resource\n");
-        mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+        mrp_res_delete_resource_set(app_data->rs);
         return;
     }
 
     /* set a resource attribute */
 
-    attr = mrp_res_get_attribute_by_name(app_data->cx, resource, "role");
+    attr = mrp_res_get_attribute_by_name(resource, "role");
 
     if (attr) {
-        mrp_res_set_attribute_string(app_data->cx, attr, "call");
+        mrp_res_set_attribute_string(attr, "call");
     }
 
-    resource = mrp_res_create_resource(app_data->cx,
-                      app_data->rs,
+    resource = mrp_res_create_resource(app_data->rs,
                       "video_playback",
                       true,
                       false);
 
     if (resource == NULL) {
         printf("Couldn't create video resource\n");
-        mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+        mrp_res_delete_resource_set(app_data->rs);
         return;
     }
 
@@ -118,7 +116,7 @@ void acquire_resources(my_app_data *app_data)
 {
     /* acquire the resources */
     if (app_data->rs)
-        mrp_res_acquire_resource_set(app_data->cx, app_data->rs);
+        mrp_res_acquire_resource_set(app_data->rs);
     else
         printf("No release set created!\n");
 }
@@ -127,7 +125,7 @@ void giveup_resources(my_app_data *app_data)
 {
     /* release resources */
     if (app_data->rs)
-        mrp_res_release_resource_set(app_data->cx, app_data->rs);
+        mrp_res_release_resource_set(app_data->rs);
     else
         printf("No release set acquired!\n");
 }
@@ -172,7 +170,7 @@ static void state_callback(mrp_res_context_t *context,
 
                 printf("listing all resources available in the system\n");
 
-                resource_names = mrp_res_list_resource_names(context, rs);
+                resource_names = mrp_res_list_resource_names(rs);
 
                 if (!resource_names) {
                     printf("No resources available in the system!\n");
@@ -181,7 +179,7 @@ static void state_callback(mrp_res_context_t *context,
 
                 for (i = 0; i < resource_names->num_strings; i++) {
 
-                    resource = mrp_res_get_resource_by_name(context, rs,
+                    resource = mrp_res_get_resource_by_name(rs,
                             resource_names->strings[i]);
 
                     if (!resource)
@@ -193,14 +191,13 @@ static void state_callback(mrp_res_context_t *context,
                     if (strcmp(resource->name, "video_playback") == 0)
                         system_handles_video = TRUE;
 
-                    attributes = mrp_res_list_attribute_names(context, resource);
+                    attributes = mrp_res_list_attribute_names(resource);
 
                     if (!attributes)
                         continue;
 
                     for (j = 0; j < attributes->num_strings; j++) {
-                        attr = mrp_res_get_attribute_by_name(context,
-                                resource,
+                        attr = mrp_res_get_attribute_by_name(resource,
                                 attributes->strings[j]);
 
                         if (!attr)
@@ -243,7 +240,7 @@ static void state_callback(mrp_res_context_t *context,
 
         case MRP_RES_DISCONNECTED:
             printf("disconnected from murphy\n");
-            mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+            mrp_res_delete_resource_set(app_data->rs);
             mrp_res_destroy(app_data->cx);
             exit(1);
     }
@@ -285,7 +282,7 @@ static void resource_callback(mrp_res_context_t *cx,
 
     /* here compare the resource set difference */
 
-    res = mrp_res_get_resource_by_name(cx, rs, "audio_playback");
+    res = mrp_res_get_resource_by_name(rs, "audio_playback");
 
     if (!res) {
         printf("audio_playback not present in resource set\n");
@@ -296,7 +293,7 @@ static void resource_callback(mrp_res_context_t *cx,
 
     printf("resource 0 name '%s' -> '%s'\n", res->name, state_to_str(res->state));
 
-    res = mrp_res_get_resource_by_name(cx, rs, "video_playback");
+    res = mrp_res_get_resource_by_name(rs, "video_playback");
 
     if (!res) {
         printf("video_playback not present in resource set\n");
@@ -311,15 +308,15 @@ static void resource_callback(mrp_res_context_t *cx,
      * It's up to the user to make sure that there's a working reference
      * to the resource set.
      */
-    mrp_res_delete_resource_set(cx, my_data->rs);
+    mrp_res_delete_resource_set(my_data->rs);
 
     /* copying must also have no semantic meaning */
-    my_data->rs = mrp_res_copy_resource_set(cx, rs);
+    my_data->rs = mrp_res_copy_resource_set(rs);
 
     /* print the current role attribute */
 
-    res = mrp_res_get_resource_by_name(cx, rs, "audio_playback");
-    attr = mrp_res_get_attribute_by_name(cx, res, "role");
+    res = mrp_res_get_resource_by_name(rs, "audio_playback");
+    attr = mrp_res_get_attribute_by_name(res, "role");
 
     if (res && attr)
         printf("attribute '%s' has role '%s'\n", res->name, attr->string);
@@ -369,7 +366,7 @@ static void handle_input(mrp_io_watch_t *watch, int fd, mrp_io_event_t events,
                 break;
             case 'Q':
                 if (app_data->rs)
-                    mrp_res_delete_resource_set(app_data->cx, app_data->rs);
+                    mrp_res_delete_resource_set(app_data->rs);
                 if (ml)
                     mrp_mainloop_quit(ml, 0);
                 break;

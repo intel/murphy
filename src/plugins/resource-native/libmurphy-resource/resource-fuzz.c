@@ -160,7 +160,7 @@ static void acquire_rset(fuzz_data_t *data)
 
         if (i-- == 0) {
             if (!item->acquired) {
-                mrp_res_acquire_resource_set(data->cx, item->rset);
+                mrp_res_acquire_resource_set(item->rset);
                 item->acquired = TRUE;
             }
             return;
@@ -187,7 +187,7 @@ static void release_rset(fuzz_data_t *data)
 
         if (i-- == 0) {
             if (item->acquired) {
-                mrp_res_release_resource_set(data->cx, item->rset);
+                mrp_res_release_resource_set(item->rset);
                 item->acquired = FALSE;
             }
             return;
@@ -214,7 +214,7 @@ static void delete_rset(fuzz_data_t *data)
 
         if (i-- == 0) {
             mrp_list_delete(ip);
-            mrp_res_delete_resource_set(data->cx, item->rset);
+            mrp_res_delete_resource_set(item->rset);
             mrp_free(item);
             data->n_items--;
             return;
@@ -225,14 +225,14 @@ error:
     return;
 }
 
-static void create_resource(fuzz_data_t *data, mrp_res_resource_set_t *rset, char *resource)
+static void create_resource(mrp_res_resource_set_t *rset, char *resource)
 {
     mrp_res_resource_t *res;
     bool attrs[][2] = { {TRUE, TRUE}, {TRUE, FALSE}, {FALSE, TRUE}, {FALSE, FALSE} };
 
     bool *attr = attrs[get_index(4)];
 
-    res = mrp_res_create_resource(data->cx, rset, resource, attr[0], attr[1]);
+    res = mrp_res_create_resource(rset, resource, attr[0], attr[1]);
 
     /* TODO: set some attributes */
 
@@ -271,7 +271,7 @@ static void create_rset(fuzz_data_t *data)
     shuffle_strings(resources, 2);
 
     for (i = 0; i < n_resources; i++) {
-        create_resource(data, rset, resources[i]);
+        create_resource(rset, resources[i]);
     }
 
     /* put the resource set to the rset list */

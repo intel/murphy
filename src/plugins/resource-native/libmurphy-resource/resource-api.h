@@ -185,13 +185,12 @@ mrp_res_resource_set_t * mrp_res_create_resource_set(mrp_res_context_t *cx,
  * when the resource becomes available again. By default the automatic
  * release mode is off.
  *
- * @param cx murphy connection context.
  * @param status automatic release status: TRUE means on, FALSE means off
  * @param rs resource set that is being updated.
  *
  * @return true if successful, false otherwise.
  */
-bool mrp_res_set_autorelease(mrp_res_context_t *cx, bool status,
+bool mrp_res_set_autorelease(bool status,
         mrp_res_resource_set_t *rs);
 
 /**
@@ -200,8 +199,7 @@ bool mrp_res_set_autorelease(mrp_res_context_t *cx, bool status,
  *
  * @param set pointer to existing resource set created by the user.
  */
-void mrp_res_delete_resource_set(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs);
+void mrp_res_delete_resource_set(mrp_res_resource_set_t *rs);
 
 /**
  * Make a copy of the resource set. This is a helper function to
@@ -212,8 +210,7 @@ void mrp_res_delete_resource_set(mrp_res_context_t *cx,
  *
  * @return pointer to a copy of the resource set.
  */
-mrp_res_resource_set_t *mrp_res_copy_resource_set(mrp_res_context_t *cx,
-        const mrp_res_resource_set_t *orig);
+mrp_res_resource_set_t *mrp_res_copy_resource_set(const mrp_res_resource_set_t *orig);
 
 /**
  * You might have assigned the same update callback for
@@ -236,26 +233,22 @@ bool mrp_res_equal_resource_set(const mrp_res_resource_set_t *a,
  * you asked for you will get an update for your resource
  * set in the resource callback.
  *
- * @param cx connnection to Murphy resource engine.
  * @param rs resource set you want to acquire.
  *
  * @return murphy error code.
  */
-int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
-        const mrp_res_resource_set_t *rs);
+int mrp_res_acquire_resource_set(const mrp_res_resource_set_t *rs);
 
 /**
  * Release the acquired resource set. Resource callbacks
  * for this set will not stop, since updates for the resource
  * set available status are still delivered.
  *
- * @param cx connnection to Murphy resource engine.
  * @param rs resource set you want to release.
  *
  * @return murphy error code.
  */
-int mrp_res_release_resource_set(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs);
+int mrp_res_release_resource_set(mrp_res_resource_set_t *rs);
 
 
 /**
@@ -273,13 +266,11 @@ int mrp_res_release_resource_set(mrp_res_context_t *cx,
  * with audio streams to find out which streams belong to which resource
  * set in the audio domain controller.
  *
- * @param cx connnection to Murphy resource engine.
  * @param rs resource set whose id is queried.
  *
  * @return resource set id.
  **/
-int mrp_res_get_resource_set_id(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs);
+int mrp_res_get_resource_set_id(mrp_res_resource_set_t *rs);
 
 
 /**
@@ -287,7 +278,6 @@ int mrp_res_get_resource_set_id(mrp_res_context_t *cx,
  * Created resource will be automatically added to
  * the resource set provided as argument.
  *
- * @param cx connnection to Murphy resource engine.
  * @param set resource the resource will be added to.
  * @param name name of the resource you want to create.
  * @param mandatory is the resource mandatory or not
@@ -295,43 +285,39 @@ int mrp_res_get_resource_set_id(mrp_res_context_t *cx,
  *
  * @return pointer to new resource if succesful null otherwise.
  */
-mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs, const char *name, bool mandatory,
+mrp_res_resource_t *mrp_res_create_resource(mrp_res_resource_set_t *rs,
+        const char *name, bool mandatory,
         bool shared);
 
 /**
  * Get the names of all resources in this resource set.
  *
- * @param cx murphy context.
  * @param rs resource set where the resource are.
  *
  * @return string array that needs to be freed with mrp_res_free_string_array
  */
-mrp_res_string_array_t * mrp_res_list_resource_names(mrp_res_context_t *cx,
+mrp_res_string_array_t * mrp_res_list_resource_names(
         const mrp_res_resource_set_t *rs);
 
 /**
  * Delete resource by name from resource set.
  *
- * @param cx connnection to Murphy resource engine.
  * @param rs resource set where you want to get the resource.
  * @param name name of the resource you want to get.
  * @param pointer to resource pointer to be assigned.
  *
  * @return 0 if resource found.
  */
-mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
+mrp_res_resource_t * mrp_res_get_resource_by_name(
         const mrp_res_resource_set_t *rs, const char *name);
 
 /**
  * Delete a resource from a resource set.
  *
- * @param set resource the resource will deleted from.
  * @param res resource to be deleted.
  *
  */
-void mrp_res_delete_resource(mrp_res_resource_set_t *rs,
-        mrp_res_resource_t *res);
+void mrp_res_delete_resource(mrp_res_resource_t *res);
 
 /**
  * Delete resource by name from resource set.
@@ -347,76 +333,70 @@ bool mrp_res_delete_resource_by_name(mrp_res_resource_set_t *rs,
 /**
  * Get the names of all attributes in this resource.
  *
- * @param cx murphy context.
  * @param res resource where the attributes are taken.
  *
  * @return string array that needs to be freed with mrp_res_free_string_array
  */
-mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
+mrp_res_string_array_t * mrp_res_list_attribute_names(
         const mrp_res_resource_t *res);
 
 /**
  * Get the particular resource attribute by name from the resource.
  *
- * @param cx murphy context.
  * @param res resource where the attributes are taken.
  * @param name of the attribute that is fetched.
  *
  * @return attribute pointer to the fetched attribute.
  */
-mrp_res_attribute_t * mrp_res_get_attribute_by_name(mrp_res_context_t *cx,
-        mrp_res_resource_t *res, const char *name);
+mrp_res_attribute_t * mrp_res_get_attribute_by_name(mrp_res_resource_t *res,
+        const char *name);
 
 /**
  * Set new string attribute value to resource.
  *
- * @param cx murphy context.
  * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
  * @value value to be set, copied by the library.
  *
  * @return murphy error code.
  */
-int mrp_res_set_attribute_string(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, const char *value);
+int mrp_res_set_attribute_string(mrp_res_attribute_t *attr,
+        const char *value);
 
 
 /**
  * Set new unsigned integer attribute value to resource.
  *
- * @param cx murphy context.
  * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
  * @value value to be set.
  *
  * @return murphy error code.
  */
-int mrp_res_set_attribute_uint(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, uint32_t value);
+int mrp_res_set_attribute_uint(mrp_res_attribute_t *attr,
+        uint32_t value);
 
 
 /**
  * Set new integer attribute value to resource.
  *
- * @param cx murphy context.
  * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
  * @value value to be set.
  *
  * @return murphy error code.
  */
-int mrp_res_set_attribute_int(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, int32_t value);
+int mrp_res_set_attribute_int(mrp_res_attribute_t *attr,
+        int32_t value);
 
 
 /**
  * Set new unsigned integer attribute value to resource.
  *
- * @param cx murphy context.
  * @param attr attríbute pointer returned by mrp_res_get_attribute_by_name.
  * @value value to be set.
  *
  * @return murphy error code.
  */
-int mrp_res_set_attribute_double(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, double value);
+int mrp_res_set_attribute_double(mrp_res_attribute_t *attr,
+        double value);
 
 
 /**

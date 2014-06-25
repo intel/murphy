@@ -153,7 +153,7 @@ static void resource_event(mrp_msg_t *msg,
         /* copy the attributes */
         for (i = 0; (int) i < n_attrs; i++) {
             mrp_res_attribute_t *src = &attrs[i];
-            mrp_res_attribute_t *dst = mrp_res_get_attribute_by_name(cx, res, src->name);
+            mrp_res_attribute_t *dst = mrp_res_get_attribute_by_name(res, src->name);
 
             if (!dst) {
                 mrp_log_error("unknown attribute '%s'!", src->name);
@@ -166,16 +166,16 @@ static void resource_event(mrp_msg_t *msg,
 
             switch (src->type) {
                 case mrp_int32:
-                    mrp_res_set_attribute_int(cx, dst, src->integer);
+                    mrp_res_set_attribute_int(dst, src->integer);
                     break;
                 case mrp_uint32:
-                    mrp_res_set_attribute_uint(cx, dst, src->unsignd);
+                    mrp_res_set_attribute_uint(dst, src->unsignd);
                     break;
                 case mrp_double:
-                    mrp_res_set_attribute_double(cx, dst, src->floating);
+                    mrp_res_set_attribute_double(dst, src->floating);
                     break;
                 case mrp_string:
-                    mrp_res_set_attribute_string(cx, dst, src->string);
+                    mrp_res_set_attribute_string(dst, src->string);
                     break;
                 default: /* mrp_invalid */
                     break;
@@ -423,7 +423,7 @@ static void destroy_context(mrp_res_context_t *cx)
         if (cx->priv->transp)
             mrp_transport_destroy(cx->priv->transp);
 
-        delete_resource_set(cx, cx->priv->master_resource_set);
+        delete_resource_set(cx->priv->master_resource_set);
 
         /* FIXME: is this the way we want to free all resources and
          * resource sets? */

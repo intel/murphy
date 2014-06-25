@@ -113,13 +113,19 @@ mrp_res_attribute_t *mrp_attribute_array_dup(uint32_t dim,
 
 /* public API */
 
-mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
+mrp_res_string_array_t * mrp_res_list_attribute_names(
         const mrp_res_resource_t *res)
 {
     int i;
     mrp_res_string_array_t *ret;
+    mrp_res_context_t *cx = NULL;
 
-    if (!cx || !res)
+    if (!res)
+        return NULL;
+
+    cx = res->priv->set->priv->cx;
+
+    if (!cx)
         return NULL;
 
     ret = mrp_allocz(sizeof(mrp_res_string_array_t));
@@ -149,11 +155,11 @@ mrp_res_string_array_t * mrp_res_list_attribute_names(mrp_res_context_t *cx,
 
 
 mrp_res_attribute_t * mrp_res_get_attribute_by_name(
-        mrp_res_context_t *cx, mrp_res_resource_t *res, const char *name)
+        mrp_res_resource_t *res, const char *name)
 {
     int i;
 
-    if (!cx || !res)
+    if (!res)
         return NULL;
 
     for (i = 0; i < res->priv->num_attributes; i++) {
@@ -166,12 +172,12 @@ mrp_res_attribute_t * mrp_res_get_attribute_by_name(
 }
 
 
-int mrp_res_set_attribute_string(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, const char *value)
+int mrp_res_set_attribute_string(mrp_res_attribute_t *attr,
+        const char *value)
 {
     char *str;
 
-    if (!cx || !attr)
+    if (!attr)
         return -1;
 
     /* check the attribute type */
@@ -191,10 +197,10 @@ int mrp_res_set_attribute_string(mrp_res_context_t *cx,
 }
 
 
-int mrp_res_set_attribute_uint(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, uint32_t value)
+int mrp_res_set_attribute_uint(mrp_res_attribute_t *attr,
+        uint32_t value)
 {
-    if (!cx || !attr || attr->type != mrp_uint32)
+    if (!attr || attr->type != mrp_uint32)
         return -1;
 
     attr->unsignd = value;
@@ -203,10 +209,10 @@ int mrp_res_set_attribute_uint(mrp_res_context_t *cx,
 }
 
 
-int mrp_res_set_attribute_int(mrp_res_context_t *cx,
-            mrp_res_attribute_t *attr, int32_t value)
+int mrp_res_set_attribute_int(mrp_res_attribute_t *attr,
+        int32_t value)
 {
-    if (!cx || !attr || attr->type != mrp_int32)
+    if (!attr || attr->type != mrp_int32)
         return -1;
 
     attr->integer = value;
@@ -215,10 +221,10 @@ int mrp_res_set_attribute_int(mrp_res_context_t *cx,
 }
 
 
-int mrp_res_set_attribute_double(mrp_res_context_t *cx,
-        mrp_res_attribute_t *attr, double value)
+int mrp_res_set_attribute_double(mrp_res_attribute_t *attr,
+        double value)
 {
-    if (!cx || !attr || attr->type != mrp_double)
+    if (!attr || attr->type != mrp_double)
         return -1;
 
     attr->floating = value;

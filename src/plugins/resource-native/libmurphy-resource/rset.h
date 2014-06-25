@@ -52,8 +52,7 @@ void decrease_ref(mrp_res_context_t *cx,
 
 void free_resource_set(mrp_res_resource_set_t *rset);
 
-void delete_resource_set(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs);
+void delete_resource_set(mrp_res_resource_set_t *rs);
 
 mrp_res_resource_set_t *resource_set_copy(
         const mrp_res_resource_set_t *original);

@@ -207,13 +207,16 @@ end:
 
 
 
-void delete_resource_set(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs)
+void delete_resource_set(mrp_res_resource_set_t *rs)
 {
+    mrp_res_context_t *cx = NULL;
+
     if (!rs)
         return;
 
-    if (cx && rs->priv) {
+    if (rs->priv && rs->priv->cx) {
+        cx = rs->priv->cx;
+
         /* check if the resource set being deleted is a library resource set */
         mrp_res_resource_set_t *internal_rset = mrp_htbl_lookup(
                 cx->priv->internal_rset_mapping, u_to_p(rs->priv->internal_id));
@@ -384,7 +387,7 @@ static mrp_res_resource_set_t *create_resource_set(
 
 error:
     mrp_log_error("error creating resource set");
-    delete_resource_set(cx, rs);
+    delete_resource_set(rs);
     return NULL;
 }
 
@@ -463,7 +466,7 @@ const mrp_res_string_array_t * mrp_res_list_application_classes(
 }
 
 
-mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
+mrp_res_resource_t *mrp_res_create_resource(
                     mrp_res_resource_set_t *set,
                     const char *name,
                     bool mandatory,
@@ -473,8 +476,14 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
     uint32_t i = 0;
     bool found = false;
     uint32_t server_id = 0;
+    mrp_res_context_t *cx = NULL;
 
-    if (cx == NULL || set == NULL || name == NULL)
+    if (set == NULL)
+        return NULL;
+
+    cx = set->priv->cx;
+
+    if (cx == NULL || name == NULL)
         return NULL;
 
     for (i = 0; i < cx->priv->master_resource_set->priv->num_resources; i++) {
@@ -528,15 +537,18 @@ error:
 }
 
 
-mrp_res_resource_set_t *mrp_res_copy_resource_set(mrp_res_context_t *cx,
+mrp_res_resource_set_t *mrp_res_copy_resource_set(
         const mrp_res_resource_set_t *original)
 {
     mrp_res_resource_set_t *copy, *internal;
+    mrp_res_context_t *cx = NULL;
 
     copy = resource_set_copy(original);
 
     if (!copy)
         goto error;
+
+    cx = original->priv->cx;
 
     /* increase the reference count of the library resource set */
 
@@ -566,12 +578,12 @@ const mrp_res_resource_set_t * mrp_res_list_resources(
 }
 
 
-int mrp_res_release_resource_set(mrp_res_context_t *cx,
-                mrp_res_resource_set_t *original)
+int mrp_res_release_resource_set(mrp_res_resource_set_t *original)
 {
     mrp_res_resource_set_t *internal_set = NULL;
+    mrp_res_context_t *cx = original->priv->cx;
 
-    if (!cx->priv->connected)
+    if (!cx || !cx->priv->connected)
         goto error;
 
     if (!original->priv->internal_id)
@@ -654,17 +666,14 @@ mrp_res_resource_set_t *mrp_res_create_resource_set(mrp_res_context_t *cx,
 }
 
 
-void mrp_res_delete_resource_set(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *set)
+void mrp_res_delete_resource_set(mrp_res_resource_set_t *set)
 {
-    delete_resource_set(cx, set);
+    delete_resource_set(set);
 }
 
 
-void mrp_res_delete_resource(mrp_res_resource_set_t *set, mrp_res_resource_t *res)
+void mrp_res_delete_resource(mrp_res_resource_t *res)
 {
-    MRP_UNUSED(set);
-
     if (res->priv->set) {
         if (!mrp_res_delete_resource_by_name(res->priv->set, res->name)) {
             /* hmm, strange */
@@ -707,13 +716,13 @@ bool mrp_res_delete_resource_by_name(mrp_res_resource_set_t *rs, const char *nam
 }
 
 
-mrp_res_string_array_t * mrp_res_list_resource_names(mrp_res_context_t *cx,
+mrp_res_string_array_t * mrp_res_list_resource_names(
                 const mrp_res_resource_set_t *rs)
 {
     uint32_t i;
     mrp_res_string_array_t *ret;
 
-    if (!cx || !rs)
+    if (!rs)
         return NULL;
 
     ret = mrp_allocz(sizeof(mrp_res_string_array_t));
@@ -742,13 +751,13 @@ mrp_res_string_array_t * mrp_res_list_resource_names(mrp_res_context_t *cx,
 }
 
 
-mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
+mrp_res_resource_t * mrp_res_get_resource_by_name(
                  const mrp_res_resource_set_t *rs,
                  const char *name)
 {
     uint32_t i;
 
-    if (!cx || !rs)
+    if (!rs)
         return NULL;
 
     for (i = 0; i < rs->priv->num_resources; i++) {
@@ -760,10 +769,10 @@ mrp_res_resource_t * mrp_res_get_resource_by_name(mrp_res_context_t *cx,
     return NULL;
 }
 
-bool mrp_res_set_autorelease(mrp_res_context_t *cx, bool status,
+bool mrp_res_set_autorelease(bool status,
         mrp_res_resource_set_t *rs)
 {
-    if (!cx || !rs)
+    if (!rs || !rs->priv->cx)
         return FALSE;
 
      /* the resource library doesn't allow updating already  used sets */
@@ -776,10 +785,11 @@ bool mrp_res_set_autorelease(mrp_res_context_t *cx, bool status,
 }
 
 
-int mrp_res_acquire_resource_set(mrp_res_context_t *cx,
+int mrp_res_acquire_resource_set(
                 const mrp_res_resource_set_t *original)
 {
     mrp_res_resource_set_t *rset;
+    mrp_res_context_t *cx = original->priv->cx;
 
     if (!cx->priv->connected) {
         mrp_res_error("not connected to server");
@@ -855,13 +865,15 @@ error:
 }
 
 
-int mrp_res_get_resource_set_id(mrp_res_context_t *cx,
-        mrp_res_resource_set_t *rs)
+int mrp_res_get_resource_set_id(mrp_res_resource_set_t *rs)
 {
     mrp_res_resource_set_t *internal_set;
+    mrp_res_context_t *cx = NULL;
 
-    if (!rs || !rs->priv)
+    if (!rs || !rs->priv || !rs->priv->cx)
         return 0;
+
+    cx = rs->priv->cx;
 
     internal_set = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
             u_to_p(rs->priv->internal_id));
