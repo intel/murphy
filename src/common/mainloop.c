@@ -216,6 +216,7 @@ struct mrp_mainloop_s {
 
     mrp_list_hook_t      iowatches;              /* list of I/O watches */
     int                  niowatch;               /* number of I/O watches */
+    mrp_io_event_t       iomode;                 /* default event trigger mode */
 
     mrp_list_hook_t      timers;                 /* list of timers */
     mrp_timer_t         *next_timer;             /* next expiring timer */
@@ -365,7 +366,8 @@ static uint32_t epoll_event_mask(mrp_io_watch_t *master, mrp_io_watch_t *ignore)
     mrp_list_hook_t *p, *n;
     uint32_t         mask;
 
-    mask = (master != ignore ? master->events : 0);
+    mask = (master != ignore ?
+            master->events : master->events & MRP_IO_TRIGGER_EDGE);
 
     mrp_list_foreach(&master->slave, p, n) {
         w = mrp_list_entry(p, typeof(*w), slave);
@@ -449,7 +451,7 @@ static int epoll_del(mrp_io_watch_t *w)
         evt.data.u64 = 0;                /* init full union for valgrind... */
         evt.data.fd  = w->fd;
 
-        if (evt.events == 0) {
+        if ((evt.events & MRP_IO_EVENT_ALL) == 0) {
             fdtbl_remove(ml->fdtbl, w->fd);
             status = epoll_ctl(ml->epollfd, EPOLL_CTL_DEL, w->fd, &evt);
 
@@ -518,6 +520,23 @@ mrp_io_watch_t *mrp_add_io_watch(mrp_mainloop_t *ml, int fd,
         w->ml        = ml;
         w->fd        = fd;
         w->events    = events & MRP_IO_EVENT_ALL;
+
+        switch (events & MRP_IO_TRIGGER_MASK) {
+        case 0:
+            if (ml->iomode == MRP_IO_TRIGGER_EDGE)
+                w->events |= MRP_IO_TRIGGER_EDGE;
+            break;
+        case MRP_IO_TRIGGER_EDGE:
+            w->events |= MRP_IO_TRIGGER_EDGE;
+            break;
+        case MRP_IO_TRIGGER_LEVEL:
+            break;
+        default:
+            mrp_log_warning("Invalid I/O event trigger mode 0x%x.",
+                            events & MRP_IO_TRIGGER_MASK);
+            break;
+        }
+
         w->cb        = cb;
         w->user_data = user_data;
         w->free      = free_io_watch;
@@ -557,6 +576,25 @@ void mrp_del_io_watch(mrp_io_watch_t *w)
 mrp_mainloop_t *mrp_get_io_watch_mainloop(mrp_io_watch_t *w)
 {
     return w ? w->ml : NULL;
+}
+
+
+int mrp_set_io_event_mode(mrp_mainloop_t *ml, mrp_io_event_t mode)
+{
+    if (mode == MRP_IO_TRIGGER_LEVEL || mode == MRP_IO_TRIGGER_EDGE) {
+        ml->iomode = mode;
+        return TRUE;
+    }
+    else {
+        mrp_log_error("Invalid I/O event mode 0x%x.", mode);
+        return FALSE;
+    }
+}
+
+
+mrp_io_event_t mrp_get_io_event_mode(mrp_mainloop_t *ml)
+{
+    return ml->iomode ? ml->iomode : MRP_IO_TRIGGER_LEVEL;
 }
 
 

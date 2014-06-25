@@ -55,7 +55,11 @@ typedef enum {
     MRP_IO_EVENT_HUP   = EPOLLRDHUP|EPOLLHUP,
     MRP_IO_EVENT_ERR   = EPOLLERR,
     MRP_IO_EVENT_INOUT = EPOLLIN|EPOLLOUT,
-    MRP_IO_EVENT_ALL   = EPOLLIN|EPOLLPRI|EPOLLOUT|EPOLLRDHUP|EPOLLERR
+    MRP_IO_EVENT_ALL   = EPOLLIN|EPOLLPRI|EPOLLOUT|EPOLLRDHUP|EPOLLERR,
+    /* event trigger modes */
+    MRP_IO_TRIGGER_LEVEL = 0x1U << 25,
+    MRP_IO_TRIGGER_EDGE  = EPOLLET,
+    MRP_IO_TRIGGER_MASK  = MRP_IO_TRIGGER_LEVEL|MRP_IO_TRIGGER_EDGE
 } mrp_io_event_t;
 
 typedef struct mrp_io_watch_s mrp_io_watch_t;
@@ -73,6 +77,11 @@ void mrp_del_io_watch(mrp_io_watch_t *watch);
 /** Get the mainloop of an I/O watch. */
 mrp_mainloop_t *mrp_get_io_watch_mainloop(mrp_io_watch_t *watch);
 
+/** Set the default event trigger mode for the given mainloop. */
+int mrp_set_io_event_mode(mrp_mainloop_t *ml, mrp_io_event_t mode);
+
+/** Get the default event trigger mode of the given mainloop. */
+mrp_io_event_t mrp_get_io_event_mode(mrp_mainloop_t *ml);
 
 /*
  * timers
