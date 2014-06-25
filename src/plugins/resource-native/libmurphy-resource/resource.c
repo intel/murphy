@@ -267,7 +267,7 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             mrp_res_info("received QUERY_RESOURCES response");
 
             cx->priv->master_resource_set =
-                    resource_query_response(msg, &cursor);
+                    resource_query_response(cx, msg, &cursor);
             if (!cx->priv->master_resource_set)
                 goto error;
             break;

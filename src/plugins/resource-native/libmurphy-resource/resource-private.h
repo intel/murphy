@@ -84,6 +84,7 @@ struct mrp_res_resource_private_s {
 
 struct mrp_res_resource_set_private_s {
     mrp_res_resource_set_t *pub; /* composition */
+    mrp_res_context_t *cx; /* the context of this resource set */
     uint32_t id; /* id given by the server */
     uint32_t internal_id; /* id for checking identity */
     uint32_t internal_ref_count;

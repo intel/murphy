@@ -62,8 +62,8 @@ bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
 
 /* handling of the message responses */
 
-mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
-        void **pcursor);
+mrp_res_resource_set_t *resource_query_response(mrp_res_context_t *cx,
+        mrp_msg_t *msg, void **pcursor);
 
 mrp_res_string_array_t *class_query_response(mrp_msg_t *msg, void **pcursor);
 

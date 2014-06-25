@@ -258,7 +258,8 @@ bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
 }
 
 
-static int priv_res_to_mrp_res(uint32_t id, resource_def_t *src, mrp_res_resource_t *dst)
+static int priv_res_to_mrp_res(uint32_t id, resource_def_t *src, mrp_res_resource_t *dst,
+        mrp_res_resource_set_t *set)
 {
     dst->name  = mrp_strdup(src->name);
     dst->state = MRP_RES_RESOURCE_LOST;
@@ -269,12 +270,13 @@ static int priv_res_to_mrp_res(uint32_t id, resource_def_t *src, mrp_res_resourc
 
     dst->priv->num_attributes = src->num_attrs;
     dst->priv->attrs = src->attrs;
+    dst->priv->set = set;
     return 0;
 }
 
 
-mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
-        void **pcursor)
+mrp_res_resource_set_t *resource_query_response(mrp_res_context_t *cx,
+        mrp_msg_t *msg, void **pcursor)
 {
     int             status;
     uint32_t        dim, i;
@@ -282,6 +284,9 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
     mrp_res_attribute_t attrs[ATTRIBUTE_MAX + 1];
     resource_def_t *src;
     mrp_res_resource_set_t *arr = NULL;
+
+    if (!cx)
+        goto failed;
 
     if (!fetch_status(msg, pcursor, &status))
         goto failed;
@@ -320,6 +325,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
 
         arr->application_class = NULL;
         arr->state = MRP_RES_RESOURCE_LOST;
+        arr->priv->cx = cx;
         arr->priv->num_resources = dim;
 
         arr->priv->resources = mrp_allocz_array(mrp_res_resource_t *, dim);
@@ -341,7 +347,7 @@ mrp_res_resource_set_t *resource_query_response(mrp_msg_t *msg,
                 arr->priv->num_resources = i;
                 goto failed;
             }
-            priv_res_to_mrp_res(i, src, arr->priv->resources[i]);
+            priv_res_to_mrp_res(i, src, arr->priv->resources[i], arr);
         }
     }
 

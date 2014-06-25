@@ -353,6 +353,7 @@ static mrp_res_resource_set_t *create_resource_set(
     rs->application_class = mrp_strdup(klass);
 
     rs->priv->pub = rs;
+    rs->priv->cx = cx;
     rs->priv->id = 0;
     rs->priv->internal_id = cx->priv->next_internal_id++;
     rs->priv->seqno = 0;
@@ -506,6 +507,7 @@ mrp_res_resource_t *mrp_res_create_resource(mrp_res_context_t *cx,
     res->priv->mandatory = mandatory;
     res->priv->shared = shared;
     res->priv->pub = res;
+    res->priv->set = set;
 
     /* copy the attributes with the default values */
     res->priv->attrs = mrp_attribute_array_dup(proto->priv->num_attributes,
