@@ -70,6 +70,7 @@
 #define RESOURCE_DELETE             "delete"
 
 #define PROP_RESOURCE_SETS          "resourceSets"
+#define PROP_AVAILABLE_CLASSES      "availableClasses"
 #define PROP_AVAILABLE_RESOURCES    "availableResources"
 #define PROP_NAME                   "name"
 #define PROP_SHARED                 "shared"
@@ -101,6 +102,8 @@ typedef struct {
     const char *default_class;
 
     bool tracking;
+
+    int has_classes;
 
     /* resource management */
     manager_o_t *mgr;
@@ -136,6 +139,7 @@ struct manager_o_s {
     mrp_htbl_t *rsets;
 
     property_o_t *rsets_prop;
+    property_o_t *available_classes_prop;
 
     /* resource library */
     const char *zone;
@@ -1963,12 +1967,66 @@ error:
     return TRUE;
 }
 
+/*
+ * Updates or creates a property that contains the available
+ * application classes. Returns -1 in case of failure (property
+ * is kept as-is), 0 if the requested list is empty, and 1 if the
+ * requested list is not empty.
+ */
+static int update_classes(dbus_data_t *ctx, property_o_t **prop)
+{
+    property_o_t *res_classes_prop = NULL;
+    const char **orig_classes_array = mrp_application_class_get_all_names(0,
+                                        NULL);
+    char **res_classes_array = NULL;
+    int arr_has_content = -1;
+
+    if (!orig_classes_array) {
+        mrp_log_error("Failed to get application classes");
+        goto error;
+    }
+
+    res_classes_array = copy_string_array(orig_classes_array);
+    if (!res_classes_array) {
+        mrp_log_error("Failed to copy application classes");
+        goto error;
+    }
+
+    res_classes_prop = create_property(ctx, MURPHY_PATH_BASE,
+            MANAGER_IFACE, "as", PROP_AVAILABLE_CLASSES,
+            res_classes_array, free_string_array);
+    if (!res_classes_prop) {
+        mrp_log_error("Failed to create a property");
+        free_string_array(res_classes_array);
+        goto error;
+    }
+
+    if (*res_classes_array) {
+        mrp_log_info("Application class listing is non-empty");
+        arr_has_content = 1;
+    } else {
+        mrp_log_info("Application class listing is empty");
+        arr_has_content = 0;
+    }
+
+    /* Remove the old prop if new is valid */
+    destroy_property(*prop);
+
+    *prop = res_classes_prop;
+
+    /* Clean up and return */
+error:
+    free_value(orig_classes_array);
+
+    return arr_has_content;
+}
 
 static int mgr_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 {
     const char *member = mrp_dbus_msg_member(msg);
     const char *iface = mrp_dbus_msg_interface(msg);
     const char *path = mrp_dbus_msg_path(msg);
+    int ret = -1;
 
     mrp_dbus_msg_t *reply;
 
@@ -1991,6 +2049,22 @@ static int mgr_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         }
 
         get_property_dict_entry(ctx->mgr->rsets_prop, reply);
+
+        /* Update classes if our array is empty */
+        if (!ctx->has_classes) {
+            mrp_log_info("Updating resource classes as they were not set");
+            ret = update_classes(ctx, &ctx->mgr->available_classes_prop);
+            if (ret < 0 || !ctx->mgr->available_classes_prop) {
+                mrp_log_error("Updating available classes failed (ret=%d, ptr=%p)",
+                    ret, ctx->mgr->available_classes_prop);
+                goto error_reply;
+            }
+
+            /* Update the status */
+            ctx->has_classes = ret;
+        }
+
+        get_property_dict_entry(ctx->mgr->available_classes_prop, reply);
 
         mrp_dbus_msg_close_container(reply);
 
@@ -2094,6 +2168,7 @@ static void destroy_manager(manager_o_t *mgr)
 
     mrp_htbl_destroy(mgr->rsets, TRUE);
     destroy_property(mgr->rsets_prop);
+    destroy_property(mgr->available_classes_prop);
 
     mrp_resource_client_destroy(mgr->client);
 
@@ -2106,6 +2181,7 @@ static manager_o_t *create_manager(dbus_data_t *ctx)
     manager_o_t *mgr = mrp_allocz(sizeof(manager_o_t));
     char **rset_arr = NULL;
     mrp_htbl_config_t rsets_conf;
+    int ret = -1;
 
     if (!mgr)
         goto error;
@@ -2124,6 +2200,15 @@ static manager_o_t *create_manager(dbus_data_t *ctx)
 
     if (!mgr->rsets_prop)
         goto error;
+
+    ret = update_classes(ctx, &mgr->available_classes_prop);
+    if (ret < 0 || !mgr->available_classes_prop) {
+        mrp_log_error("Failure to get the resource classes (ret=%d, p=%p)",
+            ret, mgr->available_classes_prop);
+        goto error;
+    }
+
+    ctx->has_classes = ret;
 
     rsets_conf.comp = mrp_string_comp;
     rsets_conf.hash = mrp_string_hash;

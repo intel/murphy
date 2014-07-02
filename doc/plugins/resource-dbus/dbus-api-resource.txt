@@ -19,6 +19,7 @@ signals:
 properties:
 
     RO [ObjectPath] resourceSets: default []
+    RO [String] availableClasses
 
 
 
