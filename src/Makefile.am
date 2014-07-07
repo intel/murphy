@@ -994,7 +994,7 @@ libbreedline_glib_la_LIBADD =		\
 
 libbreedline_glib_la_DEPENDENCIES =		\
 		linker-script.breedline-glib	\
-		$(filter %.la, $(libmurphy_glib_la_LIBADD))
+		$(filter %.la, $(libbreedline_glib_la_LIBADD))
 
 libbreedline_glibincludedir      = $(includedir)/breedline
 libbreedline_glibinclude_HEADERS = $(libbreedline_glib_la_HEADERS)
