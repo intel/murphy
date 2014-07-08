@@ -363,7 +363,7 @@ mql_result_t *mql_result_event_table_create(mqi_event_type_t  event,
 
 mql_result_t *mql_result_event_transaction_create(mqi_event_type_t event)
 {
-    result_event_table_t *rslt;
+    result_event_transact_t *rslt;
 
     MDB_CHECKARG(event == mqi_transaction_start ||
                  event == mqi_transaction_end, NULL);
