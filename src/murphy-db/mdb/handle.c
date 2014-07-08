@@ -358,6 +358,8 @@ static int freemap_free(freemap_t *freemap, int index)
                     errno = ENOMEM;
                     return -1;
                 }
+
+                freemap->buckets = buckets;
             }
         }
 
