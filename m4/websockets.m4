@@ -21,6 +21,7 @@ if test "$enable_websockets" != "no"; then
         # Check for a couple of recent features we need to adopt to.
         saved_CFLAGS="$CFLAGS"
         saved_LDFLAGS="$LDFLAGS"
+        saved_LIBS="$LIBS"
         # Note that (at least with autoconf 2.69 and gcc 4.7.2), setting
         # LD_AS_NEEDED to 1 breaks AC_LINK_IFELSE. That macro generates
         # the compilation command so that the libraries are specified
@@ -34,7 +35,7 @@ if test "$enable_websockets" != "no"; then
         saved_LD_AS_NEEDED="$LD_AS_NEEDED"
         unset LD_AS_NEEDED
         CFLAGS="`pkg-config --cflags libwebsockets`"
-        LDFLAGS="`pkg-config --libs libwebsockets`"
+        LIBS="`pkg-config --libs libwebsockets`"
 
         # Check for new context creation API.
         AC_MSG_CHECKING([for WEBSOCKETS new context creation API])
@@ -80,12 +81,6 @@ if test "$enable_websockets" != "no"; then
             [websockets_log_with_level=no])
         AC_MSG_RESULT([$websockets_log_with_level])
 
-        CFLAGS="$saved_CFLAGS"
-        LDFLAGS="$saved_LDFLAGS"
-        if test -n "$saved_LD_AS_NEEDED"; then
-            export LD_AS_NEEDED="$saved_LD_AS_NEEDED"
-        fi
-
         # Check whether we have libwebsocket_close_and_free_session.
         AC_MSG_CHECKING([for WEBSOCKETS close_and_free_session API])
         AC_LINK_IFELSE(
@@ -96,6 +91,47 @@ if test "$enable_websockets" != "no"; then
             [websockets_close_session=yes],
             [websockets_close_session=no])
         AC_MSG_RESULT([$websockets_close_session])
+
+        # Check for LWS_CALLBACK_FILTER_HTTP_CONNECTION.
+        AC_MSG_CHECKING([for WEBSOCKETS LWS_CALLBACK_FILTER_HTTP_CONNECTION])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[int foo = LWS_CALLBACK_FILTER_HTTP_CONNECTION;]])],
+            [websockets_filter_http_connection=yes],
+            [websockets_filter_http_connection=no])
+        AC_MSG_RESULT([$websockets_filter_http_connection])
+
+        # Check for LWS_CALLBACK_CHANGE_MODE_POLL_FD.
+        AC_MSG_CHECKING([for WEBSOCKETS LWS_CALLBACK_CHANGE_MODE_POLL_FD])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[int foo = LWS_CALLBACK_CHANGE_MODE_POLL_FD;]])],
+            [websockets_change_poll=yes],
+            [websockets_change_poll=no])
+        AC_MSG_RESULT([$websockets_change_poll])
+
+        # Check the signature of libwebsockets_serve_http_file to see if
+        # it takes an extra (other_headers) argument.
+        AC_MSG_CHECKING([for WEBSOCKETS libwebsockets_serve_http_file other_headers argument])
+        AC_LINK_IFELSE(
+           [AC_LANG_PROGRAM(
+                 [[#include <stdlib.h>
+                   #include <libwebsockets.h>]],
+                 [[return libwebsockets_serve_http_file(NULL, NULL, "", "", "");]])],
+            [websockets_serve_file_extraarg=yes],
+            [websockets_serve_file_extraarg=no])
+        AC_MSG_RESULT([$websockets_serve_file_extraarg])
+
+        CFLAGS="$saved_CFLAGS"
+        LDFLAGS="$saved_LDFLAGS"
+        LIBS="$saved_LIBS"
+        if test -n "$saved_LD_AS_NEEDED"; then
+            export LD_AS_NEEDED="$saved_LD_AS_NEEDED"
+        fi
     else
         WEBSOCKETS_CFLAGS=""
     fi
@@ -103,7 +139,8 @@ if test "$enable_websockets" != "no"; then
     # Check for older websockets.
     if test "$have_websockets" = "no"; then
         saved_LDFLAGS="$LDFLAGS"
-        LDFLAGS="-lwebsockets"
+        saved_LIBS="$LIBS"
+        LIBS="-lwebsockets"
         AC_MSG_CHECKING([for WEBSOCKETS without pkg-config support])
         AC_LINK_IFELSE(
            [AC_LANG_PROGRAM(
@@ -151,8 +188,18 @@ if test "$enable_websockets" != "no"; then
     if test "$websockets_close_session" = "yes"; then
         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CLOSE_SESSION"
     fi
+    if test "$websockets_filter_http_connection" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_FILTER_HTTP_CONNECTION"
+    fi
+    if test "$websockets_change_poll" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CHANGE_MODE_POLL_FD"
+    fi
+    if test "$websockets_serve_file_extraarg" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_SERVE_FILE_EXTRAARG"
+    fi
 
     LDFLAGS="$saved_LDFLAGS"
+    LIBS="$saved_LIBS"
 else
     AC_MSG_NOTICE([libwebsockets support is disabled.])
 fi

@@ -112,6 +112,12 @@ typedef struct {
 } pollfd_t;
 
 
+typedef enum {
+    POLLFD_SET    = 0,
+    POLLFD_CLEAR  = TRUE,
+    POLLFD_CHANGE,
+} pollfd_op_t;
+
 /*
  * a websocket context
  */
@@ -272,7 +278,7 @@ static pollfd_t *find_fd(wsl_ctx_t *wsc, int fd)
 }
 
 
-static int mod_fd(wsl_ctx_t *wsc, int fd, int events, int clear)
+static int mod_fd(wsl_ctx_t *wsc, int fd, int events, int op)
 {
     struct epoll_event  e;
     pollfd_t           *wfd;
@@ -284,10 +290,19 @@ static int mod_fd(wsl_ctx_t *wsc, int fd, int events, int clear)
             e.data.u64 = 0;
             e.data.fd  = fd;
 
-            if (clear)
+            switch (op) {
+            case POLLFD_CLEAR:
                 e.events = wfd->events & ~map_poll_to_event(events);
-            else
+                break;
+            case POLLFD_SET:
                 e.events = wfd->events |  map_poll_to_event(events);
+                break;
+            case POLLFD_CHANGE:
+                e.events = wfd->events =  map_poll_to_event(events);
+                break;
+            default:
+                return FALSE;
+            }
 
             if (epoll_ctl(wsc->epollfd, EPOLL_CTL_MOD, fd, &e) == 0)
                 return TRUE;
@@ -1226,10 +1241,18 @@ int wsl_serve_http_file(wsl_sck_t *sck, const char *path, const char *type)
     mrp_debug("serving file '%s' (%s) over websocket %p", path, type, sck->sck);
 
 #ifndef WEBSOCKETS_OLD
+#  ifdef WEBSOCKETS_SERVE_FILE_EXTRAARG
+    if (libwebsockets_serve_http_file(sck->ctx->ctx, sck->sck, path,
+                                      type, NULL) == 0)
+        return TRUE;
+    else
+        return FALSE;
+#  else
     if (libwebsockets_serve_http_file(sck->ctx->ctx, sck->sck, path, type) == 0)
         return TRUE;
     else
         return FALSE;
+#  endif
 #else
     if (libwebsockets_serve_http_file(sck->sck, path, type) == 0)
         return TRUE;
@@ -1342,6 +1365,45 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
         /*
          * mainloop integration
          */
+#ifdef WEBSOCKETS_CHANGE_MODE_POLL_FD
+
+    case LWS_CALLBACK_ADD_POLL_FD: {
+        struct libwebsocket_pollargs *pa = (struct libwebsocket_pollargs *)in;
+        fd   = pa->fd;
+        mask = pa->events;
+
+        mrp_debug("start polling fd %d for events 0x%x", fd, mask);
+        if (add_fd(ctx, fd, mask))
+            return LWS_EVENT_OK;
+        else
+            return LWS_EVENT_ERROR;
+    }
+
+    case LWS_CALLBACK_DEL_POLL_FD: {
+        struct libwebsocket_pollargs *pa = (struct libwebsocket_pollargs *)in;
+        fd = pa->fd;
+
+        mrp_debug("stop polling fd %d", fd);
+        if (del_fd(ctx, fd))
+            return LWS_EVENT_OK;
+        else
+            return LWS_EVENT_ERROR;
+    }
+
+    case LWS_CALLBACK_CHANGE_MODE_POLL_FD: {
+        struct libwebsocket_pollargs *pa = (struct libwebsocket_pollargs *)in;
+        fd   = pa->fd;
+        mask = pa->events;
+
+        mrp_debug("setting poll events to 0x%x for fd %d", mask, fd);
+        if (mod_fd(ctx, fd, mask, FALSE))
+            return LWS_EVENT_OK;
+        else
+            return LWS_EVENT_ERROR;
+    }
+
+#else /* WEBSOCKETS_CHANGE_MODE_POLL_FD */
+
     case LWS_CALLBACK_ADD_POLL_FD:
 #ifdef WEBSOCKETS_CONTEXT_INFO           /* just brilliant... */
         fd   = (ptrdiff_t)in;
@@ -1392,6 +1454,8 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
             return LWS_EVENT_OK;
         else
             return LWS_EVENT_ERROR;
+
+#endif /* WEBSOCKETS_CHANGE_MODE_POLL_FD */
 
     case LWS_CALLBACK_SERVER_WRITEABLE:
 #ifndef WEBSOCKETS_CLOSE_SESSION
@@ -1449,6 +1513,12 @@ static int http_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
          *     websockets and look up the associated wsl_sck_t using this
          *     secondary bookkeeping.
          */
+
+
+#ifdef WEBSOCKETS_FILTER_HTTP_CONNECTION
+    case LWS_CALLBACK_FILTER_HTTP_CONNECTION:
+        return 0;
+#endif
 
     case LWS_CALLBACK_HTTP:
         uri = (const char *)in;
