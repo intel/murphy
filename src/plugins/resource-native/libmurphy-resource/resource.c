@@ -110,7 +110,7 @@ static void resource_event(mrp_msg_t *msg,
         !fetch_resource_set_mask(msg, pcursor, 0, &grant) ||
         !fetch_resource_set_mask(msg, pcursor, 1, &advice)) {
         mrp_res_error("failed to fetch data from message");
-        goto malformed;
+        goto ignore;
     }
 
     /* Update our "master copy" of the resource set. */
@@ -119,7 +119,7 @@ static void resource_event(mrp_msg_t *msg,
 
     if (!rset) {
         mrp_res_info("resource event outside the resource set lifecycle");
-        goto malformed;
+        goto ignore;
     }
 
     while (mrp_msg_iterate(msg, pcursor, &tag, &type, &value, &size)) {
@@ -129,14 +129,14 @@ static void resource_event(mrp_msg_t *msg,
         if ((tag != RESPROTO_RESOURCE_ID || type != MRP_MSG_FIELD_UINT32) ||
                 !fetch_resource_name(msg, pcursor, &resnam)) {
             mrp_res_error("failed to read resource from message");
-            goto malformed;
+            goto ignore;
         }
 
         res = get_resource_by_name(rset, resnam);
 
         if (!res) {
             mrp_res_error("resource doesn't exist in resource set");
-            goto malformed;
+            goto ignore;
         }
 
         resid = value.u32;
@@ -147,7 +147,7 @@ static void resource_event(mrp_msg_t *msg,
 
         if (n_attrs < 0) {
             mrp_res_error("failed to read attributes from message");
-            goto malformed;
+            goto ignore;
         }
 
         /* copy the attributes */
@@ -234,8 +234,8 @@ static void resource_event(mrp_msg_t *msg,
 
     return;
 
- malformed:
-    mrp_res_error("ignoring malformed resource event");
+ ignore:
+    mrp_res_info("ignoring resource event");
 }
 
 
