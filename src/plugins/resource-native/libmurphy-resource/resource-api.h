@@ -227,6 +227,23 @@ bool mrp_res_equal_resource_set(const mrp_res_resource_set_t *a,
         const mrp_res_resource_set_t *b);
 
 /**
+ * Acquisition and release:
+ *
+ * These two functions serve two purposes. First,
+ * they start the attempt of acquisition or release of
+ * a set of resources. Second, both of them - if
+ * successful - start the delivery of Resource
+ * callbacks to the calling application regarding
+ * the affected resource set.
+ *
+ * What the second point means is that, in case an
+ * application wants to know the state of resources,
+ * but not actually acquire them, it is valid to
+ * "release" a set containing these resources
+ * without acquiring them first.
+ */
+
+/**
  * Acquire resources. Errors in the return value will
  * indicate only connection problems or malformed
  * resource structs. If you will be granted the resources
@@ -240,9 +257,15 @@ bool mrp_res_equal_resource_set(const mrp_res_resource_set_t *a,
 int mrp_res_acquire_resource_set(const mrp_res_resource_set_t *rs);
 
 /**
- * Release the acquired resource set. Resource callbacks
- * for this set will not stop, since updates for the resource
- * set available status are still delivered.
+ * Release a resource set. Releasing a set of resources
+ * will not stop delivery of Resource callbacks for that
+ * set, updates for its status will still be delivered.
+ *
+ * This function can be called even with not yet acquired
+ * sets in order to start delivery of Resource callbacks
+ * for them, which can be useful for applications wishing
+ * to survey the state of specific set of resources without
+ * actually affecting it.
  *
  * @param rs resource set you want to release.
  *
