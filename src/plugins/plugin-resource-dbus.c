@@ -1721,6 +1721,29 @@ static int add_resource_cb(void *key, void *object, void *user_data)
     return MRP_HTBL_ITER_MORE;
 }
 
+static inline int initialize_resource_set(resource_set_o_t *rset)
+{
+    /* add the resources */
+    mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
+    if (rset->error) {
+        /* could not add the resource to resource set */
+        rset->error = FALSE;
+        return FALSE;
+    }
+
+    if (mrp_application_class_add_resource_set(
+            (char *) rset->class_prop->value,
+            rset->mgr->zone, rset->set, 0) < 0) {
+        /* This is actually quite serious, since most likely we cannot
+         * ever get this to work. The zone is most likely not defined.
+         * The resource library is known to crash if the rset->set
+         * pointer is used for acquiring.
+         */
+        return FALSE;
+    }
+
+    return TRUE;
+}
 
 static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 {
@@ -1728,6 +1751,7 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
     const char *iface = mrp_dbus_msg_interface(msg);
     const char *path = mrp_dbus_msg_path(msg);
     char *error_msg = "Received invalid message";
+    int requesting = 0;
 
     mrp_dbus_msg_t *reply;
 
@@ -1824,52 +1848,35 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
 
         mrp_log_info("created resource %s\n", resource->path);
     }
-    else if (strcmp(member, RSET_REQUEST) == 0) {
-        mrp_log_info("Requesting rset %s", path);
+    /* Requesting and releasing sets mostly shares code,
+     * so we use the same code path, and set a variable to
+     * differentiate between the two modes of operation.
+     */
+    else if ((requesting = !strcmp(member, RSET_REQUEST)) ||
+             strcmp(member, RSET_RELEASE) == 0) {
+        if (requesting)
+            mrp_log_info("Requesting rset %s", path);
+        else
+            mrp_log_info("Releasing rset %s", path);
 
         if (!rset->locked) {
-            /* add the resources */
-            mrp_htbl_foreach(rset->resources, add_resource_cb, rset);
-            if (rset->error) {
-                /* could not add the resource to resource set */
-                rset->error = FALSE;
-                error_msg = "Could not add resource to resource set; "
-                        "possibly an unknown resource";
-                goto error_reply;
-            }
-
-            if (mrp_application_class_add_resource_set(
-                    (char *) rset->class_prop->value,
-                    rset->mgr->zone, rset->set, 0) < 0) {
-                /* This is actually quite serious, since most likely we cannot
-                 * ever get this to work. The zone is most likely not defined.
-                 * The resource library is known to crash if the rset->set
-                 * pointer is used for acquiring.
-                 */
+            if (!initialize_resource_set(rset)) {
+                error_msg = "Could not set up resource set; "
+                        "possibly an unknown resource or zone";
                 goto error_reply;
             }
         }
 
         rset->committed = TRUE;
-        mrp_resource_set_acquire(rset->set, 0);
+
+        if (requesting)
+            mrp_resource_set_acquire(rset->set, 0);
+        else
+            mrp_resource_set_release(rset->set, 0);
 
         /* Due to limitations in resource library, this resource set cannot
          * be changed anymore. This might change in the future.
          */
-        rset->locked = TRUE;
-
-        reply = mrp_dbus_msg_method_return(dbus, msg);
-        if (!reply)
-            goto error;
-
-        mrp_dbus_send_msg(dbus, reply);
-        mrp_dbus_msg_unref(reply);
-    }
-    else if (strcmp(member, RSET_RELEASE) == 0) {
-        mrp_log_info("Releasing rset %s", path);
-
-        rset->committed = TRUE;
-        mrp_resource_set_release(rset->set, 0);
         rset->locked = TRUE;
 
         reply = mrp_dbus_msg_method_return(dbus, msg);
