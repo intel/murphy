@@ -312,6 +312,9 @@ mrp_res_resource_set_t *resource_set_copy(
     copy->priv->resources = mrp_allocz_array(mrp_res_resource_t *,
             original->priv->num_resources);
 
+    if (copy->priv->resources == NULL && copy->priv->num_resources)
+        goto error;
+
     for (i = 0; i < copy->priv->num_resources; i++) {
         copy->priv->resources[i] = resource_copy(original->priv->resources[i],
                 copy);
