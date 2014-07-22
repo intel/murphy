@@ -334,7 +334,7 @@ void msg_free_set(msg_t *msg)
     if (set != NULL) {
         values_freed = FALSE;
         for (i = 0; i < set->ntable; i++) {
-            if (set->tables[i].rows != NULL) {
+            if (set->tables != NULL && set->tables[i].rows != NULL) {
                 if (!values_freed && set->tables[i].rows[0] != NULL) {
                     mrp_free(set->tables[i].rows[0]);
                     values_freed = TRUE;
@@ -421,12 +421,14 @@ msg_t *msg_decode_set(mrp_msg_t *msg)
     void               *it;
     mrp_domctl_data_t  *d;
     mrp_domctl_value_t *values, *v;
+    uint64_t            columns_so_far;
     uint32_t            seqno;
     uint16_t            ntable, ntotal, nrow, ncol, tblid, type;
     int                 t, r, c;
     mrp_msg_value_t     value;
 
     it = NULL;
+    columns_so_far = 0;
 
     if (!mrp_msg_iterate_get(msg, &it,
                              MSG_UINT32(MSGSEQ , &seqno),
@@ -445,12 +447,12 @@ msg_t *msg_decode_set(mrp_msg_t *msg)
     set->seq    = seqno;
     set->tables = mrp_allocz(sizeof(*set->tables) * ntable);
 
-    if (set->tables == NULL)
+    if (set->tables == NULL && ntable != 0)
         goto fail;
 
     values = mrp_allocz(sizeof(*values) * ntotal);
 
-    if (values == NULL && ntotal > 0)
+    if (values == NULL && ntotal != 0)
         goto fail;
 
     d = set->tables;
@@ -472,9 +474,15 @@ msg_t *msg_decode_set(mrp_msg_t *msg)
         if (d->rows == NULL && nrow)
             goto fail;
 
+        /* Check if we go over the possible total */
+        if (ncol > ntotal || columns_so_far + ncol > ntotal)
+            goto fail;
+
+        /* If we are not overflowing, add ncol to count */
+        columns_so_far += ncol;
+
         for (r = 0; r < nrow; r++) {
             d->rows[r] = v;
-            values     = NULL;
 
             for (c = 0; c < ncol; c++) {
                 if (!mrp_msg_iterate_get(msg, &it,
@@ -637,6 +645,7 @@ msg_t *msg_decode_notify(mrp_msg_t *msg)
     mrp_domctl_data_t  *d;
     mrp_domctl_value_t *values, *v;
     void               *it;
+    uint64_t            columns_so_far;
     uint32_t            seqno;
     uint16_t            ntable, ntotal, nrow, ncol;
     uint16_t            tblid;
@@ -645,6 +654,7 @@ msg_t *msg_decode_notify(mrp_msg_t *msg)
     mrp_msg_value_t     value;
 
     it = NULL;
+    columns_so_far = 0;
 
     if (!mrp_msg_iterate_get(msg, &it,
                              MSG_UINT32(MSGSEQ, &seqno),
@@ -689,6 +699,13 @@ msg_t *msg_decode_notify(mrp_msg_t *msg)
 
         if (d->rows == NULL && nrow != 0)
             goto fail;
+
+        /* Check if we go over the possible total */
+        if (ncol > ntotal || columns_so_far + ncol > ntotal)
+            goto fail;
+
+        /* If we are not overflowing, add ncol to count */
+        columns_so_far += ncol;
 
         for (r = 0; r < nrow; r++) {
             d->rows[r] = v;
