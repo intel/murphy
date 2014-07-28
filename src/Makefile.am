@@ -1440,7 +1440,8 @@ murphyd_LDADD  =				\
 		libmurphy-lua-decision.la	\
 		libmurphy-core.la		\
 		libmurphy-lua-utils.la		\
-		libmurphy-common.la
+		libmurphy-common.la		\
+		$(JSON_LIBS)
 
 if LIBDBUS_ENABLED
 murphyd_LDADD +=				\
