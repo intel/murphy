@@ -215,28 +215,28 @@ mrp_json_t *mrp_json_add_array(mrp_json_t *o, const char *key,
     switch (type) {
     case MRP_JSON_STRING:
         for (i = 0; i < cnt; i++) {
-            if (!mrp_json_array_append_item(a, type, ((char **)arr)[i]))
+            if (!mrp_json_array_append_string(a, ((char **)arr)[i]))
                 goto fail;
         }
         break;
 
     case MRP_JSON_INTEGER:
         for (i = 0; i < cnt; i++) {
-            if (!mrp_json_array_append_item(a, type, ((int *)arr)[i]))
+            if (!mrp_json_array_append_integer(a, ((int *)arr)[i]))
                 goto fail;
         }
         break;
 
     case MRP_JSON_DOUBLE:
         for (i = 0; i < cnt; i++) {
-            if (!mrp_json_array_append_item(a, type, ((double *)arr)[i]))
+            if (!mrp_json_array_append_double(a, ((double *)arr)[i]))
                 goto fail;
         }
         break;
 
     case MRP_JSON_BOOLEAN:
         for (i = 0; i < cnt; i++) {
-            if (!mrp_json_array_append_item(a, type, ((bool *)arr)[i]))
+            if (!mrp_json_array_append_boolean(a, ((bool *)arr)[i]))
                 goto fail;
         }
         break;

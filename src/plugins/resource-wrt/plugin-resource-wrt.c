@@ -462,11 +462,11 @@ static int append_attributes(mrp_json_t *o, mrp_attr_t *attrs, errbuf_t *e)
                 goto fail;
             break;
         case mqi_integer:
-            if (!mrp_json_add_string(a, attr->name, attr->value.integer))
+            if (!mrp_json_add_integer(a, attr->name, attr->value.integer))
                 goto fail;
             break;
         case mqi_unsignd:
-            if (!mrp_json_add_string(a, attr->name, attr->value.integer))
+            if (!mrp_json_add_integer(a, attr->name, attr->value.integer))
                 goto fail;
             break;
         case mqi_floating:
