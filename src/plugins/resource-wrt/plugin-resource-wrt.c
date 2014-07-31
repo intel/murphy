@@ -846,7 +846,7 @@ static void create_set(wrt_client_t *c, mrp_json_t *req)
                     send_message(c, reply);
 
                     allow_resource_set_events(c, rset);
-                    emit_resource_set_event(c, 0, rset, TRUE);
+                    emit_resource_set_event(c, seq, rset, TRUE);
                 }
             }
 
