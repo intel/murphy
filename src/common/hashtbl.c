@@ -327,7 +327,7 @@ int mrp_htbl_foreach(mrp_htbl_t *ht, mrp_htbl_iter_cb_t cb, void *user_data)
                     free_entry(ht, entry, TRUE);
 
                 /* cb wants to stop iterating */
-                if (cb_verdict & MRP_HTBL_ITER_STOP)
+                if (!(cb_verdict & MRP_HTBL_ITER_MORE))
                     goto out;
             }
         }
