@@ -239,7 +239,8 @@ static void delete_from_bucket(mrp_htbl_t *ht, bucket_t *bucket, entry_t *entry)
 
 
     /*
-     * If there is an iterator active and this bucket would
+     * If the bucket became empty, unlink it from the used list.
+     * If also there is an iterator active and this bucket would
      * have been the next one to iterate over, we need to
      * update the iterator to skip to the next bucket instead
      * as this one just became empty and will be removed from
@@ -249,9 +250,9 @@ static void delete_from_bucket(mrp_htbl_t *ht, bucket_t *bucket, entry_t *entry)
      * (to a single empty bucket).
      */
 
-    if (ht->iter != NULL && mrp_list_empty(&bucket->entries)) {
-        if (ht->iter->bn == &bucket->used)
-            ht->iter->bn = bucket->used.next;
+    if (mrp_list_empty(&bucket->entries)) {
+        if (ht->iter != NULL && ht->iter->bn == &bucket->used)
+                ht->iter->bn = bucket->used.next;
 
         mrp_list_delete(&bucket->used);
     }
