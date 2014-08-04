@@ -1,6 +1,6 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
-noinst_PROGRAMS  = mm-test hash-test msg-test transport-test \
+noinst_PROGRAMS  = mm-test hash-test hash12-test msg-test transport-test \
                  internal-transport-test process-watch-test native-test
 
 if LIBDBUS_ENABLED
@@ -18,6 +18,11 @@ mm_test_LDADD   = ../../libmurphy-common.la
 hash_test_SOURCES = hash-test.c
 hash_test_CFLAGS  = $(AM_CFLAGS)
 hash_test_LDADD   = ../../libmurphy-common.la
+
+# hash12-test
+hash12_test_SOURCES = hash12-test.c
+hash12_test_CFLAGS  = $(AM_CFLAGS)
+hash12_test_LDADD   = ../../libmurphy-common.la
 
 # mainloop test
 mainloop_test_SOURCES = mainloop-test.c
