@@ -219,6 +219,10 @@ static socklen_t strm_resolve(const char *str, mrp_sockaddr_t *addr,
             if (un->sun_path[0] == '@')
                 un->sun_path[0] = '\0';
         }
+
+        /* When binding the socket, we don't need the null at the end */
+        len--;
+
         break;
 
     case AF_INET:
