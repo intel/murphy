@@ -3,9 +3,7 @@ SUBDIRS         = murphy-db . \
 		  core/lua-decision/tests resolver/tests \
 		  daemon/tests  plugins/tests
 
-BUILT_SOURCES   =
-
-AM_CFLAGS       = $(WARNING_CFLAGS) $(INCLUDES) \
+AM_CFLAGS       = $(WARNING_CFLAGS) $(AM_CPPFLAGS) \
 		  -DSYSCONFDIR=\"@SYSCONFDIR@\" -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   =
 pkgconfigdir    = ${libdir}/pkgconfig
@@ -20,7 +18,7 @@ QUIET_GEN      = $(Q:@=@echo '  GEN   '$@;)
 LEXCOMPILE      = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 YACCCOMPILE     = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 
-INCLUDES        = -I$(top_builddir) -I$(top_builddir)/src \
+AM_CPPFLAGS     = -I$(top_builddir) -I$(top_builddir)/src \
 		  -I$(top_builddir)/src/murphy-db/include
 BUILT_SOURCES   =
 

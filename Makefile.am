@@ -1,3 +1,5 @@
+ACLOCAL_AMFLAGS = -I m4
+
 SUBDIRS  = . utils src doc
 doc_DATA = AUTHORS ChangeLog COPYING INSTALL NEWS README
 

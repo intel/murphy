@@ -4,14 +4,12 @@
 
 AC_PREREQ(2.59)
 
-AC_INIT([murphy],
-        m4_esyscmd([build-aux/git-version-gen .tarball-version]),
-        [krisztian.litkey at intel.com])
+AC_INIT([murphy], m4_esyscmd([build-aux/git-version-gen .tarball-version]))
 
 AC_CONFIG_SRCDIR([src])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADER([src/config.h])
-AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION)
+AM_INIT_AUTOMAKE([-Wno-portability])
 
 AC_SUBST(ACLOCAL_AMFLAGS, "-I m4")
 
