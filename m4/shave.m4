@@ -81,6 +81,7 @@ AC_DEFUN([SHAVE_INIT],
     SHAVE_SAVED_MCS=$MCS
     SHAVE_SAVED_LEX=$LEX
     SHAVE_SAVED_YACC=$YACC
+    SHAVE_SAVED_CC_FOR_BUILD=$CC_FOR_BUILD
     CCAS="${SHELL} ${shavedir}/shave ccas ${SHAVE_SAVED_CCAS}"
     CC="${SHELL} ${shavedir}/shave cc ${SHAVE_SAVED_CC}"
     CXX="${SHELL} ${shavedir}/shave cxx ${SHAVE_SAVED_CXX}"
@@ -90,6 +91,7 @@ AC_DEFUN([SHAVE_INIT],
     MCS="${SHELL} ${shavedir}/shave mcs ${SHAVE_SAVED_MCS}"
     LEX="${SHELL} ${shavedir}/shave lex ${SHAVE_SAVED_LEX}"
     YACC="${SHELL} ${shavedir}/shave yacc ${SHAVE_SAVED_YACC}"
+    CC_FOR_BUILD="${SHELL} ${shavedir}/shave cc_for_build ${SHAVE_SAVED_CC_FOR_BUILD}"
     AC_SUBST(CCAS)
     AC_SUBST(CC)
     AC_SUBST(CXX)

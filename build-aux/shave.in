@@ -110,6 +110,9 @@ link,*)
 *,yacc)
     Q="  YACC  "
     ;;
+*,cc_for_build)
+    Q=" HOSTCC "
+    ;;
 *,*)
     # should not happen
     Q="  CC    "

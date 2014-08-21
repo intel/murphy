@@ -44,6 +44,18 @@ AC_PROG_YACC
 AM_PROG_LEX
 AC_SUBST(LEXLIB)
 
+if test "$cross_compiling" != "no"; then
+    AC_MSG_NOTICE([Looks like we're being cross-compiled...])
+    if test -z "$CC_FOR_BUILD"; then
+        CC_FOR_BUILD=cc
+    fi
+else
+    AC_MSG_NOTICE([Looks like we're doing a native compilation...])
+    CC_FOR_BUILD='$(CC)'
+fi
+AC_SUBST(CC_FOR_BUILD)
+UNSHAVED_CC_FOR_BUILD="$CC_FOR_BUILD"
+
 # Make first invocation of PKG_CHECK_MODULES 'if-then-else-fi'-safe.
 PKG_PROG_PKG_CONFIG
 
@@ -649,6 +661,10 @@ AC_OUTPUT
 # Display the configuration.
 echo "----- configuration -----"
 echo "Extra C warnings flags: $WARNING_CFLAGS"
+echo "Cross-compiling: $cross_compiling"
+if test "$cross_compiling" != "no"; then
+    echo "     * native compiler: $UNSHAVED_CC_FOR_BUILD"
+fi
 echo "Lua (pkgconfig file) to use: $with_lua"
 echo "    * cflags: $LUA_CFLAGS"
 echo "    * libs: $LUA_LIBS"
