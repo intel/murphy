@@ -44,6 +44,28 @@ AC_PROG_YACC
 AM_PROG_LEX
 AC_SUBST(LEXLIB)
 
+# Check that we have flex/bison and not lex/yacc.
+AC_MSG_CHECKING([for flex vs. lex])
+case $LEX in
+    *flex*)
+        AC_MSG_RESULT([ok, looks like we have flex])
+        ;;
+    *)
+        AC_MSG_ERROR([flex is required])
+        ;;
+esac
+
+AC_MSG_CHECKING([for bison vs. yacc])
+case $YACC in
+    *bison*)
+        AC_MSG_RESULT([ok, looks like we have bison])
+        ;;
+    *)
+        AC_MSG_ERROR([bison is required])
+        ;;
+esac
+
+# Guesstimate native compiler if we're cross-compiling.
 if test "$cross_compiling" != "no"; then
     AC_MSG_NOTICE([Looks like we're being cross-compiled...])
     if test -z "$CC_FOR_BUILD"; then
@@ -58,20 +80,6 @@ UNSHAVED_CC_FOR_BUILD="$CC_FOR_BUILD"
 
 # Make first invocation of PKG_CHECK_MODULES 'if-then-else-fi'-safe.
 PKG_PROG_PKG_CONFIG
-
-# Don't require ctags (we keep linker scripts and debug files in the repo now).
-#AC_CHECK_PROG(CTAGS, ctags, "ctags")
-#if test "$CTAGS" != "ctags" ; then
-#   AC_MSG_ERROR([ctags is required])
-#fi
-
-if test "$LEX" != "flex" ; then
-   AC_MSG_ERROR([flex is required])
-fi
-
-if test "$YACC" != "bison -y" ; then
-   AC_MSG_ERROR([bison is required])
-fi
 
 # Checks for libraries.
 AC_CHECK_LIB([dl], [dlopen dlclose dlsym dlerror])
