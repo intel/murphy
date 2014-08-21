@@ -108,7 +108,9 @@ AC_CHECK_TYPES([ptrdiff_t])
 # Checks for library functions.
 AC_FUNC_ERROR_AT_LINE
 AC_HEADER_MAJOR
-AC_FUNC_MALLOC
+if test "$cross_compiling" = "no"; then
+    AC_FUNC_MALLOC
+fi
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([clock_gettime memmove memset regcomp strcasecmp strchr strdup strrchr strtol strtoul])
 
