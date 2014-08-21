@@ -275,6 +275,8 @@ static void resource_callback(mrp_res_context_t *cx,
     mrp_res_resource_t *res;
     mrp_res_attribute_t *attr;
 
+    MRP_UNUSED(cx);
+
     printf("> resource_callback\n");
 
     if (!mrp_res_equal_resource_set(rs, my_data->rs))
