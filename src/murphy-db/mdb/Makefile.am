@@ -38,7 +38,7 @@ libmdb_la_DEPENDENCIES = $(LINKER_SCRIPT)
 # linker script generation
 $(LINKER_SCRIPT): $(libmdb_la_HEADERS)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-	    -c "$(libmdb_la_CFLAGS)" -p "^(mdb_)|(mqi_)" -o $@ $^
+	    -P "$(CC)" -c "$(libmdb_la_CFLAGS)" -p "^(mdb_)|(mqi_)" -o $@ $^
 
 clean-$(LINKER_SCRIPT):
 	-rm -f $(LINKER_SCRIPT)
