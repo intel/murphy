@@ -126,6 +126,21 @@ static void verbose_message(int level, const char *fmt, ...)
 }
 
 
+static char *unshave(char *cmd)
+{
+#define SHAVE "shave cc "
+    char *shave;
+
+    shave = strstr(cmd, SHAVE);
+
+    if (shave == NULL)
+        return cmd;
+    else
+        return shave + sizeof(SHAVE) - 1;
+#undef SHAVE
+}
+
+
 static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
 {
     va_list ap;
@@ -185,7 +200,7 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
     while ((opt = getopt_long(argc, argv, OPTIONS, options, NULL)) != -1) {
         switch (opt) {
         case 'P':
-            cfg->preproc = optarg;
+            cfg->preproc = unshave(optarg);
             break;
 
         case 'c':
