@@ -428,6 +428,7 @@ ldconfig
 %files doc
 %defattr(-,root,root,-)
 %doc %{_docdir}/murphy*
+%license COPYING LICENSE-BSD
 
 %if %{?_with_pulse:1}%{!?_with_pulse:0}
 %files pulse
