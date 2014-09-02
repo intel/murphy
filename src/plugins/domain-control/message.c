@@ -475,11 +475,11 @@ msg_t *msg_decode_set(mrp_msg_t *msg)
             goto fail;
 
         /* Check if we go over the possible total */
-        if (ncol > ntotal || columns_so_far + ncol > ntotal)
+        if (ncol > ntotal || columns_so_far + (nrow * ncol) > ntotal)
             goto fail;
 
         /* If we are not overflowing, add ncol to count */
-        columns_so_far += ncol;
+        columns_so_far += nrow * ncol;
 
         for (r = 0; r < nrow; r++) {
             d->rows[r] = v;
@@ -701,11 +701,11 @@ msg_t *msg_decode_notify(mrp_msg_t *msg)
             goto fail;
 
         /* Check if we go over the possible total */
-        if (ncol > ntotal || columns_so_far + ncol > ntotal)
+        if (ncol > ntotal || columns_so_far + (nrow * ncol) > ntotal)
             goto fail;
 
         /* If we are not overflowing, add ncol to count */
-        columns_so_far += ncol;
+        columns_so_far += nrow * ncol;
 
         for (r = 0; r < nrow; r++) {
             d->rows[r] = v;
