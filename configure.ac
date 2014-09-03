@@ -47,6 +47,9 @@ AC_SUBST(LEXLIB)
 # Check that we have flex/bison and not lex/yacc.
 AC_MSG_CHECKING([for flex vs. lex])
 case $LEX in
+    *missing\ flex*)
+        AC_MSG_ERROR([looks like you're missing flex])
+        ;;
     *flex*)
         AC_MSG_RESULT([ok, looks like we have flex])
         ;;
