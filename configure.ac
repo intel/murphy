@@ -60,6 +60,9 @@ esac
 
 AC_MSG_CHECKING([for bison vs. yacc])
 case $YACC in
+    *missing\ *)
+        AC_MSG_ERROR([looks like you're missing bison])
+        ;;
     *bison*)
         AC_MSG_RESULT([ok, looks like we have bison])
         ;;
