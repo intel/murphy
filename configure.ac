@@ -138,16 +138,39 @@ fi
 
 AC_SUBST(WARNING_CFLAGS)
 
-# By default use the system default Lua (assumed to be called lua(.pc).
+# By default try to find the system default Lua (assumed to be
+# called lua(.pc). If that is not found, try to look for
+# packages lua5.2 and lua5.1, which can be found in Debian-based
+# distributions.
+#
 # You can override this using the --with-lua option. For instance
-# on Ubuntu you'd need to use --with-lua=lua5.1.
+# to use Lua 5.1 on Ubuntu while having 5.2 installed, you'd use
+# --with-lua=lua5.1.
 AC_ARG_WITH(lua,
             [  --with-lua                build with specified Lua (pkgconfig filename without .pc suffix)],
-	    [with_lua=$withval], [with_lua=lua])
+            [with_lua=$withval], [with_lua=default])
 
-# Check for Lua.
-AC_MSG_NOTICE([Compiling with Lua package $with_lua.])
-PKG_CHECK_MODULES(LUA, $with_lua >= 5.1.1)
+if test "x$with_lua" = "xdefault"; then
+    # Check for "lua" first, then "lua5.2" and finally for "lua5.1"
+    AC_MSG_NOTICE([Checking for an installed Lua...])
+    PKG_CHECK_MODULES([LUA], [lua >= 5.1.1],
+        [with_lua=lua],
+        [PKG_CHECK_MODULES([LUA52], [lua5.2],
+            [with_lua=lua5.2
+             LUA_CFLAGS=$LUA52_CFLAGS
+             LUA_LIBS=$LUA52_LIBS],
+            [PKG_CHECK_MODULES([LUA51], [lua5.1 >= 5.1.1],
+                [with_lua=lua5.1
+                 LUA_CFLAGS=$LUA51_CFLAGS
+                 LUA_LIBS=$LUA51_LIBS],
+                [AC_MSG_ERROR(Package requirement (lua >= 5.1.1) was not met!)])
+         ])
+    ])
+else
+    # Check for pre-defined Lua.
+    AC_MSG_NOTICE([Compiling with Lua package $with_lua.])
+    PKG_CHECK_MODULES(LUA, $with_lua >= 5.1.1)
+fi
 
 AC_SUBST(LUA_CFLAGS)
 AC_SUBST(LUA_LIBS)
