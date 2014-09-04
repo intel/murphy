@@ -1719,8 +1719,9 @@ int mrp_lua_object_collect_array(lua_State *L, int tidx, void **itemsp,
             isize = array_item_size(expected);
         }
         else
+            /* bail out for type mismatch (null is a valid string array) */
             if (vtype != ltype &&
-                !(expected && MRP_LUA_STRING_ARRAY && vtype == LUA_TNIL))
+                !(expected == MRP_LUA_STRING_ARRAY && vtype == LUA_TNIL))
                 goto type_error;
 
         if (max != (size_t)-1 && i >= (int)max)
