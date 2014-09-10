@@ -71,3 +71,14 @@ resource API to request access to resources and follow the resource
 status. In order to do a policy change, the system integrator only needs
 to change the policy in resource manager configuration, and the desired
 behavior should automatically follow.
+
+Compilation of Murphy
+---------------------
+
+Detailed information on building Murphy, the dependencies and options
+can be found at the [documentation](https://01.org/murphy/documentation/compiling-and-installing-murphy).
+
+In general, Murphy is an Autotools-based project, so users who have
+used Autotools before should be relatively "at home" with the process
+of generating the configure script as well as configuring and compiling
+Murphy.
