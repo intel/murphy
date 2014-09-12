@@ -51,30 +51,76 @@ static int bitwise_lua_or(lua_State *L);
 static int bitwise_lua_xor(lua_State *L);
 static int bitwise_lua_neg(lua_State *L);
 
+static int bitwise_lua_and(lua_State *L)
+{
+    int narg = lua_gettop(L);
+    int offs, i, v;
 
-#define BINARY_OPERATION(name, calc_result)                  \
-    static int bitwise_lua_##name(lua_State *L) {            \
-        int narg = lua_gettop(L);                            \
-        int arg1, arg2, offs;                                \
-                                                             \
-        switch (narg) {                                      \
-        case 2: offs = 0; break;                             \
-        case 3: offs = 1; break;                             \
-        default:          return -1;                         \
-        }                                                    \
-                                                             \
-        arg1 = lua_tointeger(L, 1 + offs);                   \
-        arg2 = lua_tointeger(L, 2 + offs);                   \
-        lua_pushinteger(L, calc_result);                     \
-                                                             \
-        return 1;                                            \
-    }                                                        \
-    struct __binary_operation_##name##_trailing_semicolon
+    switch (lua_type(L, 1)) {
+    case LUA_TUSERDATA:
+    case LUA_TLIGHTUSERDATA:
+        offs = 2;
+        break;
+    default:
+        offs = 1;
+        break;
+    }
+
+    v = lua_tointeger(L, offs);
+    for (i = offs + 1; i <= narg; i++)
+        v &= lua_tointeger(L, i);
+
+    lua_pushinteger(L, v);
+    return 1;
+}
 
 
-BINARY_OPERATION(and, arg1 & arg2);
-BINARY_OPERATION(or , arg1 | arg2);
-BINARY_OPERATION(xor, arg1 ^ arg2);
+static int bitwise_lua_or(lua_State *L)
+{
+    int narg = lua_gettop(L);
+    int offs, i, v;
+
+    switch (lua_type(L, 1)) {
+    case LUA_TUSERDATA:
+    case LUA_TLIGHTUSERDATA:
+        offs = 2;
+        break;
+    default:
+        offs = 1;
+        break;
+    }
+
+    v = lua_tointeger(L, offs);
+    for (i = offs + 1; i <= narg; i++)
+        v |= lua_tointeger(L, i);
+
+    lua_pushinteger(L, v);
+    return 1;
+}
+
+
+static int bitwise_lua_xor(lua_State *L)
+{
+    int narg = lua_gettop(L);
+    int offs, i, v;
+
+    switch (lua_type(L, 1)) {
+    case LUA_TUSERDATA:
+    case LUA_TLIGHTUSERDATA:
+        offs = 2;
+        break;
+    default:
+        offs = 1;
+        break;
+    }
+
+    v = lua_tointeger(L, offs);
+    for (i = offs + 1; i <= narg; i++)
+        v ^= lua_tointeger(L, i);
+
+    lua_pushinteger(L, v);
+    return 1;
+}
 
 
 static int bitwise_lua_neg(lua_State *L)
@@ -82,13 +128,20 @@ static int bitwise_lua_neg(lua_State *L)
     int narg = lua_gettop(L);
     int arg, offs;
 
-    switch (narg) {
-    case 1: offs = 0; break;
-    case 2: offs = 1; break;
-    default:          return -1;
+    switch (lua_type(L, 1)) {
+    case LUA_TUSERDATA:
+    case LUA_TLIGHTUSERDATA:
+        offs = 2;
+        break;
+    default:
+        offs = 1;
+        break;
     }
 
-    arg = lua_tointeger(L, 1 + offs);
+    if (narg != offs)
+        return luaL_error(L, "bitwise NEG takes a single argument");
+
+    arg = lua_tointeger(L, offs);
     lua_pushinteger(L, ~arg);
 
     return 1;
