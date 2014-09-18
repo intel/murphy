@@ -145,7 +145,7 @@ static void timer_lua_changed(void *data, lua_State *L, int member)
         break;
 
     case TIMER_MEMBER_CALLBACK:
-        if (t->callback == LUA_NOREF) {
+        if (t->callback == LUA_NOREF || t->callback == LUA_REFNIL) {
             mrp_del_timer(t->t);
             t->t = NULL;
         }
@@ -193,7 +193,7 @@ static int timer_lua_create(lua_State *L)
                           "got %d", narg);
     }
 
-    if (t->callback != LUA_NOREF && t->t == NULL) {
+    if (t->callback != LUA_NOREF && t->callback != LUA_REFNIL && t->t == NULL) {
         t->t = mrp_add_timer(t->ctx->ml, t->msecs, timer_lua_cb, t);
 
         if (t->t == NULL) {
