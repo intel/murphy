@@ -1,0 +1,12 @@
+timer = m:Timer({
+   interval = 1000,
+   callback = function (t, data)
+       print('timer-test ('..data..'): foo = ' .. t.foo .. ', bar = ' .. t.bar)
+       t.callback = nil
+       timer = nil
+   end,
+   data = '<timer-data>',
+   oneshot = false,
+   foo = 'bar',
+   bar = 'foo'
+})
