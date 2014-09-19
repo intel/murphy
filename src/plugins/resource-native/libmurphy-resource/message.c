@@ -557,10 +557,13 @@ int create_resource_set_request(mrp_res_context_t *cx,
         if (res->priv->mandatory)
             res_flags |= RESPROTO_RESFLAG_MANDATORY;
 
-        mrp_msg_append(msg, RESPROTO_RESOURCE_NAME, MRP_MSG_FIELD_STRING,
-                res->name);
-        mrp_msg_append(msg, RESPROTO_RESOURCE_FLAGS, MRP_MSG_FIELD_UINT32,
-                res_flags);
+        if (!mrp_msg_append(msg, RESPROTO_RESOURCE_NAME, MRP_MSG_FIELD_STRING,
+                res->name))
+            goto error;
+
+        if (!mrp_msg_append(msg, RESPROTO_RESOURCE_FLAGS, MRP_MSG_FIELD_UINT32,
+                res_flags))
+            goto error;
 
         for (j = 0; j < res->priv->num_attributes; j++) {
             mrp_res_attribute_t *elem = &res->priv->attrs[j];
@@ -571,27 +574,32 @@ int create_resource_set_request(mrp_res_context_t *cx,
 
             switch (elem->type) {
                 case 's':
-                    mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
-                            MRP_MSG_FIELD_STRING, elem->string);
+                    if (!mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
+                            MRP_MSG_FIELD_STRING, elem->string))
+                        goto error;
                     break;
                 case 'i':
-                    mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
-                            MRP_MSG_FIELD_SINT32, elem->integer);
+                    if (!mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
+                            MRP_MSG_FIELD_SINT32, elem->integer))
+                        goto error;
                     break;
                 case 'u':
-                    mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
-                            MRP_MSG_FIELD_UINT32, elem->unsignd);
+                    if (!mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
+                            MRP_MSG_FIELD_UINT32, elem->unsignd))
+                        goto error;
                     break;
                 case 'f':
-                    mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
-                            MRP_MSG_FIELD_DOUBLE, elem->floating);
+                    if (!mrp_msg_append(msg, RESPROTO_ATTRIBUTE_VALUE,
+                            MRP_MSG_FIELD_DOUBLE, elem->floating))
+                        goto error;
                     break;
                 default:
                     break;
             }
         }
 
-        mrp_msg_append(msg, RESPROTO_SECTION_END, MRP_MSG_FIELD_UINT8, 0);
+        if (!mrp_msg_append(msg, RESPROTO_SECTION_END, MRP_MSG_FIELD_UINT8, 0))
+            goto error;
     }
 
     if (!mrp_transport_send(cx->priv->transp, msg))
