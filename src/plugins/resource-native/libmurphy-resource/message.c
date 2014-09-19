@@ -569,8 +569,9 @@ int create_resource_set_request(mrp_res_context_t *cx,
             mrp_res_attribute_t *elem = &res->priv->attrs[j];
             const char *attr_name = elem->name;
 
-            mrp_msg_append(msg, RESPROTO_ATTRIBUTE_NAME, MRP_MSG_FIELD_STRING,
-                    attr_name);
+            if (!mrp_msg_append(msg, RESPROTO_ATTRIBUTE_NAME, MRP_MSG_FIELD_STRING,
+                    attr_name))
+                goto error;
 
             switch (elem->type) {
                 case 's':
