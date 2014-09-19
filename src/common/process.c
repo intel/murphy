@@ -582,7 +582,7 @@ int mrp_process_set_state(const char *id, mrp_process_state_t state)
     FILE *f;
     int ret = -1;
 
-    if (!initialize_dir() < 0)
+    if (initialize_dir() < 0)
         goto end;
 
     path = path_from_id(id);
