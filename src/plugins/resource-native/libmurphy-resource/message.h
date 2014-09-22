@@ -50,12 +50,13 @@ bool fetch_mrp_str_array(mrp_msg_t *msg, void **pcursor,
 
 bool fetch_seqno(mrp_msg_t *msg, void **pcursor, uint32_t *pseqno);
 
-int fetch_request(mrp_msg_t *msg, void **pcursor, uint16_t *preqtype);
+bool fetch_request(mrp_msg_t *msg, void **pcursor, uint16_t *preqtype);
 
 bool fetch_status(mrp_msg_t *msg, void **pcursor, int *pstatus);
 
-int fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
-                                 size_t dim, mrp_res_attribute_t *arr);
+bool fetch_attribute_array(mrp_msg_t *msg, void **pcursor,
+                                 size_t dim, mrp_res_attribute_t *arr,
+                                 int *n_arr);
 
 bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
                                 const char **pname);

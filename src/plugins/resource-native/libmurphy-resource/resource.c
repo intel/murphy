@@ -143,9 +143,8 @@ static void resource_event(mrp_msg_t *msg,
 
         mrp_res_info("data for '%s': %d", res->name, resid);
 
-        n_attrs = fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs);
-
-        if (n_attrs < 0) {
+        if (!fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs,
+                &n_attrs)) {
             mrp_res_error("failed to read attributes from message");
             goto ignore;
         }
@@ -253,8 +252,8 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
     MRP_UNUSED(addr);
     MRP_UNUSED(addrlen);
 
-    if (fetch_seqno(msg, &cursor, &seqno) < 0 ||
-                fetch_request(msg, &cursor, &req) < 0)
+    if (!fetch_seqno(msg, &cursor, &seqno) ||
+                !fetch_request(msg, &cursor, &req))
         goto error;
 
     mrp_res_info("received message %d for %p", req, cx);
