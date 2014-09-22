@@ -130,13 +130,13 @@
 
 
 
+
 #define MRP_LUA_FOREACH_FIELD(_L, _i, _n, _l)                           \
     for (lua_pushnil(_L);                                               \
                                                                         \
-         lua_next(_L, _i) &&                                            \
+         !(_l = 0) && lua_next(_L, _i) &&                               \
          (_n = (lua_type(_L, -2) == LUA_TSTRING) ?                      \
-          lua_tolstring(_L, -2, &_l) : ""       ) &&                    \
-         ((lua_type(_L, -2) == LUA_TSTRING) || !( _l = 0));             \
+          lua_tolstring(_L, -2, &_l) : ""       );                      \
                                                                         \
          lua_pop(_L, 1))
 
