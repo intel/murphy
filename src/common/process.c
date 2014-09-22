@@ -239,8 +239,7 @@ static void process_change(mrp_io_watch_t *wd, int fd, mrp_io_event_t events,
                 }
             }
             mrp_free(filename);
-
-        } while (processed_bytes < read_bytes);
+        }
     }
 }
 
