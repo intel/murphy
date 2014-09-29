@@ -59,10 +59,8 @@ typedef struct attribute_lua_s attribute_lua_t;
 
 struct attribute_lua_s {
     lua_State *L; /* Lua execution context */
-    mrp_context_t *ctx; /* murphy context */
 
     resource_set_lua_t *resource_set;
-    char *resource_name;
 
     int initialized;
     resource_lua_t *parent;
@@ -70,7 +68,6 @@ struct attribute_lua_s {
 
 struct resource_lua_s {
     lua_State *L; /* Lua execution context */
-    mrp_context_t *ctx; /* murphy context */
 
     bool available; /* status */
     bool acquired; /* status*/
@@ -86,7 +83,6 @@ struct resource_lua_s {
 
 struct resource_set_lua_s {
     lua_State *L; /* Lua execution context */
-    mrp_context_t *ctx; /* murphy context */
 
     mrp_resource_set_t *resource_set; /* associated murphy resource set */
 
@@ -101,6 +97,9 @@ struct resource_set_lua_s {
     const char *application_class; /* input */
     int32_t priority; /* input */
 
+    bool committed; /* resource set is locked and cannot be edited anymore */
+    bool destroyed; /* resource set is already destroyed and waiting for gc */
+
     mrp_htbl_t *resources;
 };
 
@@ -111,11 +110,14 @@ uint32_t n_sets = 0;
 
 static int resource_set_lua_create(lua_State *L);
 
-static int resource_set_get_resources(void *data, lua_State *L, int member, mrp_lua_value_t *v);
-static int resource_set_get_id(void *data, lua_State *L, int member, mrp_lua_value_t *v);
+static int resource_set_get_resources(void *data, lua_State *L, int member,
+        mrp_lua_value_t *v);
+static int resource_set_get_id(void *data, lua_State *L, int member,
+        mrp_lua_value_t *v);
 static int resource_set_add_resource(lua_State *L);
 static int resource_set_acquire(lua_State *L);
 static int resource_set_release(lua_State *L);
+static int resource_set_destroy(lua_State *L);
 
 static void resource_set_lua_changed(void *data, lua_State *L, int member);
 static void resource_set_lua_destroy(void *data);
@@ -131,7 +133,8 @@ MRP_LUA_METHOD_LIST_TABLE(resource_set_lua_methods,
                           MRP_LUA_METHOD_CONSTRUCTOR(resource_set_lua_create)
                           MRP_LUA_METHOD(addResource, resource_set_add_resource)
                           MRP_LUA_METHOD(acquire, resource_set_acquire)
-                          MRP_LUA_METHOD(release, resource_set_release));
+                          MRP_LUA_METHOD(release, resource_set_release)
+                          MRP_LUA_METHOD(destroy, resource_set_destroy));
 
 MRP_LUA_METHOD_LIST_TABLE(resource_set_lua_overrides,
                           MRP_LUA_OVERRIDE_CALL     (resource_set_lua_create)
@@ -345,12 +348,10 @@ static int resource_set_add_resource(lua_State *L)
 
     resource->parent = rset;
     resource->L = L;
-    resource->ctx = rset->ctx;
 
     resource->real_attributes = (attribute_lua_t *) mrp_lua_create_object(L,
             ATTRIBUTE_LUA_CLASS, NULL, 0);
     resource->real_attributes->L = L;
-    resource->real_attributes->ctx = rset->ctx;
     resource->real_attributes->parent = resource;
     resource->real_attributes->resource_set = rset;
     resource->real_attributes->initialized = TRUE;
@@ -364,6 +365,7 @@ static int resource_set_add_resource(lua_State *L)
 
     /* add to resource map */
 
+    mrp_debug("inserted resource %s to %p", resource->resource_name, rset);
     mrp_htbl_insert(rset->resources, resource->resource_name, resource);
 
     return 1;
@@ -378,16 +380,33 @@ static int resource_set_acquire(lua_State *L)
 {
     resource_set_lua_t *rset;
 
-    mrp_debug("> acquire");
+    mrp_debug("acquire");
 
     rset = resource_set_lua_check(L, 1);
 
     if (!rset)
         return luaL_error(L, "internal error");
 
+    if (rset->destroyed)
+        return luaL_error(L, "resource set already destroyed");
+
+    if (!rset->committed) {
+
+        /* Application backend requires us to "commit" the resource set before
+         * we can use the resource set. It can be done only after all resources
+         * have been added to the resource set and all the attributes
+         * configured. */
+
+        if (mrp_application_class_add_resource_set(rset->application_class,
+                rset->zone, rset->resource_set, 0) < 0)
+                return luaL_error(L, "failed to commit the resource set");
+
+        rset->committed = TRUE;
+    }
+
     mrp_resource_set_acquire(rset->resource_set, 0);
 
-    return 1;
+    return 0;
 }
 
 static int resource_set_release(lua_State *L)
@@ -401,9 +420,74 @@ static int resource_set_release(lua_State *L)
     if (!rset)
         return luaL_error(L, "internal error");
 
+    if (rset->destroyed)
+        return luaL_error(L, "resource set already destroyed");
+
+    if (!rset->committed) {
+
+        /* Committing the resource set here means that the resource set stays
+         * in released state but already receives events. */
+
+        if (mrp_application_class_add_resource_set(rset->application_class,
+            rset->zone, rset->resource_set, 0) < 0)
+            return luaL_error(L, "failed to commit the resource set");
+
+        rset->committed = TRUE;
+    }
+
     mrp_resource_set_release(rset->resource_set, 0);
 
-    return 1;
+    return 0;
+}
+
+static bool resource_set_internal_destroy(resource_set_lua_t *rset)
+{
+    mrp_debug("resource_set_internal_destroy (%d remaining)", n_sets-1);
+
+    if (rset->destroyed)
+        return TRUE;
+
+    rset->destroyed = TRUE;
+
+    mrp_resource_set_destroy(rset->resource_set);
+
+    mrp_debug("deleted resource htbl for %p", rset);
+
+    /* remove resources from the resource set -- they are finally cleaned from
+     * their own lua destructors */
+    mrp_htbl_destroy(rset->resources, TRUE);
+
+    rset->resources = NULL;
+
+    n_sets--;
+
+    if (n_sets == 0) {
+        mrp_resource_client_destroy(client);
+        client = NULL;
+    }
+
+    return TRUE;
+}
+
+static int resource_set_destroy(lua_State *L)
+{
+    resource_set_lua_t *rset;
+
+    /* sometimes we need to destroy the internal Murphy resource set before
+     * Lua GC kicks in. This function is mapped to the Lua interface for this
+       reason, and will be called also when GC frees the Lua object. */
+
+    mrp_debug("resource_set_destroy");
+
+    rset = resource_set_lua_check(L, 1);
+
+    if (!rset)
+        return luaL_error(L, "internal error");
+
+    if (!resource_set_internal_destroy(rset))
+        return luaL_error(L, "failed to destroy resource set");
+
+    return 0;
 }
 
 void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_data)
@@ -428,7 +512,8 @@ void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_
         mrp_lua_object_deref_value(rset, rset->L, rset->data, true);
 
         if (lua_pcall(rset->L, 2, 0, 0) != 0)
-            mrp_log_error("failed to invoke Lua resource set callback");
+            mrp_log_error("failed to invoke Lua resource set callback: %s",
+                    lua_tostring(rset->L, -1));
     }
 }
 
@@ -436,34 +521,32 @@ static void htbl_free_resource(void *key, void *object)
 {
     resource_lua_t *res = (resource_lua_t *) object;
 
+    mrp_debug("lua-resource: htbl_free_resource %p, res: '%s'", res,
+            res->resource_name);
+
     MRP_UNUSED(key);
 
-    mrp_free(res->resource_name);
-    mrp_free(res);
+    mrp_lua_destroy_object(res->L, NULL, 0, object);
 }
 
 static int resource_set_lua_create(lua_State *L)
 {
-    mrp_context_t *ctx = mrp_lua_get_murphy_context();
     char e[128] = "";
     resource_set_lua_t *rset;
     int narg;
     mrp_htbl_config_t conf;
 
-    mrp_debug("> create");
-
-    if (ctx == NULL)
-        luaL_error(L, "failed to get murphy context");
+    mrp_debug("create");
 
     narg = lua_gettop(L);
 
-    rset = (resource_set_lua_t *) mrp_lua_create_object(L, RESOURCE_SET_LUA_CLASS, NULL, 0);
+    rset = (resource_set_lua_t *) mrp_lua_create_object(L,
+            RESOURCE_SET_LUA_CLASS, NULL, 0);
 
     if (!rset)
         return luaL_error(L, "could not create Lua object");
 
     rset->L = L;
-    rset->ctx = ctx;
 
     /* user can affect these values */
     rset->zone = mrp_strdup("default");
@@ -471,12 +554,15 @@ static int resource_set_lua_create(lua_State *L)
     rset->autorelease = FALSE;
     rset->dont_wait = FALSE;
     rset->priority = 0;
+    rset->committed = FALSE;
+    rset->destroyed = FALSE;
 
     switch (narg) {
     case 2:
         /* argument table */
         if (mrp_lua_init_members(rset, L, -2, e, sizeof(e)) != 1)
-            return luaL_error(L, "failed to initialize resource members (%s)", e);
+            return luaL_error(L, "failed to initialize resource members (%s)",
+                    e);
         break;
     default:
         return luaL_error(L, "expecting a constructor argument, "
@@ -523,11 +609,6 @@ static int resource_set_lua_create(lua_State *L)
     else
         goto error;
 
-    if (mrp_application_class_add_resource_set(rset->application_class, rset->zone,
-            rset->resource_set, 0) < 0)
-        goto error;
-
-
     mrp_lua_push_object(L, rset);
 
     return 1;
@@ -536,7 +617,8 @@ error:
     return luaL_error(L, "internal resource library error");
 }
 
-static int resource_set_get_id(void *data, lua_State *L, int member, mrp_lua_value_t *v)
+static int resource_set_get_id(void *data, lua_State *L, int member,
+        mrp_lua_value_t *v)
 {
     resource_set_lua_t *rset;
     MRP_UNUSED(L);
@@ -584,7 +666,9 @@ static int resource_set_get_resources(void *data, lua_State *L, int member, mrp_
 
         /* fetch and update the resource object */
 
-        resource_lua_t *res = (resource_lua_t *) mrp_htbl_lookup(rset->resources, (void *) name);
+        resource_lua_t *res =
+                (resource_lua_t *) mrp_htbl_lookup(rset->resources,
+                (void *) name);
 
         if (!res) {
             mrp_log_error("resources out of sync: %s not found", name);
@@ -629,18 +713,9 @@ static void resource_set_lua_destroy(void *data)
 {
     resource_set_lua_t *rset = (resource_set_lua_t *) data;
 
-    mrp_debug("> destroy");
+    mrp_debug("lua destructor for rset %p", rset);
 
-    mrp_htbl_destroy(rset->resources, TRUE);
-
-    mrp_resource_set_destroy(rset->resource_set);
-
-    n_sets--;
-
-    if (n_sets == 0) {
-        mrp_resource_client_destroy(client);
-        client = NULL;
-    }
+    resource_set_internal_destroy(rset);
 
     return;
 }
@@ -710,11 +785,11 @@ static void resource_lua_destroy(void *data)
 {
     resource_lua_t *res = (resource_lua_t *) data;
 
-    mrp_debug("> resource_lua_destroy");
+    mrp_debug("lua destructor for resource %p (%s)", res, res->resource_name);
 
-    /* remove from resource set map and let the map handler free the object */
+    mrp_free(res->resource_name);
 
-    mrp_htbl_remove(res->parent->resources, res->resource_name, TRUE);
+    /* TODO: unref res->real_attributes */
 
     return;
 }
@@ -884,9 +959,8 @@ static void attribute_lua_destroy(void *data)
 {
     attribute_lua_t *attribute = (attribute_lua_t *) data;
 
-    mrp_debug("> attribute_destroy");
+    mrp_debug("lua destructor for attribute table %p", attribute);
 
-    mrp_free(attribute);
     return;
 }
 
@@ -1205,11 +1279,10 @@ static void register_murphy_bindings(void) {
 /*
 
 resourcehandler = function (rset)
-
-    if rset.resources.audio_playback.acquired == true then
-        -- do something
-    else if rset.resources.audio_playback.available == true then
-        -- do something else
+    if rset.resources.screen.acquired == true then
+        print("got it")
+    else
+        print("didn't get it")
     end
 end
 
