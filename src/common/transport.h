@@ -39,6 +39,7 @@
 #include <murphy/common/mainloop.h>
 #include <murphy/common/msg.h>
 #include <murphy/common/native-types.h>
+#include <murphy/common/json.h>
 
 MRP_CDECL_BEGIN
 
@@ -79,6 +80,7 @@ typedef enum {
     MRP_TRANSPORT_MODE_DATA   = 0x02,    /* uses registered data types */
     MRP_TRANSPORT_MODE_CUSTOM = 0x03,    /* custom message encoding */
     MRP_TRANSPORT_MODE_NATIVE = 0x04,    /* uses registered native-types */
+    MRP_TRANSPORT_MODE_JSON   = 0x05,    /* uses JSON messages */
 } mrp_transport_mode_t;
 
 typedef enum {
@@ -135,8 +137,10 @@ typedef struct {
     int (*senddata)(mrp_transport_t *t, void *data, uint16_t tag);
     /** Send data with a custom encoder over a transport. */
     int (*sendcustom)(mrp_transport_t *t, void *data);
-    /* Send a native type over a (connected) transport. */
+    /** Send a native type over a (connected) transport. */
     int (*sendnative)(mrp_transport_t *t, void *data, uint32_t type_id);
+    /** Send a JSON message over a (connected) transport. */
+    int (*sendjson)(mrp_transport_t *t, mrp_json_t *msg);
 
     /** Send a message over a(n unconnected) transport. */
     int (*sendmsgto)(mrp_transport_t *t, mrp_msg_t *msg, mrp_sockaddr_t *addr,
@@ -153,6 +157,9 @@ typedef struct {
     /** Send a native type over a transport. */
     int (*sendnativeto)(mrp_transport_t *t, void *data, uint32_t type_id,
                         mrp_sockaddr_t *addr, socklen_t addrlen);
+    /** Send a JSON messgae over a(n unconnected) transport. */
+    int (*sendjsonto)(mrp_transport_t *t, mrp_json_t *msg, mrp_sockaddr_t *addr,
+                      socklen_t addrlen);
 } mrp_transport_req_t;
 
 
@@ -183,6 +190,8 @@ typedef struct {
         /** Native type callback for connected transports. */
         void (*recvnative)(mrp_transport_t *t, void *data, uint32_t type_id,
                            void *user_data);
+        /** JSON type callback for connected transports. */
+        void (*recvjson)(mrp_transport_t *t, mrp_json_t *msg, void *user_data);
     };
 
     /** Message received on an unconnected transport. */
@@ -207,6 +216,10 @@ typedef struct {
         void (*recvnativefrom)(mrp_transport_t *t, void *data, uint32_t type_id,
                                mrp_sockaddr_t *addr, socklen_t addrlen,
                                void *user_data);
+        /** JSON type callback for unconnected transports. */
+        void (*recvjsonfrom)(mrp_transport_t *t, mrp_json_t *msg,
+                             mrp_sockaddr_t *addr, socklen_t addrlen,
+                             void *user_data);
     };
     /** Connection closed by peer. */
     void (*closed)(mrp_transport_t *t, int error, void *user_data);
@@ -385,7 +398,8 @@ struct mrp_transport_s {
                                _sendraw, _sendrawto,                      \
                                _senddata, _senddatato,                    \
                                _sendcustom, _sendcustomto,                \
-                               _sendnative, _sendnativeto)                \
+                               _sendnative, _sendnativeto,                \
+                               _sendjson, _sendjsonto)                    \
     static void _prfx##_register_transport(void)                          \
          __attribute__((constructor));                                    \
                                                                           \
@@ -414,6 +428,8 @@ struct mrp_transport_s {
                 .sendcustomto = _sendcustomto,                            \
                 .sendnative   = _sendnative,                              \
                 .sendnativeto = _sendnativeto,                            \
+                .sendjson     = _sendjson,                                \
+                .sendjsonto   = _sendjsonto,                              \
             },                                                            \
         };                                                                \
                                                                           \
@@ -508,6 +524,12 @@ int mrp_transport_sendnative(mrp_transport_t *t, void *data, uint32_t type_id);
 int mrp_transport_sendnativeto(mrp_transport_t *t, void *data, uint32_t type_id,
                                mrp_sockaddr_t *addr, socklen_t addrlen);
 
+/** Send a JSON message through the given (connected) transport. */
+int mrp_transport_sendjson(mrp_transport_t *t, mrp_json_t *msg);
+
+/** Send a JSON message through the given transport to the remote address. */
+int mrp_transport_sendjsonto(mrp_transport_t *t, mrp_json_t *msg,
+                             mrp_sockaddr_t *addr, socklen_t addrlen);
 MRP_CDECL_END
 
 #endif /* __MURPHY_TRANSPORT_H__ */

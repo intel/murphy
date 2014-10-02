@@ -459,7 +459,16 @@ static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
         data = NULL;
         size = 0;
         while (mrp_fragbuf_pull(t->buf, &data, &size)) {
-            error = t->recv_data(mt, data, size, NULL, 0);
+            if (t->mode != MRP_TRANSPORT_MODE_JSON)
+                error = t->recv_data(mt, data, size, NULL, 0);
+            else {
+                mrp_json_t *msg = mrp_json_string_to_object(data, size);
+
+                if (msg != NULL) {
+                    error = t->recv_data((mrp_transport_t *)t, msg, 0, NULL, 0);
+                    mrp_json_unref(msg);
+                }
+            }
 
             if (error)
                 goto fatal_error;
@@ -725,6 +734,39 @@ static int strm_sendnative(mrp_transport_t *mt, void *data, uint32_t type_id)
 }
 
 
+static int strm_sendjson(mrp_transport_t *mt, mrp_json_t *msg)
+{
+    strm_t       *t = (strm_t *)mt;
+    struct iovec  iov[2];
+    const char   *s;
+    ssize_t       size, n;
+    uint32_t      len;
+
+    if (t->connected && (s = mrp_json_object_to_string(msg)) != NULL) {
+        size = strlen(s);
+        len  = htobe32(size);
+        iov[0].iov_base = &len;
+        iov[0].iov_len  = sizeof(len);
+        iov[1].iov_base = (void *)s;
+        iov[1].iov_len  = size;
+
+        n = writev(t->sock, iov, 2);
+
+        if (n == (ssize_t)(size + sizeof(len)))
+            return TRUE;
+        else {
+            if (n == -1 && errno == EAGAIN) {
+                mrp_log_error("%s(): XXX TODO: this sucks, need to add "
+                              "output queuing for strm-transport.",
+                              __FUNCTION__);
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+
 MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
                        strm_bind, strm_listen, strm_accept,
@@ -733,7 +775,8 @@ MRP_REGISTER_TRANSPORT(tcp4, TCP4, strm_t, strm_resolve,
                        strm_sendraw, NULL,
                        strm_senddata, NULL,
                        NULL, NULL,
-                       strm_sendnative, NULL);
+                       strm_sendnative, NULL,
+                       strm_sendjson, NULL);
 
 MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
@@ -743,7 +786,8 @@ MRP_REGISTER_TRANSPORT(tcp6, TCP6, strm_t, strm_resolve,
                        strm_sendraw, NULL,
                        strm_senddata, NULL,
                        NULL, NULL,
-                       strm_sendnative, NULL);
+                       strm_sendnative, NULL,
+                       strm_sendjson, NULL);
 
 MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
                        strm_open, strm_createfrom, strm_close, NULL,
@@ -753,4 +797,5 @@ MRP_REGISTER_TRANSPORT(unxstrm, UNXS, strm_t, strm_resolve,
                        strm_sendraw, NULL,
                        strm_senddata, NULL,
                        NULL, NULL,
-                       strm_sendnative, NULL);
+                       strm_sendnative, NULL,
+                       strm_sendjson, NULL);

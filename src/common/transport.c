@@ -631,6 +631,43 @@ int mrp_transport_sendnativeto(mrp_transport_t *t, void *data, uint32_t type_id,
 }
 
 
+int mrp_transport_sendjson(mrp_transport_t *t, mrp_json_t *msg)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_JSON && t->descr->req.sendjson) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendjson(t, msg);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
+int mrp_transport_sendjsonto(mrp_transport_t *t, mrp_json_t *msg,
+                             mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    int result;
+
+    if (t->mode == MRP_TRANSPORT_MODE_JSON && t->descr->req.sendjsonto) {
+        MRP_TRANSPORT_BUSY(t, {
+                result = t->descr->req.sendjsonto(t, msg, addr, addrlen);
+            });
+
+        purge_destroyed(t);
+    }
+    else
+        result = FALSE;
+
+    return result;
+}
+
+
 static int recv_data(mrp_transport_t *t, void *data, size_t size,
                      mrp_sockaddr_t *addr, socklen_t addrlen)
 {
@@ -764,6 +801,24 @@ static int recv_data(mrp_transport_t *t, void *data, size_t size,
                     t->evt.recvnativefrom(t, decoded, type_id, addr, addrlen,
                                           t->user_data);
                 });
+        }
+        return 0;
+
+    case MRP_TRANSPORT_MODE_JSON:
+        if (t->connected) {
+            if (t->evt.recvjson) {
+                MRP_TRANSPORT_BUSY(t, {
+                        t->evt.recvjson(t, data, t->user_data);
+                    });
+            }
+        }
+        else {
+            if (t->evt.recvjsonfrom) {
+                MRP_TRANSPORT_BUSY(t, {
+                        t->evt.recvjsonfrom(t, data, addr, addrlen,
+                                            t->user_data);
+                    });
+            }
         }
         return 0;
 

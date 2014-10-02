@@ -668,7 +668,8 @@ static int senddatato(mrp_transport_t *mu, void *data, uint16_t tag,
             if (u->connected)
                 n = send(u->sock, buf, len + sizeof(*lenp), 0);
             else
-                n = sendto(u->sock, buf, len + sizeof(*lenp), 0, &addr->any, addrlen);
+                n = sendto(u->sock, buf, len + sizeof(*lenp), 0, &addr->any,
+                           addrlen);
 
             mrp_free(buf);
 
@@ -761,6 +762,76 @@ static int dgrm_sendnativeto(mrp_transport_t *mu, void *data, uint32_t type_id,
 }
 
 
+static int sendjsonto(mrp_transport_t *mu, mrp_json_t *msg,
+                      mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    dgrm_t       *u = (dgrm_t *)mu;
+    struct iovec  iov[2];
+    const char   *s;
+    ssize_t       size, n;
+    uint32_t      len;
+
+    if (MRP_UNLIKELY(u->sock == -1)) {
+        if (!open_socket(u, ((struct sockaddr *)addr)->sa_family))
+            return FALSE;
+    }
+
+    if (u->connected && (s = mrp_json_object_to_string(msg)) != NULL) {
+        size = strlen(s);
+        len  = htobe32(size);
+
+        iov[0].iov_base = &len;
+        iov[0].iov_len  = sizeof(len);
+        iov[1].iov_base = (char *)s;
+        iov[1].iov_len  = size;
+
+        if (u->connected)
+            n = writev(u->sock, iov, 2);
+        else {
+            struct msghdr mh;
+
+            mh.msg_name       = &addr->any;
+            mh.msg_namelen    = addrlen;
+            mh.msg_iov        = iov;
+            mh.msg_iovlen     = MRP_ARRAY_SIZE(iov);
+            mh.msg_control    = NULL;
+            mh.msg_controllen = 0;
+            mh.msg_flags      = 0;
+
+            n = sendmsg(u->sock, &mh, 0);
+        }
+
+        if (n == (ssize_t)(size + sizeof(len)))
+            return TRUE;
+        else {
+            if (n == -1 && errno == EAGAIN) {
+                mrp_log_error("%s(): XXX TODO: this sucks, need to add "
+                              "output queuing for dgrm-transport.",
+                              __FUNCTION__);
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+
+static int dgrm_sendjson(mrp_transport_t *mu, mrp_json_t *msg)
+{
+    if (mu->connected)
+        return sendjsonto(mu, msg, NULL, 0);
+    else
+        return FALSE;
+}
+
+
+static int dgrm_sendjsonto(mrp_transport_t *mu, mrp_json_t *msg,
+                           mrp_sockaddr_t *addr, socklen_t addrlen)
+{
+    return sendjsonto(mu, msg, addr, addrlen);
+}
+
+
 MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
                        dgrm_bind, dgrm_listen, NULL,
@@ -769,7 +840,8 @@ MRP_REGISTER_TRANSPORT(udp4, UDP4, dgrm_t, dgrm_resolve,
                        dgrm_sendraw, dgrm_sendrawto,
                        dgrm_senddata, dgrm_senddatato,
                        NULL, NULL,
-                       dgrm_sendnative, dgrm_sendnativeto);
+                       dgrm_sendnative, dgrm_sendnativeto,
+                       dgrm_sendjson, dgrm_sendjsonto);
 
 MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
@@ -779,7 +851,8 @@ MRP_REGISTER_TRANSPORT(udp6, UDP6, dgrm_t, dgrm_resolve,
                        dgrm_sendraw, dgrm_sendrawto,
                        dgrm_senddata, dgrm_senddatato,
                        NULL, NULL,
-                       dgrm_sendnative, dgrm_sendnativeto);
+                       dgrm_sendnative, dgrm_sendnativeto,
+                       dgrm_sendjson, dgrm_sendjsonto);
 
 MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
                        dgrm_open, dgrm_createfrom, dgrm_close, NULL,
@@ -789,4 +862,5 @@ MRP_REGISTER_TRANSPORT(unxdgrm, UNXD, dgrm_t, dgrm_resolve,
                        dgrm_sendraw, dgrm_sendrawto,
                        dgrm_senddata, dgrm_senddatato,
                        NULL, NULL,
-                       dgrm_sendnative, dgrm_sendnativeto);
+                       dgrm_sendnative, dgrm_sendnativeto,
+                       dgrm_sendjson, dgrm_sendjsonto);

@@ -581,4 +581,5 @@ MRP_REGISTER_TRANSPORT(internal, INTERNAL, internal_t, internal_resolve,
                        internal_sendraw, internal_sendrawto,
                        internal_senddata, internal_senddatato,
                        NULL, NULL,
+                       NULL, NULL,
                        NULL, NULL);
