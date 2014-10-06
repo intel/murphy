@@ -80,6 +80,7 @@ void mrp_resource_client_destroy(mrp_resource_client_t *client)
             mrp_resource_set_destroy(rset);
         }
 
+        mrp_free((void *) client->name);
         mrp_free(client);
     }
 }
