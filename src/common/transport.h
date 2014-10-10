@@ -39,7 +39,31 @@
 #include <murphy/common/mainloop.h>
 #include <murphy/common/msg.h>
 #include <murphy/common/native-types.h>
-#include <murphy/common/json.h>
+
+/*
+ * json-c and JSON-Glib have a symbol clash on json_object_get_type.
+ * Unfortunately we'd really need to include our own json.h here to
+ * get mrp_json_t defined. That however pulls in json-c's headers as
+ * our implementation uses json-c and the type itself is just a
+ * typedef'd alias to json_object.
+ *
+ * Now if some unfortunate sould ends up directly or indirectly
+ * including both our transport.h, and consequently json.h, and
+ * JSON-Glib, we'll trigger the symbol clash.
+ *
+ * As a workaround if we detect that JSON-Glib has already been
+ * included we'll compile with alternative signatures (void *,
+ * instead of mrp_json_t *) and omit including json.h. Also we
+ * let people give us a warning by defining __JSON_GLIB_DANGER__
+ * that they will or might include JSON-Glib, in which case
+ * we also compile with the alternative signatures. Oh boy...
+ */
+
+#if !defined(__JSON_TYPES_H__) && !defined(__JSON_GLIB_DANGER__)
+#  include <murphy/common/json.h>
+#else
+#  define mrp_json_t void
+#endif
 
 MRP_CDECL_BEGIN
 
