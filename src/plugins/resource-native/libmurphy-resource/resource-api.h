@@ -32,6 +32,16 @@
 
 #include <stdarg.h>
 
+/*
+ * Enable the json-c/JSON-Glib symbol clash hackaround in transport.h.
+ * This is currently the only known place which triggers the symbol
+ * clash. It happens when compiling ico-uxf-homescreen which includes
+ * this indirectly and also uses JSON-Glib internally for manipulating
+ * JSON objects...
+ */
+
+#define __JSON_GLIB_DANGER__
+
 #include <murphy/common.h>
 
 MRP_CDECL_BEGIN
