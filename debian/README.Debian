@@ -1,0 +1,9 @@
+murphy for Debian
+-----------------
+
+Versioning of the upstream is done using tags of v(%version) in the master git
+branch. Our version is (%version)-0ubuntu(%d) where (%d) is the Ubuntu release
+number. The Debian release number is 0 because this package is not coming from
+Debian.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Tue, 14 Oct 2014 21:17:28 +0300

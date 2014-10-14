@@ -1,0 +1,7 @@
+usr/include/breedline/*.h
+usr/lib/*/pkgconfig/breedline.pc
+usr/lib/*/pkgconfig/breedline-murphy.pc
+usr/lib/*/pkgconfig/breedline-glib.pc
+usr/lib/*/libbreedline.so
+usr/lib/*/libbreedline-murphy.so
+usr/lib/*/libbreedline-glib.so

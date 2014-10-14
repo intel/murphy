@@ -1,0 +1,9 @@
+usr/bin/murphyd
+usr/lib/*/libmurphy-core.so.*
+usr/lib/*/libmurphy-libdbus.so.*
+usr/lib/*/libmurphy-dbus-libdbus.so.*
+usr/lib/*/libmurphy-lua-utils.so.*
+usr/lib/*/libmurphy-lua-decision.so.*
+usr/lib/*/libmurphy-resolver.so.*
+usr/lib/*/libmurphy-resource-backend.so.*
+usr/lib/*/murphy/plugins/*.so

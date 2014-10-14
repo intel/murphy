@@ -1,0 +1,4 @@
+usr/include/murphy/common.h
+usr/include/murphy/common/*.h
+usr/lib/*/pkgconfig/murphy-common.pc
+usr/lib/*/libmurphy-common.so

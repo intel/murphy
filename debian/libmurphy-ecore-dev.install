@@ -1,0 +1,3 @@
+usr/include/murphy/ecore/*.h
+usr/lib/*/pkgconfig/murphy-ecore.pc
+usr/lib/*/libmurphy-ecore.so
