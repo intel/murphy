@@ -1,0 +1,221 @@
+Source: murphy
+Section: admin
+Priority: optional
+Maintainer: Ismo Puustinen <ismo.puustinen@intel.com>
+Build-Depends: debhelper (>= 8.0.0), libjson-c-dev, libecore-dev, libdbus-1-dev, libglib2.0-dev, libpulse-dev, libwebsockets-dev, liblua5.2-dev, flex, bison, automake, autoconf, build-essential, make, libtool
+Standards-Version: 3.9.5
+Homepage: https://01.org/murphy
+Vcs-Git: git://github.com/01org/murphy.git
+Vcs-Browser: https://github.com/01org/murphy
+
+Package: libmurphy-common0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: common libraries for Murphy
+ Common libraries used by Murphy components, domain controllers and so on.
+
+Package: libmurphy-common-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for Murphy common libraries
+ Development files for libmurphy-common.
+
+Package: libmurphy-common-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-common
+ Debugging symbols for libmurphy-common.
+
+Package: libmurphy-db0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: in-memory database for Murphy
+ Library for Murphy database support.
+
+Package: libmurphy-db-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for Murphy database library
+ Development files for libmurphy-db.
+
+Package: libmurphy-db-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-db
+ Debugging symbols for libmurphy-db.
+
+Package: libmurphy-resource0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: resource policy client API for Murphy
+ Client library for acquiring/releasing resources defined in Murphy.
+
+Package: libmurphy-resource-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for Murphy resource policy client API
+ Development files for libmurphy-resource.
+
+Package: libmurphy-resource-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-resource
+ Debugging symbols for libmurphy-resource.
+
+Package: libmurphy-domain-controller0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: resource policy manager domain controller library
+ Library for Murphy domain controllers.
+
+Package: libmurphy-domain-controller-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for resource policy manager domain controller library
+ Development files for libmurphy-domain-controller.
+
+Package: libmurphy-domain-controller-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-domain-controller
+ Debugging symbols for libmurphy-domain-controller.
+
+Package: libmurphy-glib0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: resource policy manager glib support library
+ Library for Murphy glib support.
+
+Package: libmurphy-glib-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for resource policy manager glib support library
+ Development files for libmurphy-glib.
+
+Package: libmurphy-glib-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-glib
+ Debugging symbols for libmurphy-glib.
+
+Package: libmurphy-pulse0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: resource policy manager PulseAudio support library
+ Library for Murphy glib support.
+
+Package: libmurphy-pulse-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for Murphy PulseAudio support library
+ Development files for libmurphy-pulse.
+
+Package: libmurphy-pulse-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-pulse
+ Debugging symbols for libmurphy-pulse.
+
+Package: libmurphy-ecore0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: ecore support library for Murphy
+ Library for Murphy ecore support.
+
+Package: libmurphy-ecore-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for murphy ecore support library
+ Development files for libmurphy-ecore.
+
+Package: libmurphy-ecore-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libmurphy-ecore
+ Debugging symbols for libmurphy-ecore.
+
+Package: libbreedline0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: line editing library
+ Library for line editing support.
+
+Package: libbreedline-dev
+Architecture: any
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for libbreedline
+ Development files for libbreedline.
+
+Package: libbreedline-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for libbreedline
+ Debugging symbols for libbreedline.
+
+Package: murphy-config
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: example configuration files for Murphy
+ Example configuration files for Murphy. These are meant to provide a baseline
+ for real configuration.
+
+Package: murphy
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: resource policy manager
+ Murphy is a centralized resource policy daemon. Murphy assigns system
+ resources to applications in an event-based and centralized way, meaning
+ that resources are given to applications that request them in a priority
+ order.
+
+Package: murphy-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: headers for Murphy internal libraries
+ Development files for Murphy plugins.
+
+Package: murphy-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for Murphy
+ Debugging symbols for Murphy.
+
+Package: murphy-tests
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: test binaries for Murphy
+ Various interactive and non-interactive test binaries for Murphy.
+
+Package: murphy-tests-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for murphy-tests
+ Debugging symbols for murphy-tests.

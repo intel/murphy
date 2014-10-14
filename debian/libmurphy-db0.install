@@ -1,0 +1,3 @@
+usr/lib/*/murphy/libmql.so.*
+usr/lib/*/murphy/libmqi.so.*
+usr/lib/*/murphy/libmdb.so.*

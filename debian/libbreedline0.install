@@ -1,0 +1,3 @@
+usr/lib/*/libbreedline.so.*
+usr/lib/*/libbreedline-murphy.so.*
+usr/lib/*/libbreedline-glib.so.*

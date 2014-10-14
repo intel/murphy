@@ -1,0 +1,5 @@
+usr/include/murphy-db/*.h
+/usr/lib/*/murphy/libmql.so
+/usr/lib/*/murphy/libmqi.so
+/usr/lib/*/murphy/libmdb.so
+usr/lib/*/pkgconfig/murphy-db.pc
