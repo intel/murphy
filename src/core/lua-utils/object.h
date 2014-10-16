@@ -128,7 +128,51 @@
         .flags         = 0,                                             \
     }
 
+#define MRP_LUA_CLASS_DEF_FLAGS(_name, _constr, _type, _destr, _methods,      \
+                                _overrides, _class_flags)                     \
+    static mrp_lua_classdef_t _name ## _ ## _constr ## _class_def = {         \
+        .class_name    = MRP_LUA_CLASS_NAME(_name),                           \
+        .class_id      = MRP_LUA_CLASS_ID(_name, _constr),                    \
+        .constructor   = # _name "." # _constr,                               \
+        .destructor    = _destr,                                              \
+        .type_name     = #_type,                                              \
+        .type_id       = -1,                                                  \
+        .userdata_id   = MRP_LUA_UDATA_ID(_name, _constr),                    \
+        .userdata_size = sizeof(_type),                                       \
+        .methods       = _methods,                                            \
+        .overrides     = _overrides,                                          \
+        .members       = NULL,                                                \
+        .nmember       = 0,                                                   \
+        .natives       = NULL,                                                \
+        .nnative       = 0,                                                   \
+        .notify        = NULL,                                                \
+        .flags         = _class_flags,                                        \
+    }
 
+
+#define MRP_LUA_CLASS_DEF_SIMPLE_FLAGS(_name, _type, _destr, _methods,  \
+                                       _overrides, _class_flags)        \
+    static luaL_reg _name ## _class_methods[]   = _methods;             \
+    static luaL_reg _name ## _class_overrides[] = _overrides;           \
+                                                                        \
+    static mrp_lua_classdef_t _name ## _class_def = {                   \
+        .class_name    = MRP_LUA_CLASS_NAME(_name),                     \
+        .class_id      = MRP_LUA_CLASS_ID(_name, _constr),              \
+        .constructor   = # _name,                                       \
+        .destructor    = _destr,                                        \
+        .type_name     = #_type,                                        \
+        .type_id       = -1,                                            \
+        .userdata_id   = MRP_LUA_UDATA_ID(_name, _constr),              \
+        .userdata_size = sizeof(_type),                                 \
+        .methods       = _name ## _class_methods,                       \
+        .overrides     = _name ## _class_overrides,                     \
+        .members       = NULL,                                          \
+        .nmember       = 0,                                             \
+        .natives       = NULL,                                          \
+        .nnative       = 0,                                             \
+        .notify        = NULL,                                          \
+        .flags         = _class_flags,                                  \
+    }
 
 
 #define MRP_LUA_FOREACH_FIELD(_L, _i, _n, _l)                           \
@@ -234,10 +278,10 @@ typedef enum {
     MRP_LUA_CLASS_NOTIFY     = 0x004,    /* notify when member is changed */
     MRP_LUA_CLASS_NOINIT     = 0x008,    /* don't initialize member */
     MRP_LUA_CLASS_NOOVERRIDE = 0x010,    /* don't override setters, getters */
-    MRP_LUA_CLASS_PRIVREFS   = 0x020,    /* private references */
-    MRP_LUA_CLASS_RAWGETTER  = 0x040,    /* getter pushes to the stack */
-    MRP_LUA_CLASS_RAWSETTER  = 0x080,    /* setter takes args from the stack */
-    MRP_LUA_CLASS_USESTACK   = 0x100,    /* autobridged method uses the stack */
+    MRP_LUA_CLASS_RAWGETTER  = 0x020,    /* getter pushes to the stack */
+    MRP_LUA_CLASS_RAWSETTER  = 0x040,    /* setter takes args from the stack */
+    MRP_LUA_CLASS_USESTACK   = 0x080,    /* autobridged method uses the stack */
+    MRP_LUA_CLASS_DYNAMIC    = 0x100,    /* allow dynamic GC for this class */
 } mrp_lua_class_flag_t;
 
 /*
@@ -628,6 +672,8 @@ struct mrp_lua_classdef_s {
 
     mrp_lua_tostr_t tostring;            /* stringification handler */
     mrp_list_hook_t objects;             /* instances of this class */
+    uint32_t        ncreated;            /* number of objects created */
+    uint32_t        ndestroyed;          /* number of objects destroyed */
     int             nactive;             /* number of active objects */
     int             ndead;               /* nuber of dead objects */
 

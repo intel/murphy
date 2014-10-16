@@ -42,6 +42,7 @@
 #include <murphy/common/log.h>
 #include <murphy/common/env.h>
 #include <murphy/common/mm.h>
+#include <murphy/common/refcnt.h>
 
 #include <murphy/core/lua-bindings/murphy.h>
 #include <murphy/core/lua-utils/object.h>
@@ -58,9 +59,12 @@
 typedef struct {
     void *selfish;                       /* verification pointer(ish) to us */
     mrp_lua_classdef_t *def;             /* class definition for this object */
-    int  luatbl;                         /* lua table */
-    int  reftbl;                         /* table of private references */
-    int  exttbl;                         /* table of object extensions */
+    struct {
+        int self;                        /* self reference for static objects */
+        int ext;                         /* object extensions */
+        int priv;                        /* private references */
+    } refs;
+    mrp_refcnt_t refcnt;                 /* object reference count */
     int  dead : 1;                       /* being cleaned up */
     int  initializing : 1;               /* being initialized */
     mrp_list_hook_t hook[0];             /* to object list if we're tracking */
@@ -120,9 +124,6 @@ static struct {
  */
 static mrp_lua_classdef_t **classdefs;
 static int                  nclassdef;
-
-/** Our (reference to our) shared table for storing references within object. */
-static int reftbl = LUA_NOREF;
 
 /**
  * Macros to convert between userdata and user-visible data addresses.
@@ -495,13 +496,61 @@ mrp_lua_type_t mrp_lua_class_type(const char *type_name)
     return class_by_type_name(type_name)->type_id;
 }
 
+/** Dump the given oject instance for debugging. */
+static char *__instance(userdata_t **uptr, const char *fmt)
+{
+    static char buf[16][256];
+    static int  idx = 0;
+
+    userdata_t *u = uptr ? *uptr : NULL;
+    char       *p = buf[idx++];
+
+    MRP_UNUSED(fmt);
+
+    if (u != NULL)
+        snprintf(p, sizeof(buf[0]), "<%s:%s>%p(%p+%ld)",
+                 u->def->flags & MRP_LUA_CLASS_DYNAMIC ? "D" : "S",
+                 u->def->type_name, uptr, u, USERDATA_SIZE);
+    else
+        snprintf(p, sizeof(buf[0]), "<NULL> instance");
+
+    if (idx >= (int)MRP_ARRAY_SIZE(buf))
+        idx = 0;
+
+    return p;
+}
+
+/** Dump the given object for debugging. */
+static char *__object(userdata_t *u, const char *fmt)
+{
+    static char buf[16][256];
+    static int  idx = 0;
+    char       *p = buf[idx++];
+
+    MRP_UNUSED(fmt);
+
+    if (u != NULL)
+        snprintf(p, sizeof(buf[0]), "<%s:%s>(%p+%ld)",
+                 u->def->flags & MRP_LUA_CLASS_DYNAMIC ? "D" : "S",
+                 u->def->type_name, u, USERDATA_SIZE);
+    else
+        snprintf(p, sizeof(buf[0]), "<NULL> object");
+
+    if (idx >= (int)MRP_ARRAY_SIZE(buf))
+        idx = 0;
+
+    return p;
+}
+
+
 /** Create a new object, optionally assign it to a class table name or index. */
 void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
                             const char *name, int idx)
 {
     int class = 0;
     size_t size;
-    userdata_t *userdata;
+    userdata_t **userdatap, *userdata;
+    int dynamic;
 
     MRP_UNUSED(class_by_userdata_id);
 
@@ -526,25 +575,38 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
     lua_pushliteral(L, "userdata");
 
     size = USERDATA_SIZE + def->userdata_size;
-    userdata = (userdata_t *)lua_newuserdata(L, size);
+    userdata = (userdata_t *)mrp_allocz(size);
 
-    memset(userdata, 0, size);
+    if (userdata == NULL) {
+        mrp_log_error("Failed to allocate object of type %s <%s>.",
+                      def->class_name, def->type_name);
+        return NULL;
+    }
+
+    userdatap = (userdata_t **)lua_newuserdata(L, sizeof(userdata));
+    *userdatap = userdata;
+    mrp_refcnt_init(&userdata->refcnt);
 
     if (cfg.track)
         mrp_list_init(&userdata->hook[0]);
 
-    userdata->reftbl = LUA_NOREF;
-    userdata->exttbl = LUA_NOREF;
+    userdata->refs.priv = LUA_NOREF;
+    userdata->refs.ext  = LUA_NOREF;
 
     luaL_getmetatable(L, def->userdata_id);
     lua_setmetatable(L, -2);
 
-    lua_rawset(L, -3);
+    lua_rawset(L, -3);              /* userdata["userdata"]=lib<def->methods> */
 
-    lua_pushvalue(L, -1);
     userdata_setself(userdata);
     userdata->def    = def;
-    userdata->luatbl = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    if (!(dynamic = def->flags & MRP_LUA_CLASS_DYNAMIC)) {
+        lua_pushvalue(L, -1);       /* userdata->refs.self = lib<def->methods> */
+        userdata->refs.self = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+    else
+        userdata->refs.self = LUA_NOREF;
 
     if (name) {
         lua_pushstring(L, name);
@@ -573,6 +635,9 @@ void *mrp_lua_create_object(lua_State *L, mrp_lua_classdef_t *def,
         mrp_list_append(&def->objects, &userdata->hook[0]);
 
     def->nactive++;
+    def->ncreated++;
+
+    mrp_debug("created %s", __instance(userdatap, "*"));
 
     return USER_TO_DATA(userdata);
 }
@@ -613,22 +678,40 @@ void mrp_lua_destroy_object(lua_State *L, const char *name, int idx, void *data)
     userdata_t *userdata = userdata_get(data, CHECK);
     mrp_lua_classdef_t *def;
 
-    if (userdata && !userdata->dead) {
+    if (userdata) {
+        if (userdata->dead)
+            return;
+
         userdata->dead = true;
         def = userdata->def;
-        def->nactive--;
-        def->ndead++;
 
-        object_delete_reftbl(userdata, L);
-        object_delete_exttbl(userdata, L);
+        if (!(def->flags & MRP_LUA_CLASS_DYNAMIC)) {
+            mrp_debug("destroying %s (name: '%s', idx: %d)",
+                      __object(userdata, "*"), name ? name : "", idx);
 
-        lua_rawgeti(L, LUA_REGISTRYINDEX, userdata->luatbl);
-        lua_pushstring(L, "userdata");
-        lua_pushnil(L);
-        lua_rawset(L, -3);
-        lua_pop(L, -1);
+            def->nactive--;
+            def->ndead++;
 
-        luaL_unref(L, LUA_REGISTRYINDEX, userdata->luatbl);
+            object_delete_reftbl(userdata, L);
+            object_delete_exttbl(userdata, L);
+
+            if (userdata->refs.self != LUA_NOREF) {
+                lua_rawgeti(L, LUA_REGISTRYINDEX, userdata->refs.self);
+                lua_pushstring(L, "userdata");
+                lua_pushnil(L);
+                lua_rawset(L, -3);
+                lua_pop(L, -1);
+
+                luaL_unref(L, LUA_REGISTRYINDEX, userdata->refs.self);
+                userdata->refs.self = LUA_NOREF;
+            }
+        }
+        else {
+            mrp_log_error("ERROR: %s should be called for static object",
+                          __FUNCTION__);
+            mrp_log_error("ERROR: but was called for %s",
+                          __object(userdata, "*"));
+        }
 
         if (name || idx) {
             mrp_lua_get_class_table(L, def);
@@ -648,8 +731,17 @@ void mrp_lua_destroy_object(lua_State *L, const char *name, int idx, void *data)
             lua_pop(L, 1);
         }
 
+#if 0
+        /* remove initial reference */
+        mrp_debug("removing initial reference of <%s>@%p(%p) ", def->type_name,
+                  "of class <%s> (%s)", userdata, data);
+                  def->type_name);
+        mrp_unref_obj(userdata, refcnt);
+#endif
+
     }
 }
+
 
 /** Find the object corresponding to the given name in the class table. */
 int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def, const char *name)
@@ -672,7 +764,7 @@ int mrp_lua_find_object(lua_State *L, mrp_lua_classdef_t *def, const char *name)
 /** Check if the object @idx is ours and optionally of the given type. */
 void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
-    userdata_t *userdata;
+    userdata_t *userdata, **userdatap;
     char errmsg[256];
 
     luaL_checktype(L, idx, LUA_TTABLE);
@@ -681,16 +773,26 @@ void *mrp_lua_check_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     lua_pushliteral(L, "userdata");
     lua_rawget(L, -2);
 
-    if (!def)
-        userdata = (userdata_t *)lua_touserdata(L, -1);
-    else {
-        userdata = (userdata_t *)luaL_checkudata(L, -1, def->userdata_id);
+    if (!def) {
+        userdatap = (userdata_t **)lua_touserdata(L, -1);
 
-        if (!userdata || def != userdata->def) {
+        if (!userdatap) {
+            luaL_argerror(L, idx, "couldn't find expected userdata");
+            userdata = NULL;
+        }
+        else
+            userdata = *userdatap;
+    }
+    else {
+        userdatap = (userdata_t **)luaL_checkudata(L, -1, def->userdata_id);
+
+        if (!userdatap || def != (userdata = *userdatap)->def) {
             snprintf(errmsg, sizeof(errmsg), "'%s' expected", def->class_name);
             luaL_argerror(L, idx, errmsg);
             userdata = NULL;
         }
+        else
+            userdata = *userdatap;
     }
 
     if (userdata_getself(userdata) != userdata) {
@@ -788,7 +890,7 @@ int mrp_lua_pointer_of_type(void *data, mrp_lua_type_t type)
 /** Obtain the user-visible data for the object @idx. */
 void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
 {
-    userdata_t *userdata;
+    userdata_t *userdata, **userdatap;
     int top = lua_gettop(L);
 
     idx = (idx < 0) ? lua_gettop(L) + idx + 1 : idx;
@@ -799,12 +901,14 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     lua_pushliteral(L, "userdata");
     lua_rawget(L, idx);
 
-    userdata = (userdata_t *)lua_touserdata(L, -1);
+    userdatap = (userdata_t **)lua_touserdata(L, -1);
 
-    if (!userdata || !lua_getmetatable(L, -1)) {
+    if (!userdatap || !lua_getmetatable(L, -1)) {
         lua_settop(L, top);
         return NULL;
     }
+
+    userdata = *userdatap;
 
     lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
 
@@ -816,17 +920,63 @@ void *mrp_lua_to_object(lua_State *L, mrp_lua_classdef_t *def, int idx)
     return userdata ? USER_TO_DATA(userdata) : NULL;
 }
 
+
 /** Push the given data on the stack. */
 int mrp_lua_push_object(lua_State *L, void *data)
 {
     userdata_t *userdata = userdata_get(data, CHECK);
+    userdata_t **userdatap;
+    mrp_lua_classdef_t *def = userdata ? userdata->def : NULL;
+
+    /*
+     * Notes:
+     *
+     *    This is essentially mrp_lua_create_object with a few differences:
+     *      1) No need for name or idx handling.
+     *      2) No need for adding global reference, already done during
+     *         initial object creation if necessary.
+     *      3) Instead of creating a Lua userdata pointer and a new userdata,
+     *         we only create a Lua userdata pointer, make it point to the
+     *         existing userdata and increate the userdata reference count.
+     *
+     *   userdata_destructor has been similarly modified to decrese the
+     *   reference count of userdata and destroy the object only when the
+     *   last reference is dropped.
+     */
 
     mrp_lua_checkstack(L, -1);
 
-    if (!userdata || userdata->dead)
+    if (!userdata || !def || userdata->dead) {
         lua_pushnil(L);
-    else
-        lua_rawgeti(L, LUA_REGISTRYINDEX, userdata->luatbl);
+        return 1;
+    }
+
+    if (!(def->flags & MRP_LUA_CLASS_DYNAMIC)) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, userdata->refs.self);
+
+        mrp_debug("pushed %s", __object(userdata, "*"));
+    }
+    else {
+        lua_createtable(L, 1, 1);
+
+        luaL_openlib(L, NULL, def->methods, 0);
+
+        luaL_getmetatable(L, def->class_id);
+        lua_setmetatable(L, -2);
+
+        lua_pushliteral(L, "userdata");
+
+        userdatap = (userdata_t **)lua_newuserdata(L, sizeof(userdata));
+        *userdatap = userdata;
+        mrp_ref_obj(userdata, refcnt);
+
+        luaL_getmetatable(L, def->userdata_id);
+        lua_setmetatable(L, -2);
+
+        lua_rawset(L, -3);
+
+        mrp_debug("pushed %s", __instance(userdatap, "*"));
+    }
 
     return 1;
 }
@@ -864,24 +1014,50 @@ static bool valid_id(const char *id)
 
 static int userdata_destructor(lua_State *L)
 {
-    userdata_t *userdata;
+    userdata_t *userdata, **userdatap;
     mrp_lua_classdef_t *def;
 
-    if (!(userdata = lua_touserdata(L, -1)) || !lua_getmetatable(L, -1))
+    if (!(userdatap = lua_touserdata(L, -1)) || !lua_getmetatable(L, -1))
         luaL_error(L, "attempt to destroy unknown type of userdata");
     else {
+        userdata = *userdatap;
         def = userdata->def;
 
-        if (cfg.track)
-            mrp_list_delete(&userdata->hook[0]);
+        if (mrp_unref_obj(userdata, refcnt)) {
+            mrp_debug("freeing %s", __instance(userdatap, "*"));
 
-        def->ndead--;
+            if (cfg.track)
+                mrp_list_delete(&userdata->hook[0]);
 
-        lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
-        if (!lua_rawequal(L, -1, -2))
-            luaL_typerror(L, -2, def->userdata_id);
-        else
-            def->destructor(USER_TO_DATA(userdata));
+            if (def->flags & MRP_LUA_CLASS_DYNAMIC) {
+                def->nactive--;
+
+                object_delete_reftbl(userdata, L);
+                object_delete_exttbl(userdata, L);
+            }
+            else {
+                def->ndead--;
+            }
+
+            def->ndestroyed++;
+
+            lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
+            if (!lua_rawequal(L, -1, -2))
+                luaL_typerror(L, -2, def->userdata_id);
+            else
+                def->destructor(USER_TO_DATA(userdata));
+
+            *userdatap = NULL;
+            mrp_free(userdata);
+        }
+        else {
+            mrp_debug("unreffed %s", __instance(userdatap, "*"));
+
+            if (!(def->flags & MRP_LUA_CLASS_DYNAMIC))
+                mrp_log_error("Hmm, more refs for a static object ?");
+
+            *userdatap = NULL;
+        }
     }
 
     return 0;
@@ -1383,58 +1559,52 @@ static int seterr(lua_State *L, char *e, size_t size, const char *format, ...)
 
 static void object_create_reftbl(userdata_t *u, lua_State *L)
 {
-    if (u->def->flags & MRP_LUA_CLASS_PRIVREFS) {
-        lua_newtable(L);
-        u->reftbl = luaL_ref(L, LUA_REGISTRYINDEX);
-    }
-    else {
-        if (reftbl == LUA_NOREF) {
-            lua_newtable(L);
-            reftbl = luaL_ref(L, LUA_REGISTRYINDEX);
-        }
-        u->reftbl = reftbl;
-    }
+    lua_newtable(L);
+    u->refs.priv = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
 
 static void object_delete_reftbl(userdata_t *u, lua_State *L)
 {
-    int tidx;
+    int prividx, ref;
 
-    if (u->reftbl == LUA_NOREF || u->reftbl == reftbl)
+    if (u->refs.priv == LUA_NOREF)
         return;
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->reftbl);
-    tidx = lua_gettop(L);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.priv);
+    prividx = lua_gettop(L);
+
+    /*
+     * Notes:
+     *     I'm not sure whether explicitly unreffing all references
+     *     is necessary. I couldn't find anything about it in the
+     *     documentation, so let's try to play safe.
+     */
 
     lua_pushnil(L);
-    while (lua_next(L, tidx) != 0) {
+    while (lua_next(L, prividx) != 0) {
+        ref = lua_tointeger(L, -1);
+        mrp_debug("freeing reference %d for %s", ref, __object(u, "*"));
+        luaL_unref(L, prividx, ref);
         lua_pop(L, 1);
-        lua_pushvalue(L, -1);
-        lua_pushnil(L);
-        lua_rawset(L, -3);
     }
 
-    luaL_unref(L, LUA_REGISTRYINDEX, u->reftbl);
+    luaL_unref(L, LUA_REGISTRYINDEX, u->refs.priv);
+    u->refs.priv = LUA_NOREF;
+
+    lua_settop(L, prividx);
     lua_pop(L, 1);
-    u->reftbl = LUA_NOREF;
-}
-
-
-static inline int get_reftbl(userdata_t *u)
-{
-    return (u != NULL ? u->reftbl : reftbl);
 }
 
 
 /** Refcount the object @idx for or within the given object. */
 int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
 {
-    int tbl = get_reftbl(userdata_get(data, CHECK));
+    userdata_t *u = userdata_get(data, CHECK);
     int ref;
 
-    if (tbl != LUA_NOREF) {
-        lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
+    if (u->refs.priv != LUA_NOREF) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.priv);
         lua_pushvalue(L, idx > 0 ? idx : idx - 1);
         ref = luaL_ref(L, -2);
         lua_pop(L, 1);
@@ -1448,13 +1618,11 @@ int mrp_lua_object_ref_value(void *data, lua_State *L, int idx)
 /** Release the given reference for/from within the given object. */
 void mrp_lua_object_unref_value(void *data, lua_State *L, int ref)
 {
-    int tbl;
+    userdata_t *u = userdata_get(data, CHECK);
 
     if (ref != LUA_NOREF && ref != LUA_REFNIL) {
-        tbl = get_reftbl(userdata_get(data, CHECK));
-
-        if (tbl != LUA_NOREF) {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
+        if (u->refs.priv != LUA_NOREF) {
+            lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.priv);
             luaL_unref(L, -1, ref);
             lua_pop(L, 1);
         }
@@ -1464,46 +1632,53 @@ void mrp_lua_object_unref_value(void *data, lua_State *L, int ref)
 /** Obtain and push the object for the given reference on the stack. */
 int mrp_lua_object_deref_value(void *data, lua_State *L, int ref, int pushnil)
 {
-    int tbl;
+    userdata_t *u = userdata_get(data, CHECK);
 
-    if (ref != LUA_NOREF) {
-        tbl = get_reftbl(userdata_get(data, CHECK));
-
-        if (ref != LUA_REFNIL && tbl != LUA_NOREF) {
-            lua_rawgeti(L, LUA_REGISTRYINDEX, tbl);
-            lua_rawgeti(L, -1, ref);
-            lua_remove(L, -2);
-        }
-        else
-        nilref:
-            lua_pushnil(L);
-
+    if (ref == LUA_REFNIL) {
+    nilref:
+        lua_pushnil(L);
         return 1;
     }
-    else {
+
+    if (ref == LUA_NOREF) {
         if (pushnil)
             goto nilref;
         else
             return 0;
     }
+
+    if (u->refs.priv == LUA_NOREF) {
+        if (pushnil)
+            goto nilref;
+        else
+            return 0;
+    }
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.priv);
+    lua_rawgeti(L, -1, ref);
+    lua_remove(L, -2);
+
+    return 1;
 }
 
 /** Obtain a new reference based on the reference owned by owner. */
 int mrp_lua_object_getref(void *owner, void *data, lua_State *L, int ref)
 {
-    int otbl, dtbl;
+    userdata_t *uo = userdata_get(owner, CHECK);
+    userdata_t *ud = userdata_get(data , CHECK);
 
     if (ref == LUA_NOREF || ref == LUA_REFNIL)
         return ref;
 
-    if ((otbl = get_reftbl(userdata_get(owner, CHECK))) == LUA_NOREF ||
-        (dtbl = get_reftbl(userdata_get(data , CHECK))) == LUA_NOREF)
+    if (uo->refs.priv == LUA_NOREF || ud->refs.priv == LUA_NOREF)
         return LUA_NOREF;
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, otbl);
-    lua_rawgeti(L, LUA_REGISTRYINDEX, dtbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, uo->refs.priv);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ud->refs.priv);
+
     lua_rawgeti(L, -2, ref);
     ref = luaL_ref(L, -2);
+
     lua_pop(L, 2);
 
     return ref;
@@ -1513,31 +1688,40 @@ int mrp_lua_object_getref(void *owner, void *data, lua_State *L, int ref)
 static void object_create_exttbl(userdata_t *u, lua_State *L)
 {
     lua_newtable(L);
-    u->exttbl = luaL_ref(L, LUA_REGISTRYINDEX);
+    u->refs.ext = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
 
 static void object_delete_exttbl(userdata_t *u, lua_State *L)
 {
-    int tidx;
+    int extidx, ref;
 
-    if (u->exttbl == LUA_NOREF)
+    if (u->refs.ext == LUA_NOREF)
         return;
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
-    tidx = lua_gettop(L);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.ext);
+    extidx = lua_gettop(L);
+
+    /*
+     * Notes:
+     *     I'm not sure whether explicitly unreffing all references
+     *     is necessary. I couldn't find anything about it in the
+     *     documentation, so let's try to play safe.
+     */
 
     lua_pushnil(L);
-    while (lua_next(L, tidx) != 0) {
+    while (lua_next(L, extidx) != 0) {
+        ref = lua_tointeger(L, -1);
+        mrp_debug("freeing reference %d for %s", ref, __object(u, "*"));
+        luaL_unref(L, extidx, ref);
         lua_pop(L, 1);
-        lua_pushvalue(L, -1);
-        lua_pushnil(L);
-        lua_rawset(L, -3);
     }
 
-    luaL_unref(L, LUA_REGISTRYINDEX, u->exttbl);
+    luaL_unref(L, LUA_REGISTRYINDEX, u->refs.ext);
+    u->refs.ext = LUA_NOREF;
+
+    lua_settop(L, extidx);
     lua_pop(L, 1);
-    u->exttbl = LUA_NOREF;
 }
 
 
@@ -1546,7 +1730,7 @@ static int object_setext(void *data, lua_State *L, const char *name,
 {
     userdata_t *u = DATA_TO_USER(data);
 
-    if (u->exttbl == LUA_NOREF) {
+    if (u->refs.ext == LUA_NOREF) {
         if (err)
             return seterr(L, err, esize, "trying to set user-defined field %s "
                           "for non-extensible object %s", name,
@@ -1557,7 +1741,7 @@ static int object_setext(void *data, lua_State *L, const char *name,
                               u->def->class_name);
     }
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.ext);
     lua_pushvalue(L, vidx > 0 ? vidx : vidx - 1);
     lua_setfield(L, -2, name);
     lua_pop(L, 1);
@@ -1570,12 +1754,12 @@ static int object_getext(void *data, lua_State *L, const char *name)
 {
     userdata_t *u = DATA_TO_USER(data);
 
-    if (u->exttbl == LUA_NOREF) {
+    if (u->refs.ext == LUA_NOREF) {
         lua_pushnil(L);
         return 1;
     }
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.ext);
     lua_getfield(L, -1, name);
     lua_remove(L, -2);
 
@@ -1587,13 +1771,13 @@ static int object_setiext(void *data, lua_State *L, int idx, int val)
 {
     userdata_t *u = DATA_TO_USER(data);
 
-    if (u->exttbl == LUA_NOREF) {
+    if (u->refs.ext == LUA_NOREF) {
         return luaL_error(L, "trying to set user-defined index %d "
                           "for non-extensible object %s", idx,
                           u->def->class_name);
     }
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.ext);
     lua_pushvalue(L, val > 0 ? val : val - 1);
     lua_rawseti(L, -2, idx);
     lua_pop(L, 1);
@@ -1606,12 +1790,12 @@ static int object_getiext(void *data, lua_State *L, int idx)
 {
     userdata_t *u = DATA_TO_USER(data);
 
-    if (u->exttbl == LUA_NOREF) {
+    if (u->refs.ext == LUA_NOREF) {
         lua_pushnil(L);
         return 1;
     }
 
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->exttbl);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.ext);
     lua_rawgeti(L, -1, idx);
     lua_remove(L, -2);
 
@@ -1855,7 +2039,7 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
     vtype = lua_type(L, -1);
 
     mrp_debug("setting %s.%s of Lua object %p(%p)", u->def->class_name,
-              m->name, data, u);
+              m->name, u, data);
 
     if (!u->initializing && (m->flags & MRP_LUA_CLASS_READONLY))
         return seterr(L, err, esize, "%s.%s of Lua object is readonly",
@@ -2005,8 +2189,10 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
 
         lua_pushliteral(L, "userdata");
         lua_rawget(L, -2);
-        if ((v.obj.ptr = lua_touserdata(L, -1)) != NULL)
+        if ((v.obj.ptr = lua_touserdata(L, -1)) != NULL) {
+            v.obj.ptr = *(void **)v.obj.ptr;
             v.obj.ptr = USER_TO_DATA(v.obj.ptr);
+        }
         lua_pop(L, 1);
 
         if (m->setter(data, L, midx, &v) == 1)
@@ -2383,8 +2569,7 @@ static int override_tostring(lua_State *L)
         if (u->def->tostring == NULL ||
             u->def->tostring(MRP_LUA_TOSTR_LUA, buf, sizeof(buf),
                              L, data) <= 0) {
-            snprintf(buf, sizeof(buf), "<object %s(%s)>@%p(%p)",
-                     u->def->class_id, u->def->type_name, data, u);
+            snprintf(buf, sizeof(buf), "<%s)", __object(u, "*"));
         }
 
         lua_pushstring(L, buf);
@@ -2514,7 +2699,14 @@ ssize_t mrp_lua_object_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
 ssize_t mrp_lua_index_tostr(mrp_lua_tostr_mode_t mode, char *buf, size_t size,
                             lua_State *L, int index)
 {
-    return mrp_lua_object_tostr(mode, buf, size, L, lua_touserdata(L, index));
+    userdata_t **userdatap;
+
+    userdatap = (userdata_t **)lua_touserdata(L, index);
+
+    if (userdatap != NULL)
+        return mrp_lua_object_tostr(mode, buf, size, L, *userdatap);
+    else
+        return snprintf(buf, size, "<invalid object, no userdata>");;
 }
 
 
@@ -2526,22 +2718,25 @@ void mrp_lua_dump_objects(mrp_lua_tostr_mode_t mode, lua_State *L, FILE *fp)
     userdata_t         *u;
     void               *d;
     int                 i, cnt;
+    char                active[64], dead[64], created[64], destroyed[64];
     char                obj[4096];
 
     fprintf(fp, "Lua memory usage: %d k, %.2f M\n",
             lua_gc(L, LUA_GCCOUNT, 0), lua_gc(L, LUA_GCCOUNT, 0) / 1024.0);
 
+    fprintf(fp, "Objects by class/type: A=active, D=dead, "
+            "c=created, d=destroyed\n");
     for (i = 0; i < nclassdef; i++) {
         def = classdefs[i];
 
-        if (def->nactive == 0 && def->ndead == 0) {
-            fprintf(fp, "No active or dead objects for Lua class <%s> (%s).\n",
-                    def->class_name, def->type_name);
-            continue;
-        }
+        snprintf(active, sizeof(active), "%u", def->nactive);
+        snprintf(dead, sizeof(dead), "%u", def->ndead);
+        snprintf(created, sizeof(created), "%u", def->ncreated);
+        snprintf(destroyed, sizeof(destroyed), "%u", def->ndestroyed);
 
-        fprintf(fp, "%d active, %d dead objects for Lua class <%s> (%s)\n",
-                def->nactive, def->ndead,def->class_name, def->type_name);
+        fprintf(fp, "<%s/%s>: A:%s, D:%s, c:%s, d:%s\n",
+                def->class_name, def->type_name,
+                active, dead, created, destroyed);
 
         cnt = 0;
         mrp_list_foreach(&def->objects, p, n) {
