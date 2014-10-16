@@ -71,8 +71,9 @@ MRP_LUA_METHOD_LIST_TABLE(json_lua_overrides,
                           MRP_LUA_OVERRIDE_SETFIELD (json_lua_setfield)
                           MRP_LUA_OVERRIDE_STRINGIFY(json_lua_stringify));
 
-MRP_LUA_CLASS_DEF(json, lua, json_lua_t,
-                  json_lua_destroy, json_lua_methods, json_lua_overrides);
+MRP_LUA_CLASS_DEF_FLAGS(json, lua, json_lua_t,
+                        json_lua_destroy, json_lua_methods, json_lua_overrides,
+                        MRP_LUA_CLASS_DYNAMIC);
 
 
 int mrp_json_lua_create(lua_State *L)
@@ -122,8 +123,6 @@ int mrp_json_lua_create(lua_State *L)
         return luaL_error(L, "invalid arguments to JSON constructor (%d)",
                           lua_gettop(L));
     }
-
-    mrp_lua_push_object(L, lson);
 
     return 1;
 }
