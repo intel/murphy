@@ -27,6 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <murphy/core/console.h>
+#include <errno.h>
 
 /*
  * debug commands
@@ -98,6 +100,31 @@ static void debug_reset(mrp_console_t *c, void *user_data,
 }
 
 
+static void debug_mm(mrp_console_t *c, void *user_data,
+                     int argc, char **argv)
+{
+    MRP_UNUSED(user_data);
+
+    if (argc == 3 && !strcmp(argv[2], "dump"))
+        mrp_mm_dump(c->stdout);
+    else if (argc == 4 && !strcmp(argv[2], "dump")) {
+        char *path = argv[3];
+        FILE *fp   = fopen(path, "w");
+
+        if (fp != NULL) {
+            printf("Producing mm-dump to '%s'...\n", path);
+            mrp_mm_dump(fp);
+            fclose(fp);
+        }
+        else
+            printf("Failed to open '%s' (%d: %s).", path,
+                   errno, strerror(errno));
+    }
+    else
+        printf("Unknown command...\n");
+}
+
+
 #define DEBUG_GROUP_DESCRIPTION                                           \
     "Debugging commands provide fine-grained control over runtime\n"      \
     "debugging messages produced by the murphy daemon or any of the\n"    \
@@ -153,11 +180,11 @@ static void debug_reset(mrp_console_t *c, void *user_data,
     "Reset the debugging configuration to the defaults. This will turn"   \
     "disable debugging globally and flush all debugging rules.\n"
 
-#define LIST_SYNTAX         "list"
-#define LIST_SUMMARY        "list known debug sites"
-#define LIST_DESCRIPTION                                                  \
-    "List all known debug sites of the murphy daemon itself as\n"         \
-    "as well as from any loaded murphy plugins.\n"
+#define MM_SYNTAX         "mm dump [file]"
+#define MM_SUMMARY        "produce an mm-dump"
+#define MM_DESCRIPTION                                                  \
+    "Produce an mm-dump of all currently allocated objects to the given\n" \
+    "or to the console.\n"
 
 MRP_CORE_CONSOLE_GROUP(debug_group, "debug", DEBUG_GROUP_DESCRIPTION, NULL, {
         MRP_TOKENIZED_CMD("enable", debug_enable, FALSE,
@@ -169,5 +196,7 @@ MRP_CORE_CONSOLE_GROUP(debug_group, "debug", DEBUG_GROUP_DESCRIPTION, NULL, {
         MRP_TOKENIZED_CMD("set", debug_set, FALSE,
                           SET_SYNTAX, SET_SUMMARY, SET_DESCRIPTION),
         MRP_TOKENIZED_CMD("reset", debug_reset, FALSE,
-                          RESET_SYNTAX, RESET_SUMMARY, RESET_DESCRIPTION)
+                          RESET_SYNTAX, RESET_SUMMARY, RESET_DESCRIPTION),
+        MRP_TOKENIZED_CMD("mm", debug_mm, FALSE,
+                          MM_SYNTAX, MM_SUMMARY, MM_DESCRIPTION),
 });
