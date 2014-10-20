@@ -77,6 +77,9 @@ typedef json_object_iter mrp_json_iter_t;
 /** Create a new JSON object of the given type. */
 mrp_json_t *mrp_json_create(mrp_json_type_t type, ...);
 
+/** Clone the given JSON object, creating a new private copy of it. */
+mrp_json_t *mrp_json_clone(mrp_json_t *o);
+
 /** Deserialize a string to a JSON object. */
 mrp_json_t *mrp_json_string_to_object(const char *str, int len);
 

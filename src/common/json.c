@@ -88,6 +88,15 @@ mrp_json_t *mrp_json_create(mrp_json_type_t type, ...)
 }
 
 
+mrp_json_t *mrp_json_clone(mrp_json_t *o)
+{
+    if (o != NULL)
+        return mrp_json_string_to_object(mrp_json_object_to_string(o), -1);
+    else
+        return NULL;
+}
+
+
 mrp_json_t *mrp_json_string_to_object(const char *s, int len)
 {
     if (parser == NULL) {
