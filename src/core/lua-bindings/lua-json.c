@@ -273,7 +273,7 @@ static mrp_json_t *json_lua_table_to_object(lua_State *L, int t)
     mrp_json_t *val;
 
     if ((lson = json_lua_get(L, t)) != NULL)
-        return lson->json;
+        return mrp_json_clone(lson->json);
 
     json = NULL;
     val  = NULL;
