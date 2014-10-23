@@ -36,6 +36,9 @@
  */
 
 #include <murphy/common/macros.h>
+#include <murphy/common/log.h>
+
+#define __MURPHY_REFCNT_CHECK__
 
 MRP_CDECL_BEGIN
 
@@ -53,8 +56,13 @@ static inline void *_mrp_ref_obj(void *obj, off_t offs)
     return obj;
 }
 
-
-static inline int _mrp_unref_obj(void *obj, off_t offs)
+static inline int _mrp_unref_obj(void *obj, off_t offs
+#ifdef __MURPHY_REFCNT_CHECK__
+                                 , const char *file
+                                 , int line
+                                 , const char *func
+#endif
+                                 )
 {
     mrp_refcnt_t *refcnt;
 
@@ -62,8 +70,25 @@ static inline int _mrp_unref_obj(void *obj, off_t offs)
         refcnt = (mrp_refcnt_t *) ((char *) obj + offs);
         --(*refcnt);
 
-        if (*refcnt <= 0)
+        if (*refcnt == 0)
             return TRUE;
+
+#ifdef __MURPHY_REFCNT_CHECK__
+#  define W mrp_log_error
+
+        if (*refcnt < 0) {
+            W("****************** REFCOUNTING BUG WARNING ******************");
+            W("* Reference-counting bug detected. The reference count of");
+            W("* object %p (@offs %d) has dropped to %d.", obj, (int)offs,
+              (int)*refcnt);
+            W("* The offending unref call was made at:");
+            W("*     %s@%s:%d", func ? func : "<unkown>",
+              file ? file : "<unknown>", line);
+            W("*************************************************************");
+        }
+
+#undef W
+#endif
     }
 
     return FALSE;
@@ -78,8 +103,13 @@ static inline void mrp_refcnt_init(mrp_refcnt_t *refcnt)
 #define mrp_ref_obj(obj, member)                                          \
     (typeof(obj))_mrp_ref_obj(obj, MRP_OFFSET(typeof(*(obj)), member))
 
-#define mrp_unref_obj(obj, member)                                        \
+#ifndef __MURPHY_REFCNT_CHECK__
+#  define mrp_unref_obj(obj, member)                                      \
     _mrp_unref_obj(obj, MRP_OFFSET(typeof(*(obj)), member))
+#else
+#  define mrp_unref_obj(obj, member)                                      \
+    _mrp_unref_obj(obj, MRP_OFFSET(typeof(*(obj)), member), __LOC__)
+#endif
 
 MRP_CDECL_END
 
