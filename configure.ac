@@ -647,6 +647,15 @@ AC_SUBST(MRP_DOXYDEPS, [$MRP_DOCSCRIPT_DIR/doxydeps.py])
 # Shave by default.
 SHAVE_INIT([build-aux], [enable])
 
+# Create murphy symlink to match domain controller's
+# placing with how it is installed.
+if test ! -L murphy/domain-control; then
+    AC_MSG_NOTICE([Symlinking src/plugins/domain-control to src/domain-control...])
+    cd src
+    ln -s plugins/domain-control domain-control
+    cd ..
+fi
+
 # Create murphy symlink to src.
 if test ! -L murphy; then
     AC_MSG_NOTICE([Symlinking src to murphy...])
