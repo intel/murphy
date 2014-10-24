@@ -180,9 +180,16 @@ bool mrp_resource_lua_veto(mrp_zone_t *zone,
     mrp_resource_setref_t *sref, *rref;
     mrp_resource_ownersref_t *oref;
     mrp_funcbridge_value_t args[16];
-    int i;
+    int i, top;
+    bool success;
 
-    if (L && zone && rset && owners && methods &&
+    if (L == NULL)
+        return true;
+
+    success = true;
+    top = lua_gettop(L);
+
+    if (zone && rset && owners && methods &&
         (sref = find_in_id_hash(rset->id)) &&
         (oref = owners_get(L, zone->id)))
     {
@@ -196,11 +203,16 @@ bool mrp_resource_lua_veto(mrp_zone_t *zone,
             args[++i].pointer = oref;
             args[++i].pointer = rref;
 
-            return mrp_funcarray_call_from_c(L, veto, "sodoo", args);
+            success = mrp_funcarray_call_from_c(L, veto, "sodoo", args);
+
+            goto out;
         }
     }
 
-    return true;
+ out:
+    lua_settop(L, top);
+
+    return success;
 }
 
 void mrp_resource_lua_set_owners(mrp_zone_t *zone,mrp_resource_owner_t *owners)
