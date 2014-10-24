@@ -30,6 +30,8 @@
 #ifndef __MURPHY_LUA_UTILS_H__
 #define __MURPHY_LUA_UTILS_H__
 
+#include <stdbool.h>
+
 #include <lualib.h>
 #include <lauxlib.h>
 
@@ -79,5 +81,11 @@ const char *mrp_lua_findtable(lua_State *L, int t, const char *field, int size);
 
 /** Make sure there's space for at least extra values in the stack. */
 void mrp_lua_checkstack(lua_State *L, int extra);
+
+/** Produce a Lua call stack trace of the given depth. */
+const char *mrp_lua_callstack(lua_State *L, char *buf, size_t size, int depth);
+
+/** Print a Lua call stack trace of the given depth. */
+void mrp_lua_calltrace(lua_State *L, int depth, bool debug);
 
 #endif /* __MURPHY_LUA_UTILS_H__ */

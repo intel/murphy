@@ -29,6 +29,8 @@
 
 #include <string.h>
 
+#include "murphy/common/debug.h"
+#include "murphy/common/log.h"
 #include "murphy/core/lua-utils/lua-utils.h"
 
 
@@ -149,4 +151,81 @@ void mrp_lua_checkstack(lua_State *L, int extra)
      */
 
     lua_checkstack(L, extra > 0 ? extra : 40);
+}
+
+
+const char *mrp_lua_callstack(lua_State *L, char *buf, size_t size, int depth)
+{
+    int         top;
+    int         i, b, e;
+    const char *w;
+    char       *p;
+    int         n, l;
+
+    if (depth <= 0)
+        depth = 16;
+
+    top = lua_gettop(L);
+
+    p = buf;
+    l = (int)size;
+
+    *p = '\0';
+
+    b = e = -1;
+    for (i = 0; i < depth; i++) {
+        luaL_where(L, i);
+
+        if (lua_isnil(L, -1))
+            break;
+
+        w = lua_tostring(L, -1);
+
+        if (!(w && *w)) {
+            if (b < 0)
+                b = e = i;
+            else
+                e = i;
+
+            continue;
+        }
+
+        if (b >= 0  && e == i - 1) {
+            if (b != e)
+                n = snprintf(p, l, "\n    [#%d-%d] ?", b, e);
+            else
+                n = snprintf(p, l, "\n    [#%d] ?", b);
+            b = e = -1;
+
+            p += n;
+            l -= n;
+
+            if (l <= 0)
+                goto out;
+        }
+
+        n = snprintf(p, l, "\n    [#%d] @%s", i, w);
+
+        p += n;
+        l -= n;
+
+        if (l <= 0)
+            goto out;
+    }
+
+ out:
+    lua_settop(L, top);
+
+    return buf;
+}
+
+
+void mrp_lua_calltrace(lua_State *L, int depth, bool debug)
+{
+    char buf[1024];
+
+    if (debug)
+        mrp_debug("\n%s", mrp_lua_callstack(L, buf, sizeof(buf), depth));
+    else
+        mrp_log_info("%s", mrp_lua_callstack(L, buf, sizeof(buf), depth));
 }
