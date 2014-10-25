@@ -1681,7 +1681,7 @@ static void object_delete_reftbl(userdata_t *u, lua_State *L)
 
     lua_pushnil(L);
     while (lua_next(L, prividx) != 0) {
-        ref = lua_tointeger(L, -1);
+        ref = lua_tointeger(L, -2);
         mrp_debug("freeing reference %d for %s", ref, __object(u, "*"));
         luaL_unref(L, prividx, ref);
         lua_pop(L, 1);
@@ -1809,7 +1809,7 @@ static void object_delete_exttbl(userdata_t *u, lua_State *L)
 
     lua_pushnil(L);
     while (lua_next(L, extidx) != 0) {
-        ref = lua_tointeger(L, -1);
+        ref = lua_tointeger(L, -2);
         mrp_debug("freeing reference %d for %s", ref, __object(u, "*"));
         luaL_unref(L, extidx, ref);
         lua_pop(L, 1);
