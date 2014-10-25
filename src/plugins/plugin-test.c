@@ -383,7 +383,9 @@ void invoke_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     method = argv[3];
     narg   = MRP_ARRAY_SIZE(args);
 
-    for (i = 4, narg = 0; i < argc && narg < MRP_ARRAY_SIZE(args); i++, narg++) {
+    for (i = 4, narg = 0;
+         i < argc && narg < (int)MRP_ARRAY_SIZE(args);
+         i++, narg++) {
         type  = argv[i];
         value = strchr(type, ':');
 
