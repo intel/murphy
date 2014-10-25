@@ -212,6 +212,7 @@ static ssize_t sighandler_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
     const char       *s = strsignal(h->signum);
 
     MRP_UNUSED(L);
+    MRP_UNUSED(sighandler_lua_check);
 
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
