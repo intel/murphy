@@ -54,7 +54,6 @@ typedef struct {
     mrp_timer_t   *t;                    /* associated murphy timer */
     unsigned int   msecs;                /* timer interval in milliseconds */
     int            callback;             /* reference to callback */
-    int            data;                 /* referece to callback data */
     bool           oneshot;              /* true for one-shot timers */
 } timer_lua_t;
 
@@ -64,6 +63,8 @@ static void timer_lua_destroy(void *data);
 static void timer_lua_changed(void *data, lua_State *L, int member);
 static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
                                   size_t size, lua_State *L, void *data);
+static int timer_lua_start(lua_State *L);
+static int timer_lua_stop(lua_State *L);
 
 
 /*
@@ -76,7 +77,9 @@ static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
 #define NOFLAGS MRP_LUA_CLASS_NOFLAGS
 
 MRP_LUA_METHOD_LIST_TABLE(timer_lua_methods,
-                          MRP_LUA_METHOD_CONSTRUCTOR(timer_lua_create));
+                          MRP_LUA_METHOD_CONSTRUCTOR(timer_lua_create)
+                          MRP_LUA_METHOD(stop , timer_lua_stop)
+                          MRP_LUA_METHOD(start, timer_lua_start));
 
 MRP_LUA_METHOD_LIST_TABLE(timer_lua_overrides,
                           MRP_LUA_OVERRIDE_CALL     (timer_lua_create));
@@ -84,21 +87,20 @@ MRP_LUA_METHOD_LIST_TABLE(timer_lua_overrides,
 MRP_LUA_MEMBER_LIST_TABLE(timer_lua_members,
     MRP_LUA_CLASS_INTEGER("interval", OFFS(msecs)   , NULL, NULL, NOTIFY)
     MRP_LUA_CLASS_LFUNC  ("callback", OFFS(callback), NULL, NULL, NOTIFY)
-    MRP_LUA_CLASS_ANY    ("data"    , OFFS(data)    , NULL, NULL, NOTIFY)
     MRP_LUA_CLASS_BOOLEAN("oneshot" , OFFS(oneshot) , NULL, NULL, NOTIFY));
 
 
 typedef enum {
     TIMER_MEMBER_INTERVAL,
     TIMER_MEMBER_CALLBACK,
-    TIMER_MEMBER_DATA,
     TIMER_MEMBER_ONESHOT
 } timer_member_t;
 
 MRP_LUA_DEFINE_CLASS(timer, lua, timer_lua_t, timer_lua_destroy,
                      timer_lua_methods, timer_lua_overrides,
                      timer_lua_members, NULL, timer_lua_changed,
-                     timer_lua_tostring, NULL, MRP_LUA_CLASS_EXTENSIBLE);
+                     timer_lua_tostring, NULL,
+                     MRP_LUA_CLASS_EXTENSIBLE | MRP_LUA_CLASS_DYNAMIC);
 
 
 static void timer_lua_cb(mrp_timer_t *timer, void *user_data)
@@ -110,10 +112,12 @@ static void timer_lua_cb(mrp_timer_t *timer, void *user_data)
 
     if (mrp_lua_object_deref_value(t, t->L, t->callback, false)) {
         mrp_lua_push_object(t->L, t);
-        mrp_lua_object_deref_value(t, t->L, t->data, true);
 
-        if (lua_pcall(t->L, 2, 0, 0) != 0)
-            mrp_log_error("failed to invoke Lua timer callback");
+        if (lua_pcall(t->L, 1, 0, 0) != 0) {
+            mrp_log_error("failed to invoke Lua timer callback, stopping");
+            mrp_del_timer(t->t);
+            t->t = NULL;
+        }
     }
 
     if (one) {
@@ -179,7 +183,7 @@ static int timer_lua_create(lua_State *L)
     t->L        = L;
     t->ctx      = ctx;
     t->callback = LUA_NOREF;
-    t->data     = LUA_NOREF;
+    t->msecs    = 5000;
 
     switch (narg) {
     case 1:
@@ -196,13 +200,9 @@ static int timer_lua_create(lua_State *L)
     if (t->callback != LUA_NOREF && t->callback != LUA_REFNIL && t->t == NULL) {
         t->t = mrp_add_timer(t->ctx->ml, t->msecs, timer_lua_cb, t);
 
-        if (t->t == NULL) {
-            mrp_lua_destroy_object(L, NULL, 0, t);
+        if (t->t == NULL)
             return luaL_error(L, "failed to create Murphy timer");
-        }
     }
-
-    mrp_lua_push_object(L, t);
 
     return 1;
 }
@@ -212,13 +212,14 @@ static void timer_lua_destroy(void *data)
 {
     timer_lua_t *t = (timer_lua_t *)data;
 
+    mrp_debug("destroying Lua timer %p", data);
+
     mrp_del_timer(t->t);
     t->t = NULL;
 
     mrp_lua_object_unref_value(t, t->L, t->callback);
-    mrp_lua_object_unref_value(t, t->L, t->data);
+
     t->callback = LUA_NOREF;
-    t->data     = LUA_NOREF;
 }
 
 
@@ -234,7 +235,6 @@ static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
     timer_lua_t *t = (timer_lua_t *)data;
 
     MRP_UNUSED(L);
-    MRP_UNUSED(timer_lua_check);
 
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
@@ -244,6 +244,42 @@ static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
                         t->oneshot  ? "oneshot " : "",
                         t->t, t->msecs);
     }
+}
+
+
+static int timer_lua_start(lua_State *L)
+{
+    timer_lua_t *t = timer_lua_check(L, -1);
+
+    if (t == NULL) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    if (t->t == NULL && t->callback != LUA_NOREF)
+        t->t = mrp_add_timer(t->ctx->ml, t->msecs, timer_lua_cb, t);
+
+    lua_pushboolean(L, t->t != NULL);
+
+    return 1;
+}
+
+
+static int timer_lua_stop(lua_State *L)
+{
+    timer_lua_t *t = timer_lua_check(L, -1);
+
+    if (t == NULL) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    mrp_del_timer(t->t);
+    t->t = NULL;
+
+    lua_pushboolean(L, true);
+
+    return 1;
 }
 
 
