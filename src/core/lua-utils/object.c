@@ -508,9 +508,9 @@ static char *__instance(userdata_t **uptr, const char *fmt)
     MRP_UNUSED(fmt);
 
     if (u != NULL)
-        snprintf(p, sizeof(buf[0]), "<%s:%s>%p(%p+%ld)",
+        snprintf(p, sizeof(buf[0]), "<%s:%s>%p(%p+%d)",
                  u->def->flags & MRP_LUA_CLASS_DYNAMIC ? "D" : "S",
-                 u->def->type_name, uptr, u, USERDATA_SIZE);
+                 u->def->type_name, uptr, u, (int)USERDATA_SIZE);
     else
         snprintf(p, sizeof(buf[0]), "<NULL> instance");
 
@@ -530,9 +530,9 @@ static char *__object(userdata_t *u, const char *fmt)
     MRP_UNUSED(fmt);
 
     if (u != NULL)
-        snprintf(p, sizeof(buf[0]), "<%s:%s>(%p+%ld)",
+        snprintf(p, sizeof(buf[0]), "<%s:%s>(%p+%d)",
                  u->def->flags & MRP_LUA_CLASS_DYNAMIC ? "D" : "S",
-                 u->def->type_name, u, USERDATA_SIZE);
+                 u->def->type_name, u, (int)USERDATA_SIZE);
     else
         snprintf(p, sizeof(buf[0]), "<NULL> object");
 
