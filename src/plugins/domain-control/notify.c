@@ -62,6 +62,10 @@ static void check_watch_notification(pep_watch_t *w)
             update = (w->stamp < mqi_get_table_stamp(t->h));
         else
             update = FALSE;
+
+        mrp_debug("'%s': table '%s' = #%u, watch = # %u: %s", proxy->name,
+                  t->name, mqi_get_table_stamp(t->h), w->stamp,
+                  update ? "UPDATE" : "OMIT");
     }
 
     proxy->notify_update |= update;
@@ -168,6 +172,13 @@ void notify_table_changes(pdp_t *pdp)
             }
 
             send_proxy_notification(proxy);
+
+            mrp_list_foreach(&proxy->watches, wp, wn) {
+                w = mrp_list_entry(wp, typeof(*w), pep_hook);
+
+                if (w->table && w->table->h != MQI_HANDLE_INVALID)
+                    w->stamp = mqi_get_table_stamp(w->table->h);
+            }
         }
     }
 }
