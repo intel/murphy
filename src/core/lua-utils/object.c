@@ -497,49 +497,147 @@ mrp_lua_type_t mrp_lua_class_type(const char *type_name)
 }
 
 /** Dump the given oject instance for debugging. */
-static char *__instance(userdata_t **uptr, const char *fmt)
+static const char *__instance(userdata_t **uptr, const char *fmt)
 {
     static char buf[16][256];
     static int  idx = 0;
 
     userdata_t *u = uptr ? *uptr : NULL;
     char       *p = buf[idx++];
+    char       *r = p;
+    const char *s;
+    int         l, n;
 
-    MRP_UNUSED(fmt);
+    /*
+     * Notes: The currently implemeted format specifiers are:
+     *     'D': dynamic flag, avaluates to 'S' or 'D'
+     *     't': object type name
+     *     'i': object instancem indirect userdata pointer
+     *     'u': object userdata_t
+     *     'd': object user-visible data
+     *     'S': USERDATA_SIZE
+     *     'R': reference count
+     */
 
-    if (u != NULL)
-        snprintf(p, sizeof(buf[0]), "<%s:%s>%p(%p+%d)",
-                 u->def->flags & MRP_LUA_CLASS_DYNAMIC ? "D" : "S",
-                 u->def->type_name, uptr, u, (int)USERDATA_SIZE);
-    else
-        snprintf(p, sizeof(buf[0]), "<NULL> instance");
+    if (!fmt || !*fmt || (fmt[0] == '*' && fmt[1] == '\0'))
+        fmt = "<%D:%t>%i:(%u+%S)>";
+
+    l = (int)sizeof(buf[0]);
+    s = fmt;
+    while (*s && l > 0) {
+        if (*s != '%') {
+            *p++ = *s++;
+            l--;
+            continue;
+        }
+
+        if (!u) {
+            *p++ = '?';
+            s++;
+            l--;
+            continue;
+        }
+
+        s++;
+
+#define P(fmt, arg) n = snprintf(p, l, fmt, arg);
+        switch (*s) {
+        case 'D': P("%s", u->def->flags & MRP_LUA_CLASS_DYNAMIC?"D":"S"); break;
+        case 't': P("%s", u->def->type_name);                             break;
+        case 'i': P("%p", uptr);                                          break;
+        case 'u': P("%p", u);                                             break;
+        case 'd': P("%p", USER_TO_DATA(u));                               break;
+        case 'S': P("%d", (int)USERDATA_SIZE);                            break;
+        case 'R': P("%d", (int)u->refcnt);                                break;
+        default : P("%s", "?");                                           break;
+        }
+#undef P
+
+        p += n;
+        l -= n;
+
+        if (*s)
+            s++;
+    }
+
+    if (l <= 0)
+        buf[idx-1][sizeof(buf[0])-1] = '\0';
 
     if (idx >= (int)MRP_ARRAY_SIZE(buf))
         idx = 0;
 
-    return p;
+    return r;
 }
 
 /** Dump the given object for debugging. */
-static char *__object(userdata_t *u, const char *fmt)
+static const char *__object(userdata_t *u, const char *fmt)
 {
     static char buf[16][256];
     static int  idx = 0;
+
     char       *p = buf[idx++];
+    char       *r = p;
+    const char *s;
+    int         l, n;
 
-    MRP_UNUSED(fmt);
+    /*
+     * Notes: The currently implemeted format specifiers are:
+     *     'D': dynamic flag, avaluates to 'S' or 'D'
+     *     't': object type name
+     *     'u': object userdata_t
+     *     'd': object user-visible data
+     *     'S': USERDATA_SIZE
+     *     'R': reference count
+     */
 
-    if (u != NULL)
-        snprintf(p, sizeof(buf[0]), "<%s:%s>(%p+%d)",
-                 u->def->flags & MRP_LUA_CLASS_DYNAMIC ? "D" : "S",
-                 u->def->type_name, u, (int)USERDATA_SIZE);
-    else
-        snprintf(p, sizeof(buf[0]), "<NULL> object");
+    if (!fmt || !*fmt || (fmt[0] == '*' && fmt[1] == '\0'))
+        fmt = "<%D:%t>%i:(%u+%S)>";
+
+    l = (int)sizeof(buf[0]);
+    s = fmt;
+    while (*s && l > 0) {
+        if (*s != '%') {
+            *p++ = *s++;
+            l--;
+            continue;
+        }
+
+        if (!u) {
+            *p++ = '?';
+            s++;
+            l--;
+            continue;
+        }
+
+        s++;
+
+#define P(fmt, arg) n = snprintf(p, l, fmt, arg);
+        switch (*s) {
+        case 'D': P("%s", u->def->flags & MRP_LUA_CLASS_DYNAMIC?"D":"S"); break;
+        case 't': P("%s", u->def->type_name);                             break;
+        case 'i': P("%s", "?");                                           break;
+        case 'u': P("%p", u);                                             break;
+        case 'd': P("%p", USER_TO_DATA(u));                               break;
+        case 'S': P("%d", (int)USERDATA_SIZE);                            break;
+        case 'R': P("%d", (int)u->refcnt);                                break;
+        default : P("%s", "?");                                           break;
+        }
+#undef P
+
+        p += n;
+        l -= n;
+
+        if (*s)
+            s++;
+    }
+
+    if (l <= 0)
+        buf[idx-1][sizeof(buf[0])-1] = '\0';
 
     if (idx >= (int)MRP_ARRAY_SIZE(buf))
         idx = 0;
 
-    return p;
+    return r;
 }
 
 
