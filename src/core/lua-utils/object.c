@@ -828,15 +828,6 @@ void mrp_lua_destroy_object(lua_State *L, const char *name, int idx, void *data)
 
             lua_pop(L, 1);
         }
-
-#if 0
-        /* remove initial reference */
-        mrp_debug("removing initial reference of <%s>@%p(%p) ", def->type_name,
-                  "of class <%s> (%s)", userdata, data);
-                  def->type_name);
-        mrp_unref_obj(userdata, refcnt);
-#endif
-
     }
 }
 
