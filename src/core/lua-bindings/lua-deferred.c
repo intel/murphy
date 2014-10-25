@@ -225,6 +225,7 @@ static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
     deferred_lua_t *d = (deferred_lua_t *)data;
 
     MRP_UNUSED(L);
+    MRP_UNUSED(deferred_lua_check);
 
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
