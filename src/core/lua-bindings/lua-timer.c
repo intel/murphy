@@ -234,6 +234,7 @@ static ssize_t timer_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
     timer_lua_t *t = (timer_lua_t *)data;
 
     MRP_UNUSED(L);
+    MRP_UNUSED(timer_lua_check);
 
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
