@@ -49,9 +49,9 @@
 
 typedef struct {
     lua_State      *L;                   /* Lua execution context */
+    mrp_mainloop_t *ml;                  /* murphy mainloop */
     mrp_deferred_t *d;                   /* associated murphy deferred */
     int             callback;            /* reference to callback */
-    int             data;                /* referece to callback data */
     bool            disabled;            /* true if disabled */
     bool            oneshot;             /* true for one-shot deferreds */
 } deferred_lua_t;
@@ -62,6 +62,8 @@ static void deferred_lua_destroy(void *data);
 static void deferred_lua_changed(void *data, lua_State *L, int member);
 static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
                                      size_t size, lua_State *L, void *data);
+static int deferred_lua_enable(lua_State *L);
+static int deferred_lua_disable(lua_State *L);
 
 /*
  * Lua deferred class
@@ -74,20 +76,20 @@ static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
 #define USESTACK MRP_LUA_CLASS_USESTACK
 
 MRP_LUA_METHOD_LIST_TABLE(deferred_lua_methods,
-                          MRP_LUA_METHOD_CONSTRUCTOR(deferred_lua_create));
+                          MRP_LUA_METHOD_CONSTRUCTOR(deferred_lua_create)
+                          MRP_LUA_METHOD(disable, deferred_lua_disable)
+                          MRP_LUA_METHOD(enable , deferred_lua_enable));
 
 MRP_LUA_METHOD_LIST_TABLE(deferred_lua_overrides,
                           MRP_LUA_OVERRIDE_CALL     (deferred_lua_create));
 
 MRP_LUA_MEMBER_LIST_TABLE(deferred_lua_members,
     MRP_LUA_CLASS_LFUNC  ("callback" , OFFS(callback) , NULL, NULL, NOTIFY )
-    MRP_LUA_CLASS_ANY    ("data"     , OFFS(data)     , NULL, NULL, NOFLAGS)
     MRP_LUA_CLASS_BOOLEAN("disabled" , OFFS(disabled) , NULL, NULL, NOTIFY )
     MRP_LUA_CLASS_BOOLEAN("oneshot"  , OFFS(oneshot)  , NULL, NULL, NOTIFY ));
 
 typedef enum {
     DEFERRED_MEMBER_CALLBACK,
-    DEFERRED_MEMBER_DATA,
     DEFERRED_MEMBER_DISABLED,
     DEFERRED_MEMBER_ONESHOT,
 } deferred_member_t;
@@ -95,7 +97,8 @@ typedef enum {
 MRP_LUA_DEFINE_CLASS(deferred, lua, deferred_lua_t, deferred_lua_destroy,
                      deferred_lua_methods, deferred_lua_overrides,
                      deferred_lua_members, NULL, deferred_lua_changed,
-                     deferred_lua_tostring, NULL, MRP_LUA_CLASS_EXTENSIBLE);
+                     deferred_lua_tostring, NULL,
+                     MRP_LUA_CLASS_EXTENSIBLE | MRP_LUA_CLASS_DYNAMIC);
 
 
 static void deferred_lua_cb(mrp_deferred_t *deferred, void *user_data)
@@ -107,14 +110,18 @@ static void deferred_lua_cb(mrp_deferred_t *deferred, void *user_data)
 
     if (mrp_lua_object_deref_value(d, d->L, d->callback, false)) {
         mrp_lua_push_object(d->L, d);
-        mrp_lua_object_deref_value(d, d->L, d->data, true);
 
-        if (lua_pcall(d->L, 2, 0, 0) != 0)
-            mrp_log_error("failed to invoke Lua deferred callback");
+        if (lua_pcall(d->L, 1, 0, 0) != 0) {
+            mrp_log_error("failed to invoke Lua deferred callback, disabling");
+            mrp_disable_deferred(d->d);
+            d->disabled = true;
+        }
     }
 
-    if (one)
+    if (one) {
         mrp_disable_deferred(d->d);
+        d->disabled = true;
+    }
 }
 
 
@@ -170,14 +177,12 @@ static int deferred_lua_create(lua_State *L)
     d = (deferred_lua_t *)mrp_lua_create_object(L, DEFERRED_LUA_CLASS, NULL, 0);
 
     d->L        = L;
-    d->d        = mrp_add_deferred(ctx->ml, deferred_lua_cb, d);
+    d->ml       = ctx->ml;
+    d->d        = mrp_add_deferred(d->ml, deferred_lua_cb, d);
     d->callback = LUA_NOREF;
-    d->data     = LUA_NOREF;
 
-    if (d->d == NULL) {
-        mrp_lua_destroy_object(L, NULL, 0, d);
+    if (d->d == NULL)
         return luaL_error(L, "failed to create Lua Murphy deferred");
-    }
 
     switch (narg) {
     case 1:
@@ -190,10 +195,8 @@ static int deferred_lua_create(lua_State *L)
         return luaL_error(L, "expecting 0 or 1 arguments, got %d", narg);
     }
 
-    if (d->callback == LUA_NOREF)
+    if (d->disabled || d->callback == LUA_NOREF || d->callback == LUA_REFNIL)
         mrp_disable_deferred(d->d);
-
-    mrp_lua_push_object(L, d);
 
     return 1;
 }
@@ -203,13 +206,14 @@ static void deferred_lua_destroy(void *data)
 {
     deferred_lua_t *d = (deferred_lua_t *)data;
 
+    mrp_debug("destroying Lua deferred %p", data);
+
     mrp_del_deferred(d->d);
     d->d = NULL;
 
     mrp_lua_object_unref_value(d, d->L, d->callback);
-    mrp_lua_object_unref_value(d, d->L, d->data);
+
     d->callback = LUA_NOREF;
-    d->data     = LUA_NOREF;
 }
 
 
@@ -225,7 +229,6 @@ static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
     deferred_lua_t *d = (deferred_lua_t *)data;
 
     MRP_UNUSED(L);
-    MRP_UNUSED(deferred_lua_check);
 
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
@@ -235,6 +238,46 @@ static ssize_t deferred_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
                         d->oneshot  ? "oneshot"  : "recurring",
                         d->d);
     }
+}
+
+
+static int deferred_lua_enable(lua_State *L)
+{
+    deferred_lua_t *d = deferred_lua_check(L, -1);
+
+    if (d == NULL) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    if (d->d != NULL && d->callback != LUA_NOREF && d->callback != LUA_REFNIL) {
+        mrp_enable_deferred(d->d);
+        d->disabled = false;
+    }
+
+    lua_pushboolean(L, !d->disabled);
+
+    return 1;
+}
+
+
+static int deferred_lua_disable(lua_State *L)
+{
+    deferred_lua_t *d = deferred_lua_check(L, -1);
+
+    if (d == NULL) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    if (d->d != NULL) {
+        mrp_disable_deferred(d->d);
+        d->disabled = true;
+    }
+
+    lua_pushboolean(L, true);
+
+    return 1;
 }
 
 
