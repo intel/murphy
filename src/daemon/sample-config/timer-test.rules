@@ -1,12 +1,65 @@
 timer = m:Timer({
    interval = 1000,
-   callback = function (t, data)
-       print('timer-test ('..data..'): foo = ' .. t.foo .. ', bar = ' .. t.bar)
-       t.callback = nil
-       timer = nil
+   callback = function (t)
+       print('timer-test<'..t.data..'> #' .. tostring(t.count))
+       print('    foo = ' .. t.foo .. ', bar = ' .. t.bar)
+
+       t.count = t.count + 1
+
+       if t.count == 5 then
+          t.interval = 500
+       else
+          if t.count == 10 then
+             t.interval = 250
+          else
+             if t.count == 20 then
+                t:stop()
+             end
+          end
+       end
    end,
-   data = '<timer-data>',
    oneshot = false,
-   foo = 'bar',
-   bar = 'foo'
+   data    = 'timer-data',
+   count   = 0,
+   foo     = 'bar',
+   bar     = 'foo'
+})
+
+
+def = m:Deferred({
+    disabled = true,
+    data     = 'test-deferred',
+    callback = function (d)
+       print('deferred <'..d.data..'> callback #'.. tostring(d.count))
+       print('    xyzzy = ' .. d.xyzzy .. ', what = ' .. d.what)
+
+       if d.count == 10 then
+          d.disabled = true
+       else
+          if d.count == 20 then
+             d:disable()
+             d.count = 1
+          end
+       end
+
+       d.count = d.count + 1
+    end,
+    count = 1,
+    xyzzy = 'blah',
+    what  = 'ever...'
+
+})
+
+
+sh = m:SigHandler({
+    signal = 17,
+    data     = 'test-sighandler',
+    callback = function (sh)
+       print('SigHandler <'..sh.data..'> callback #'.. tostring(sh.count))
+       print('    xyzzy = ' .. sh.attr1 .. ', what = ' .. sh.attr2)
+       sh.count = sh.count + 1
+    end,
+    count = 1,
+    attr1 = 'sh-attr-1',
+    attr2 = 'sh-attr-2'
 })
