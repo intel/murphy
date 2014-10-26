@@ -1118,6 +1118,12 @@ static int userdata_destructor(lua_State *L)
             if (cfg.track)
                 mrp_list_delete(&userdata->hook[0]);
 
+            lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
+            if (!lua_rawequal(L, -1, -2))
+                luaL_typerror(L, -2, def->userdata_id);
+            else
+                def->destructor(USER_TO_DATA(userdata));
+
             if (def->flags & MRP_LUA_CLASS_DYNAMIC) {
                 def->nactive--;
 
@@ -1129,12 +1135,6 @@ static int userdata_destructor(lua_State *L)
             }
 
             def->ndestroyed++;
-
-            lua_getfield(L, LUA_REGISTRYINDEX, def->userdata_id);
-            if (!lua_rawequal(L, -1, -2))
-                luaL_typerror(L, -2, def->userdata_id);
-            else
-                def->destructor(USER_TO_DATA(userdata));
 
             *userdatap = NULL;
             mrp_free(userdata);
@@ -1655,34 +1655,8 @@ static void object_create_reftbl(userdata_t *u, lua_State *L)
 
 static void object_delete_reftbl(userdata_t *u, lua_State *L)
 {
-    int prividx, ref;
-
-    if (u->refs.priv == LUA_NOREF)
-        return;
-
-    lua_rawgeti(L, LUA_REGISTRYINDEX, u->refs.priv);
-    prividx = lua_gettop(L);
-
-    /*
-     * Notes:
-     *     I'm not sure whether explicitly unreffing all references
-     *     is necessary. I couldn't find anything about it in the
-     *     documentation, so let's try to play safe.
-     */
-
-    lua_pushnil(L);
-    while (lua_next(L, prividx) != 0) {
-        ref = lua_tointeger(L, -2);
-        mrp_debug("freeing reference %d for %s", ref, __object(u, "*"));
-        luaL_unref(L, prividx, ref);
-        lua_pop(L, 1);
-    }
-
     luaL_unref(L, LUA_REGISTRYINDEX, u->refs.priv);
     u->refs.priv = LUA_NOREF;
-
-    lua_settop(L, prividx);
-    lua_pop(L, 1);
 }
 
 
@@ -1783,7 +1757,7 @@ static void object_create_exttbl(userdata_t *u, lua_State *L)
 
 static void object_delete_exttbl(userdata_t *u, lua_State *L)
 {
-    int extidx, ref;
+    int extidx;
 
     if (u->refs.ext == LUA_NOREF)
         return;
@@ -1794,16 +1768,21 @@ static void object_delete_exttbl(userdata_t *u, lua_State *L)
     /*
      * Notes:
      *     I'm not sure whether explicitly unreffing all references
-     *     is necessary. I couldn't find anything about it in the
-     *     documentation, so let's try to play safe.
+     *     is necessary... In principle this should not be necessary.
+     *     We should have the only reference to our exttbl and we are
+     *     about to remove that making exttb garbage-collectable.
      */
 
     lua_pushnil(L);
     while (lua_next(L, extidx) != 0) {
-        ref = lua_tointeger(L, -2);
-        mrp_debug("freeing reference %d for %s", ref, __object(u, "*"));
-        luaL_unref(L, extidx, ref);
         lua_pop(L, 1);
+        lua_pushvalue(L, -1);
+        lua_pushnil(L);
+
+        mrp_debug("freeing extended member [%s] of %s", lua_tostring(L, -2),
+                  __object(u, "*"));
+
+        lua_rawset(L, extidx);
     }
 
     luaL_unref(L, LUA_REGISTRYINDEX, u->refs.ext);
