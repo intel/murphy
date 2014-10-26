@@ -39,7 +39,7 @@
 MRP_CDECL_BEGIN
 
 /* Type for a proxied invocation handler. */
-typedef int (*mrp_domain_invoke_cb_t)(int narg, mrp_domctl_arg_t *args,
+typedef int (*mrp_domain_invoke_cb_t)(uint32_t narg, mrp_domctl_arg_t *args,
                                       uint32_t *nout, mrp_domctl_arg_t *outs,
                                       void *user_data);
 

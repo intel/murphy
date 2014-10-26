@@ -93,8 +93,6 @@ static int queue_pending(mrp_domctl_t *dc, uint32_t seq,
 static int notify_pending(mrp_domctl_t *dc, msg_t *msg);
 static int queue_invoke(mrp_domctl_t *dc, uint32_t seq,
                         mrp_domctl_return_cb_t cb, void *user_data);
-static int notify_invoke(mrp_domctl_t *dc, uint32_t seq, int error,
-                         int status, int narg, mrp_domctl_arg_t *args);
 static void purge_pending(mrp_domctl_t *dc);
 
 
@@ -526,6 +524,8 @@ static void process_invoke(mrp_domctl_t *dc, invoke_msg_t *invoke)
 
     if (m == NULL) {
         ret.error = MRP_DOMCTL_NOTFOUND;
+        args = NULL;
+        narg = 0;
     }
     else {
         ret.error = MRP_DOMCTL_OK;
@@ -536,6 +536,8 @@ static void process_invoke(mrp_domctl_t *dc, invoke_msg_t *invoke)
             args = ret.args = alloca(narg * sizeof(args[0]));
             memset(args, 0, narg * sizeof(args[0]));
         }
+        else
+            args = NULL;
 
         ret.retval = m->cb(dc, invoke->narg, invoke->args,
                            &ret.narg, ret.args, m->user_data);
@@ -553,7 +555,7 @@ static void process_invoke(mrp_domctl_t *dc, invoke_msg_t *invoke)
         msg = msg_encode_message((msg_t *)&ret);
 
         ret.narg = 0;
-        ret.args = NULL;
+        ret.args = args = NULL;
     }
 
     if (msg != NULL) {

@@ -105,13 +105,13 @@ typedef void (*mrp_domctl_watch_cb_t)(mrp_domctl_t *dc,
 
 /** Callback type for return of/reply to a proxied method invocation. */
 typedef void (*mrp_domctl_return_cb_t)(mrp_domctl_t *dc, int error, int retval,
-                                       int narg, mrp_domctl_arg_t *args,
+                                       uint32_t narg, mrp_domctl_arg_t *args,
                                        void *user_data);
 
 /** Callback type for a proxied method invocation. */
-typedef int (*mrp_domctl_invoke_cb_t)(mrp_domctl_t *dc, int narg,
+typedef int (*mrp_domctl_invoke_cb_t)(mrp_domctl_t *dc, uint32_t narg,
                                       mrp_domctl_arg_t *args,
-                                      int *nout, mrp_domctl_arg_t *outs,
+                                      uint32_t *nout, mrp_domctl_arg_t *outs,
                                       void *user_data);
 
 /*

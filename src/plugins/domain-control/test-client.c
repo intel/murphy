@@ -714,8 +714,8 @@ void update_imports(client_t *c, mrp_domctl_data_t *data, int ntable)
 }
 
 
-static int ping_cb(mrp_domctl_t *dc, int narg, mrp_domctl_arg_t *args,
-                   int *nout, mrp_domctl_arg_t *outs, void *user_data)
+static int ping_cb(mrp_domctl_t *dc, uint32_t narg, mrp_domctl_arg_t *args,
+                   uint32_t *nout, mrp_domctl_arg_t *outs, void *user_data)
 {
     client_t *c = (client_t *)user_data;
     int       i;
@@ -725,7 +725,7 @@ static int ping_cb(mrp_domctl_t *dc, int narg, mrp_domctl_arg_t *args,
 
     info_msg("pinged with %d arguments", narg);
 
-    for (i = 0; i < narg; i++) {
+    for (i = 0; i < (int)narg; i++) {
         switch (args[i].type) {
         case MRP_DOMCTL_STRING:
             info_msg("    #%d: %s", i, args[i].str);
@@ -761,8 +761,8 @@ static int ping_cb(mrp_domctl_t *dc, int narg, mrp_domctl_arg_t *args,
     }
 
 
-    for (i = 0; i < *nout; i++) {
-        if (i < narg) {
+    for (i = 0; i < (int)*nout; i++) {
+        if (i < (int)narg) {
             if (MRP_DOMCTL_IS_ARRAY(args[i].type)) {
                 int j;
 
