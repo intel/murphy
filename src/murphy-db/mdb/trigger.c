@@ -115,7 +115,7 @@ static MDB_DLIST_HEAD(transact_change_triggers);
 static int get_select_params(mdb_table_t *, mqi_column_desc_t *, int *, int *);
 static void row_change(mqi_event_type_t, mdb_table_t *, mdb_row_t *);
 static void table_change(mqi_event_type_t, mdb_table_t *);
-static void transaction_change(mqi_event_type_t);
+static void transaction_change(mqi_event_type_t, uint32_t);
 
 
 void mdb_trigger_init(mdb_trigger_t *trigger, int ncol)
@@ -514,14 +514,14 @@ void mdb_trigger_table_drop(mdb_table_t *tbl)
         table_change(mqi_table_dropped, tbl);
 }
 
-void mdb_trigger_transaction_start(void)
+void mdb_trigger_transaction_start(uint32_t depth)
 {
-    transaction_change(mqi_transaction_start);
+    transaction_change(mqi_transaction_start, depth);
 }
 
-void mdb_trigger_transaction_end(void)
+void mdb_trigger_transaction_end(uint32_t depth)
 {
-    transaction_change(mqi_transaction_end);
+    transaction_change(mqi_transaction_end, depth);
 }
 
 static int get_select_params(mdb_table_t       *tbl,
@@ -602,7 +602,7 @@ static void table_change(mqi_event_type_t event, mdb_table_t *tbl)
     }
 }
 
-static void transaction_change(mqi_event_type_t event)
+static void transaction_change(mqi_event_type_t event, uint32_t depth)
 {
     mqi_event_t           evt;
     transact_trigger_t   *tr;
@@ -612,6 +612,7 @@ static void transaction_change(mqi_event_type_t event)
     te = &evt.transact;
 
     te->event = event;
+    te->depth = depth;
 
     MDB_DLIST_FOR_EACH(transact_trigger_t,link, tr, &transact_change_triggers){
         tr->callback.function(&evt, tr->callback.user_data);

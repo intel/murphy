@@ -64,12 +64,12 @@ int mdb_transaction_commit(uint32_t depth)
 #define CHECK_TRIGGER_START(en) do {                    \
         if (!start_triggered) {                         \
             start_triggered = true;                     \
-            mdb_trigger_transaction_start();            \
+            mdb_trigger_transaction_start(depth);       \
         }                                               \
     } while (0)
 #define CHECK_TRIGGER_END() do {                        \
         if (start_triggered) {                          \
-            mdb_trigger_transaction_end();              \
+            mdb_trigger_transaction_end(depth);         \
         }                                               \
     } while (0)
 
@@ -129,9 +129,9 @@ int mdb_transaction_commit(uint32_t depth)
             sts = s;
     }
 
-    CHECK_TRIGGER_END();
-
     txdepth--;
+
+    CHECK_TRIGGER_END();
 
     return sts;
 

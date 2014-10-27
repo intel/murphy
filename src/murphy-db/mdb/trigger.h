@@ -52,8 +52,8 @@ void mdb_trigger_row_insert(mdb_table_t *, mdb_row_t *);
 void mdb_trigger_table_create(mdb_table_t *);
 void mdb_trigger_table_drop(mdb_table_t *);
 
-void mdb_trigger_transaction_start(void);
-void mdb_trigger_transaction_end(void);
+void mdb_trigger_transaction_start(uint32_t);
+void mdb_trigger_transaction_end(uint32_t);
 
 #endif /* __MDB_TRIGGER_H__ */
 

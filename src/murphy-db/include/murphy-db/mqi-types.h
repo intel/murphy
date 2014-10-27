@@ -240,6 +240,7 @@ struct mqi_table_event_s {
 
 struct mqi_transact_event_s {
     mqi_event_type_t  event;
+    uint32_t          depth;
 };
 
 
