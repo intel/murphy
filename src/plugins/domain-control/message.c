@@ -630,6 +630,54 @@ int msg_update_notify(mrp_msg_t *msg, int tblid, mql_result_t *r)
                 goto fail;
             }
         }
+
+        mrp_debug_code({
+                char buf[4096], *p;
+                int  n, l;
+
+                p = buf;
+                l = sizeof(buf) - 1;
+
+                n  = snprintf(p, l, "{");
+                p += n;
+                l -= n;
+
+                for (j = 0; j < ncol; j++) {
+                    switch (types[j]) {
+                    case mqi_string:
+                        str = mql_result_rows_get_string(r, j, i, NULL, 0);
+                        n   = snprintf(p, l, "%s'%s'", j ? ", " : " ", str);
+                        break;
+                    case mqi_integer:
+                        s32 = mql_result_rows_get_integer(r, j, i);
+                        n   = snprintf(p, l, "%s%d", j ? ", " : " ", s32);
+                        break;
+                    case mqi_unsignd:
+                        u32 = mql_result_rows_get_unsigned(r, j, i);
+                        n   = snprintf(p, l, "%s%u", j ? ", " : " ", u32);
+                        break;
+                    case mqi_floating:
+                        dbl = mql_result_rows_get_floating(r, j, i);
+                        n   = snprintf(p, l, "%s%f", j ? ", " : " ", dbl);
+                        break;
+                    default:
+                        continue;
+                    }
+
+                    p += n;
+                    l -= n;
+
+                    if (l <= 0)
+                        break;
+                }
+
+                if (l > 2) {
+                    *p++ = ' ', *p++ = '}';
+                    *p = '\0';
+
+                    mrp_debug("%s", buf);
+                }
+            });
     }
 
     return nrow * ncol;

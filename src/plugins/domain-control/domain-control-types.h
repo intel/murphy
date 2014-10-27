@@ -30,6 +30,8 @@
 #ifndef __MURPHY_DOMAIN_CONTROL_TYPES_H__
 #define __MURPHY_DOMAIN_CONTROL_TYPES_H__
 
+#include <stdbool.h>
+
 #include <murphy/common/list.h>
 #include <murphy/common/mainloop.h>
 #include <murphy/common/transport.h>
@@ -89,7 +91,7 @@ struct pep_table_s {
     int                 ncolumn;         /* number of columns */
     int                 idx_col;         /* column index of index column */
     mrp_list_hook_t     watches;         /* watches for this table */
-    int                 notify_all : 1;  /* notify all watches */
+    bool                changed;         /* whether has unsynced changes */
 };
 
 
@@ -104,9 +106,9 @@ struct pep_watch_s {
     int              max_rows;           /* max number of rows to select */
     pep_proxy_t     *proxy;              /* enforcement point */
     int              id;                 /* table id within proxy */
-    uint32_t         stamp;              /* last notified update stamp */
     mrp_list_hook_t  tbl_hook;           /* hook to table watch list */
     mrp_list_hook_t  pep_hook;           /* hook to proxy watch list */
+    bool             notify;             /* whether to notify this watch */
 };
 
 
@@ -136,12 +138,11 @@ struct pep_proxy_s {
     proxy_ops_t       *ops;              /* transport/messaging operations */
     uint32_t           seqno;            /* request sequence number */
     mrp_list_hook_t    pending;          /* pending method invocations */
-    int                notify_update;    /* whether needs notification */
     void              *notify_msg;       /* notification being built */
     int                notify_ntable;    /* number of changed tables */
     int                notify_ncolumn;   /* total columns in notification */
     int                notify_fail : 1;  /* notification failure */
-    int                notify_all : 1;   /* notify all watches */
+    int                notify : 1;       /* whether has pending notifications */
 };
 
 
@@ -159,7 +160,10 @@ struct pdp_s {
     mrp_list_hook_t  tables;             /* list of tables we track */
     mrp_htbl_t      *watched;            /* tracked tables by name */
     mrp_deferred_t  *notify;             /* deferred notification */
-    int              notify_scheduled;   /* is notification scheduled? */
+    bool             notify_scheduled;   /* is notification scheduled? */
+    void            *reh;                /* resolver event handler */
+    bool             ractive;            /* resolver active */
+    bool             rblocked;           /* resolver blocked update */
 };
 
 

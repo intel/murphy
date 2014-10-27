@@ -33,6 +33,8 @@
 #include <murphy/common/log.h>
 #include <murphy/common/wsck-transport.h>
 
+#include <murphy/core/event.h>
+#include <murphy/resolver/resolver.h>
 #include <murphy/core/domain.h>
 
 #include "proxy.h"
@@ -50,6 +52,58 @@ static int invoke_handler(void *handler_data, const char *id,
                           mrp_domain_return_cb_t return_cb,
                           void *user_data);
 
+static int RESEVT_START, RESEVT_DONE, RESEVT_FAIL;
+
+
+static void resolver_event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *data,
+                              void *user_data)
+{
+    pdp_t *pdp = (pdp_t *)user_data;
+
+    MRP_UNUSED(w);
+    MRP_UNUSED(data);
+
+    if (id == RESEVT_START)
+        pdp->ractive++;
+    else if (id == RESEVT_DONE || id == RESEVT_FAIL)
+        pdp->ractive--;
+
+    mrp_debug("resolver is %s active", pdp->ractive == 1 ? "now" :
+              pdp->ractive > 1 ? "still" : "no longer");
+
+    if (pdp->ractive == 0) {
+        schedule_notification(pdp);
+        pdp->rblocked = false;
+    }
+}
+
+
+static int add_resolver_trigger(pdp_t *pdp)
+{
+    mrp_event_mask_t mask;
+
+    RESEVT_START = mrp_register_event(MRP_RESOLVER_EVENT_STARTED);
+    RESEVT_DONE  = mrp_register_event(MRP_RESOLVER_EVENT_DONE);
+    RESEVT_FAIL  = mrp_register_event(MRP_RESOLVER_EVENT_FAILED);
+
+    mrp_reset_event_mask(&mask);
+
+    mrp_add_event(&mask, RESEVT_START);
+    mrp_add_event(&mask, RESEVT_DONE);
+    mrp_add_event(&mask, RESEVT_FAIL);
+
+    pdp->reh = mrp_add_event_watch(&mask, resolver_event_cb, pdp);
+
+    return pdp->reh != NULL;
+}
+
+
+static void del_resolver_trigger(pdp_t *pdp)
+{
+    mrp_del_event_watch(pdp->reh);
+    pdp->reh = NULL;
+}
+
 
 pdp_t *create_domain_control(mrp_context_t *ctx,
                              const char *extaddr, const char *intaddr,
@@ -64,6 +118,9 @@ pdp_t *create_domain_control(mrp_context_t *ctx,
         pdp->address = extaddr;
 
         if (init_proxies(pdp) && init_tables(pdp)) {
+
+            if (!add_resolver_trigger(pdp))
+                goto fail;
 
             if (extaddr && *extaddr)
                 pdp->extt = create_transport(pdp, extaddr);
@@ -94,6 +151,7 @@ pdp_t *create_domain_control(mrp_context_t *ctx,
             }
         }
 
+    fail:
         destroy_domain_control(pdp);
     }
 
@@ -104,6 +162,7 @@ pdp_t *create_domain_control(mrp_context_t *ctx,
 void destroy_domain_control(pdp_t *pdp)
 {
     if (pdp != NULL) {
+        del_resolver_trigger(pdp);
         destroy_proxies(pdp);
         destroy_tables(pdp);
         destroy_transport(pdp->extt);
@@ -120,7 +179,7 @@ static void notify_cb(mrp_deferred_t *d, void *user_data)
     pdp_t *pdp = (pdp_t *)user_data;
 
     mrp_disable_deferred(d);
-    pdp->notify_scheduled = FALSE;
+    pdp->notify_scheduled = false;
     notify_table_changes(pdp);
 }
 
@@ -134,6 +193,7 @@ void schedule_notification(pdp_t *pdp)
     if (!pdp->notify_scheduled) {
         mrp_debug("scheduling client notification");
         mrp_enable_deferred(pdp->notify);
+        pdp->notify_scheduled = true;
     }
 }
 
@@ -191,7 +251,6 @@ static void process_register(pep_proxy_t *proxy, register_msg_t *reg)
     if (register_proxy(proxy, reg->name, reg->tables, reg->ntable,
                        reg->watches, reg->nwatch, &error, &errmsg)) {
         msg_send_ack(proxy, reg->seq);
-        proxy->notify_all = TRUE;
         schedule_notification(proxy->pdp);
     }
     else

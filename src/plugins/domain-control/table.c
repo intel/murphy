@@ -37,6 +37,7 @@
 
 #include <murphy-db/mqi.h>
 #include <murphy-db/mql.h>
+#include <murphy-db/mdb.h>
 
 #include "domain-control.h"
 #include "table.h"
@@ -54,6 +55,67 @@ static pep_table_t *lookup_watch_table(pdp_t *pdp, const char *name);
  */
 
 
+static void table_change_cb(mqi_event_t *e, void *tptr)
+{
+    static const char *events[] = {
+        "unknown (?)",
+        "column change",
+        "row insert",
+        "row delete",
+        "table create",
+        "table drop",
+        "transaction start (?)",
+        "transaction end (?)",
+    };
+    pep_table_t *t = (pep_table_t *)tptr;
+
+    if (!t->changed) {
+        t->changed = true;
+        mrp_debug("table '%s' changed by %s event", t->name, events[e->event]);
+    }
+}
+
+
+static int add_table_triggers(pep_table_t *t)
+{
+    mdb_table_t *tbl;
+
+    if (t->h == MQI_HANDLE_INVALID) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    if ((tbl = mdb_table_find(t->name)) == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (mdb_trigger_add_row_callback(tbl, table_change_cb, t, NULL) < 0 ||
+        mdb_trigger_add_column_callback(tbl, 0, table_change_cb, t, NULL) < 0) {
+        mdb_trigger_delete_row_callback(tbl, table_change_cb, t);
+        errno = EINVAL;
+        return -1;
+    }
+
+    return 0;
+}
+
+
+static void del_table_triggers(pep_table_t *t)
+{
+    mdb_table_t *tbl;
+
+    if (t->h == MQI_HANDLE_INVALID)
+        return;
+
+    if ((tbl = mdb_table_find(t->name)) == NULL)
+        return;
+
+    mdb_trigger_delete_row_callback(tbl, table_change_cb, t);
+    mdb_trigger_delete_column_callback(tbl, 0, table_change_cb, t);
+}
+
+
 static void table_event_cb(mqi_event_t *e, void *user_data)
 {
     pdp_t        *pdp  = (pdp_t *)user_data;
@@ -69,6 +131,7 @@ static void table_event_cb(mqi_event_t *e, void *user_data)
     case mqi_table_dropped:
         mrp_debug("table %s (0x%x) dropped", name, h);
         break;
+
     default:
         return;
     }
@@ -76,8 +139,16 @@ static void table_event_cb(mqi_event_t *e, void *user_data)
     t = lookup_watch_table(pdp, name);
 
     if (t != NULL) {
-        t->notify_all = TRUE;
-        t->h          = h;
+        t->changed = true;
+
+        if (e->event == mqi_table_created) {
+            t->h = h;
+            add_table_triggers(t);
+        }
+        else {
+            t->h = MQI_HANDLE_INVALID;
+            del_table_triggers(t);
+        }
     }
 
     schedule_notification(pdp);
@@ -86,21 +157,30 @@ static void table_event_cb(mqi_event_t *e, void *user_data)
 
 static void transaction_event_cb(mqi_event_t *e, void *user_data)
 {
-    pdp_t *pdp = (pdp_t *)user_data;
+    pdp_t *pdp   = (pdp_t *)user_data;
+    int    depth = e->transact.depth;
 
     switch (e->event) {
     case mqi_transaction_end:
-        mrp_debug("transaction ended");
-        if (mqi_get_transaction_depth() == 1) {
-            mrp_debug("was not nested, scheduling notification");
-            schedule_notification(pdp);
+        if (depth == 1) {
+            mrp_debug("outermost transaction ended");
+
+            if (pdp->ractive) {
+                mrp_debug("resolver active, delaying client notifications");
+                pdp->rblocked = true;
+            }
+            else
+                schedule_notification(pdp);
         }
         else
-            mrp_debug("was nested");
+            mrp_debug("nested transaction (#%d) ended", depth);
         break;
 
     case mqi_transaction_start:
-        mrp_debug("transaction started");
+        if (depth == 1)
+            mrp_debug("outermost transaction started");
+        else
+            mrp_debug("nested transaction (#%d) started", depth);
         break;
 
     default:
@@ -111,13 +191,19 @@ static void transaction_event_cb(mqi_event_t *e, void *user_data)
 
 static int open_db(pdp_t *pdp)
 {
+    static bool done = false;
+
+    if (done)
+        return TRUE;
+
     if (mqi_open() == 0) {
-        if (mqi_create_transaction_trigger(transaction_event_cb, pdp) == 0) {
-            if (mqi_create_table_trigger(table_event_cb, pdp) == 0)
-                return TRUE;
-            else
-                mqi_drop_transaction_trigger(transaction_event_cb, pdp);
+        if (mqi_create_transaction_trigger(transaction_event_cb, pdp) == 0 &&
+            mqi_create_table_trigger(table_event_cb, pdp) == 0) {
+            done = true;
+            return TRUE;
         }
+
+        mqi_drop_transaction_trigger(transaction_event_cb, pdp);
     }
 
     return FALSE;
@@ -320,6 +406,9 @@ pep_table_t *create_watch_table(pdp_t *pdp, const char *name)
 
         get_table_description(t);
 
+        if (t->h != MQI_HANDLE_INVALID)
+            add_table_triggers(t);
+
         if (!mrp_htbl_insert(pdp->watched, t->name, t))
             goto fail;
 
@@ -341,6 +430,8 @@ static void destroy_table_watches(pep_table_t *t)
     mrp_list_hook_t *p, *n;
 
     if (t != NULL) {
+        del_table_triggers(t);
+
         mrp_list_foreach(&t->watches, p, n) {
             w = mrp_list_entry(p, typeof(*w), tbl_hook);
 
@@ -415,6 +506,7 @@ int create_proxy_watch(pep_proxy_t *proxy, int id,
         w->max_rows     = max_rows;
         w->proxy        = proxy;
         w->id           = id;
+        w->notify       = true;
 
         if (w->mql_columns == NULL || w->mql_where == NULL)
             goto fail;

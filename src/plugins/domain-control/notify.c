@@ -40,35 +40,9 @@
 
 static void prepare_proxy_notification(pep_proxy_t *proxy)
 {
-    proxy->notify_update  = FALSE;
     proxy->notify_ntable  = 0;
     proxy->notify_ncolumn = 0;
-    proxy->notify_fail    = FALSE;
-}
-
-
-static void check_watch_notification(pep_watch_t *w)
-{
-    pep_proxy_t *proxy = w->proxy;
-    pep_table_t *t     = w->table;
-    int          update;
-
-    if (t->notify_all) {
-        t->h   = mqi_get_table_handle(t->name);
-        update = TRUE;
-    }
-    else {
-        if (t->h != MQI_HANDLE_INVALID)
-            update = (w->stamp < mqi_get_table_stamp(t->h));
-        else
-            update = FALSE;
-
-        mrp_debug("'%s': table '%s' = #%u, watch = # %u: %s", proxy->name,
-                  t->name, mqi_get_table_stamp(t->h), w->stamp,
-                  update ? "UPDATE" : "OMIT");
-    }
-
-    proxy->notify_update |= update;
+    proxy->notify_fail    = false;
 }
 
 
@@ -104,7 +78,7 @@ static int collect_watch_notification(pep_watch_t *w)
     else {
     fail:
         proxy->ops->free_notify(proxy);
-        proxy->notify_fail = TRUE;
+        proxy->notify_fail = true;
 
         return FALSE;
     }
@@ -129,8 +103,7 @@ static int send_proxy_notification(pep_proxy_t *proxy)
     proxy->notify_msg     = NULL;
     proxy->notify_ntable  = 0;
     proxy->notify_ncolumn = 0;
-    proxy->notify_fail    = FALSE;
-    proxy->notify_all     = FALSE;
+    proxy->notify_fail    = false;
 
     return TRUE;
 }
@@ -153,18 +126,25 @@ void notify_table_changes(pdp_t *pdp)
     mrp_list_foreach(&pdp->tables, p, n) {
         t = mrp_list_entry(p, typeof(*t), hook);
 
+        mrp_debug("table '%s' has %s changes", t->name,
+                  t->changed ? "unsynced" : "no");
+
+        if (!t->changed)
+            continue;
+
         mrp_list_foreach(&t->watches, wp, wn) {
             w = mrp_list_entry(wp, typeof(*w), tbl_hook);
-            check_watch_notification(w);
+            w->proxy->notify = true;
         }
-
-        t->notify_all = FALSE;
     }
 
     mrp_list_foreach(&pdp->proxies, p, n) {
         proxy = mrp_list_entry(p, typeof(*proxy), hook);
 
-        if (proxy->notify_update || proxy->notify_all) {
+        mrp_debug("proxy %s needs %supdate", proxy->name,
+                  proxy->notify ? "" : "no ");
+
+        if (proxy->notify) {
             mrp_list_foreach(&proxy->watches, wp, wn) {
                 w = mrp_list_entry(wp, typeof(*w), pep_hook);
                 if (!collect_watch_notification(w))
@@ -173,12 +153,12 @@ void notify_table_changes(pdp_t *pdp)
 
             send_proxy_notification(proxy);
 
-            mrp_list_foreach(&proxy->watches, wp, wn) {
-                w = mrp_list_entry(wp, typeof(*w), pep_hook);
-
-                if (w->table && w->table->h != MQI_HANDLE_INVALID)
-                    w->stamp = mqi_get_table_stamp(w->table->h);
-            }
+            proxy->notify = false;
         }
+    }
+
+    mrp_list_foreach(&pdp->tables, p, n) {
+        t = mrp_list_entry(p, typeof(*t), hook);
+        t->changed = false;
     }
 }
