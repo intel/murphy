@@ -105,8 +105,11 @@ static void deferred_lua_cb(mrp_deferred_t *deferred, void *user_data)
 {
     deferred_lua_t *d   = (deferred_lua_t *)user_data;
     int             one = d->oneshot;
+    int             top;
 
     MRP_UNUSED(deferred);
+
+    top = lua_gettop(d->L);
 
     if (mrp_lua_object_deref_value(d, d->L, d->callback, false)) {
         mrp_lua_push_object(d->L, d);
@@ -122,6 +125,8 @@ static void deferred_lua_cb(mrp_deferred_t *deferred, void *user_data)
         mrp_disable_deferred(d->d);
         d->disabled = true;
     }
+
+    lua_settop(d->L, top);
 }
 
 
