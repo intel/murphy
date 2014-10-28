@@ -84,6 +84,9 @@ static int log_msg(lua_State *L, int level)
     lua_Debug   caller;
     const char *file, *func;
     int         line;
+    int         top;
+
+    top = lua_gettop(L);
 
     if (!loaded) {
         luaopen_string(L);
@@ -97,7 +100,7 @@ static int log_msg(lua_State *L, int level)
 
     if (n > 1)
         if (call_function(L, "string", "format") != 0)
-            return 0;
+            goto out;
 
     lua_getstack(L, 1, &caller);
     if (lua_getinfo(L, "Snl", &caller)) {
@@ -112,6 +115,9 @@ static int log_msg(lua_State *L, int level)
     }
 
     mrp_log_msg(level, file, line, func, "%s", lua_tostring(L, 1));
+
+ out:
+    lua_settop(L, top);
 
     return 0;
 }
