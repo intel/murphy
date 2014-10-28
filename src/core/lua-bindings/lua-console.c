@@ -43,7 +43,7 @@ static void eval_cb(mrp_console_t *c, void *user_data, const char *grp,
                     const char *cmd, char *code)
 {
     lua_State *L;
-    int        len;
+    int        len, top;
 
     MRP_UNUSED(c);
     MRP_UNUSED(user_data);
@@ -57,11 +57,13 @@ static void eval_cb(mrp_console_t *c, void *user_data, const char *grp,
         return;
     }
 
+    top = lua_gettop(L);
+
     len = strlen(code);
     if (luaL_loadbuffer(L, code, len, "<console>") || lua_pcall(L, 0, 0, 0))
         printf("Lua error: %s\n", lua_tostring(L, -1));
 
-    lua_settop(L, 0);
+    lua_settop(L, top);
 }
 
 
@@ -73,6 +75,7 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     size_t       size;
     ssize_t      len;
     int          fd;
+    int          top;
 
     MRP_UNUSED(c);
     MRP_UNUSED(user_data);
@@ -92,6 +95,8 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     }
 
     if (path && *path) {
+        top = lua_gettop(L);
+
         if (stat(path, &st) == 0) {
             fd = open(path, O_RDONLY);
 
@@ -105,8 +110,6 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
                     if (luaL_loadbuffer(L, code, len, path) != 0 ||
                         lua_pcall(L, 0, 0, 0) != 0)
                         printf("Lua error: %s\n", lua_tostring(L, -1));
-
-                    lua_settop(L, 0);
                 }
             }
             else
@@ -116,6 +119,8 @@ static void source_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
         else
             printf("Failed to open %s (%d: %s).\n", path,
                    errno, strerror(errno));
+
+        lua_settop(L, top);
     }
 }
 
