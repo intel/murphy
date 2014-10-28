@@ -527,11 +527,14 @@ static ssize_t transport_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
 static void event_connect(mrp_transport_t *mt, void *user_data)
 {
     transport_lua_t *t = (transport_lua_t *)user_data;
+    int              top;
 
     MRP_UNUSED(mt);
 
     mrp_debug("incoming connection on <transport <%s> %p(%p)>",
               t->address ? t->address : "no address", t, t->t);
+
+    top = lua_gettop(t->L);
 
     if (mrp_lua_object_deref_value(t, t->L, t->callback.connect, false)) {
         mrp_lua_push_object(t->L, t);
@@ -541,17 +544,22 @@ static void event_connect(mrp_transport_t *mt, void *user_data)
         if (lua_pcall(t->L, 3, 0, 0) != 0)
             mrp_log_error("failed to invoke transport connect callback");
     }
+
+    lua_settop(t->L, top);
 }
 
 
 static void event_closed(mrp_transport_t *mt, int error, void *user_data)
 {
     transport_lua_t *t = (transport_lua_t *)user_data;
+    int              top;
 
     MRP_UNUSED(mt);
 
     mrp_debug("<transport <%s> %p(%p)> has been closed",
               t->address ? t->address : "no address", t, t->t);
+
+    top = lua_gettop(t->L);
 
     if (mrp_lua_object_deref_value(t, t->L, t->callback.closed, false)) {
         mrp_lua_push_object(t->L, t);
@@ -564,17 +572,22 @@ static void event_closed(mrp_transport_t *mt, int error, void *user_data)
         mrp_transport_destroy(t->t);
         t->t = NULL;
     }
+
+    lua_settop(t->L, top);
 }
 
 
 static void event_recv(mrp_transport_t *mt, void *msg, void *user_data)
 {
     transport_lua_t *t = (transport_lua_t *)user_data;
+    int              top;
 
     MRP_UNUSED(mt);
 
     mrp_debug("received message on <transport <%s> %p(%p)>",
               t->address ? t->address : "no address", t, t->t);
+
+    top = lua_gettop(t->L);
 
     if (mrp_lua_object_deref_value(t, t->L, t->callback.recv, false)) {
         mrp_lua_push_object(t->L, t);
@@ -584,6 +597,8 @@ static void event_recv(mrp_transport_t *mt, void *msg, void *user_data)
         if (lua_pcall(t->L, 3, 0, 0) != 0)
             mrp_log_error("failed to invoke transport recv callback");
     }
+
+    lua_settop(t->L, top);
 }
 
 
@@ -591,6 +606,7 @@ static void event_recvfrom(mrp_transport_t *mt, void *msg, mrp_sockaddr_t *addr,
                            socklen_t alen, void *user_data)
 {
     transport_lua_t *t = (transport_lua_t *)user_data;
+    int              top;
 
     MRP_UNUSED(mt);
     MRP_UNUSED(addr);
@@ -598,6 +614,8 @@ static void event_recvfrom(mrp_transport_t *mt, void *msg, mrp_sockaddr_t *addr,
 
     mrp_debug("received message on <transport <%s> %p(%p)>",
               t->address ? t->address : "no address", t, t->t);
+
+    top = lua_gettop(t->L);
 
     if (mrp_lua_object_deref_value(t, t->L, t->callback.recvfrom, false)) {
         mrp_lua_push_object(t->L, t);
@@ -608,6 +626,8 @@ static void event_recvfrom(mrp_transport_t *mt, void *msg, mrp_sockaddr_t *addr,
         if (lua_pcall(t->L, 4, 0, 0) != 0)
             mrp_log_error("failed to invoke transport recvfrom callback");
     }
+
+    lua_settop(t->L, top);
 }
 
 
