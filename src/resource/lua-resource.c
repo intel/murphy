@@ -494,11 +494,14 @@ void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_
 {
     resource_set_lua_t *rset = (resource_set_lua_t *) user_data;
     mrp_resource_mask_t grant, advice;
+    int                 top;
 
     MRP_UNUSED(request_id);
     MRP_UNUSED(resource_set);
 
     mrp_debug("> event_cb");
+
+    top = lua_gettop(rset->L);
 
     grant = mrp_get_resource_set_grant(rset->resource_set);
     advice = mrp_get_resource_set_advice(rset->resource_set);
@@ -515,6 +518,8 @@ void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_
             mrp_log_error("failed to invoke Lua resource set callback: %s",
                     lua_tostring(rset->L, -1));
     }
+
+    lua_settop(rset->L, top);
 }
 
 static void htbl_free_resource(void *key, void *object)
