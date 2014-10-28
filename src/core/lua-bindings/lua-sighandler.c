@@ -105,8 +105,11 @@ static void sighandler_lua_cb(mrp_sighandler_t *hlr, int sig, void *user_data)
     sighandler_lua_t *h   = (sighandler_lua_t *)user_data;
     int               one = h->oneshot;
     const char       *s   = strsignal(sig);
+    int               top;
 
     MRP_UNUSED(hlr);
+
+    top = lua_gettop(h->L);
 
     if (mrp_lua_object_deref_value(h, h->L, h->callback, false)) {
         mrp_lua_push_object(h->L, h);
@@ -123,6 +126,8 @@ static void sighandler_lua_cb(mrp_sighandler_t *hlr, int sig, void *user_data)
         mrp_del_sighandler(h->h);
         h->h = NULL;
     }
+
+    lua_settop(h->L, top);
 }
 
 
