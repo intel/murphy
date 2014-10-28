@@ -107,8 +107,11 @@ static void timer_lua_cb(mrp_timer_t *timer, void *user_data)
 {
     timer_lua_t *t   = (timer_lua_t *)user_data;
     int          one = t->oneshot;
+    int          top;
 
     MRP_UNUSED(timer);
+
+    top = lua_gettop(t->L);
 
     if (mrp_lua_object_deref_value(t, t->L, t->callback, false)) {
         mrp_lua_push_object(t->L, t);
@@ -124,6 +127,8 @@ static void timer_lua_cb(mrp_timer_t *timer, void *user_data)
         mrp_del_timer(t->t);
         t->t = NULL;
     }
+
+    lua_settop(t->L, top);
 }
 
 
