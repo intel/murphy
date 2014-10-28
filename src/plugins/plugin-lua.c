@@ -48,15 +48,19 @@ enum {
 
 static int load_config(lua_State *L, const char *path)
 {
+    int success;
+
     if (!luaL_loadfile(L, path) && !lua_pcall(L, 0, 0, 0))
-        return TRUE;
+        success = TRUE;
     else {
         mrp_log_error("plugin-lua: failed to load config file %s.", path);
         mrp_log_error("%s", lua_tostring(L, -1));
         lua_settop(L, 0);
 
-        return FALSE;
+        success = FALSE;
     }
+
+    return success;
 }
 
 
@@ -97,24 +101,27 @@ static int luaR_execute(mrp_scriptlet_t *script, mrp_context_tbl_t *ctbl)
     mrp_interpreter_t *i   = script->interpreter;
     lua_State         *L   = i->data;
     int                ref = (ptrdiff_t)script->data;
+    int                top, success;
 
     MRP_UNUSED(ctbl);
+
+    success = FALSE;
+    top = lua_gettop(L);
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
 
     if (lua_isfunction(L, -1)) {
-        if (!lua_pcall(L, 0, 0, 0)) {
-            lua_settop(L, 0);
-
-            return TRUE;
-        }
+        if (!lua_pcall(L, 0, 0, 0))
+            success = TRUE;
+    }
+    else {
+        mrp_log_error("plugin-lua: failed to execute scriptlet.");
+        mrp_log_error("error: %s", lua_tostring(L, -1));
     }
 
-    mrp_log_error("plugin-lua: failed to execute scriptlet.");
-    mrp_log_error("error: %s", lua_tostring(L, -1));
-    lua_settop(L, 0);
+    lua_settop(L, top);
 
-    return FALSE;
+    return success;
 }
 
 
