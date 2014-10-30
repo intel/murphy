@@ -1072,6 +1072,13 @@ resource_api_fuzz_SOURCES = plugins/resource-native/libmurphy-resource/resource-
 resource_api_fuzz_CFLAGS  = $(AM_CFLAGS)
 resource_api_fuzz_LDADD   = libmurphy-common.la libmurphy-resource.la
 
+# context-create
+bin_PROGRAMS += resource-context-create
+
+resource_context_create_SOURCES = plugins/resource-native/libmurphy-resource/context-create.c
+resource_context_create_CFLAGS  = $(AM_CFLAGS)
+resource_context_create_LDADD   = libmurphy-common.la libmurphy-resource.la
+
 ###################################
 # murphy plugins
 #
