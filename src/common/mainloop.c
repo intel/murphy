@@ -1811,7 +1811,7 @@ int mrp_mainloop_poll(mrp_mainloop_t *ml, int may_block)
 {
     int n, timeout;
 
-    timeout = may_block ? ml->poll_timeout : 0;
+    timeout = may_block && mrp_list_empty(&ml->deferred) ? ml->poll_timeout : 0;
 
     if (ml->nevent > 0) {
         if (ml->super_ops == NULL || ml->super_ops->poll_io == NULL) {
