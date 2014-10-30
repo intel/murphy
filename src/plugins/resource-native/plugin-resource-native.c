@@ -811,6 +811,9 @@ static void closed_evt(mrp_transport_t *transp, int error, void *user_data)
 
     mrp_list_delete(&client->list);
     mrp_free(client);
+
+    mrp_transport_disconnect(transp);
+    mrp_transport_destroy(transp);
 }
 
 
