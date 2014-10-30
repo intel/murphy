@@ -176,12 +176,27 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: debugging data for libbreedline
  Debugging symbols for libbreedline.
 
-Package: murphy-config
+Package: murphy-demo-config
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: example configuration files for Murphy
  Example configuration files for Murphy. These are meant to provide a baseline
  for real configuration.
+
+Package: murphy-demo-plugins
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: demo plugins for Murphy
+ Plugins demonstrating how system information is read and processed inside
+ Murphy. Works the best with murphy-demo-config.
+
+Package: murphy-demo-plugins-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: debugging data for murphy-demo-plugins
+ Debugging symbols for murphy-demo-plugins.
 
 Package: murphy
 Architecture: any

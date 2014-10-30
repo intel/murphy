@@ -31,5 +31,6 @@ override_dh_strip:
 	dh_strip -plibmurphy-pulse0 --dbg-package=libmurphy-pulse-dbg
 	dh_strip -plibmurphy-ecore0 --dbg-package=libmurphy-ecore-dbg
 	dh_strip -plibbreedline0 --dbg-package=libbreedline-dbg
+	dh_strip -pmurphy-demo-plugins --dbg-package=murphy-demo-plugins-dbg
 	dh_strip -pmurphy --dbg-package=murphy-dbg
 	dh_strip -pmurphy-tests --dbg-package=murphy-tests-dbg
