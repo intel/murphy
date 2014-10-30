@@ -1815,6 +1815,9 @@ int mrp_mainloop_poll(mrp_mainloop_t *ml, int may_block)
 
     if (ml->nevent > 0) {
         if (ml->super_ops == NULL || ml->super_ops->poll_io == NULL) {
+            mrp_debug("polling %d descriptors with timeout %d",
+                      ml->nevent, timeout);
+
             n = epoll_wait(ml->epollfd, ml->events, ml->nevent, timeout);
 
             if (n < 0 && errno == EINTR)
