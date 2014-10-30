@@ -540,7 +540,8 @@ clean-linker-script::
 #
 
 murphy_pulse_headers =			\
-		common/pulse-glue.h
+		common/pulse-glue.h	\
+		common/pulse-subloop.h
 
 if PULSE_ENABLED
 lib_LTLIBRARIES += libmurphy-pulse.la
@@ -553,7 +554,8 @@ libmurphy_pulse_ladir      =		\
 libmurphy_pulse_la_HEADERS = $(murphy_pulse_headers)
 
 libmurphy_pulse_la_SOURCES =		\
-		common/pulse-glue.c
+		common/pulse-glue.c	\
+		common/pulse-subloop.c
 
 libmurphy_pulse_la_CFLAGS  =		\
 		$(AM_CFLAGS)		\
@@ -578,7 +580,8 @@ endif
 # linker script generation
 linker-script.pulse: $(murphy_pulse_headers)
 	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
-		-P "$(CC)" -c "$(libmurphy_pulse_la_CFLAGS)" -o $@ $^
+		-P "$(CC)" -c "$(libmurphy_pulse_la_CFLAGS)" \
+                -p '^mrp_|^_mrp|^pa_' -o $@ $^
 
 clean-linker-script::
 	-rm -f linker-script.pulse
