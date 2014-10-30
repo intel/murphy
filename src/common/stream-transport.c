@@ -44,6 +44,7 @@
 #include <murphy/common/log.h>
 #include <murphy/common/msg.h>
 #include <murphy/common/fragbuf.h>
+#include <murphy/common/socket-utils.h>
 #include <murphy/common/transport.h>
 
 #ifndef UNIX_PATH_MAX
@@ -295,6 +296,25 @@ static int strm_createfrom(mrp_transport_t *mt, void *conn)
 }
 
 
+static void strm_close(mrp_transport_t *mt)
+{
+    strm_t *t = (strm_t *)mt;
+
+    mrp_debug("closing transport %p", mt);
+
+    mrp_del_io_watch(t->iow);
+    t->iow = NULL;
+
+    mrp_fragbuf_destroy(t->buf);
+    t->buf = NULL;
+
+    if (t->sock >= 0){
+        close(t->sock);
+        t->sock = -1;
+    }
+}
+
+
 static int strm_bind(mrp_transport_t *mt, mrp_sockaddr_t *addr,
                      socklen_t addrlen)
 {
@@ -343,9 +363,8 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 
     addrlen = sizeof(addr);
     t->sock = accept(lt->sock, &addr.any, &addrlen);
-    t->buf  = mrp_fragbuf_create(TRUE, 0);
 
-    if (t->sock >= 0 && t->buf != NULL) {
+    if (t->sock >= 0) {
         if (mt->flags & MRP_TRANSPORT_REUSEADDR) {
             on = 1;
             setsockopt(t->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -359,42 +378,44 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
             fcntl(t->sock, F_SETFL, O_CLOEXEC, on);
         }
 
+        t->buf = mrp_fragbuf_create(TRUE, 0);
         events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
         t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
 
-        if (t->iow != NULL) {
+        if (t->iow != NULL && t->buf != NULL) {
             mrp_debug("accepted connection on transport %p/%p", mlt, mt);
             return TRUE;
         }
         else {
+            mrp_fragbuf_destroy(t->buf);
+            t->buf = NULL;
             close(t->sock);
             t->sock = -1;
         }
     }
-    else
-        mrp_fragbuf_destroy(t->buf);
+    else {
+        if (mrp_reject_connection(lt->sock, NULL, 0) < 0) {
+            mrp_log_error("%s(): accept failed, closing transport %p (%d: %s).",
+                          __FUNCTION__, mlt, errno, strerror(errno));
+            strm_close(mlt);
 
-    mrp_debug("failed to accept connection on transport %p/%p", mlt, mt);
-    return FALSE;
-}
-
-
-static void strm_close(mrp_transport_t *mt)
-{
-    strm_t *t = (strm_t *)mt;
-
-    mrp_debug("closing transport %p", mt);
-
-    mrp_del_io_watch(t->iow);
-    t->iow = NULL;
-
-    mrp_fragbuf_destroy(t->buf);
-    t->buf = NULL;
-
-    if (t->sock >= 0){
-        close(t->sock);
-        t->sock = -1;
+            /* Notes:
+             *     Unfortunately we cannot safely emit a closed event here.
+             *     The closed event is semantically attached to an accepted
+             *     tranport being closed and there is no equivalent for a
+             *     listening transport (we should have had a generic error
+             *     event). There for the transport owner expects and treats
+             *     (IOW casts) the associated user_data accordingly. That
+             *     would end up in a disaster... Once we cleanup/rework the
+             *     transport infra, this needs to be done better.
+             */
+        }
+        else
+            mrp_log_error("%s(): rejected connection for transport %p (%d: %s).",
+                          __FUNCTION__, mlt, errno, strerror(errno));
     }
+
+    return FALSE;
 }
 
 
