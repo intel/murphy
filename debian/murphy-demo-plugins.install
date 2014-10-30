@@ -1,0 +1,3 @@
+usr/lib/*/murphy/plugins/plugin-wifi-on.so
+usr/lib/*/murphy/plugins/plugin-pulseaudio-volume.so
+usr/lib/*/murphy/plugins/plugin-demo-dc.so

@@ -6,4 +6,5 @@ usr/lib/*/libmurphy-lua-utils.so.*
 usr/lib/*/libmurphy-lua-decision.so.*
 usr/lib/*/libmurphy-resolver.so.*
 usr/lib/*/libmurphy-resource-backend.so.*
-usr/lib/*/murphy/plugins/*.so
+usr/lib/*/murphy/plugins/plugin-resource-native.so
+usr/lib/*/murphy/plugins/plugin-domain-control.so
