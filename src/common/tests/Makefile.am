@@ -1,7 +1,8 @@
 AM_CFLAGS = $(WARNING_CFLAGS) -I$(top_builddir)
 
 noinst_PROGRAMS  = mm-test hash-test hash12-test msg-test transport-test \
-                 internal-transport-test process-watch-test native-test
+                 internal-transport-test process-watch-test native-test \
+		 mkdir-test
 
 if LIBDBUS_ENABLED
 noinst_PROGRAMS += mainloop-test dbus-test
@@ -127,3 +128,8 @@ endif
 fragbuf_test_SOURCES = fragbuf-test.c
 fragbuf_test_CFLAGS  = $(AM_CFLAGS)
 fragbuf_test_LDADD   = ../../libmurphy-common.la
+
+# mkdir-test
+mkdir_test_SOURCES = mkdir-test.c
+mkdir_test_CFLAGS  = $(AM_CFLAGS) -I.
+mkdir_test_LDADD   = ../../libmurphy-common.la

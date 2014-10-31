@@ -37,6 +37,7 @@
 #include <sys/stat.h>
 
 #include <murphy/common/macros.h>
+#include <murphy/common/debug.h>
 #include <murphy/common/file-utils.h>
 
 
@@ -178,4 +179,96 @@ int mrp_find_file(const char *file, const char **dirs, int mode, char *buf,
         snprintf(buf, size, "%s", file);
 
     return 0;
+}
+
+
+int mrp_mkdir(const char *path, mode_t mode)
+{
+    const char *p;
+    char       *q, buf[PATH_MAX];
+    int         n, undo[PATH_MAX / 2];
+    struct stat st;
+
+    if (path == NULL || path[0] == '\0') {
+        errno = path ? EINVAL : EFAULT;
+        return -1;
+    }
+
+    /*
+     * Notes:
+     *     Our directory creation algorithm logic closely resembles what
+     *     'mkdir -p' does. We simply walk the given path component by
+     *     component, testing if each one exist. If an existing one is
+     *     not a directory we bail out. Missing ones we try to create with
+     *     the given mode, bailing out if we fail.
+     *
+     *     Unlike 'mkdir -p' whenever we fail we clean up by removing
+     *     all directories we have created (or at least we try).
+     *
+     *     Similarly to 'mkdir -p' we don't try to be overly 'smart' about
+     *     the path we're handling. Especially we never try to treat '..'
+     *     in any special way. This is very much intentional and the idea
+     *     is to let the caller try to create a full directory hierarchy
+     *     atomically, either succeeeding creating the full hierarchy, or
+     *     none of it. To see the consequences of these design choices,
+     *     consider what are the possible outcomes of a call like
+     *
+     *       mrp_mkdir("/home/kli/bin/../sbin/../scripts/../etc/../doc", 0755);
+     */
+
+    p = path;
+    q = buf;
+    n = 0;
+    while (1) {
+        if (q - buf >= (ptrdiff_t)sizeof(buf) - 1) {
+            errno = ENAMETOOLONG;
+            goto cleanup;
+        }
+
+        if (*p && *p != '/') {
+            *q++ = *p++;
+            continue;
+        }
+
+        *q = '\0';
+
+        mrp_debug("checking/creating '%s'...", buf);
+
+        if (q != buf) {
+            if (stat(buf, &st) < 0) {
+                if (errno != ENOENT)
+                    goto cleanup;
+
+                if (mkdir(buf, mode) < 0)
+                    goto cleanup;
+
+                undo[n++] = q - buf;
+            }
+            else {
+                if (!S_ISDIR(st.st_mode)) {
+                    errno = ENOTDIR;
+                    goto cleanup;
+                }
+            }
+        }
+
+        while (*p == '/')
+            p++;
+
+        if (!*p)
+            break;
+
+        *q++ = '/';
+    }
+
+    return 0;
+
+ cleanup:
+    while (--n >= 0) {
+        buf[undo[n]] = '\0';
+        mrp_debug("cleaning up '%s'...", buf);
+        rmdir(buf);
+    }
+
+    return -1;
 }

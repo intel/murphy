@@ -32,7 +32,7 @@
 
 #include <dirent.h>
 #include <sys/types.h>
-
+#include <sys/stat.h>
 
 /*
  * Routines for scanning a directory for matching entries.
@@ -68,5 +68,8 @@ int mrp_scan_dir(const char *path, const char *pattern, mrp_dirent_type_t mask,
 /** Do an #include-like search for the given file among the given dirs. */
 int mrp_find_file(const char *file, const char **dirs, int mode, char *buf,
                   size_t size);
+
+/** Create a directory, creating leading path as necessary. */
+int mrp_mkdir(const char *path, mode_t mode);
 
 #endif /* __MURPHY_FILEUTILS_H__ */
