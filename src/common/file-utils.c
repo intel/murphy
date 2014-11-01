@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 #include <dirent.h>
 #include <regex.h>
 #include <sys/types.h>
@@ -271,4 +272,113 @@ int mrp_mkdir(const char *path, mode_t mode)
     }
 
     return -1;
+}
+
+
+char *mrp_normalize_path(char *buf, size_t size, const char *path)
+{
+    const char *p;
+    char       *q;
+    int         n, back[PATH_MAX / 2];
+
+    if (path == NULL)
+        return NULL;
+
+    if (*path == '\0') {
+        if (size > 0) {
+            *buf = '\0';
+            return buf;
+        }
+        else {
+        overflow:
+            errno = ENAMETOOLONG;
+            return NULL;
+        }
+    }
+
+    p   = path;
+    q   = buf;
+    n   = 0;
+
+    while (*p) {
+        if (q - buf + 1 >= (ptrdiff_t)size)
+            goto overflow;
+
+        switch (*p) {
+        case '/':
+            back[n++] = q - buf;
+            *q++ = *p++;
+
+        skip_slashes:
+            while (*p == '/')
+                p++;
+
+            /*
+             * '.'
+             *
+             * We skip './' including all trailing slashes. Note that
+             * the code is arranged so that whenever we skip trailing
+             * slashes, we automatically check and skip also trailing
+             * './'s too...
+             */
+
+            if (p[0] == '.' && (p[1] == '/' || p[1] == '\0')) {
+                p++;
+                goto skip_slashes;
+            }
+
+            /*
+             * '..'
+             *
+             * We throw away the last incorrectly saved backtracking
+             * point (we saved it for this '../'). Then if we can still
+             * backtrack, we do so. Otherwise (we're at the beginning
+             * already), if the path is absolute, we just ignore the
+             * current '../' (can't go above '/'), otherwise we keep it
+             * for relative pathes.
+             */
+
+            if (p[0] == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0')) {
+                n--;                                /* throw away */
+                if (n > 0) {                        /* can still backtrack */
+                    if (back[n - 1] >= 0)           /* previous not a '..' */
+                        q = buf + back[n - 1] + 1;
+                }
+                else {
+                    if (q > buf && buf[0] == '/')   /* for absolute pathes */
+                        q = buf + 1;                /*     reset to start */
+                    else {                          /* for relative pathes */
+                        if (q - buf + 4 >= (ptrdiff_t)size)
+                            goto overflow;
+
+                        q[0] = '.';                 /*     append this '..' */
+                        q[1] = '.';
+                        q[2] = '/';
+                        q += 3;
+                        back[n] = -1;               /*     block backtracking */
+                    }
+                }
+
+                p += 2;
+                goto skip_slashes;
+            }
+            break;
+
+        default:
+            *q++ = *p++;
+            break;
+        }
+    }
+
+    /*
+     * finally for other than '/' align trailing slashes
+     */
+
+    if (p > path + 1 && p[-1] != '/')
+        if (q > buf + 1 && q[-1] == '/')
+            q--;
+
+    *q = '\0';
+
+    return buf;
 }

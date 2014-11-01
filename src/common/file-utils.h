@@ -72,4 +72,8 @@ int mrp_find_file(const char *file, const char **dirs, int mode, char *buf,
 /** Create a directory, creating leading path as necessary. */
 int mrp_mkdir(const char *path, mode_t mode);
 
+
+/** Parse a path into a normalized form, removing ../'s and ./'s. */
+char *mrp_normalize_path(char *buf, size_t size, const char *path);
+
 #endif /* __MURPHY_FILEUTILS_H__ */
