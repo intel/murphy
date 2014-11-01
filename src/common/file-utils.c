@@ -304,8 +304,7 @@ char *mrp_normalize_path(char *buf, size_t size, const char *path)
         if (q - buf + 1 >= (ptrdiff_t)size)
             goto overflow;
 
-        switch (*p) {
-        case '/':
+        if (*p == '/') {
             back[n++] = q - buf;
             *q++ = *p++;
 
@@ -362,12 +361,9 @@ char *mrp_normalize_path(char *buf, size_t size, const char *path)
                 p += 2;
                 goto skip_slashes;
             }
-            break;
-
-        default:
-            *q++ = *p++;
-            break;
         }
+        else
+            *q++ = *p++;
     }
 
     /*
