@@ -254,3 +254,30 @@ print(tostring(t))
 
 print(t.accept)
 print(t.recv)
+
+function test_rs_create(iterations)
+    resourceHandler = function (rset) print(rset) end
+
+    for i = 1, iterations do
+        r = m:ResourceSet({
+            zone = "driver",
+            callback = resourceHandler,
+            application_class = "player"
+        })
+
+        if r then
+
+            r:addResource({
+                resource_name = "audio_playback",
+                mandatory = true
+            })
+
+            r.resources.audio_playback.attributes.pid = tostring(i)
+
+            print("pid: " .. r.resources.audio_playback.attributes.pid)
+            r:acquire()
+            r:release()
+        end
+        r = nil
+    end
+end
