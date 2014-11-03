@@ -459,10 +459,25 @@ static void resclass_class_create(lua_State *L)
     mrp_lua_create_object_class(L, RESCLASS_CLASS);
 }
 
+static int resource_destructor(lua_State *L)
+{
+    resource_t *r;
+
+    if ((r = lua_touserdata(L, -1)) != NULL) {
+        mrp_debug("destroying Lua resource %p", r);
+        luaL_unref(L, LUA_REGISTRYINDEX, r->attr_tbl);
+        r->attr_tbl = LUA_NOREF;
+    }
+
+    return 0;
+}
+
 static void resource_class_create(lua_State *L)
 {
     /* create a metatable for resource instances */
     luaL_newmetatable(L, RESOURCE_CLASSID);
+    lua_pushcfunction(L, resource_destructor);
+    lua_setfield(L, -2, "__gc");
     lua_pushliteral(L, "__index");
     lua_pushvalue(L, -2);
     lua_settable(L, -3);        /* metatable.__index = metatable */
