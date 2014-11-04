@@ -56,6 +56,7 @@ typedef struct {
     const char      *addrstr;            /* server address */
     int              zone;               /* run in zone control mode */
     int              verbose;            /* verbose mode */
+    int              audio;              /* subscribe for audio_playback_* */
     mrp_mainloop_t  *ml;                 /* murphy mainloop */
     void            *dc;                 /* domain controller */
     brl_t           *brl;                /* breedline for terminal input */
@@ -137,6 +138,9 @@ static stream_t streams[] = {
 #define STREAM_SELECT "*"
 #define STREAM_WHERE  NULL
 
+#define SELECT_ALL "*"
+#define ANY_WHERE  NULL
+
 mrp_domctl_table_t media_tables[] = {
     MRP_DOMCTL_TABLE("test-devices", DEVICE_COLUMNS, DEVICE_INDEX),
     MRP_DOMCTL_TABLE("test-streams", STREAM_COLUMNS, STREAM_INDEX),
@@ -145,6 +149,8 @@ mrp_domctl_table_t media_tables[] = {
 mrp_domctl_watch_t media_watches[] = {
     MRP_DOMCTL_WATCH("test-devices", DEVICE_SELECT, DEVICE_WHERE, 0),
     MRP_DOMCTL_WATCH("test-streams", STREAM_SELECT, STREAM_WHERE, 0),
+    MRP_DOMCTL_WATCH("audio_playback_owner", SELECT_ALL, ANY_WHERE, 0),
+    MRP_DOMCTL_WATCH("audio_playback_users", SELECT_ALL, ANY_WHERE, 0),
 };
 
 
@@ -222,7 +228,9 @@ mrp_domctl_table_t zone_tables[] = {
 
 mrp_domctl_watch_t zone_watches[] = {
     MRP_DOMCTL_WATCH("test-zones", ZONE_SELECT, ZONE_WHERE, 0),
-    MRP_DOMCTL_WATCH("test-calls", CALL_SELECT, CALL_WHERE, 0)
+    MRP_DOMCTL_WATCH("test-calls", CALL_SELECT, CALL_WHERE, 0),
+    MRP_DOMCTL_WATCH("audio_playback_owner", SELECT_ALL, ANY_WHERE, 0),
+    MRP_DOMCTL_WATCH("audio_playback_users", SELECT_ALL, ANY_WHERE, 0),
 };
 
 mrp_domctl_table_t *exports;
@@ -697,7 +705,9 @@ void update_imports(client_t *c, mrp_domctl_data_t *data, int ntable)
 {
     int i;
 
-    for (i = 0; i < ntable; i++) {
+    MRP_UNUSED(ntable);
+
+    for (i = 0; i < 2; i++) {
         if (c->zone) {
             if (data[i].id == 0)
                 update_devices(data + i);
@@ -909,7 +919,8 @@ static void fatal_msg(int error, const char *format, ...)
 {
     va_list ap;
 
-    brl_hide_prompt(client->brl);
+    if (client && client->brl)
+        brl_hide_prompt(client->brl);
 
     fprintf(stderr, "fatal error: ");
     va_start(ap, format);
@@ -926,7 +937,8 @@ static void error_msg(const char *format, ...)
 {
     va_list ap;
 
-    brl_hide_prompt(client->brl);
+    if (client && client->brl)
+        brl_hide_prompt(client->brl);
 
     fprintf(stderr, "error: ");
     va_start(ap, format);
@@ -935,7 +947,8 @@ static void error_msg(const char *format, ...)
     fprintf(stderr, "\n");
     fflush(stderr);
 
-    brl_show_prompt(client->brl);
+    if (client && client->brl)
+        brl_show_prompt(client->brl);
 }
 
 
@@ -943,7 +956,8 @@ static void info_msg(const char *format, ...)
 {
     va_list ap;
 
-    brl_hide_prompt(client->brl);
+    if (client && client->brl)
+        brl_hide_prompt(client->brl);
 
     va_start(ap, format);
     vfprintf(stdout, format, ap);
@@ -951,7 +965,8 @@ static void info_msg(const char *format, ...)
     fprintf(stdout, "\n");
     fflush(stdout);
 
-    brl_show_prompt(client->brl);
+    if (client && client->brl)
+        brl_show_prompt(client->brl);
 }
 
 
@@ -1165,14 +1180,17 @@ static void client_setup(client_t *c)
             exports = media_tables;
             nexport = MRP_ARRAY_SIZE(media_tables);
             imports = zone_watches;
-            nimport = MRP_ARRAY_SIZE(zone_watches);
+            nimport = MRP_ARRAY_SIZE(zone_watches) - (c->audio ? 0 : 2);
         }
         else {
             exports = zone_tables;
             nexport = MRP_ARRAY_SIZE(zone_tables);
             imports = media_watches;
-            nimport = MRP_ARRAY_SIZE(media_watches);
+            nimport = MRP_ARRAY_SIZE(media_watches) - (c->audio ? 0 : 2);
         }
+
+        if (c->audio)
+            info_msg("Will subscribe for audio_playback_* tables.");
 
         dc = mrp_domctl_create(c->zone ? "zone-ctrl" : "media-ctrl", ml,
                                exports, nexport, imports, nimport,
@@ -1272,6 +1290,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "The possible options are:\n"
            "  -s, --server <address>     connect to murphy at given address\n"
            "  -z, --zone                 run as zone controller\n"
+           "  -A, --audio                subscribe for audio_playback*\n"
            "  -v, --verbose              run in verbose mode\n"
            "  -h, --help                 show this help on usage\n",
            argv0);
@@ -1289,16 +1308,18 @@ static void client_set_defaults(client_t *c)
     c->addrstr = MRP_DEFAULT_DOMCTL_ADDRESS;
     c->zone    = FALSE;
     c->verbose = FALSE;
+    c->audio   = FALSE;
 }
 
 
 int parse_cmdline(client_t *c, int argc, char **argv)
 {
-#   define OPTIONS "vzhs:"
+#   define OPTIONS "vAzhs:"
     struct option options[] = {
-        { "server"    , required_argument, NULL, 's' },
         { "zone"      , no_argument      , NULL, 'z' },
         { "verbose"   , optional_argument, NULL, 'v' },
+        { "audio"     , no_argument      , NULL, 'A' },
+        { "server"    , required_argument, NULL, 's' },
         { "help"      , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
@@ -1313,11 +1334,16 @@ int parse_cmdline(client_t *c, int argc, char **argv)
             c->zone = TRUE;
             break;
 
+        case 'A':
+            c->audio = TRUE;
+            c->verbose = TRUE;
+            break;
+
         case 'v':
             c->verbose = TRUE;
             break;
 
-        case 'a':
+        case 's':
             c->addrstr = optarg;
             break;
 
