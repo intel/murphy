@@ -413,7 +413,7 @@ static void send_rset_event(mrp_resource_set_t *rset, mrp_resource_event_t ev)
     switch (ev) {
         case MRP_RESOURCE_EVENT_CREATED:
             id = mrp_get_event_id(MURPHY_RESOURCE_EVENT_CREATED, 0);
-            mrp_log_info("emit event %d for rset %u", id, rset->id);
+            mrp_debug("emit event %d for rset %u", id, rset->id);
             mrp_emit_event(id, MRP_MSG_TAG_UINT32(tag, rset->id), MRP_MSG_END);
             break;
         case MRP_RESOURCE_EVENT_ACQUIRE:
