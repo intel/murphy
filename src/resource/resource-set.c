@@ -331,6 +331,8 @@ void mrp_resource_set_acquire(mrp_resource_set_t *rset, uint32_t reqid)
 
     MRP_ASSERT(rset, "invalid argument");
 
+    mrp_debug("acquiring resource set #%d", rset->id);
+
     old_state = rset->state;
     rset->state = mrp_resource_acquire;
 
@@ -354,6 +356,8 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
     mqi_handle_t trh;
 
     MRP_ASSERT(rset, "invalid argument");
+
+    mrp_debug("releasing resource set #%d", rset->id);
 
     if (!rset->class.ptr)
         rset->state = mrp_resource_release;
@@ -388,12 +392,16 @@ void mrp_resource_set_updated(mrp_resource_set_t *rset)
 
     MRP_ASSERT(rset, "invalid argument");
 
+    mrp_debug("resource set got #%d updated", rset->id);
+
     mrp_list_foreach(&rset->resource.list, resen, n) {
         res = mrp_list_entry(resen, mrp_resource_t, list);
         def = res->def;
 
         mask = ((mrp_resource_mask_t)1) << def->id;
         grant =  (mask & rset->resource.mask.grant) ? true : false;
+
+        mrp_debug("    %s now %sgranted", def->name, grant ? "" : "not ");
 
         mrp_resource_user_update(res, rset->state, grant);
     }
