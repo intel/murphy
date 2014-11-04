@@ -78,7 +78,9 @@ static void table_change_cb(mqi_event_t *e, void *tptr)
 
 static int add_table_triggers(pep_table_t *t)
 {
-    mdb_table_t *tbl;
+    mdb_table_t      *tbl;
+    mqi_column_def_t  cols[256];
+    int               ncol, i;
 
     if (t->h == MQI_HANDLE_INVALID) {
         errno = EAGAIN;
@@ -90,11 +92,23 @@ static int add_table_triggers(pep_table_t *t)
         return -1;
     }
 
-    if (mdb_trigger_add_row_callback(tbl, table_change_cb, t, NULL) < 0 ||
-        mdb_trigger_add_column_callback(tbl, 0, table_change_cb, t, NULL) < 0) {
-        mdb_trigger_delete_row_callback(tbl, table_change_cb, t);
+    if ((ncol = mdb_table_describe(tbl, &cols[0], sizeof(cols))) <= 0) {
         errno = EINVAL;
         return -1;
+    }
+
+    if (mdb_trigger_add_row_callback(tbl, table_change_cb, t, NULL)) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    for (i = 0; i < ncol; i++) {
+        if (mdb_trigger_add_column_callback(tbl, i, table_change_cb,
+                                            t, NULL) < 0) {
+            mdb_trigger_delete_row_callback(tbl, table_change_cb, t);
+            errno = EINVAL;
+            return -1;
+        }
     }
 
     return 0;
@@ -103,7 +117,9 @@ static int add_table_triggers(pep_table_t *t)
 
 static void del_table_triggers(pep_table_t *t)
 {
-    mdb_table_t *tbl;
+    mdb_table_t      *tbl;
+    mqi_column_def_t  cols[256];
+    int               ncol, i;
 
     if (t->h == MQI_HANDLE_INVALID)
         return;
@@ -111,8 +127,12 @@ static void del_table_triggers(pep_table_t *t)
     if ((tbl = mdb_table_find(t->name)) == NULL)
         return;
 
+    ncol = mdb_table_describe(tbl, &cols[0], sizeof(cols));
+
     mdb_trigger_delete_row_callback(tbl, table_change_cb, t);
-    mdb_trigger_delete_column_callback(tbl, 0, table_change_cb, t);
+
+    for (i = 0; i < ncol; i++)
+        mdb_trigger_delete_column_callback(tbl, i, table_change_cb, t);
 }
 
 
