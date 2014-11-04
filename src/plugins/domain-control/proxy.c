@@ -120,6 +120,7 @@ int register_proxy(pep_proxy_t *proxy, char *name,
     proxy->name   = mrp_strdup(name);
     proxy->tables = mrp_allocz_array(typeof(*proxy->tables) , ntable);
     proxy->ntable = ntable;
+    proxy->notify = true;
 
     if (proxy->name == NULL || (ntable && proxy->tables == NULL)) {
         *error  = ENOMEM;
