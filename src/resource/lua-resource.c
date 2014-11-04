@@ -88,7 +88,6 @@ struct resource_set_lua_s {
 
     int id; /* resource set internal id */
     int callback; /* callback */
-    int data; /* callback user data? maybe not needed */
     bool available; /* status */
     bool acquired; /* status */
     bool autorelease; /* input */
@@ -148,7 +147,6 @@ MRP_LUA_MEMBER_LIST_TABLE(resource_set_lua_members,
     MRP_LUA_CLASS_BOOLEAN("available", RS_OFFS(available), NULL, NULL, RS_RDONLY)
     MRP_LUA_CLASS_BOOLEAN("acquired", RS_OFFS(acquired), NULL, NULL, RS_RDONLY)
     MRP_LUA_CLASS_INTEGER("priority", RS_OFFS(priority), NULL, NULL, RS_RDONLY)
-    MRP_LUA_CLASS_ANY("data", RS_OFFS(data), NULL, NULL, RS_NOFLAGS)
     MRP_LUA_CLASS_LFUNC("callback", RS_OFFS(callback), NULL, NULL, RS_NOTIFY));
 
 /* be careful! needs to be in the same order as the member list table */
@@ -162,7 +160,6 @@ typedef enum {
     RESOURCE_SET_MEMBER_AVAILABLE,
     RESOURCE_SET_MEMBER_ACQUIRED,
     RESOURCE_SET_MEMBER_PRIORITY,
-    RESOURCE_SET_MEMBER_DATA,
     RESOURCE_SET_MEMBER_CALLBACK,
 } resource_set_member_t;
 
@@ -463,9 +460,8 @@ void event_cb(uint32_t request_id, mrp_resource_set_t *resource_set, void *user_
 
     if (mrp_lua_object_deref_value(rset, rset->L, rset->callback, false)) {
         mrp_lua_push_object(rset->L, rset);
-        mrp_lua_object_deref_value(rset, rset->L, rset->data, true);
 
-        if (lua_pcall(rset->L, 2, 0, 0) != 0)
+        if (lua_pcall(rset->L, 1, 0, 0) != 0)
             mrp_log_error("failed to invoke Lua resource set callback: %s",
                     lua_tostring(rset->L, -1));
     }
@@ -717,7 +713,6 @@ static void resource_set_lua_changed(void *data, lua_State *L, int member)
 
     switch (member) {
         case RESOURCE_SET_MEMBER_CALLBACK:
-        case RESOURCE_SET_MEMBER_DATA:
             /* no special handling needed */
             break;
         default:
