@@ -218,7 +218,7 @@ mrp_application_class_iterate_rsets(mrp_application_class_t *class,
 
 const char *mrp_application_class_get_name(mrp_application_class_t *class)
 {
-    if (!class | !class->name)
+    if (!class || !class->name)
         return "<unknown class>";
 
     return class->name;
