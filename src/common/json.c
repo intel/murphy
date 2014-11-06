@@ -219,7 +219,7 @@ mrp_json_t *mrp_json_add_array(mrp_json_t *o, const char *key,
     a   = mrp_json_create(MRP_JSON_ARRAY);
 
     if (a == NULL)
-        return NULL;
+        goto fail;
 
     switch (type) {
     case MRP_JSON_STRING:
