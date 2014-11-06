@@ -261,15 +261,13 @@ int mrp_emit_event_msg(int id, mrp_msg_t *event_data)
             mrp_msg_unref(event_data);
         }
 
+        if (nemit <= 0)
+            purge_deleted();
+
         return TRUE;
     }
-    else
-        return FALSE;
 
-
-
-    if (nemit <= 0)
-        purge_deleted();
+    return FALSE;
 }
 
 
