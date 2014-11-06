@@ -545,6 +545,7 @@ static void column_event_callback(mqi_event_t *evt, void *user_data)
         free(rsel);
     else {
         cb->function(rslt, cb->user_data);
+        free(rsel);
         free(rslt);
     }
 }
