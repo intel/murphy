@@ -742,9 +742,11 @@ static mrp_plugin_descr_t *open_dynamic(mrp_context_t *ctx, const char *name,
                 if (d->init != NULL && d->exit != NULL && d->name != NULL) {
                     if (!d->core)
                         *handle = h;
-                    else
+                    else {
                         *handle = dlopen(path,
                                          RTLD_LAZY|RTLD_GLOBAL|RTLD_NOLOAD);
+                        dlclose(h);
+                    }
 
                     return d;
                 }
