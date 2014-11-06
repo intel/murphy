@@ -120,7 +120,7 @@ static socklen_t parse_address(const char *str, mrp_dbusaddr_t *addr,
 
     p = str;
     q = addr->db_fqa;
-    l = sizeof(addr->db_fqa);
+    l = sizeof(addr->db_fqa) - 1;
 
     /* get bus address */
     if (*p != '[') {
@@ -209,7 +209,7 @@ static mrp_dbusaddr_t *copy_address(mrp_dbusaddr_t *dst, mrp_dbusaddr_t *src)
     /* copy bus address */
     p = src->db_bus;
     q = dst->db_fqa;
-    l = sizeof(dst->db_fqa);
+    l = sizeof(dst->db_fqa) - 1;
 
     n = strlen(p);
     if (l < n + 1) {
@@ -269,7 +269,7 @@ static size_t peer_address(mrp_sockaddr_t *addrp, const char *sender,
     int             l, n;
 
     q = addr->db_fqa;
-    l = sizeof(addr->db_fqa);
+    l = sizeof(addr->db_fqa) - 1;
     p = ANY_ADDRESS;
     n = 3;
 
