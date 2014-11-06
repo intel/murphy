@@ -295,10 +295,12 @@ static int strm_createfrom(mrp_transport_t *mt, void *conn)
 
     if (t->sock >= 0) {
         if (mt->flags & MRP_TRANSPORT_REUSEADDR)
-            set_reuseaddr(t->sock, true);
+            if (set_reuseaddr(t->sock, true) < 0)
+                return FALSE;
 
         if (mt->flags & MRP_TRANSPORT_NONBLOCK || t->listened)
-            set_nonblocking(t->sock, true);
+            if (set_nonblocking(t->sock, true) < 0)
+                return FALSE;
 
         if (t->connected || t->listened) {
             if (!t->connected ||
@@ -361,7 +363,8 @@ static int strm_listen(mrp_transport_t *mt, int backlog)
     strm_t *t = (strm_t *)mt;
 
     if (t->sock != -1 && t->iow != NULL && t->evt.connection != NULL) {
-        set_nonblocking(t->sock, true);
+        if (set_nonblocking(t->sock, true) < 0)
+            return FALSE;
 
         if (listen(t->sock, backlog) == 0) {
             mrp_debug("transport %p listening", mt);
@@ -396,13 +399,16 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
 
     if (t->sock >= 0) {
         if (mt->flags & MRP_TRANSPORT_REUSEADDR)
-            set_reuseaddr(t->sock, true);
+            if (set_reuseaddr(t->sock, true) < 0)
+                goto reject;
 
         if (mt->flags & MRP_TRANSPORT_NONBLOCK)
-            set_nonblocking(t->sock, true);
+            if (set_nonblocking(t->sock, true) < 0)
+                goto reject;
 
         if (mt->flags & MRP_TRANSPORT_CLOEXEC)
-            set_cloexec(t->sock, true);
+            if (set_cloexec(t->sock, true) < 0)
+                goto reject;
 
         t->buf = mrp_fragbuf_create(TRUE, 0);
         events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
@@ -420,6 +426,7 @@ static int strm_accept(mrp_transport_t *mt, mrp_transport_t *mlt)
         }
     }
     else {
+    reject:
         if (mrp_reject_connection(lt->sock, NULL, 0) < 0) {
             mrp_log_error("%s(): accept failed, closing transport %p (%d: %s).",
                           __FUNCTION__, mlt, errno, strerror(errno));
@@ -543,13 +550,16 @@ static int open_socket(strm_t *t, int family)
 
     if (t->sock != -1) {
         if (t->flags & MRP_TRANSPORT_REUSEADDR)
-            set_reuseaddr(t->sock, true);
+            if (set_reuseaddr(t->sock, true) < 0)
+                goto fail;
 
         if (t->flags & MRP_TRANSPORT_NONBLOCK)
-            set_nonblocking(t->sock, true);
+            if (set_nonblocking(t->sock, true) < 0)
+                goto fail;
 
         if (t->flags & MRP_TRANSPORT_CLOEXEC)
-            set_cloexec(t->sock, true);
+            if (set_cloexec(t->sock, true) < 0)
+                goto fail;
 
         events = MRP_IO_EVENT_IN | MRP_IO_EVENT_HUP;
         t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
@@ -557,6 +567,7 @@ static int open_socket(strm_t *t, int family)
         if (t->iow != NULL)
             return TRUE;
         else {
+        fail:
             close(t->sock);
             t->sock = -1;
         }
@@ -578,6 +589,10 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
         goto fail;
 
     if (connect(t->sock, &addr->any, addrlen) == 0) {
+        if (set_reuseaddr(t->sock, true)   < 0 ||
+            set_nonblocking(t->sock, true) < 0)
+            goto close_and_fail;
+
         t->buf = mrp_fragbuf_create(TRUE, 0);
 
         if (t->buf != NULL) {
@@ -585,9 +600,6 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
             t->iow = mrp_add_io_watch(t->ml, t->sock, events, strm_recv_cb, t);
 
             if (t->iow != NULL) {
-                set_reuseaddr(t->sock, true);
-                set_nonblocking(t->sock, true);
-
                 mrp_debug("connected transport %p", mt);
 
                 return TRUE;
@@ -599,6 +611,7 @@ static int strm_connect(mrp_transport_t *mt, mrp_sockaddr_t *addr,
     }
 
     if (t->sock != -1) {
+    close_and_fail:
         close(t->sock);
         t->sock = -1;
     }
