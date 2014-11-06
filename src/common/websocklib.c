@@ -2069,17 +2069,13 @@ static void libwebsockets(const char *line)
         if (!l)
             break;
 
-        if (lvl != NULL) {
-            switch (lvl[0] | (lvl[1] << 8)) {
-            case 'd': mrp_debug("%*.*s", l, l, b);                      break;
-            case 'i': mrp_debug("%*.*s", l, l, b);                      break;
-            case 'w': mrp_log_warning("libwebsockets: %*.*s", l, l, b); break;
-            case 'e': mrp_log_error("libwebsockets: %*.*s", l, l, b);   break;
-            default:  mrp_debug("[%*.*s] %*.*s", ls, ls, lvl, l, l, b);
-            }
+        switch (lvl[0] | (lvl[1] << 8)) {
+        case 'd': mrp_debug("%*.*s", l, l, b);                      break;
+        case 'i': mrp_debug("%*.*s", l, l, b);                      break;
+        case 'w': mrp_log_warning("libwebsockets: %*.*s", l, l, b); break;
+        case 'e': mrp_log_error("libwebsockets: %*.*s", l, l, b);   break;
+        default:  mrp_debug("[%*.*s] %*.*s", ls, ls, lvl, l, l, b);
         }
-        else
-            mrp_debug("%*.*s", l, l, b);
 
         if (e != NULL) {
             b = e + 1;
