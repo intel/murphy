@@ -903,12 +903,12 @@ int mrp_dbus_install_filterv(mrp_dbus_t *dbus, const char *sender,
                              const char *path, const char *interface,
                              const char *member, va_list args)
 {
-#define ADD_TAG(tag, value) do {                                          \
+#define ADD_TAG(tag, value, ...) do {                                     \
         if (value != NULL) {                                              \
             l = snprintf(p, n, "%s%s='%s'", p == filter ? "" : ",",       \
                          tag, value);                                     \
             if (l >= n)                                                   \
-                return FALSE;                                             \
+                do { __VA_ARGS__; } while (0);                            \
             n -= l;                                                       \
             p += l;                                                       \
         }                                                                 \
@@ -922,17 +922,17 @@ int mrp_dbus_install_filterv(mrp_dbus_t *dbus, const char *sender,
     p = filter;
     n = sizeof(filter);
 
-    ADD_TAG("type"     , "signal");
-    ADD_TAG("sender"   ,  sender);
-    ADD_TAG("path"     ,  path);
-    ADD_TAG("interface",  interface);
-    ADD_TAG("member"   ,  member);
+    ADD_TAG("type"     , "signal"  , return FALSE);
+    ADD_TAG("sender"   ,  sender   , return FALSE);
+    ADD_TAG("path"     ,  path     , return FALSE);
+    ADD_TAG("interface",  interface, return FALSE);
+    ADD_TAG("member"   ,  member   , return FALSE);
 
     va_copy(ap, args);
     i = 0;
     while ((val = va_arg(ap, char *)) != NULL) {
         snprintf(argn, sizeof(argn), "arg%d", i);
-        ADD_TAG(argn, val);
+        ADD_TAG(argn, val, { va_end(ap); return FALSE; });
         i++;
     }
     va_end(ap);
@@ -980,17 +980,17 @@ int mrp_dbus_remove_filterv(mrp_dbus_t *dbus, const char *sender,
     p = filter;
     n = sizeof(filter);
 
-    ADD_TAG("type"     , "signal");
-    ADD_TAG("sender"   ,  sender);
-    ADD_TAG("path"     ,  path);
-    ADD_TAG("interface",  interface);
-    ADD_TAG("member"   ,  member);
+    ADD_TAG("type"     , "signal"  , return FALSE);
+    ADD_TAG("sender"   ,  sender   , return FALSE);
+    ADD_TAG("path"     ,  path     , return FALSE);
+    ADD_TAG("interface",  interface, return FALSE);
+    ADD_TAG("member"   ,  member   , return FALSE);
 
     va_copy(ap, args);
     i = 0;
     while ((val = va_arg(ap, char *)) != NULL) {
         snprintf(argn, sizeof(argn), "arg%d", i);
-        ADD_TAG(argn, val);
+        ADD_TAG(argn, val, { va_end(ap); return FALSE; });
         i++;
     }
     va_end(ap);
