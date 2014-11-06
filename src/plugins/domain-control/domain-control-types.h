@@ -162,7 +162,7 @@ struct pdp_s {
     mrp_deferred_t  *notify;             /* deferred notification */
     bool             notify_scheduled;   /* is notification scheduled? */
     void            *reh;                /* resolver event handler */
-    bool             ractive;            /* resolver active */
+    int              ractive;            /* resolver active */
     bool             rblocked;           /* resolver blocked update */
 };
 
