@@ -112,7 +112,7 @@ typedef struct {
 
 
 #define NAME_FORMAT "#%d test object"
-#define POISON      0xf233d
+#define POISON      0xf3
 
 static int obj_setup(void *ptr)
 {
