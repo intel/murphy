@@ -169,7 +169,7 @@ static int pool_tests(void)
 
     limit    = 0;
     prealloc = 512;
-    max      = limit ? limit : 8382;
+    max      = 8382;
     ptrs     = mrp_allocz(max * sizeof(obj_t));
 
     if (ptrs == NULL) {
