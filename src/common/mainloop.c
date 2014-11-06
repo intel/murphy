@@ -1492,10 +1492,8 @@ mrp_mainloop_t *mrp_mainloop_create(void)
             mrp_list_init(&ml->deleted);
             mrp_list_init(&ml->subloops);
 
-            if (!setup_sighandlers(ml)) {
-                close(ml->epollfd);
+            if (!setup_sighandlers(ml))
                 goto fail;
-            }
         }
         else {
         fail:
