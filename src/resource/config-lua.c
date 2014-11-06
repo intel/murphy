@@ -1161,10 +1161,12 @@ static int resource_getfield(lua_State *L)
         break;
 
     default:
-        if (!(s = mrp_resource_set_find_by_id(res->rsetid)))
-            m = 0;
-        else
+        if (!(s = mrp_resource_set_find_by_id(res->rsetid))) {
+            lua_pushnil(L);
+            break;
+        } else {
             m = ((mrp_resource_mask_t)1) << res->resid;
+        }
 
         switch (fld) {
         case MANDATORY:
