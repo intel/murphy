@@ -356,7 +356,7 @@ static void lua_debug(lua_State *L, lua_Debug *ar)
 
             name = f.name ? f.name : NULL;
 
-            if (f.currentline != -1 && f.short_src != NULL)
+            if (f.currentline != -1 && f.short_src[0])
                 snprintf(loc, sizeof(loc), "@ %s:%d", f.short_src,
                          f.currentline);
             else
