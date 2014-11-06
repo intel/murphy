@@ -515,6 +515,8 @@ static void strm_recv_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
                     error = t->recv_data((mrp_transport_t *)t, msg, 0, NULL, 0);
                     mrp_json_unref(msg);
                 }
+                else
+                    error = EILSEQ;
             }
 
             if (error)
