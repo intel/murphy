@@ -256,7 +256,7 @@ static inline int check_address(mrp_sockaddr_t *addr, socklen_t addrlen)
 {
     mrp_dbusaddr_t *a = (mrp_dbusaddr_t *)addr;
 
-    return (a->db_family = MRP_AF_DBUS && addrlen == sizeof(*a));
+    return (a && a->db_family == MRP_AF_DBUS && addrlen == sizeof(*a));
 }
 
 
