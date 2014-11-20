@@ -81,6 +81,7 @@ int              mql_result_columns_get_length(mql_result_t *, int);
 
 int              mql_result_rows_get_row_column_count(mql_result_t *);
 mqi_data_type_t  mql_result_rows_get_row_column_type(mql_result_t *, int);
+int              mql_result_rows_get_row_column_index(mql_result_t *, int);
 int              mql_result_rows_get_row_count(mql_result_t *);
 const char      *mql_result_rows_get_string(mql_result_t*, int,int, char*,int);
 int32_t          mql_result_rows_get_integer(mql_result_t *, int,int);
