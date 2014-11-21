@@ -820,7 +820,9 @@ static int delete_single_row(mdb_table_t *tbl, mdb_row_t *row,int index_update)
     uint32_t txdepth = mdb_transaction_get_depth();
 
     mdb_row_delete(tbl, row, index_update, !txdepth);
-    mdb_log_change(tbl, txdepth, mdb_log_delete, 0, row, NULL);
+
+    if (txdepth)
+        mdb_log_change(tbl, txdepth, mdb_log_delete, 0, row, NULL);
 
     return 0;
 }

@@ -247,6 +247,7 @@ int mdb_index_insert(mdb_table_t   *tbl,
             if (mdb_row_delete(tbl, old, 0,0) < 0 ||
                 mdb_log_change(tbl, txdepth, mdb_log_update,cmask,old,row) < 0)
             {
+                /* errno is either EEXIST or ENOMEM set by mdb_hash_add */
                 return -1;
             }
 
@@ -256,6 +257,7 @@ int mdb_index_insert(mdb_table_t   *tbl,
     }
     else { /* duplicate insertion is an error. keep the original row */
         mdb_row_delete(tbl, row, 0, 1);
+        /* errno is either EEXIST or ENOMEM set by mdb_hash_add */
         return -1;
     }
 

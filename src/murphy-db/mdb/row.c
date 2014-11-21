@@ -124,13 +124,18 @@ int mdb_row_update(mdb_table_t       *tbl,
         mdb_index_delete(tbl, row);
 
     cmod = 0;
-    for (cmask = i = 0;  (cidx = (source_dsc = cds + i)->cindex) >= 0;  i++){
+    for (cmask = i = 0;  (cidx = (source_dsc = cds + i)->cindex) >= 0;  i++) {
         cmask |= (((mqi_bitfld_t)1) << cidx);
         cmod |= mdb_column_write(columns + cidx, row->data, source_dsc, data);
     }
 
-    if (index_update)
-        mdb_index_insert(tbl, row, cmask, 0);
+    if (index_update) {
+        if (mdb_index_insert(tbl, row, cmask, 0) < 0) {
+            if (cmask_ret)
+                *cmask_ret = 0;
+            return -1;
+        }
+    }
 
     if (cmask_ret)
         *cmask_ret = cmask;
