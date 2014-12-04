@@ -259,6 +259,7 @@ LUA_BINDINGS_SOURCES = 					\
 		core/lua-bindings/lua-bitwise.c   	\
 		core/lua-bindings/lua-json.c		\
 		core/lua-bindings/lua-timer.c   	\
+		core/lua-bindings/lua-event.c   	\
 		core/lua-bindings/lua-deferred.c	\
 		core/lua-bindings/lua-sighandler.c	\
 		core/lua-bindings/lua-transport.c	\
