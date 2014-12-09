@@ -73,6 +73,7 @@ struct fact_s {
 
 struct mrp_resolver_s {
     mrp_context_t     *ctx;              /* murphy context we're running in */
+    mrp_event_bus_t   *bus;              /* bus for resolver events */
     target_t          *targets;          /* targets defined in the ruleset */
     int                ntarget;          /* number of targets */
     fact_t            *facts;            /* facts tracked as dependencies */

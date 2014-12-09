@@ -42,7 +42,6 @@
 #include <murphy/common/debug.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
-#include <murphy/core/event.h>
 #include <murphy/core/lua-bindings/murphy.h>
 
 #include <murphy-db/mql.h>
@@ -76,6 +75,7 @@ enum {
 
 typedef struct {
     mrp_plugin_t      *plugin;
+    mrp_event_bus_t   *plugin_bus;
     mrp_event_watch_t *w;
     mrp_sockaddr_t     saddr;
     socklen_t          alen;
@@ -1062,15 +1062,15 @@ static void initiate_lua_configuration(mrp_plugin_t *plugin)
     mrp_resource_configuration_init();
 }
 
-static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
-                     void *user_data)
+static void event_cb(mrp_event_watch_t *w, uint32_t id, int format,
+                     void *event_data, void *user_data)
 {
-    mrp_plugin_t     *plugin   = (mrp_plugin_t *)user_data;
+    mrp_plugin_t     *plugin     = (mrp_plugin_t *)user_data;
 #if 0
     mrp_plugin_arg_t *args     = plugin->args;
 #endif
     resource_data_t  *data     = (resource_data_t *)plugin->data;
-    const char       *event    = mrp_get_event_name(id);
+    const char       *event    = mrp_event_name(id);
     uint16_t          tag_inst = MRP_PLUGIN_TAG_INSTANCE;
     uint16_t          tag_name = MRP_PLUGIN_TAG_PLUGIN;
     const char       *inst;
@@ -1078,6 +1078,7 @@ static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
     int               success;
 
     MRP_UNUSED(w);
+    MRP_UNUSED(format);
 
     mrp_log_info("%s: got event 0x%x (%s):", plugin->instance, id, event);
 
@@ -1107,18 +1108,24 @@ static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
 static int subscribe_events(mrp_plugin_t *plugin)
 {
     resource_data_t  *data = (resource_data_t *)plugin->data;
+    mrp_mainloop_t   *ml   = plugin->ctx->ml;
+    mrp_event_bus_t  *bus  = mrp_event_bus_get(ml, MRP_PLUGIN_BUS);
     mrp_event_mask_t  events;
 
-    mrp_set_named_events(&events,
-                         MRP_PLUGIN_EVENT_LOADED,
-                         MRP_PLUGIN_EVENT_STARTED,
-                         MRP_PLUGIN_EVENT_FAILED,
-                         MRP_PLUGIN_EVENT_STOPPING,
-                         MRP_PLUGIN_EVENT_STOPPED,
-                         MRP_PLUGIN_EVENT_UNLOADED,
-                         NULL);
+    if (bus == NULL)
+        return FALSE;
 
-    data->w = mrp_add_event_watch(&events, event_cb, plugin);
+    data->plugin_bus = bus;
+
+    mrp_mask_init(&events);
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_LOADED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_STARTED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_FAILED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_STOPPING));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_STOPPED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_UNLOADED));
+
+    data->w = mrp_event_add_watch_mask(bus, &events, event_cb, plugin);
 
     return (data->w != NULL);
 }
@@ -1129,7 +1136,7 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
     resource_data_t *data = (resource_data_t *)plugin->data;
 
     if (data->w) {
-        mrp_del_event_watch(data->w);
+        mrp_event_del_watch(data->w);
         data->w = NULL;
     }
 }
@@ -1137,14 +1144,14 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 
 static void register_events(mrp_plugin_t *plugin)
 {
-    /* register the events that are sent on the resource state changes */
-
     MRP_UNUSED(plugin);
 
-    mrp_register_event(MURPHY_RESOURCE_EVENT_CREATED);
-    mrp_register_event(MURPHY_RESOURCE_EVENT_ACQUIRE);
-    mrp_register_event(MURPHY_RESOURCE_EVENT_RELEASE);
-    mrp_register_event(MURPHY_RESOURCE_EVENT_DESTROYED);
+    /* register the events that are sent on the resource state changes */
+
+    mrp_event_register(MURPHY_RESOURCE_EVENT_CREATED);
+    mrp_event_register(MURPHY_RESOURCE_EVENT_ACQUIRE);
+    mrp_event_register(MURPHY_RESOURCE_EVENT_RELEASE);
+    mrp_event_register(MURPHY_RESOURCE_EVENT_DESTROYED);
 }
 
 

@@ -61,7 +61,8 @@ libmurphy_common_la_HEADERS =		\
 		common/json.h		\
 		common/transport.h	\
 		common/tlv.h		\
-		common/native-types.h
+		common/native-types.h	\
+		common/mask.h
 
 libmurphy_common_la_REGULAR_SOURCES =		\
 		common/log.c			\
@@ -288,7 +289,6 @@ libmurphy_core_la_HEADERS =		\
 		core/console.h		\
 		core/scripting.h	\
 		core/method.h		\
-		core/event.h		\
 		core/auth.h		\
 		core/domain.h		\
 		core/domain-types.h
@@ -299,7 +299,6 @@ libmurphy_core_la_REGULAR_SOURCES =	\
 		core/console.c		\
 		core/scripting.c	\
 		core/method.c		\
-		core/event.c		\
 		core/auth.c		\
 		core/auth-deny.c	\
 		core/domain.c		\

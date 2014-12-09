@@ -57,6 +57,7 @@ typedef struct mrp_plugin_s mrp_plugin_t;
  * names of plugin-related events we emit
  */
 
+#define MRP_PLUGIN_BUS            "plugin-bus"
 #define MRP_PLUGIN_EVENT_LOADED   "plugin-loaded"
 #define MRP_PLUGIN_EVENT_STARTED  "plugin-started"
 #define MRP_PLUGIN_EVENT_FAILED   "plugin-failed"

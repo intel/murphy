@@ -37,9 +37,9 @@
 /* event protocol */
 
 #define MURPHY_RESOURCE_EVENT_CREATED   "resource_set_created"
+#define MURPHY_RESOURCE_EVENT_DESTROYED "resource_set_destroyed"
 #define MURPHY_RESOURCE_EVENT_ACQUIRE   "resource_set_acquire"
 #define MURPHY_RESOURCE_EVENT_RELEASE   "resource_set_release"
-#define MURPHY_RESOURCE_EVENT_DESTROYED "resource_set_destroyed"
 
 #define MRP_RESOURCE_TAG_RSET_ID ((uint16_t) 1)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Intel Corporation
+ * Copyright (c) 2012-2014, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,6 +32,7 @@
 #include <time.h>
 #include <signal.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
@@ -41,6 +42,8 @@
 #include <murphy/common/log.h>
 #include <murphy/common/list.h>
 #include <murphy/common/hashtbl.h>
+#include <murphy/common/json.h>
+#include <murphy/common/msg.h>
 #include <murphy/common/mainloop.h>
 
 #define USECS_PER_SEC  (1000 * 1000)
@@ -205,6 +208,47 @@ struct mrp_subloop_s {
 
 
 /*
+ * event busses
+ */
+
+struct mrp_event_bus_s {
+    char            *name;                       /* bus name */
+    mrp_list_hook_t  hook;                       /* to list of busses */
+    mrp_mainloop_t  *ml;                         /* associated mainloop */
+    mrp_list_hook_t  watches;                    /* event watches on this bus */
+    int              busy;                       /* whether pumping events */
+    int              dead;
+};
+
+
+/*
+ * event watches
+ */
+
+struct mrp_event_watch_s {
+    mrp_list_hook_t       hook;                  /* to list of event watches */
+    mrp_event_bus_t      *bus;                   /* associated event bus */
+    mrp_event_mask_t      mask;                  /* mask of watched events */
+    mrp_event_watch_cb_t  cb;                    /* notification callback */
+    void                 *user_data;             /* opaque user data */
+    int                   dead : 1;              /* marked for deletion */
+};
+
+
+/*
+ * pending events
+ */
+
+typedef struct {
+    mrp_list_hook_t  hook;                       /* to event queue */
+    mrp_event_bus_t *bus;                        /* bus for this event */
+    uint32_t         id;                         /* event id */
+    int              format;                     /* attached data format */
+    void            *data;                       /* attached data */
+} pending_event_t;
+
+
+/*
  * main loop
  */
 
@@ -245,12 +289,22 @@ struct mrp_mainloop_s {
     void                *iow;                    /* superloop epollfd watch */
     void                *timer;                  /* superloop timer */
     void                *work;                   /* superloop deferred work */
+
+    mrp_list_hook_t      busses;                 /* known event busses */
+    mrp_list_hook_t      eventq;                 /* pending events */
+    mrp_deferred_t      *eventd;                 /* deferred event pump cb */
 };
+
+
+static mrp_event_def_t *events;                  /* registered events */
+static int              nevent;                  /* number of events */
+static MRP_LIST_HOOK   (ewatches);               /* global, synchronous 'bus' */
 
 
 static void dump_pollfds(const char *prefix, struct pollfd *fds, int nfd);
 static void adjust_superloop_timer(mrp_mainloop_t *ml);
 static size_t poll_events(void *id, mrp_mainloop_t *ml, void **bufp);
+static void pump_events(mrp_deferred_t *d, void *user_data);
 
 /*
  * fd table manipulation
@@ -1491,6 +1545,13 @@ mrp_mainloop_t *mrp_mainloop_create(void)
             mrp_list_init(&ml->wakeups);
             mrp_list_init(&ml->deleted);
             mrp_list_init(&ml->subloops);
+            mrp_list_init(&ml->busses);
+            mrp_list_init(&ml->eventq);
+
+            ml->eventd = mrp_add_deferred(ml, pump_events, ml);
+            if (ml->eventd == NULL)
+                goto fail;
+            mrp_disable_deferred(ml->eventd);
 
             if (!setup_sighandlers(ml))
                 goto fail;
@@ -1503,6 +1564,8 @@ mrp_mainloop_t *mrp_mainloop_create(void)
             ml = NULL;
         }
     }
+
+
 
     return ml;
 }
@@ -2178,4 +2241,379 @@ static void dump_pollfds(const char *prefix, struct pollfd *fds, int nfd)
     for (i = 0, t = ""; i < nfd; i++, t = ", ")
         printf("%s%d/0x%x", t, fds[i].fd, fds[i].events);
     printf("\n");
+}
+
+
+/*
+ * event bus and events
+ */
+
+static inline void *ref_event_data(void *data, int format)
+{
+    switch (format & MRP_EVENT_FORMAT_MASK) {
+    case MRP_EVENT_FORMAT_JSON:
+        return mrp_json_ref((mrp_json_t *)data);
+    case MRP_EVENT_FORMAT_MSG:
+        return mrp_msg_ref((mrp_msg_t *)data);
+    default:
+        return data;
+    }
+}
+
+
+static inline void unref_event_data(void *data, int format)
+{
+    switch (format & MRP_EVENT_FORMAT_MASK) {
+    case MRP_EVENT_FORMAT_JSON:
+        mrp_json_unref((mrp_json_t *)data);
+        break;
+    case MRP_EVENT_FORMAT_MSG:
+        mrp_msg_unref((mrp_msg_t *)data);
+        break;
+    default:
+        break;
+    }
+}
+
+
+mrp_event_bus_t *mrp_event_bus_get(mrp_mainloop_t *ml, const char *name)
+{
+    mrp_list_hook_t *p, *n;
+    mrp_event_bus_t *bus;
+
+    if (name == NULL || !strcmp(name, MRP_GLOBAL_BUS_NAME))
+        return MRP_GLOBAL_BUS;
+
+    mrp_list_foreach(&ml->busses, p, n) {
+        bus = mrp_list_entry(p, typeof(*bus), hook);
+
+        if (!strcmp(bus->name, name))
+            return bus;
+    }
+
+    bus = mrp_allocz(sizeof(*bus));
+
+    if (bus == NULL)
+        return NULL;
+
+    bus->name = mrp_strdup(name);
+
+    if (bus->name == NULL) {
+        mrp_free(bus);
+        return NULL;
+    }
+
+    mrp_list_init(&bus->hook);
+    mrp_list_init(&bus->watches);
+    bus->ml = ml;
+
+    mrp_list_append(&ml->busses, &bus->hook);
+
+    return bus;
+}
+
+
+uint32_t mrp_event_id(const char *name)
+{
+    mrp_event_def_t *e;
+    int              i;
+
+    if (events != NULL)
+        for (i = 0, e = events; i < nevent; i++, e++)
+            if (!strcmp(e->name, name))
+                return e->id;
+
+    if (!mrp_reallocz(events, nevent, nevent + 1))
+        return 0;
+
+    e = events + nevent;
+
+    e->id   = nevent;
+    e->name = mrp_strdup(name);
+
+    if (e->name == NULL) {
+        mrp_reallocz(events, nevent + 1, nevent);
+        return 0;
+    }
+
+    nevent++;
+
+    return e->id;
+}
+
+
+const char *mrp_event_name(uint32_t id)
+{
+    if ((int)id < nevent)
+        return events[id].name;
+    else
+        return MRP_EVENT_UNKNOWN_NAME;
+}
+
+
+char *mrp_event_dump_mask(mrp_event_mask_t *mask, char *buf, size_t size)
+{
+    char *p, *t;
+    int   l, n, id;
+
+    p = buf;
+    l = (int)size;
+    t = "";
+
+    MRP_MASK_FOREACH_SET(mask, id, 1) {
+        n = snprintf(p, l, "%s%s", t, mrp_event_name(id));
+        t = "|";
+
+        if (n >= l)
+            return "<insufficient mask dump buffer>";
+
+        p += n;
+        l -= n;
+    }
+
+    return buf;
+}
+
+
+mrp_event_watch_t *mrp_event_add_watch(mrp_event_bus_t *bus, uint32_t id,
+                                       mrp_event_watch_cb_t cb, void *user_data)
+{
+    mrp_list_hook_t   *watches = bus ? &bus->watches : &ewatches;
+    mrp_event_watch_t *w;
+
+    w = mrp_allocz(sizeof(*w));
+
+    if (w == NULL)
+        return NULL;
+
+    mrp_list_init(&w->hook);
+    mrp_mask_init(&w->mask);
+    w->bus       = bus;
+    w->cb        = cb;
+    w->user_data = user_data;
+
+    if (!mrp_mask_set(&w->mask, id)) {
+        mrp_free(w);
+        return NULL;
+    }
+
+    mrp_list_append(watches, &w->hook);
+
+    mrp_debug("added event watch %p for event %d (%s) on bus %s", w, id,
+              mrp_event_name(id), bus ? bus->name : MRP_GLOBAL_BUS_NAME);
+
+    return w;
+}
+
+
+mrp_event_watch_t *mrp_event_add_watch_mask(mrp_event_bus_t *bus,
+                                            mrp_event_mask_t *mask,
+                                            mrp_event_watch_cb_t cb,
+                                            void *user_data)
+{
+    mrp_list_hook_t   *watches = bus ? &bus->watches : &ewatches;
+    mrp_event_watch_t *w;
+    char               events[512];
+
+    w = mrp_allocz(sizeof(*w));
+
+    if (w == NULL)
+        return NULL;
+
+    mrp_list_init(&w->hook);
+    mrp_mask_init(&w->mask);
+    w->bus       = bus;
+    w->cb        = cb;
+    w->user_data = user_data;
+
+    if (!mrp_mask_copy(&w->mask, mask)) {
+        mrp_free(w);
+        return NULL;
+    }
+
+    mrp_list_append(watches, &w->hook);
+
+    mrp_debug("added event watch %p for events <%s> on bus %s", w,
+              mrp_event_dump_mask(&w->mask, events, sizeof(events)),
+              bus ? bus->name : MRP_GLOBAL_BUS_NAME);
+
+    return w;
+}
+
+
+void mrp_event_del_watch(mrp_event_watch_t *w)
+{
+    if (w == NULL)
+        return;
+
+    if (w->bus != NULL && w->bus->busy) {
+        w->dead = TRUE;
+        w->bus->dead++;
+        return;
+    }
+
+    mrp_list_delete(&w->hook);
+    mrp_mask_reset(&w->mask);
+    mrp_free(w);
+}
+
+
+void bus_purge_dead(mrp_event_bus_t *bus)
+{
+    mrp_event_watch_t *w;
+    mrp_list_hook_t   *p, *n;
+
+    if (!bus->dead)
+        return;
+
+    mrp_list_foreach(&bus->watches, p, n) {
+        w = mrp_list_entry(p, typeof(*w), hook);
+
+        if (!w->dead)
+            continue;
+
+        mrp_list_delete(&w->hook);
+        mrp_mask_reset(&w->mask);
+        mrp_free(w);
+    }
+
+    bus->dead = 0;
+}
+
+
+static int queue_event(mrp_event_bus_t *bus, uint32_t id, void *data,
+                       mrp_event_flag_t flags)
+{
+    pending_event_t *e;
+
+    e = mrp_allocz(sizeof(*e));
+
+    if (e == NULL)
+        return -1;
+
+    mrp_list_init(&e->hook);
+    e->bus    = bus;
+    e->id     = id;
+    e->format = flags & MRP_EVENT_FORMAT_MASK;
+    e->data   = ref_event_data(data, e->format);
+    mrp_list_append(&bus->ml->eventq, &e->hook);
+
+    mrp_enable_deferred(bus->ml->eventd);
+
+    return 0;
+}
+
+
+static int emit_event(mrp_event_bus_t *bus, uint32_t id, void *data,
+                      mrp_event_flag_t flags)
+{
+    mrp_list_hook_t   *watches;
+    mrp_event_watch_t *w;
+    mrp_list_hook_t   *p, *n;
+
+    if (bus)
+        watches = &bus->watches;
+    else {
+        if (!(flags & MRP_EVENT_SYNCHRONOUS)) {
+            errno = EINVAL;
+            return -1;
+        }
+        watches = &ewatches;
+    }
+
+    if (bus)
+        bus->busy++;
+
+    mrp_debug("emitting event 0x%x (%s) on bus <%s>", id, mrp_event_name(id),
+              bus ? bus->name : MRP_GLOBAL_BUS_NAME);
+
+    mrp_list_foreach(watches, p, n) {
+        w = mrp_list_entry(p, typeof(*w), hook);
+
+        if (w->dead)
+            continue;
+
+        if (mrp_mask_test(&w->mask, id))
+            w->cb(w, id, flags & MRP_EVENT_FORMAT_MASK, data, w->user_data);
+    }
+
+    if (bus) {
+        bus->busy--;
+
+        if (!bus->busy)
+            bus_purge_dead(bus);
+    }
+
+    return 0;
+}
+
+
+static void pump_events(mrp_deferred_t *d, void *user_data)
+{
+    mrp_mainloop_t  *ml = (mrp_mainloop_t *)user_data;
+    mrp_list_hook_t *p, *n;
+    pending_event_t *e;
+
+ pump:
+    mrp_list_foreach(&ml->eventq, p, n) {
+        e = mrp_list_entry(p, typeof(*e), hook);
+
+        emit_event(e->bus, e->id, e->data, e->format);
+
+        mrp_list_delete(&e->hook);
+        unref_event_data(e->data, e->format);
+
+        mrp_free(e);
+    }
+
+    if (!mrp_list_empty(&ml->eventq))
+        goto pump;
+
+    mrp_disable_deferred(d);
+}
+
+
+int mrp_emit_event(mrp_event_bus_t *bus, uint32_t id, mrp_event_flag_t flags,
+                   void *data)
+{
+    int status;
+
+    if (flags & MRP_EVENT_SYNCHRONOUS) {
+        ref_event_data(data, flags);
+        status = emit_event(bus, id, data, flags);
+        unref_event_data(data, flags);
+
+        return status;
+    }
+    else
+        return queue_event(bus, id, data, flags);
+}
+
+
+int _mrp_event_emit_msg(mrp_event_bus_t *bus, uint32_t id,
+                        mrp_event_flag_t flags, ...)
+{
+    mrp_msg_t *msg;
+    uint16_t   tag;
+    va_list    ap;
+    int        status;
+
+    va_start(ap, flags);
+    tag = va_arg(ap, unsigned int);
+    msg = tag ? mrp_msg_createv(tag, ap) : NULL;
+    va_end(ap);
+
+    flags &= ~MRP_EVENT_FORMAT_MASK;
+    status = mrp_emit_event(bus, id, flags | MRP_EVENT_FORMAT_MSG, msg);
+    mrp_msg_unref(msg);
+
+    return status;
+}
+
+
+MRP_INIT static void init_events(void)
+{
+    MRP_ASSERT(mrp_event_id(MRP_EVENT_UNKNOWN_NAME) == MRP_EVENT_UNKNOWN,
+               "reserved id 0x%x for builtin event <%s> already taken",
+               MRP_EVENT_UNKNOWN, MRP_EVENT_UNKNOWN_NAME);
 }

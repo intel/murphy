@@ -33,7 +33,6 @@
 #include <murphy/common/json.h>
 #include <murphy/core/plugin.h>
 #include <murphy/core/console.h>
-#include <murphy/core/event.h>
 #include <murphy/core/auth.h>
 #include <murphy/core/domain.h>
 
@@ -635,34 +634,36 @@ int test_imports(void)
 }
 
 
-static void event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *event_data,
-                     void *user_data)
+static void event_cb(mrp_event_watch_t *w, uint32_t id, int format,
+                     void *event_data, void *user_data)
 {
     mrp_plugin_t *plugin = (mrp_plugin_t *)user_data;
 
     MRP_UNUSED(w);
+    MRP_UNUSED(format);
 
     mrp_log_info("%s: got event 0x%x (%s):", plugin->instance, id,
-                 mrp_get_event_name(id));
+                 mrp_event_name(id));
     mrp_msg_dump(event_data, stdout);
 }
 
 
 static int subscribe_events(mrp_plugin_t *plugin)
 {
-    test_data_t      *data = (test_data_t *)plugin->data;
-    mrp_event_mask_t  events;
+    mrp_mainloop_t   *ml     = plugin->ctx->ml;
+    mrp_event_bus_t  *bus    = mrp_event_bus_get(ml, MRP_PLUGIN_BUS);
+    test_data_t      *data   = (test_data_t *)plugin->data;
+    mrp_event_mask_t  events = MRP_MASK_EMPTY;
 
-    mrp_set_named_events(&events,
-                         MRP_PLUGIN_EVENT_LOADED,
-                         MRP_PLUGIN_EVENT_STARTED,
-                         MRP_PLUGIN_EVENT_FAILED,
-                         MRP_PLUGIN_EVENT_STOPPING,
-                         MRP_PLUGIN_EVENT_STOPPED,
-                         MRP_PLUGIN_EVENT_UNLOADED,
-                         NULL);
 
-    data->w = mrp_add_event_watch(&events, event_cb, plugin);
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_LOADED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_STARTED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_FAILED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_STOPPING));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_STOPPED));
+    mrp_mask_set(&events, mrp_event_id(MRP_PLUGIN_EVENT_UNLOADED));
+
+    data->w = mrp_event_add_watch_mask(bus, &events, event_cb, plugin);
 
     return (data->w != NULL);
 }
@@ -672,7 +673,7 @@ static void unsubscribe_events(mrp_plugin_t *plugin)
 {
     test_data_t *data = (test_data_t *)plugin->data;
 
-    mrp_del_event_watch(data->w);
+    mrp_event_del_watch(data->w);
     data->w = NULL;
 }
 

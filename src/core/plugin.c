@@ -36,7 +36,6 @@
 
 #include <murphy/common/list.h>
 #include <murphy/common/file-utils.h>
-#include <murphy/core/event.h>
 #include <murphy/core/plugin.h>
 
 #define PLUGIN_PREFIX "plugin-"
@@ -85,13 +84,13 @@ enum {
 };
 
 
-MRP_REGISTER_EVENTS(events,
-                    { MRP_PLUGIN_EVENT_LOADED  , PLUGIN_EVENT_LOADED   },
-                    { MRP_PLUGIN_EVENT_STARTED , PLUGIN_EVENT_STARTED  },
-                    { MRP_PLUGIN_EVENT_FAILED  , PLUGIN_EVENT_FAILED   },
-                    { MRP_PLUGIN_EVENT_STOPPING, PLUGIN_EVENT_STOPPING },
-                    { MRP_PLUGIN_EVENT_STOPPED , PLUGIN_EVENT_STOPPED  },
-                    { MRP_PLUGIN_EVENT_UNLOADED, PLUGIN_EVENT_UNLOADED });
+MRP_REGISTER_EVENTS(plugin_events,
+                    MRP_EVENT(MRP_PLUGIN_EVENT_LOADED  , PLUGIN_EVENT_LOADED  ),
+                    MRP_EVENT(MRP_PLUGIN_EVENT_STARTED , PLUGIN_EVENT_STARTED ),
+                    MRP_EVENT(MRP_PLUGIN_EVENT_FAILED  , PLUGIN_EVENT_FAILED  ),
+                    MRP_EVENT(MRP_PLUGIN_EVENT_STOPPING, PLUGIN_EVENT_STOPPING),
+                    MRP_EVENT(MRP_PLUGIN_EVENT_STOPPED , PLUGIN_EVENT_STOPPED ),
+                    MRP_EVENT(MRP_PLUGIN_EVENT_UNLOADED, PLUGIN_EVENT_UNLOADED));
 
 
 static inline int is_listed(const char *list,  const char *name)
@@ -201,13 +200,21 @@ static inline int is_blacklisted(mrp_context_t *ctx, const char *name,
 
 static int emit_plugin_event(int idx, mrp_plugin_t *plugin)
 {
-    uint16_t name = MRP_PLUGIN_TAG_PLUGIN;
-    uint16_t inst = MRP_PLUGIN_TAG_INSTANCE;
+    mrp_context_t  *ctx   = plugin->ctx;
+    mrp_mainloop_t *ml    = ctx->ml;
+    uint16_t        name  = MRP_PLUGIN_TAG_PLUGIN;
+    uint16_t        inst  = MRP_PLUGIN_TAG_INSTANCE;
+    int             flags = MRP_EVENT_SYNCHRONOUS;
 
-    return mrp_emit_event(events[idx].id,
-                          MRP_MSG_TAG_STRING(name, plugin->descriptor->name),
-                          MRP_MSG_TAG_STRING(inst, plugin->instance),
-                          MRP_MSG_END);
+    if (ctx->plugin_bus == NULL)
+        ctx->plugin_bus = mrp_event_bus_get(ml, MRP_PLUGIN_BUS);
+
+    if (mrp_event_emit_msg(ctx->plugin_bus, plugin_events[idx].id, flags,
+                           MRP_MSG_TAG_STRING(name, plugin->descriptor->name),
+                           MRP_MSG_TAG_STRING(inst, plugin->instance)) < 0)
+        return FALSE;
+    else
+        return TRUE;
 }
 
 

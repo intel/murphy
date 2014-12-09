@@ -442,7 +442,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
     r->stamp = r->stamp + 1;
 
     level = r->level++;
-    emit_resolver_event(RESOLVER_UPDATE_STARTED, t->name, level);
+    emit_resolver_event(r, RESOLVER_UPDATE_STARTED, t->name, level);
 
     save_target_stamps(r, t, stamps);
 
@@ -477,7 +477,7 @@ static int update_target(mrp_resolver_t *r, target_t *t)
     if (status <= 0) {
         rollback_transaction(r, tx);
         restore_target_stamps(r, t, stamps);
-        emit_resolver_event(RESOLVER_UPDATE_FAILED, t->name, level);
+        emit_resolver_event(r, RESOLVER_UPDATE_FAILED, t->name, level);
     }
     else {
         if (!commit_transaction(r, tx)) {
@@ -490,9 +490,9 @@ static int update_target(mrp_resolver_t *r, target_t *t)
     }
 
     if (status <= 0)
-        emit_resolver_event(RESOLVER_UPDATE_FAILED, t->name, level);
+        emit_resolver_event(r, RESOLVER_UPDATE_FAILED, t->name, level);
     else
-        emit_resolver_event(RESOLVER_UPDATE_DONE  , t->name, level);
+        emit_resolver_event(r, RESOLVER_UPDATE_DONE  , t->name, level);
 
     r->level--;
 

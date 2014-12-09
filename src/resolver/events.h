@@ -41,7 +41,8 @@ enum {
 };
 
 
-int emit_resolver_event(int event, const char *target, int level);
+int emit_resolver_event(mrp_resolver_t *r, int event, const char *target,
+                        int level);
 
 
 #endif /* __MURPHY_RESOLVER_EVENTS_H__ */
