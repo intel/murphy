@@ -46,6 +46,7 @@ MRP_CDECL_BEGIN
  * tags and names of resolver-related events we emit
  */
 
+#define MRP_RESOLVER_BUS           "resolver-bus"
 #define MRP_RESOLVER_EVENT_STARTED "resolver-update-start"
 #define MRP_RESOLVER_EVENT_FAILED  "resolver-update-failed"
 #define MRP_RESOLVER_EVENT_DONE    "resolver-update-done"

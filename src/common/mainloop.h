@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Intel Corporation
+ * Copyright (c) 2012-2014, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,6 +31,7 @@
 #define __MURPHY_MAINLOOP_H__
 
 #include <signal.h>
+#include <stdint.h>
 #include <sys/poll.h>
 #include <sys/epoll.h>
 
@@ -305,6 +306,125 @@ int mrp_mainloop_iterate(mrp_mainloop_t *ml);
 
 /** Quit the mainloop. */
 void mrp_mainloop_quit(mrp_mainloop_t *ml, int exit_code);
+
+/*
+ * event bus and and events
+ */
+
+#include <murphy/common/mask.h>
+#include <murphy/common/msg.h>
+
+#define MRP_GLOBAL_BUS      NULL         /* global synchronous bus */
+#define MRP_GLOBAL_BUS_NAME "global"     /* global synchronous bus name */
+
+/** event flags */
+typedef enum {
+    MRP_EVENT_ASYNCHRONOUS  = 0x00,      /* deliver asynchronously */
+    MRP_EVENT_SYNCHRONOUS   = 0x01,      /* deliver synchronously */
+    MRP_EVENT_FORMAT_JSON   = 0x01 << 1, /* attached data is JSON */
+    MRP_EVENT_FORMAT_MSG    = 0x02 << 1, /* attached data is mrp_msg_t */
+    MRP_EVENT_FORMAT_CUSTOM = 0x03 << 1, /* attached data is of custom format */
+    MRP_EVENT_FORMAT_MASK   = 0x03 << 1,
+} mrp_event_flag_t;
+
+/** Reserved event id for unknown events. */
+#define MRP_EVENT_UNKNOWN 0
+
+/** Reserved name for unknown events. */
+#define MRP_EVENT_UNKNOWN_NAME "unknown"
+
+/**
+ * Event definition for registering event(name)s.
+ */
+typedef struct {
+    char     *name;                      /* event name */
+    uint32_t  id;                        /* event id assigned by murphy */
+} mrp_event_def_t;
+
+/** Opaque event watch type. */
+typedef struct mrp_event_watch_s mrp_event_watch_t;
+
+/** Event watch notification callback type. */
+typedef void (*mrp_event_watch_cb_t)(mrp_event_watch_t *w, uint32_t id,
+                                     int format, void *data, void *user_data);
+
+/** Opaque event bus type. */
+typedef struct mrp_event_bus_s mrp_event_bus_t;
+
+/** Event mask type (a bitmask of event ids). */
+typedef mrp_mask_t mrp_event_mask_t;
+
+/** Look up (or create) the event bus with the given name. */
+mrp_event_bus_t *mrp_event_bus_get(mrp_mainloop_t *ml, const char *name);
+#define mrp_event_bus_create mrp_event_bus_get
+
+/** Look up (or register) the id of the given event. */
+uint32_t mrp_event_id(const char *name);
+#define mrp_event_register mrp_event_id
+
+/** Look up the name of the given event. */
+const char *mrp_event_name(uint32_t id);
+
+/** Dump the names of the events set in mask. */
+char *mrp_event_dump_mask(mrp_event_mask_t *mask, char *buf, size_t size);
+
+/** Register an event watch for a single event on the given bus. */
+mrp_event_watch_t *mrp_event_add_watch(mrp_event_bus_t *bus, uint32_t id,
+                                       mrp_event_watch_cb_t cb, void *user_data);
+
+/** Register an event watch for a number of events on the given bus. */
+mrp_event_watch_t *mrp_event_add_watch_mask(mrp_event_bus_t *bus,
+                                            mrp_event_mask_t *mask,
+                                            mrp_event_watch_cb_t cb,
+                                            void *user_data);
+
+/** Unregister the given event watch. */
+void mrp_event_del_watch(mrp_event_watch_t *w);
+
+/** Emit the given event with the data attached on the given bus. */
+int mrp_event_emit(mrp_event_bus_t *bus, uint32_t id, mrp_event_flag_t flags,
+                   void *data);
+
+/** Convenience macro to emit an event with JSON data attached. */
+#define mrp_event_emit_json(bus, id, flags, data)                 \
+    mrp_event_emit((bus), (id), (flags) | MRP_EVENT_FORMAT_JSON, (data))
+
+/** Convenience macro to emit an event with mrp_msg_t data attached. */
+#define mrp_event_emit_msg(bus, id, flags, ...)                         \
+    _mrp_event_emit_msg((bus), (id), (flags), __VA_ARGS__, MRP_MSG_END)
+
+/** Emit an event with mrp_msg_t data attached. */
+int _mrp_event_emit_msg(mrp_event_bus_t *bus, uint32_t id,
+                        mrp_event_flag_t flags, ...);
+
+/** Convenience macro to emit an event with custom data attached. */
+#define mrp_event_emit_custom(bus, id, data, flags) \
+    mrp_event_emit((bus), (id), (data), (flags) | MRP_EVENT_FORMAT_CUSTOM)
+
+/** Convenience macros for autoregistering a table of events on startup. */
+#define MRP_EVENT(_name, _id) [_id] = { .name = _name, .id = 0 }
+#define MRP_REGISTER_EVENTS(_event_table, ...)                  \
+    static mrp_event_def_t _event_table[] = {                   \
+        __VA_ARGS__,                                            \
+        { .name = NULL }                                        \
+    };                                                          \
+                                                                \
+    MRP_INIT static void register_##_event_table(void)          \
+    {                                                           \
+        mrp_event_def_t *e;                                     \
+                                                                \
+        for (e = _event_table; e->name != NULL; e++) {          \
+            e->id = mrp_event_register(e->name);                \
+                                                                \
+            if (e->id != MRP_EVENT_UNKNOWN)                     \
+                mrp_log_info("Event '%s' registered as 0x%x.",  \
+                             e->name, e->id);                   \
+            else                                                \
+                mrp_log_error("Failed to register event '%s'.", \
+                              e->name);                         \
+        }                                                       \
+    }                                                           \
+    struct __mrp_allow_trailing_semicolon
 
 MRP_CDECL_END
 

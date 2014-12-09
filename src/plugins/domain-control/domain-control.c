@@ -33,7 +33,6 @@
 #include <murphy/common/log.h>
 #include <murphy/common/wsck-transport.h>
 
-#include <murphy/core/event.h>
 #include <murphy/resolver/resolver.h>
 #include <murphy/core/domain.h>
 
@@ -52,15 +51,16 @@ static int invoke_handler(void *handler_data, const char *id,
                           mrp_domain_return_cb_t return_cb,
                           void *user_data);
 
-static int RESEVT_START, RESEVT_DONE, RESEVT_FAIL;
+static uint32_t RESEVT_START, RESEVT_DONE, RESEVT_FAIL;
 
 
-static void resolver_event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *data,
-                              void *user_data)
+static void resolver_event_cb(mrp_event_watch_t *w, uint32_t id, int format,
+                              void  *data, void *user_data)
 {
     pdp_t *pdp = (pdp_t *)user_data;
 
     MRP_UNUSED(w);
+    MRP_UNUSED(format);
     MRP_UNUSED(data);
 
     if (id == RESEVT_START)
@@ -80,19 +80,25 @@ static void resolver_event_cb(mrp_event_watch_t *w, int id, mrp_msg_t *data,
 
 static int add_resolver_trigger(pdp_t *pdp)
 {
+    mrp_context_t   *ctx = pdp->ctx;
+    mrp_mainloop_t  *ml  = ctx->ml;
+    mrp_event_bus_t *bus = mrp_event_bus_get(ml, MRP_RESOLVER_BUS);
     mrp_event_mask_t mask;
 
-    RESEVT_START = mrp_register_event(MRP_RESOLVER_EVENT_STARTED);
-    RESEVT_DONE  = mrp_register_event(MRP_RESOLVER_EVENT_DONE);
-    RESEVT_FAIL  = mrp_register_event(MRP_RESOLVER_EVENT_FAILED);
+    if (bus == NULL)
+        return FALSE;
 
-    mrp_reset_event_mask(&mask);
+    RESEVT_START = mrp_event_id(MRP_RESOLVER_EVENT_STARTED);
+    RESEVT_DONE  = mrp_event_id(MRP_RESOLVER_EVENT_DONE);
+    RESEVT_FAIL  = mrp_event_id(MRP_RESOLVER_EVENT_FAILED);
 
-    mrp_add_event(&mask, RESEVT_START);
-    mrp_add_event(&mask, RESEVT_DONE);
-    mrp_add_event(&mask, RESEVT_FAIL);
+    mrp_mask_init(&mask);
+    if (mrp_mask_set(&mask, RESEVT_START) < 0 ||
+        mrp_mask_set(&mask, RESEVT_DONE ) < 0 ||
+        mrp_mask_set(&mask, RESEVT_FAIL ) < 0)
+        return FALSE;
 
-    pdp->reh = mrp_add_event_watch(&mask, resolver_event_cb, pdp);
+    pdp->reh = mrp_event_add_watch_mask(bus, &mask, resolver_event_cb, pdp);
 
     return pdp->reh != NULL;
 }
@@ -100,7 +106,7 @@ static int add_resolver_trigger(pdp_t *pdp)
 
 static void del_resolver_trigger(pdp_t *pdp)
 {
-    mrp_del_event_watch(pdp->reh);
+    mrp_event_del_watch(pdp->reh);
     pdp->reh = NULL;
 }
 

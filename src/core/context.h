@@ -73,6 +73,8 @@ struct mrp_context_s {
     int              state;                /* context/daemon state */
     mrp_mainloop_t  *ml;                   /* mainloop */
     mrp_list_hook_t  plugins;              /* list of loaded plugins */
+    mrp_event_bus_t *plugin_bus;           /* bus for plugin events */
+    mrp_event_bus_t *daemon_bus;           /* bus for daemon events */
     mrp_list_hook_t  cmd_groups;           /* console command groups */
     mrp_list_hook_t  consoles;             /* active consoles */
     mrp_resolver_t  *r;                    /* resolver context */

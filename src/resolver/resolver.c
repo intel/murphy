@@ -51,8 +51,9 @@ mrp_resolver_t *mrp_resolver_create(mrp_context_t *ctx)
     if (r != NULL) {
         r->ctx  = ctx;
         r->ctbl = mrp_create_context_table();
+        r->bus  = mrp_event_bus_get(ctx->ml, MRP_RESOLVER_BUS);
 
-        if (r->ctbl != NULL)
+        if (r->ctbl != NULL && r->bus != NULL)
             return r;
 
         mrp_free(r);

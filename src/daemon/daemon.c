@@ -36,7 +36,6 @@
 #include <murphy/common/utils.h>
 #include <murphy/core/context.h>
 #include <murphy/core/plugin.h>
-#include <murphy/core/event.h>
 #include <murphy/resolver/resolver.h>
 #include <murphy/daemon/config.h>
 #include <murphy/daemon/daemon.h>
@@ -54,16 +53,20 @@ enum {
 };
 
 
-MRP_REGISTER_EVENTS(events,
-                    { MRP_DAEMON_LOADING , DAEMON_EVENT_LOADING  },
-                    { MRP_DAEMON_STARTING, DAEMON_EVENT_STARTING },
-                    { MRP_DAEMON_RUNNING , DAEMON_EVENT_RUNNING  },
-                    { MRP_DAEMON_STOPPING, DAEMON_EVENT_STOPPING });
+MRP_REGISTER_EVENTS(daemon_events,
+                    MRP_EVENT(MRP_DAEMON_LOADING , DAEMON_EVENT_LOADING ),
+                    MRP_EVENT(MRP_DAEMON_STARTING, DAEMON_EVENT_STARTING),
+                    MRP_EVENT(MRP_DAEMON_RUNNING , DAEMON_EVENT_RUNNING ),
+                    MRP_EVENT(MRP_DAEMON_STOPPING, DAEMON_EVENT_STOPPING));
 
 
-static int emit_daemon_event(int idx)
+static int emit_daemon_event(mrp_context_t *ctx, int idx)
 {
-    return mrp_emit_event(events[idx].id, MRP_MSG_END);
+    mrp_event_bus_t *bus   = ctx->daemon_bus;
+    uint32_t         id    = daemon_events[idx].id;
+    int              flags = MRP_EVENT_SYNCHRONOUS;
+
+    return mrp_event_emit_msg(bus, id, flags, MRP_MSG_END);
 }
 
 
@@ -97,8 +100,10 @@ static mrp_context_t *create_context(void)
 
     ctx = mrp_context_create();
 
-    if (ctx != NULL)
+    if (ctx != NULL) {
+        ctx->daemon_bus = mrp_event_bus_get(ctx->ml, MRP_DAEMON_BUS);
         return ctx;
+    }
     else
         mrp_log_error("Failed to create murphy main context.");
 
@@ -124,7 +129,7 @@ static void load_configuration(mrp_context_t *ctx)
     mrp_cfgfile_t *cfg;
 
     mrp_context_setstate(ctx, MRP_STATE_LOADING);
-    emit_daemon_event(DAEMON_EVENT_LOADING);
+    emit_daemon_event(ctx, DAEMON_EVENT_LOADING);
 
     cfg = mrp_parse_cfgfile(ctx->config_file);
 
@@ -181,7 +186,7 @@ static void load_ruleset(mrp_context_t *ctx)
 static void start_plugins(mrp_context_t *ctx)
 {
     mrp_context_setstate(ctx, MRP_STATE_STARTING);
-    emit_daemon_event(DAEMON_EVENT_STARTING);
+    emit_daemon_event(ctx, DAEMON_EVENT_STARTING);
 
     if (mrp_start_plugins(ctx))
         mrp_log_info("Successfully started all loaded plugins.");
@@ -237,7 +242,7 @@ static void prepare_ruleset(mrp_context_t *ctx)
 static void run_mainloop(mrp_context_t *ctx)
 {
     mrp_context_setstate(ctx, MRP_STATE_RUNNING);
-    emit_daemon_event(DAEMON_EVENT_RUNNING);
+    emit_daemon_event(ctx, DAEMON_EVENT_RUNNING);
     mrp_mainloop_run(ctx->ml);
 }
 
@@ -247,7 +252,7 @@ static void stop_plugins(mrp_context_t *ctx)
     MRP_UNUSED(ctx);
 
     mrp_context_setstate(ctx, MRP_STATE_STOPPING);
-    emit_daemon_event(DAEMON_EVENT_STOPPING);
+    emit_daemon_event(ctx, DAEMON_EVENT_STOPPING);
 }
 
 
