@@ -87,7 +87,7 @@ mrp_resource_set_t *mrp_resource_set_create(mrp_resource_client_t *client,
 
     mrp_resource_set_t *rset;
 
-    MRP_ASSERT(client, "invlaid argument");
+    MRP_ASSERT(client, "invalid argument");
 
     if (priority >= PRIORITY_MAX)
         priority = PRIORITY_MAX - 1;
