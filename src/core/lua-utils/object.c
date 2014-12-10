@@ -1160,7 +1160,12 @@ static int default_setter(void *data, lua_State *L, int member,
     mrp_lua_class_member_t *m;
     mrp_lua_value_t        *vptr;
     void                  **itemsp;
-    size_t                 *nitemp;
+    union {
+        void     *ptr;
+        size_t   *size;
+        uint32_t *u32;
+    } nitemp;
+    size_t                   nitem;
 
     mrp_lua_checkstack(L, -1);
 
@@ -1187,10 +1192,13 @@ static int default_setter(void *data, lua_State *L, int member,
         case MRP_LUA_BOOLEAN_ARRAY:
         case MRP_LUA_INTEGER_ARRAY:
         case MRP_LUA_DOUBLE_ARRAY:
-            itemsp = data + m->offs;
-            nitemp = data + m->size;
-            *itemsp = NULL;
-            *nitemp = 0;
+            itemsp     = data + m->offs;
+            nitemp.ptr = data + m->size;
+            *itemsp    = NULL;
+            if (m->sizew == 8)
+                *nitemp.size = 0;
+            else
+                *nitemp.u32  = 0;
             goto ok;
         case MRP_LUA_OBJECT:
             if (m->type_id == MRP_LUA_NONE)
@@ -1251,11 +1259,18 @@ static int default_setter(void *data, lua_State *L, int member,
     case MRP_LUA_BOOLEAN_ARRAY:
     case MRP_LUA_INTEGER_ARRAY:
     case MRP_LUA_DOUBLE_ARRAY:
-        itemsp = data + m->offs;
-        nitemp = data + m->size;
-        mrp_lua_object_free_array(itemsp, nitemp, m->type);
+        itemsp     = data + m->offs;
+        nitemp.ptr = data + m->size;
+        if (m->sizew == 8)
+            nitem = *nitemp.size;
+        else
+            nitem = *nitemp.u32;
+        mrp_lua_object_free_array(itemsp, &nitem, m->type);
         *itemsp = *v->array.items;
-        *nitemp = *v->array.nitem;
+        if (m->sizew == 8)
+            *nitemp.size = *v->array.nitem64;
+        else
+            *nitemp.u32 = (uint32_t)*v->array.nitem64;
         goto ok;
 
     case MRP_LUA_OBJECT:
@@ -1474,6 +1489,15 @@ int mrp_lua_declare_members(mrp_lua_classdef_t *def, mrp_lua_class_flag_t flags,
         if (members[i].flags & MRP_LUA_CLASS_NOTIFY) {
             if (notify == NULL) {
                 mrp_log_error("member '%s' needs a non-NULL notifier",
+                              members[i].name);
+                goto fail;
+            }
+        }
+
+        if (MRP_LUA_BOOLEAN_ARRAY <= members[i].type &&
+            members[i].type <= MRP_LUA_DOUBLE_ARRAY) {
+            if (members[i].sizew != 8 && members[i].sizew != 4) {
+                mrp_log_error("array member '%s': size must be 32- or 64-bit",
                               members[i].name);
                 goto fail;
             }
@@ -2230,10 +2254,14 @@ int mrp_lua_set_member(void *data, lua_State *L, char *err, size_t esize)
                                          err, esize) < 0)
             return -1;
         else {
-            v.array.items  = data + m->offs;
-            v.array.nitem  = data + m->size;
+            v.array.items   = data + m->offs;
+            v.array.nitem64 = data + m->size;
+
             *v.array.items = items;
-            *v.array.nitem = nitem;
+            if (m->sizew == 8)
+                *v.array.nitem64 = nitem;
+            else
+                *v.array.nitem32 = (uint32_t)nitem;
         }
         goto ok;
 

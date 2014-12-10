@@ -339,7 +339,10 @@ union mrp_lua_value_u {
     int         any;                     /* Lua reference */
     struct {                             /* array value */
         void    **items;                 /* array items */
-        size_t   *nitem;                 /* number of items */
+        union {
+            size_t   *nitem64;           /* number of items */
+            int      *nitem32;           /* number of items */
+        };
     } array;
     struct {
         int       ref;                   /* object reference */
@@ -354,9 +357,10 @@ union mrp_lua_value_u {
 
 struct mrp_lua_class_member_s {
     char             *name;              /* member name */
-    mrp_lua_type_t    type;              /* memebr type */
+    mrp_lua_type_t    type;              /* member type */
     size_t            offs;              /* offset within type buffer */
     size_t            size;              /* offset to size within type buffer */
+    size_t            sizew;             /* width of size within type buffer */
     const char       *type_name;         /* object type name */
     mrp_lua_type_t    type_id;           /* object type id */
     mrp_lua_setter_t  setter;            /* setter if any */
@@ -590,10 +594,11 @@ struct mrp_lua_class_member_s {
     {MRP_LUA_CLASS_MEMBER(MRP_LUA_ANY, _name, _offs, _set, _get, _flags)},
 
 /** Declare an automatic array and size member of the given type. */
-#define MRP_LUA_CLASS_ARRAY(_name, _type, _poffs, _noffs, _set, _get, _flags) \
+#define MRP_LUA_CLASS_ARRAY(_name, _type, _ctype, _p, _n, _set, _get, _flags) \
     {MRP_LUA_CLASS_MEMBER(MRP_LUA_##_type##_ARRAY, _name,                     \
-                          _poffs, _set, _get, _flags)                   \
-            .size = _noffs                            },
+                          MRP_OFFSET(_ctype, _p), _set, _set, _flags)         \
+            .size  = MRP_OFFSET(_ctype, _n),                                  \
+            .sizew = sizeof(((_ctype *)NULL)->_n)    },
 
 /** Declare an automatic object and reference member of the given type. */
 #define MRP_LUA_CLASS_OBJECT(_name, _type, _poffs, _roffs, _set, _get, _flags) \
