@@ -33,7 +33,6 @@
 #include <errno.h>
 
 #include <murphy/common.h>
-#include <murphy/core/event.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-bindings/murphy.h>
 
@@ -44,214 +43,360 @@
  * argumentless messages exists. */
 
 /*
- * Lua EventListener object
+ * Lua EventWatch object
  */
 
-#define EVENT_LUA_CLASS MRP_LUA_CLASS(event, lua)
+#define EVTWATCH_LUA_CLASS MRP_LUA_CLASS(evtwatch, lua)
 
 typedef struct {
-    lua_State          *L;         /* Lua execution context */
-    mrp_event_watch_t *ev;         /* associated murphy event */
-    bool initialized;
+    lua_State         *L;          /* Lua execution context */
+    mrp_context_t     *ctx;        /* murphy context */
+    mrp_event_bus_t   *bus;        /* event bus to watch on */
+    mrp_event_mask_t   mask;       /* mask of events to watch */
+    mrp_event_watch_t *w;          /* associated murphy event watch */
+    bool               init;       /* being initialized */
 
     /* Lua members */
+    char              *bus_name;   /* name of the event bus to use */
+    char             **events;     /* name of the events to watch */
+    int                nevent;     /* number of event names */
     int                callback;   /* reference to callback */
-    const char        *name;       /* event name */
-} event_lua_t;
+    bool               oneshot;    /* disable after first matching event */
+} evtwatch_lua_t;
 
 
-static int event_lua_create(lua_State *L);
-static void event_lua_destroy(void *data);
-static void event_lua_changed(void *data, lua_State *L, int member);
-static ssize_t event_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
-                                  size_t size, lua_State *L, void *data);
+static int evtwatch_lua_create(lua_State *L);
+static void evtwatch_lua_destroy(void *data);
+static void evtwatch_lua_changed(void *data, lua_State *L, int member);
+static ssize_t evtwatch_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                     size_t size, lua_State *L, void *data);
+
+static int evtwatch_lua_start(lua_State *L);
+static int evtwatch_lua_stop(lua_State *L);
+
+static void evtwatch_lua_cb(mrp_event_watch_t *ew, uint32_t id,
+                            int format, void *data, void *user_data);
+
 
 
 /*
- * Lua EventListener class
+ * Lua EventWatch class
  */
 
-#define OFFS(m) MRP_OFFSET(event_lua_t, m)
+#define OFFS(m) MRP_OFFSET(evtwatch_lua_t, m)
 #define RDONLY  MRP_LUA_CLASS_READONLY
 #define NOTIFY  MRP_LUA_CLASS_NOTIFY
 #define NOFLAGS MRP_LUA_CLASS_NOFLAGS
 
-MRP_LUA_METHOD_LIST_TABLE(event_lua_methods,
-        MRP_LUA_METHOD_CONSTRUCTOR(event_lua_create));
+MRP_LUA_METHOD_LIST_TABLE(evtwatch_lua_methods,
+                          MRP_LUA_METHOD_CONSTRUCTOR(evtwatch_lua_create)
+                          MRP_LUA_METHOD(stop , evtwatch_lua_stop)
+                          MRP_LUA_METHOD(start, evtwatch_lua_start));
 
-MRP_LUA_METHOD_LIST_TABLE(event_lua_overrides,
-        MRP_LUA_OVERRIDE_CALL (event_lua_create));
+MRP_LUA_METHOD_LIST_TABLE(evtwatch_lua_overrides,
+                          MRP_LUA_OVERRIDE_CALL(evtwatch_lua_create));
 
-MRP_LUA_MEMBER_LIST_TABLE(event_lua_members,
-        MRP_LUA_CLASS_LFUNC  ("callback", OFFS(callback), NULL, NULL, NOFLAGS)
-        MRP_LUA_CLASS_STRING ("name", OFFS(name), NULL, NULL, NOTIFY));
+MRP_LUA_MEMBER_LIST_TABLE(evtwatch_lua_members,
+    MRP_LUA_CLASS_STRING ("bus"     , OFFS(bus_name), NULL, NULL, NOTIFY)
+    MRP_LUA_CLASS_ARRAY  ("events"  , STRING, evtwatch_lua_t, events, nevent,
+                                                      NULL, NULL, NOTIFY)
+    MRP_LUA_CLASS_LFUNC  ("callback", OFFS(callback), NULL, NULL, NOTIFY)
+    MRP_LUA_CLASS_BOOLEAN("oneshot" , OFFS(oneshot) , NULL, NULL, NOTIFY));
 
 
 typedef enum {
+    EVENT_MEMBER_BUS,
+    EVENT_MEMBER_EVENTS,
     EVENT_MEMBER_CALLBACK,
-    EVENT_MEMBER_NAME,
+    EVENT_MEMBER_ONESHOT
 } event_member_t;
 
-MRP_LUA_DEFINE_CLASS(event, lua, event_lua_t, event_lua_destroy,
-        event_lua_methods, event_lua_overrides,
-        event_lua_members, NULL, event_lua_changed,
-        event_lua_tostring, NULL,
+MRP_LUA_DEFINE_CLASS(evtwatch, lua, evtwatch_lua_t, evtwatch_lua_destroy,
+        evtwatch_lua_methods, evtwatch_lua_overrides,
+        evtwatch_lua_members, NULL, evtwatch_lua_changed,
+        evtwatch_lua_tostring, NULL,
         MRP_LUA_CLASS_EXTENSIBLE | MRP_LUA_CLASS_DYNAMIC);
 
 
-static void event_lua_cb(mrp_event_watch_t *event, int id, mrp_msg_t *msg,
-        void *user_data)
+static void evtwatch_stop(evtwatch_lua_t *w)
 {
-    event_lua_t *ev = (event_lua_t *) user_data;
-    int top;
-
-    MRP_UNUSED(event);
-    MRP_UNUSED(msg);
-
-    mrp_debug("callback for event %d", id);
-
-    top = lua_gettop(ev->L);
-
-    if (ev->callback == LUA_NOREF || ev->callback == LUA_REFNIL)
-        goto end;
-
-    if (mrp_lua_object_deref_value(ev, ev->L, ev->callback, false)) {
-        mrp_lua_push_object(ev->L, ev);
-
-        if (lua_pcall(ev->L, 1, 0, 0) != 0) {
-            mrp_log_error("failed to invoke Lua event callback, stopping");
-            mrp_del_event_watch(ev->ev);
-        }
-    }
-
-end:
-    lua_settop(ev->L, top);
+    mrp_event_del_watch(w->w);
+    w->w = NULL;
 }
 
 
-static void event_lua_changed(void *data, lua_State *L, int member)
+static bool evtwatch_start(evtwatch_lua_t *w)
 {
-    event_lua_t *ev = (event_lua_t *) data;
+    if (w->w == NULL) {
+        w->w = mrp_event_add_watch_mask(w->bus, &w->mask, evtwatch_lua_cb, w);
+        mrp_debug("started event watch %p (%p)", w, w->w);
+    }
+
+    return w->w != NULL;
+}
+
+
+static void evtwatch_lua_cb(mrp_event_watch_t *watch, uint32_t id,
+                            int format, void *data, void *user_data)
+{
+    evtwatch_lua_t *w   = (evtwatch_lua_t *)user_data;
+    int             one = w->oneshot;
+    int             top;
+
+    MRP_UNUSED(watch);
+    MRP_UNUSED(format);
+    MRP_UNUSED(data);
+
+    mrp_debug("got event 0x%x (%s)", id, mrp_event_name(id));
+
+    top = lua_gettop(w->L);
+
+    if (mrp_lua_object_deref_value(w, w->L, w->callback, false)) {
+        mrp_lua_push_object(w->L, w);
+        lua_pushinteger(w->L, id);
+
+        if (lua_pcall(w->L, 2, 0, 0) != 0) {
+            mrp_log_error("failed to invoke Lua event watch callback (%s), "
+                          "stopping", lua_tostring(w->L, -1));
+            evtwatch_stop(w);
+        }
+
+        if (one)
+            evtwatch_stop(w);
+    }
+
+    lua_settop(w->L, top);
+}
+
+
+static void evtwatch_lua_changed(void *data, lua_State *L, int member)
+{
+    evtwatch_lua_t *w = (evtwatch_lua_t *)data;
+    int             i;
 
     MRP_UNUSED(L);
 
-    if (!ev->initialized)
-        return;
-
-    mrp_debug("%s (%d)", ev->name, member);
+    mrp_debug("event watch member #%d (%s) changed", member,
+              evtwatch_lua_members[member].name);
 
     switch (member) {
-        case EVENT_MEMBER_NAME: {
-            uint32_t id;
-            mrp_event_mask_t mask = 0;
+    case EVENT_MEMBER_BUS:
+        if (!w->init)
+            evtwatch_stop(w);
+        if (!w->bus_name || !*w->bus_name || !strcmp(w->bus_name, "global"))
+            w->bus = NULL;
+        else
+            w->bus = mrp_event_bus_get(w->ctx->ml, w->bus_name);
+        if (!w->init)
+            evtwatch_start(w);
+        break;
 
-            if (ev->ev) {
-                mrp_del_event_watch(ev->ev);
-            }
-            id = mrp_get_event_id(ev->name, TRUE);
-            mrp_add_event(&mask, id);
-
-            ev->ev = mrp_add_event_watch(&mask, event_lua_cb, ev);
-            break;
+    case EVENT_MEMBER_EVENTS:
+        if (!w->init)
+            evtwatch_stop(w);
+        mrp_mask_reset(&w->mask);
+        for (i = 0; i < w->nevent; i++) {
+            mrp_debug("setting event %s in mask", w->events[i]);
+            mrp_mask_set(&w->mask, mrp_event_id(w->events[i]));
         }
+        if (!w->init)
+            evtwatch_start(w);
+        break;
+
+    case EVENT_MEMBER_CALLBACK:
+        mrp_debug("callback set to (ref) %u", w->callback);
+        if (w->callback == LUA_NOREF || w->callback == LUA_REFNIL) {
+            if (!w->init)
+                evtwatch_stop(w);
+        }
+        else
+            if (!w->init)
+                evtwatch_start(w);
+        break;
+
+    case EVENT_MEMBER_ONESHOT:
+        break;
+
     default:
         break;
     }
+
+
+
 }
 
 
-static int event_lua_create(lua_State *L)
+static int evtwatch_lua_create(lua_State *L)
 {
-    event_lua_t *ev;
-    uint32_t id;
-    mrp_event_mask_t mask = 0;
-    int narg;
-    char e[128];
+    evtwatch_lua_t *w;
+    int             narg;
+    char           e[128], events[512];
 
     narg = lua_gettop(L);
 
-    if (narg < 1 || narg > 2) {
-        return luaL_error(L, "expected 0-1 constructor arguments, got %d",
-                narg-1);
-    }
+    if (narg < 1 || narg > 2)
+        return luaL_error(L, "expected 0, or 1 arguments, got %d", narg - 1);
 
-    ev = (event_lua_t *) mrp_lua_create_object(L, EVENT_LUA_CLASS, NULL, 0);
-    ev->initialized = FALSE;
+    w = (evtwatch_lua_t *)mrp_lua_create_object(L, EVTWATCH_LUA_CLASS, NULL, 0);
+    w->L        = L;
+    w->ctx      = mrp_lua_get_murphy_context();
+    w->init     = true;
+    w->callback = LUA_NOREF;
 
-    if (mrp_lua_init_members(ev, L, -2, e, sizeof(e)) != 1)
-        return luaL_error(L, "failed to initialize deferred (%s)", e);
+    if (mrp_lua_init_members(w, L, -2, e, sizeof(e)) != 1)
+        return luaL_error(L, "failed to initialize event watch (%s)", e);
 
-    ev->L = L;
+    w->init = false;
 
-    id = mrp_get_event_id(ev->name, TRUE);
-    mrp_add_event(&mask, id);
+    evtwatch_start(w);
 
-    ev->ev = mrp_add_event_watch(&mask, event_lua_cb, ev);
-    if (ev->ev == NULL)
-        return luaL_error(L, "failed to create Murphy event listener");
-
-    ev->initialized = TRUE;
-
-    mrp_debug("created listener %p for event %s (%d)", ev, ev->name, id);
+    mrp_debug("created event watch %p (%p) for events %s", w, w->w,
+              mrp_event_dump_mask(&w->mask, events, sizeof(events)));
 
     return 1;
 }
 
 
-static void event_lua_destroy(void *data)
+static void evtwatch_lua_destroy(void *data)
 {
-    event_lua_t *ev = (event_lua_t *) data;
+    evtwatch_lua_t *w = (evtwatch_lua_t *) data;
 
-    mrp_debug("destroying Lua event watch %p", ev);
+    mrp_debug("destroying Lua event watch %p", w);
 
-    if (ev->ev)
-        mrp_del_event_watch(ev->ev);
-    ev->ev = NULL;
+    evtwatch_stop(w);
 
-    mrp_lua_object_unref_value(ev, ev->L, ev->callback);
+    mrp_lua_object_unref_value(w, w->L, w->callback);
 
-    ev->callback = LUA_NOREF;
+    w->callback = LUA_NOREF;
 }
 
 
-static ssize_t event_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
-                                  size_t size, lua_State *L, void *data)
+static evtwatch_lua_t *evtwatch_lua_check(lua_State *L, int idx)
 {
-    event_lua_t *ev = (event_lua_t *) data;
+    return (evtwatch_lua_t *)mrp_lua_check_object(L, EVTWATCH_LUA_CLASS, idx);
+}
+
+
+static ssize_t evtwatch_lua_tostring(mrp_lua_tostr_mode_t mode, char *buf,
+                                     size_t size, lua_State *L, void *data)
+{
+    evtwatch_lua_t *w = (evtwatch_lua_t *) data;
+    char            events[512];
 
     MRP_UNUSED(L);
-
-    mrp_debug("%p", ev);
 
     switch (mode & MRP_LUA_TOSTR_MODEMASK) {
     case MRP_LUA_TOSTR_LUA:
     default:
-        return snprintf(buf, size, "event '%s'", ev->name);
+        return snprintf(buf, size, "event watch <%s>",
+                        mrp_event_dump_mask(&w->mask, events, sizeof(events)));
     }
 }
 
 
-static int event_send_event(lua_State *L)
+static int evtwatch_lua_start(lua_State *L)
 {
-    const char *event_name;
-    uint32_t id;
-    bool ret = FALSE;
+    evtwatch_lua_t *w = evtwatch_lua_check(L, -1);
 
-    luaL_checktype(L, 2, LUA_TSTRING);
-    event_name = lua_tostring(L, 2);
-
-    id = mrp_get_event_id(event_name, FALSE);
-
-    if (id != MRP_EVENT_UNKNOWN) {
-        mrp_debug("sending event %s", event_name);
-        ret = mrp_emit_event(id, NULL);
-    }
-
-    lua_pushboolean(L, ret);
+    lua_pushboolean(L, evtwatch_start(w));
 
     return 1;
 }
 
-MURPHY_REGISTER_LUA_BINDINGS(murphy, EVENT_LUA_CLASS,
-                             { "EventListener", event_lua_create },
-                             { "send_event", event_send_event });
+
+static int evtwatch_lua_stop(lua_State *L)
+{
+    evtwatch_lua_t *w = evtwatch_lua_check(L, -1);
+
+    evtwatch_stop(w);
+
+    return 0;
+}
+
+
+static int evtwatch_emit_event(lua_State *L)
+{
+    mrp_context_t   *ctx  = mrp_lua_get_murphy_context();
+    int              narg = lua_gettop(L);
+    mrp_event_bus_t *bus;
+    const char      *bus_name, *event;
+    uint32_t         id;
+    int              flags, r;
+
+    if (narg != 3 && narg != 4)
+        return luaL_error(L, "expected 2 or 3 arguments, got %d", narg - 1);
+
+    if (lua_type(L, 2) == LUA_TSTRING)
+        bus_name = lua_tostring(L, 2);
+    else if (lua_type(L, 2) == LUA_TNIL)
+        bus_name = NULL;
+    else
+        return luaL_error(L, "expected nil or bus name as 1st argument");
+
+    if (lua_type(L, 3) == LUA_TSTRING)
+        event = lua_tostring(L, 3);
+    else
+        return luaL_error(L, "expected event name string as 2nd argument");
+
+    flags = MRP_EVENT_SYNCHRONOUS;
+
+    if (narg == 4) {
+        if (lua_type(L, 4) != LUA_TBOOLEAN)
+            return luaL_error(L, "expected asynchronous bool as 3rd argument");
+        if (lua_toboolean(L, 4))
+            flags = MRP_EVENT_ASYNCHRONOUS;
+    }
+
+    bus = mrp_event_bus_get(ctx->ml, bus_name);
+    id  = mrp_event_id(event);
+
+    mrp_debug("emitting event 0x%x (<%s>) on bus <%s>", id, event,
+              bus_name ? bus_name : "global");
+
+    r = mrp_event_emit_msg(bus, id, MRP_EVENT_SYNCHRONOUS, flags, MRP_MSG_END);
+
+    lua_pushboolean(L, r == 0);
+
+    return 1;
+}
+
+
+static int evtwatch_event_id(lua_State *L)
+{
+    int narg = lua_gettop(L);
+
+    if (narg != 2)
+        return luaL_error(L, "expected 1 event name argument, got %d", narg);
+
+    if (lua_type(L, 2) != LUA_TSTRING)
+        return luaL_error(L, "expected event name string argument");
+
+    lua_pushinteger(L, mrp_event_id(lua_tostring(L, 2)));
+
+    return 1;
+}
+
+
+static int evtwatch_event_name(lua_State *L)
+{
+    int narg = lua_gettop(L);
+
+    if (narg != 2)
+        return luaL_error(L, "expected 1 event id argument, got %d", narg);
+
+    if (lua_type(L, 2) != LUA_TNUMBER)
+        return luaL_error(L, "expected event id integer argument");
+
+    lua_pushstring(L, mrp_event_name(lua_tointeger(L, 2)));
+
+    return 1;
+}
+
+
+MURPHY_REGISTER_LUA_BINDINGS(murphy, EVTWATCH_LUA_CLASS,
+                             { "EventWatch"   , evtwatch_lua_create },
+                             { "emit_event"   , evtwatch_emit_event },
+                             { "EventListener", evtwatch_lua_create },
+                             { "send_event"   , evtwatch_emit_event },
+                             { "event_id"     , evtwatch_event_id   },
+                             { "event_name"   , evtwatch_event_name });
