@@ -497,7 +497,7 @@ static int table_getfield(lua_State *L)
     MRP_LUA_ENTER;
 
     if (lua_type(L, 2) == LUA_TNUMBER) {
-        mrp_debug("reading row %d in '%s'", lua_tointeger(L,-1), tbl->name);
+        mrp_debug("reading row %d in '%s'", (int)lua_tointeger(L,-1), tbl->name);
         lua_rawget(L, 1);
     }
     else {
@@ -551,7 +551,7 @@ static int table_setfield(lua_State *L)
             luaL_checktype(L, -1, LUA_TTABLE);
         }
 
-        mrp_debug("setting row %u in table '%s'\n", rowidx+1, tbl->name);
+        mrp_debug("setting row %zu in table '%s'\n", rowidx+1, tbl->name);
     }
 
     MRP_LUA_LEAVE(1);
@@ -1007,7 +1007,8 @@ static int select_getfield(lua_State *L)
         lua_pushnil(L);
     else {
         if (lua_type(L, 2) == LUA_TNUMBER) {
-            mrp_debug("reading row %d in '%s'", lua_tointeger(L,-1),sel->name);
+            mrp_debug("reading row %d in '%s'", (int)lua_tointeger(L,-1),
+                      sel->name);
             lua_rawget(L, 1);
         }
         else {
