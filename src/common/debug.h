@@ -101,7 +101,7 @@ int mrp_debug_dump_config(FILE *fp);
 
 /** Low-level log wrapper for debug messages. */
 void mrp_debug_msg(const char *file, int line, const char *func,
-                   const char *format, ...);
+                   const char *format, ...) MRP_PRINTF_LIKE(4, 5);
 
 /** Check if the given debug site is enabled. */
 int mrp_debug_check(const char *func, const char *file, int line);
