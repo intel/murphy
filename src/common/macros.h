@@ -113,10 +113,10 @@
 
 /** Assertions. */
 #ifndef NDEBUG
-#    define MRP_ASSERT(expr, msg) do {                                    \
+#    define MRP_ASSERT(expr, fmt, args...) do {                           \
         if (!(expr)) {                                                    \
-            printf("assertion '%s' failed at %s@%s:%d: %s\n", #expr,      \
-                   __FUNCTION__, __FILE__, __LINE__, msg);                \
+            printf("assertion '%s' failed at %s@%s:%d: "fmt"\n", #expr,   \
+                   __FUNCTION__, __FILE__, __LINE__, ## args);          \
             abort();                                                      \
         }                                                                 \
     } while (0)
