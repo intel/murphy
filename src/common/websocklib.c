@@ -1801,7 +1801,7 @@ static int wsl_event(lws_ctx_t *ws_ctx, lws_t *ws, lws_event_t event,
 
     case LWS_CALLBACK_RECEIVE:
     case LWS_CALLBACK_CLIENT_RECEIVE:
-        mrp_debug("%d bytes received on websocket %p/%p", len, ws, user);
+        mrp_debug("%zu bytes received on websocket %p/%p", len, ws, user);
         mrp_debug("%zd remaining from this message",
                   libwebsockets_remaining_packet_payload(ws));
 

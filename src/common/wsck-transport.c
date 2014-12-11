@@ -760,7 +760,7 @@ static void recv_cb(wsl_sck_t *sck, void *data, size_t size, void *user_data,
 
     MRP_UNUSED(proto_data);
 
-    mrp_debug("%d bytes on websocket %p", size, sck);
+    mrp_debug("%zu bytes on websocket %p", size, sck);
 
     MRP_TRANSPORT_BUSY(t, {
             if (t->mode != MRP_TRANSPORT_MODE_CUSTOM)
@@ -912,7 +912,7 @@ static void http_connection_cb(wsl_ctx_t *ctx, char *addr, const char *protocol,
             mrp_log_error("failed to create new HTTP client");
     }
     else
-        mrp_debug("rejecting pure HTTP client for context %p");
+        mrp_debug("rejecting pure HTTP client for context %p", ctx);
 }
 
 
@@ -949,7 +949,7 @@ static void http_req_cb(wsl_sck_t *sck, void *data, size_t size,
     type = http_mapuri(c, uri, path, sizeof(path));
 
     if (type != NULL) {
-        mrp_debug("mapped to '%s' (%s)", uri, path, type);
+        mrp_debug("mapped to '%s' (%s)", path, type);
         wsl_serve_http_file(sck, path, type);
     }
     else
