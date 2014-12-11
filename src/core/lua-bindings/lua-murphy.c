@@ -305,7 +305,7 @@ void mrp_lua_dump_stack(lua_State *L, const char *prefix)
                       lua_typename(L, lua_type(L, -i)));
     }
     else
-        mrp_debug("%sLua stack is empty");
+        mrp_debug("%sLua stack is empty", prefix);
 }
 
 
@@ -345,7 +345,7 @@ static void lua_debug(lua_State *L, lua_Debug *ar)
             else if (RUNNING(&f, "Lua"))  type = "Lua";
             else if (RUNNING(&f, "main")) type = "Lua-main";
             else if (RUNNING(&f, "tail")) {
-                mrp_debug(ALIGNFMT"<=> %*.*stail-call", ALIGNARG);
+                mrp_debug(ALIGNFMT"<=> tail-call", ALIGNARG);
 #ifndef LUA_HOOKTAILRET
                 depth++;
 #endif
