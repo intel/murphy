@@ -221,7 +221,7 @@ static int transport_create(transport_lua_t *t, char *err, size_t elen)
     t->t  = mrp_transport_create(t->ctx->ml, t->atype, &events, t, flags);
 
     if (t->t == NULL)
-        mrp_lua_error(-1, t->L, "failed to create transport");
+        return mrp_lua_error(-1, t->L, "failed to create transport");
 
 
     opt = MRP_WSCK_OPT_SENDMODE;
