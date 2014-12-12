@@ -8,10 +8,10 @@
 
 int main(int argc, char *argv[])
 {
-    unsigned long bits;
-    int           i, j, prev, set, n, cnt, clr, bit;
-    mrp_mask_t    m = MRP_MASK_EMPTY, m1;
-    int           b[] = { 0, 1, 5, 16, 32, 48, 97, 112, 113, 114, 295, 313, -1 };
+    uint64_t   bits;
+    int        i, j, prev, set, n, cnt, clr, bit;
+    mrp_mask_t m = MRP_MASK_EMPTY, m1;
+    int        b[] = { 0, 1, 5, 16, 32, 48, 97, 112, 113, 114, 295, 313, -1 };
 
     cnt = argc > 1 ? strtoul(argv[1], NULL, 10) : 100;
 
