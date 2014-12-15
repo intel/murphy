@@ -2585,8 +2585,13 @@ int mrp_emit_event(mrp_event_bus_t *bus, uint32_t id, mrp_event_flag_t flags,
 
         return status;
     }
-    else
-        return queue_event(bus, id, data, flags);
+    else {
+        if (bus != NULL)
+            return queue_event(bus, id, data, flags);
+
+        errno = EOPNOTSUPP;
+        return -1;
+    }
 }
 
 
