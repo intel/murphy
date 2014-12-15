@@ -56,7 +56,8 @@ typedef struct {
 
 
 /** Macro to intialize a bitmask to empty. */
-#define MRP_MASK_EMPTY { .nbit = 64, .bits = 0 }
+#define MRP_MASK_EMPTY   { .nbit = 64, .bits = 0 }
+#define MRP_MASK_INIT(m) do { (m)->nbit = 64; (m)->bits = 0; } while (0)
 
 /** Macro to declare a bitmask variable and initialize it. */
 #define MRP_MASK(m)    mrp_mask_t m = MRP_MASK_EMPTY
@@ -76,7 +77,11 @@ typedef struct {
 /** Initialize the given mask. */
 static inline void mrp_mask_init(mrp_mask_t *m)
 {
+#ifndef __cplusplus
     *m = (mrp_mask_t)MRP_MASK_EMPTY;
+#else
+    MRP_MASK_INIT(m);
+#endif
 }
 
 
@@ -103,7 +108,7 @@ static inline mrp_mask_t *mrp_mask_ensure(mrp_mask_t *m, int bits)
         w = m->bits;
         n = (bits + _BITS_PER_WORD - 1) / _BITS_PER_WORD;
 
-        m->bitp = mrp_allocz(n * sizeof(*m->bitp));
+        m->bitp = (_mask_t *)mrp_allocz(n * sizeof(*m->bitp));
 
         if (m->bitp == NULL) {
             m->bits = w;
@@ -225,7 +230,7 @@ static inline mrp_mask_t *mrp_mask_copy(mrp_mask_t *dst, mrp_mask_t *src)
     if (src->nbit == _BITS_PER_WORD)
         *dst = *src;
     else {
-        dst->bitp = mrp_alloc(dst->nbit * _BITS_PER_WORD);
+        dst->bitp = (_mask_t *)mrp_alloc(dst->nbit * _BITS_PER_WORD);
 
         if (dst->bitp == NULL)
             return NULL;
