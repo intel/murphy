@@ -95,6 +95,7 @@ void mrp_debug_reset(void);
 
 /** Apply the debug configuration settings given in cmd. */
 int mrp_debug_set_config(const char *cmd);
+#define mrp_debug_set mrp_debug_set_config
 
 /** Dump the active debug configuration. */
 int mrp_debug_dump_config(FILE *fp);
