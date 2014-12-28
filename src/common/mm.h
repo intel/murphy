@@ -94,6 +94,20 @@ MRP_CDECL_BEGIN
                                                                           \
             _ptr; })
 
+#define mrp_memalign(ptrp, align, size)                                   \
+    mrp_mm_memalign(ptrp, align, size, __LOC__)
+
+#define mrp_memalignz(ptrp, align, size) ({                               \
+            void *_ptrp;                                                  \
+            int   _r;                                                     \
+                                                                          \
+            _r = mrp_mm_memalign(&_ptrp, align, size, __LOC__);           \
+            if (_r == 0)                                                  \
+                memset(_ptrp, 0, size);                                   \
+                                                                          \
+            *ptrp = _ptrp;                                                \
+            _r; })
+
 #define mrp_clear(obj) memset((obj), 0, sizeof(*(obj)))
 
 
