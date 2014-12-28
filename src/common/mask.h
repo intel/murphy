@@ -446,6 +446,35 @@ static inline int mrp_mask_next_clear(mrp_mask_t *m, int bit)
 }
 
 
+/** Get the first bit cleared bit and set it to 1. */
+static inline int mrp_mask_alloc(mrp_mask_t *m)
+{
+    _mask_t *wrd;
+    int     w, n, bit;
+
+    bit = 0;
+    while (bit < m->nbit - 1) {
+        w = _WORD(bit);
+
+        if (m->nbit == _BITS_PER_WORD)
+            wrd = &m->bits;
+        else
+            wrd = m->bitp + w;
+
+        n = mrp_ffsll(~*wrd);
+
+        if (n > 0) {
+            *wrd |= _MASK(n - 1);
+            return w * _BITS_PER_WORD + n - 1;
+        }
+
+        bit += _BITS_PER_WORD;
+    }
+
+    return -1;
+}
+
+
 /** Loop through all bits set in a mask. */
 #define MRP_MASK_FOREACH_SET(m, bit, start)     \
     for (bit = mrp_mask_next_set(m, start);     \

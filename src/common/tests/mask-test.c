@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
     uint64_t   bits;
     int        i, j, prev, set, n, cnt, clr, bit;
-    mrp_mask_t m = MRP_MASK_EMPTY, m1;
+    mrp_mask_t m = MRP_MASK_EMPTY, m1 = MRP_MASK_EMPTY;
     int        b[] = { 0, 1, 5, 16, 32, 48, 97, 112, 113, 114, 295, 313, -1 };
 
     cnt = argc > 1 ? strtoul(argv[1], NULL, 10) : 100;
@@ -122,6 +122,19 @@ int main(int argc, char *argv[])
 
     MRP_MASK_FOREACH_SET(&m1, bit, 0) {
         printf("next bit set (and'd): %d\n", bit);
+    }
+
+    mrp_mask_reset(&m);
+
+    for (i = 0; i < 1024; i++) {
+        mrp_mask_ensure(&m, i + 1);
+        j = mrp_mask_alloc(&m);
+        if (j < 0) {
+            printf("failed to allocate bit #%d\n", i);
+            exit(1);
+        }
+        else
+            printf("allocated bit #%d: %d\n", i, j);
     }
 
     mrp_mask_reset(&m);
