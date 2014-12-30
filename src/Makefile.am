@@ -70,7 +70,6 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/debug.c			\
 		common/env.c			\
 		common/mm.c			\
-		common/hashtbl.c		\
 		common/mainloop.c		\
 		common/utils.c			\
 		common/file-utils.c		\

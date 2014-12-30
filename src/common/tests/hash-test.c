@@ -59,18 +59,38 @@
 #define NKEY   4
 #define NPHASE 0xff
 
-#define INFO(fmt, args...)  do {                         \
-        printf("[%s] "fmt"\n" , __FUNCTION__ , ## args); \
-        fflush(stdout);                                  \
+enum {
+    V_FATAL = 0,
+    V_ERROR,
+    V_PROGRESS,
+    V_INFO
+};
+
+#define INFO(fmt, args...)  do {                                \
+        if (test.verbosity >= V_INFO) {                         \
+            printf("[%s] "fmt"\n" , __FUNCTION__ , ## args);    \
+            fflush(stdout);                                     \
+        }                                                       \
     } while (0)
 
-#define ERROR(fmt, args...) do {                                \
-        printf("[%s] error: "fmt"\n" , __FUNCTION__, ## args);  \
-        fflush(stdout);                                         \
+#define PROGRESS(fmt, args...) do {                             \
+        if (test.verbosity >= V_PROGRESS) {                     \
+            printf("[%s] "fmt"\n" , __FUNCTION__ , ## args);    \
+            fflush(stdout);                                     \
+        }                                                       \
+    } while (0)
+
+#define ERROR(fmt, args...) do {                                        \
+        if (test.verbosity >= V_ERROR) {                                \
+            printf("[%s] [phase #%d.%d] error: "fmt"\n",                \
+                   __FUNCTION__, test.phi, test.phj, ## args);          \
+            fflush(stdout);                                             \
+        }                                                               \
     } while (0)
 
 #define FATAL(fmt, args...) do {                                        \
-        printf("[%s] fatal error: "fmt"\n" , __FUNCTION__, ## args);    \
+        printf("[%s] [phase #%d.%d (%zu)] fatal error: "fmt"\n",        \
+               __FUNCTION__, test.phi, test.phj, test.size, ## args);   \
         fflush(stdout);                                                 \
         exit(1);                                                        \
     } while (0)
@@ -115,6 +135,9 @@ typedef struct {
 
     int         keyidx;
     uint32_t    pattern;
+
+    int         verbosity;
+    int         phi, phj;
 } test_t;
 
 
@@ -283,7 +306,7 @@ test_init(void)
     int      i;
     entry_t *entry;
 
-    INFO("setting up tests...");
+    INFO("setting up tests for %d entries...", test.nentry);
 
     if ((test.entries = ALLOC_ARR(entry_t, test.nentry)) == NULL)
         FATAL("failed to allocate test set");
@@ -362,11 +385,17 @@ test_run(void)
               test.keyidx, test.size);
 
     for (i = 0, entry = test.entries; i < test.nentry; i++, entry++) {
+        test.phi = i;
+        test.phj = 0;
+
+        PROGRESS("Running test cycle #%d (@size %zu)...", i, test.size);
         populate();
 
         test.pattern = 0;
         for (j = 0; j < NPHASE; j++) {
-            INFO("Running test phase #%d...", j);
+            test.phj = j;
+
+            INFO("Running test phase #%d.%d...", i, j);
 
             evict();
             check();
@@ -392,8 +421,17 @@ main(int argc, char *argv[])
 
     memset(&test, 0, sizeof(test));
 
-    if (argc < 2 || (test.nentry = (int)strtoul(argv[1], NULL, 10)) <= 16)
-        test.nentry = 16;
+    test.nentry    = 16;
+    test.verbosity = V_ERROR;
+
+    for (i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-v"))
+            test.verbosity++;
+        else {
+            if ((test.nentry = (int)strtoul(argv[i], NULL, 10)) <= 16)
+                test.nentry = 16;
+        }
+    }
 
     test_init();
 
