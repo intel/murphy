@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Intel Corporation
+ * Copyright (c) 2012 - 2014, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,70 +33,139 @@
 #include <stdint.h>
 
 #include <murphy/common/macros.h>
+#include <murphy/common/hash-table.h>
+
 
 MRP_CDECL_BEGIN
 
-typedef struct mrp_htbl_s mrp_htbl_t;
-
-/** Prototype for key comparison functions. */
-typedef int (*mrp_htbl_comp_fn_t)(const void *key1, const void *key2);
-
-/** Prototoype for key hash functions. */
-typedef uint32_t (*mrp_htbl_hash_fn_t)(const void *key);
-
-/** Prototype for functions used to free entries. */
-typedef void (*mrp_htbl_free_fn_t)(void *key, void *object);
-
-
-/*
- * hash table configuration
+/**
+ * \addtogroup MurphyCommonInfra
+ * @{
+ *
+ * @file hash-table.h
+ *
+ * @brief Backward-ccompatibilty layer to provide the original Murphy hash table
+ *        implementation API. Please consider directly using directly the new
+ *        hash table implementatio @mrp_hashtbl_t. For more details, and the new
+ *        API, please refer to hash-table.h.
+ * @}
  */
+
+typedef mrp_hashtbl_t mrp_htbl_t;
+typedef mrp_comp_fn_t mrp_htbl_comp_fn_t;
+typedef mrp_hash_fn_t mrp_htbl_hash_fn_t;
+typedef mrp_free_fn_t mrp_htbl_free_fn_t;
+
 typedef struct {
-    size_t             nentry;                   /* estimated entries */
-    mrp_htbl_comp_fn_t comp;                     /* comparison function */
-    mrp_htbl_hash_fn_t hash;                     /* hash function */
-    mrp_htbl_free_fn_t free;                     /* freeing function */
-    size_t             nbucket;                  /* number of buckets, or 0 */
+    size_t             nentry;
+    mrp_htbl_comp_fn_t comp;
+    mrp_htbl_hash_fn_t hash;
+    mrp_htbl_free_fn_t free;
+    size_t             nbucket;
 } mrp_htbl_config_t;
 
-
-/** Create a new hash table with the given configuration. */
-mrp_htbl_t *mrp_htbl_create(mrp_htbl_config_t *cfg);
-
-/** Destroy a hash table, free all entries unless @free is FALSE. */
-void mrp_htbl_destroy(mrp_htbl_t *ht, int free);
-
-/** Reset a hash table, also free all entries unless @free is FALSE. */
-void mrp_htbl_reset(mrp_htbl_t *ht, int free);
-
-/** Insert the given @key/@object pair to the hash table. */
-int mrp_htbl_insert(mrp_htbl_t *ht, void *key, void *object);
-
-/** Remove and return the object for @key, also free unless @free is FALSE. */
-void *mrp_htbl_remove(mrp_htbl_t *ht, void *key, int free);
-
-/** Look up the object corresponding to @key. */
-void *mrp_htbl_lookup(mrp_htbl_t *ht, void *key);
-
-/** Find the first matching entry in a hash table. */
-typedef int (*mrp_htbl_find_cb_t)(void *key, void *object, void *user_data);
-void *mrp_htbl_find(mrp_htbl_t *ht, mrp_htbl_find_cb_t cb, void *user_data);
-
-
-/*
- * hash table iterators
- */
-
 enum {
-    MRP_HTBL_ITER_STOP   = 0x0,                  /* stop iterating */
-    MRP_HTBL_ITER_MORE   = 0x1,                  /* keep iterating */
-    MRP_HTBL_ITER_UNHASH = 0x2,                  /* unhash without freeing */
-    MRP_HTBL_ITER_DELETE = 0x6,                  /* unhash and free */
+    MRP_HTBL_ITER_STOP   = 0x0,
+    MRP_HTBL_ITER_MORE   = 0x1,
+    MRP_HTBL_ITER_UNHASH = 0x2,
+    MRP_HTBL_ITER_DELETE = 0x6,
 };
 
+typedef int (*mrp_htbl_find_cb_t)(void *key, void *object, void *user_data);
 typedef int (*mrp_htbl_iter_cb_t)(void *key, void *object, void *user_data);
-int mrp_htbl_foreach(mrp_htbl_t *ht, mrp_htbl_iter_cb_t cb, void *user_data);
+
+
+static inline mrp_htbl_t *mrp_htbl_create(mrp_htbl_config_t *cfg)
+{
+    mrp_hashtbl_config_t c;
+
+    if (cfg->nentry > 16384)
+        cfg->nentry = 16384;
+
+    mrp_clear(&c);
+    c.hash    = cfg->hash;
+    c.comp    = cfg->comp;
+    c.free    = cfg->free;
+    c.nalloc  = cfg->nentry;
+    c.nbucket = cfg->nbucket;
+
+    return mrp_hashtbl_create(&c);
+}
+
+
+static inline void mrp_htbl_destroy(mrp_htbl_t *t, int free)
+{
+    mrp_hashtbl_destroy(t, free ? true : false);
+}
+
+
+static inline void mrp_htbl_reset(mrp_htbl_t *t, int free)
+{
+    mrp_hashtbl_reset(t, free ? true : false);
+}
+
+
+static inline int mrp_htbl_insert(mrp_htbl_t *t, void *key, void *object)
+{
+    return mrp_hashtbl_add(t, key, object, NULL) < 0 ? false : true;
+}
+
+
+static inline void *mrp_htbl_remove(mrp_htbl_t *t, void *key, int free)
+{
+    return mrp_hashtbl_del(t, key, MRP_HASH_COOKIE_NONE, free ? true : false);
+}
+
+
+static inline void *mrp_htbl_lookup(mrp_htbl_t *t, void *key)
+{
+    return mrp_hashtbl_lookup(t, key, MRP_HASH_COOKIE_NONE);
+}
+
+
+static inline void *mrp_htbl_find(mrp_htbl_t *t, mrp_htbl_find_cb_t cb, void *user_data)
+{
+    mrp_hashtbl_iter_t  it;
+    const void         *key, *obj;
+
+    MRP_HASHTBL_FOREACH(t, &it, &key, NULL, &obj) {
+        if (cb((void *)key, (void *)obj, user_data))
+            return (void *)obj;
+    }
+
+    return NULL;
+}
+
+
+static inline int mrp_htbl_foreach(mrp_htbl_t *t, mrp_htbl_iter_cb_t cb, void *user_data)
+{
+    mrp_hashtbl_iter_t  it;
+    const void         *key, *obj;
+    int                 verdict, saved_errno, status;
+    bool                release;
+
+    saved_errno = errno;
+    errno = 0;
+    MRP_HASHTBL_FOREACH(t, &it, &key, NULL, &obj) {
+        verdict = cb((void *)key, (void *)obj, user_data);
+
+        if (verdict & MRP_HTBL_ITER_UNHASH) {
+            release = !!((verdict & ~MRP_HTBL_ITER_UNHASH) & MRP_HTBL_ITER_DELETE);
+            mrp_hashtbl_del(t, key, MRP_HASH_COOKIE_NONE, release);
+        }
+
+        if (!(verdict & MRP_HTBL_ITER_MORE))
+            break;
+    }
+
+    status = (errno == EBUSY ? FALSE : TRUE);
+    errno = saved_errno;
+
+    return status;
+}
+
 
 MRP_CDECL_END
+
 
 #endif /* __MURPHY_HASHTBL_H__ */
