@@ -35,6 +35,7 @@
 typedef struct mrp_context_s mrp_context_t;
 
 #include <murphy/common/list.h>
+#include <murphy/common/object.h>
 #include <murphy/common/mainloop.h>
 #include <murphy/resolver/resolver.h>
 
@@ -75,6 +76,11 @@ struct mrp_context_s {
     mrp_list_hook_t  plugins;              /* list of loaded plugins */
     mrp_event_bus_t *plugin_bus;           /* bus for plugin events */
     mrp_event_bus_t *daemon_bus;           /* bus for daemon events */
+
+    MRP_EXTENSIBLE;                        /* context extensions */
+
+
+
     mrp_list_hook_t  cmd_groups;           /* console command groups */
     mrp_list_hook_t  consoles;             /* active consoles */
     mrp_resolver_t  *r;                    /* resolver context */

@@ -34,38 +34,58 @@
 #include <murphy/core/console-priv.h>
 #include <murphy/core/domain.h>
 
+static uint32_t context_id;
+
 mrp_context_t *mrp_context_create(void)
 {
     mrp_context_t *c;
 
-    if ((c = mrp_allocz(sizeof(*c))) != NULL) {
-        mrp_list_init(&c->plugins);
-        console_setup(c);
-        domain_setup(c);
+    if ((c = mrp_allocz(sizeof(*c))) == NULL)
+        return NULL;
 
-        mrp_list_init(&c->auth);
+    mrp_list_init(&c->plugins);
+    mrp_list_init(&c->auth);
 
+    c->ml = mrp_mainloop_create();
 
-        if ((c->ml = mrp_mainloop_create()) == NULL) {
-            mrp_log_error("Failed to create mainloop.");
-            mrp_free(c);
-            c = NULL;
-        }
+    if (c->ml == NULL) {
+        mrp_log_error("Failed to create mainloop.");
+        goto fail;
     }
 
+    context_id = MRP_EXTENSIBLE_TYPE(mrp_context_t);
+
+    if (!context_id) {
+        mrp_log_error("Failed to register mrp_context_t as extensible.");
+        goto fail;
+    }
+
+    mrp_extensible_init(c, context_id);
+
+    console_setup(c);
+    domain_setup(c);
+
     return c;
+
+ fail:
+    mrp_log_error("Failed to set create Murphy context.");
+    mrp_mainloop_destroy(c->ml);
+    mrp_free(c);
+
+    return NULL;
 }
 
 
 void mrp_context_destroy(mrp_context_t *c)
 {
-    if (c != NULL) {
-        console_cleanup(c);
-        mrp_mainloop_destroy(c->ml);
-        mrp_free(c);
-    }
+    if (c == NULL)
+        return;
 
+    console_cleanup(c);
+    mrp_extensible_cleanup(c, context_id);
+    mrp_mainloop_destroy(c->ml);
 
+    mrp_free(c);
 }
 
 
