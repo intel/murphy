@@ -35,6 +35,13 @@
 #include <murphy/common/mask.h>
 #include <murphy/common/hash-table.h>
 
+/*
+ * We used inlined allocation bitmasks if this is defined. Inlined masks will
+ * save memory by putting the chunk allocation mask into the leftover memory
+ * area after the last full-sized entry in the chunk.
+ */
+#define __INLINED_MASKS__
+
 #define MIN_BUCKETS   16                 /* use at least this many buckets */
 #define MAX_BUCKETS  512                 /* use at most this many buckets */
 #define CHUNKSIZE   4096                 /* allocation chunk size */
@@ -57,7 +64,9 @@ typedef struct {
 } hash_bucket_t;
 
 typedef struct {
+#ifndef __INLINED_MASKS__
     mrp_mask_t       used;               /* entry usage mask */
+#endif
     mrp_list_hook_t  hook;               /* to free list */
     uint32_t         idx;                /* hash chunk index */
     hash_entry_t     entries[0];         /* actual entries */
@@ -115,9 +124,26 @@ static int calculate_sizes(mrp_hashtbl_t *t)
 }
 
 
+static inline mrp_mask_t *chunk_mask(hash_chunk_t *c, int nentry)
+{
+#ifdef __INLINED_MASKS__
+    mrp_mask_t *m;
+
+    m = (void *)&c->entries[nentry];
+#else
+    MRP_UNUSED(nentry);
+
+    m = &c->used;
+#endif
+
+    return m;
+}
+
+
 static int allocate_chunks(mrp_hashtbl_t *t, uint32_t nentry)
 {
     hash_chunk_t *c;
+    mrp_mask_t   *m;
     uint32_t      nchunk, n, total, full, last, size, i;
 
     MRP_ASSERT(t->nlast == 0,
@@ -159,14 +185,14 @@ static int allocate_chunks(mrp_hashtbl_t *t, uint32_t nentry)
         return -1;
 
     for (i = 0; i < n; i++) {
-        size = (i < full ? CHUNKSIZE : MRP_OFFSET(hash_chunk_t, entries[last]));
+        if (i < full)
+            size = CHUNKSIZE;
+        else {
+            size = MRP_OFFSET(hash_chunk_t, entries[last]);
+            size += mrp_mask_inlined_size(last);
+        }
 
         if (mrp_memalignz((void **)&c, CHUNKSIZE, size) < 0)
-            return -1;
-
-        mrp_mask_init(&c->used);
-
-        if (!mrp_mask_ensure(&c->used, t->nperchunk))
             return -1;
 
         mrp_list_init(&c->hook);
@@ -178,6 +204,18 @@ static int allocate_chunks(mrp_hashtbl_t *t, uint32_t nentry)
 
         t->nchunk++;
         t->nalloc += i < full ? t->nperchunk : last;
+
+        m = chunk_mask(c, i < full ? t->nperchunk : last);
+
+#ifdef __INLINED_MASKS__
+        if (!mrp_mask_init_inlined(m, i < full ? t->nperchunk : last, c, size))
+            return -1;
+#else
+        mrp_mask_init(m);
+
+        if (!mrp_mask_ensure(&c->used, t->nperchunk))
+            return -1;
+#endif
     }
 
     t->nlast = last;
@@ -366,12 +404,15 @@ static inline hash_entry_t *hash_entry(mrp_hashtbl_t *t, const void *key,
 static inline hash_entry_t *alloc_entry(mrp_hashtbl_t *t)
 {
     hash_chunk_t    *c;
+    mrp_mask_t      *m;
     mrp_list_hook_t *p, *n;
     int              i;
 
     mrp_list_foreach(&t->space, p, n) {
         c = mrp_list_entry(p, typeof(*c), hook);
-        i = mrp_mask_alloc(&c->used);
+        m = chunk_mask(c, c->idx == t->nchunk - 1 && t->nlast ?
+                       t->nlast : t->nperchunk);
+        i = mrp_mask_alloc(m);
 
         if ((i < 0 || i >= (int)t->nperchunk) ||
             (c->idx == t->nchunk - 1 && t->nlast && i >= (int)t->nlast)) {
@@ -390,6 +431,7 @@ static inline hash_entry_t *alloc_entry(mrp_hashtbl_t *t)
 static inline void free_entry(mrp_hashtbl_t *t, hash_entry_t *e, bool release)
 {
     hash_chunk_t *c;
+    mrp_mask_t   *m;
     uint32_t      i;
 
     if (release && t->free)
@@ -401,9 +443,11 @@ static inline void free_entry(mrp_hashtbl_t *t, hash_entry_t *e, bool release)
     mrp_list_delete(&e->hook);
 
     c = entry_chunk(e);
+    m = chunk_mask(c, c->idx == t->nchunk - 1 && t->nlast ?
+                   t->nlast : t->nperchunk);
     i = e - c->entries;
 
-    mrp_mask_clear(&c->used, i);
+    mrp_mask_clear(m, i);
 
     if (mrp_list_empty(&c->hook))
         mrp_list_append(&t->space, &c->hook);

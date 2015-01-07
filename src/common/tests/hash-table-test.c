@@ -540,6 +540,7 @@ main(int argc, char *argv[])
         if (!strcmp(argv[i], "-d")) {
             mrp_debug_enable(true);
             mrp_debug_set("@hash-table.c");
+            mrp_debug_set("@mask.h");
         }
         else if (!strcmp(argv[i], "-v"))
             test.verbosity++;
