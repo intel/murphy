@@ -704,12 +704,12 @@ void *_mrp_hashtbl_iter(mrp_hashtbl_t *t, mrp_hashtbl_iter_t *it, int dir,
         bn = (dir < 0 ? bp->prev : bp->next);
         b  = mrp_list_entry(bp, typeof(*b), hook);
         ep = it->e;
+
+        if (ep == NULL) /* hmm... can this happen ? */
+            ep = it->e = t->it.e = &b->entries;
+
         goto next_entry;
     }
-
-    if (ep == NULL)
-        ep = it->e = t->it.e = &b->entries;
-    goto next_entry;
 
  next_bucket:
     bp = it->b;
