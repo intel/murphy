@@ -1125,6 +1125,7 @@ static void setup_dbus_client(mrp_mainloop_t *ml)
     DBusConnection *conn;
     int             i, nmethod, nsignal;
     size_t          size;
+    ssize_t         amount_read;
 
     nmethod = cfg.ndbus_method;
     nsignal = cfg.ndbus_signal;
@@ -1142,8 +1143,10 @@ static void setup_dbus_client(mrp_mainloop_t *ml)
         if (i != dbus_test.pipe[0])
             close(i);
 
-    size = sizeof(dbus_test.address);
-    if (read(dbus_test.pipe[0], dbus_test.address, size) > 0) {
+    size = sizeof(dbus_test.address) - 1;
+    amount_read = read(dbus_test.pipe[0], dbus_test.address, size);
+    if (amount_read > 0) {
+        dbus_test.address[amount_read] = '\0';
         info("DBUS test: got address '%s'", dbus_test.address);
     }
 

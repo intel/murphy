@@ -973,7 +973,8 @@ static int attribute_lua_stringify(lua_State *L)
 
         int keylen = strlen(attrs->name);
 
-        available -= keylen + 2;
+        /* we need space for 2 + null */
+        available -= keylen + 3;
 
         if (available < 0)
             goto outofspace;
@@ -981,8 +982,15 @@ static int attribute_lua_stringify(lua_State *L)
         strncpy(p, attrs->name, keylen);
         p += keylen;
 
-        strncpy(p, ": ", 2);
+        /*
+         * we copy ": \0" and then proceed to only
+         * move the pointer by two, thus we can
+         * add one to the amount of available
+         * space.
+         */
+        strncpy(p, ": ", 3);
         p += 2;
+        available += 1;
 
         switch (attrs->type) {
             case mqi_string:

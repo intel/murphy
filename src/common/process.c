@@ -177,7 +177,7 @@ static void process_change(mrp_io_watch_t *wd, int fd, mrp_io_event_t events,
                            void *user_data)
 {
     struct inotify_event *is;
-    int bufsize = sizeof(struct inotify_event) + PATH_MAX;
+    int bufsize = sizeof(struct inotify_event) + PATH_MAX + 1;
     char buf[bufsize];
     i_watch_t *w;
     FILE *f;
@@ -192,13 +192,15 @@ static void process_change(mrp_io_watch_t *wd, int fd, mrp_io_event_t events,
         int read_bytes;
         int processed_bytes = 0;
 
-        read_bytes = read(fd, buf, bufsize);
+        read_bytes = read(fd, buf, bufsize - 1);
 
         if (read_bytes < 0) {
             mrp_log_error("Failed to read event from inotify: %s",
                     strerror(errno));
             return;
         }
+
+        buf[read_bytes] = '\0';
 
         while (processed_bytes < read_bytes) {
             char *filename = NULL;
