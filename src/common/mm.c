@@ -213,7 +213,7 @@ static int get_config_string(const char *cfg, const char *key,
 
 
 
-static void __attribute__((constructor)) setup(void)
+MRP_INIT_AT(101) static void setup(void)
 {
     char *config = getenv(MRP_MM_CONFIG_ENVVAR);
 

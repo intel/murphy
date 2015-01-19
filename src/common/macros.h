@@ -88,11 +88,11 @@
          __attribute__ ((format (printf, format_idx, first_arg_idx)))
 
      /** Mark a function to be called before main is entered. */
-#    define MRP_INIT __attribute__((constructor))
+#    define MRP_INIT __attribute__((constructor(65535)))
 #    define MRP_INIT_AT(prio) __attribute__ ((constructor(prio)))
 
      /** Mark a function to be called after main returns, or exit is called. */
-#    define MRP_EXIT __attribute__ ((destructor))
+#    define MRP_EXIT __attribute__ ((destructor(65535)))
 #    define MRP_EXIT_AT(prio) __attribute__ ((destructor(prio)))
 
 /** Mark a variable unused. */
