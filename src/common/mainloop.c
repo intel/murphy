@@ -846,6 +846,7 @@ mrp_deferred_t *mrp_add_deferred(mrp_mainloop_t *ml, mrp_deferred_cb_t cb,
         d->user_data = user_data;
 
         mrp_list_append(&ml->deferred, &d->hook);
+        adjust_superloop_timer(ml);
     }
 
     return d;
