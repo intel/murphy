@@ -353,7 +353,7 @@ int mrp_tlv_push_int64(mrp_tlv_t *tlv, uint32_t tag, int64_t v)
 {
     int64_t *p;
 
-    mrp_debug("<0x%x>%lld", tag, v);
+    mrp_debug("<0x%x>%lld", tag, (long long)v);
 
     if (push_tag(tlv, tag) < 0)
         return -1;
@@ -372,7 +372,7 @@ int mrp_tlv_push_uint64(mrp_tlv_t *tlv, uint32_t tag, uint64_t v)
 {
     uint64_t *p;
 
-    mrp_debug("<0x%x>%llu", tag, v);
+    mrp_debug("<0x%x>%llu", tag, (unsigned long long)v);
 
     if (push_tag(tlv, tag) < 0)
         return -1;
