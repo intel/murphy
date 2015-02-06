@@ -1,0 +1,89 @@
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Wed, 29 Oct 2014 11:15:19 +0200
+Subject: build: install the correct demo configuration.
+
+---
+ src/Makefile.am        |  4 ++--
+ src/daemon/murphy.conf | 53 ++------------------------------------------------
+ 2 files changed, 4 insertions(+), 53 deletions(-)
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 7fcc1da..1b849a4 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -1503,7 +1503,7 @@ endif
+ bin_PROGRAMS += murphyd
+ EXTRA_DIST   += $(config_DATA)
+ configdir     = $(sysconfdir)/murphy
+-config_DATA   = $(shell ls daemon/sample-config/*.{cfg,rules})
++config_DATA   = daemon/murphy.lua daemon/murphy.conf
+ 
+ murphyd_SOURCES =			\
+ 		daemon/daemon.c		\
+@@ -1541,7 +1541,7 @@ murphyd_LDFLAGS = -rdynamic
+ 
+ install-data-hook::
+ 	rm -f $(DESTDIR)/$(sysconfdir)/murphy/murphy.cfg
+-	echo "load-plugin lua config=\"$(sysconfdir)/murphy/main.cfg\"" \
++	echo "load-plugin lua config=\"$(sysconfdir)/murphy/murphy.lua\"" \
+ 	    > $(DESTDIR)/$(sysconfdir)/murphy/murphy.conf
+ 
+ ###################################
+diff --git a/src/daemon/murphy.conf b/src/daemon/murphy.conf
+index 60b46cb..666e5fe 100644
+--- a/src/daemon/murphy.conf
++++ b/src/daemon/murphy.conf
+@@ -1,51 +1,2 @@
+-set resolver-ruleset '/u/src/work/murphy/src/resolver/test-input'
+-
+-# try-load-plugin console
+-try-load-plugin console	# address="tcp4:127.0.0.1:3000"
+-                        # address="udp4:127.0.0.1:3000"
+-                        # address="unxs:@/murphyd"
+-			# address="dbus:[session]@murphy.org/console
+-
+-# load two instances of the test plugin
+-if plugin-exists test
+-    load-plugin test string2='this is now string 2' boolean2=TRUE \
+-                     int32=-981 string1="and this is string 1" \
+-		     double=2.73 \
+-                     object='{ "foo": "f o o", "bar": "b a r", "two": 2, \
+-                               "array": [ 1, 2, 3, 4, "five", "six", ] }'
+-    load-plugin test as test5 # foo=foo foobar=foobar
+-    info "Successfully loaded two instances of test..."
+-end
+-
+-# load the dbus and glib plugins if they exist
+-if plugin-exists dbus
+-    load-plugin dbus
+-end
+-
+-# try loading the glib plugin, ignoring any errors
+-try-load-plugin glib
+-
+-# load the murphy DB plugin if it exists
+-if plugin-exists murphydb
+-    load-plugin murpydb
+-#else
+-#    error "Could not find mandatory plugin murphydb, giving up..."
+-end
+-
+-# load the native resource plugin if it exists
+-if plugin-exists resource-native
+-    load-plugin resource-native
+-else
+-    info "Could not find resource-native plugin"
+-end
+-
+-#if plugin-exists resource-dbus
+-#    try-load-plugin resource-dbus
+-#end
+-
+-if plugin-exists domain-control
+-    load-plugin domain-control
+-else
+-    info "No domain-control plugin found..."
+-end
+-
++# load the murphy lua configuration
++load-plugin lua config="src/daemon/murphy.lua"

@@ -1,0 +1,65 @@
+From: =?utf-8?q?Jan_Ekstr=C3=B6m?= <jan.ekstrom@intel.com>
+Date: Mon, 28 Jul 2014 15:40:03 +0300
+Subject: websockets: Enable support for older versions of cmi struct
+
+Older versions of the cmi struct do not have the ssl_cipher_list
+parameter.
+---
+ m4/websockets.m4        | 18 ++++++++++++++++++
+ src/common/websocklib.c |  6 ++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/m4/websockets.m4 b/m4/websockets.m4
+index ab1a41d..1761aa9 100644
+--- a/m4/websockets.m4
++++ b/m4/websockets.m4
+@@ -49,6 +49,20 @@ if test "$enable_websockets" != "no"; then
+             [websockets_cci=no])
+         AC_MSG_RESULT([$websockets_cci])
+ 
++        # Check for the cipher list parameter in new context creation API.
++        if test "$websockets_cci" = "yes"; then
++            AC_MSG_CHECKING([for WEBSOCKETS cipher list in new context creation API])
++            AC_LINK_IFELSE(
++               [AC_LANG_PROGRAM(
++                     [[#include <stdlib.h>
++                       #include <libwebsockets.h>]],
++                     [[struct lws_context_creation_info cci;
++                       cci.ssl_cipher_list = NULL;]])],
++                [websockets_cipher_list=yes],
++                [websockets_cipher_list=no])
++            AC_MSG_RESULT([$websockets_cipher_list])
++        fi
++
+         # Check for new libwebsockets_get_internal_extensions.
+         AC_MSG_CHECKING([for WEBSOCKETS internal extension query API])
+         AC_LINK_IFELSE(
+@@ -178,6 +192,10 @@ if test "$enable_websockets" != "no"; then
+     fi
+     if test "$websockets_cci" = "yes"; then
+         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CONTEXT_INFO"
++
++        if test "$websockets_cipher_list" = "no"; then
++            WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_WITHOUT_CIPHER_LIST"
++        fi
+     fi
+     if test "$websockets_query_ext" = "yes"; then
+         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_QUERY_EXTENSIONS"
+diff --git a/src/common/websocklib.c b/src/common/websocklib.c
+index 0595c46..de9452d 100644
+--- a/src/common/websocklib.c
++++ b/src/common/websocklib.c
+@@ -743,7 +743,13 @@ wsl_ctx_t *wsl_create_context(mrp_mainloop_t *ml, wsl_ctx_cfg_t *cfg)
+     cci.ssl_cert_filepath        = cfg->ssl_cert;
+     cci.ssl_private_key_filepath = cfg->ssl_pkey;
+     cci.ssl_ca_filepath          = cfg->ssl_ca;
++#ifdef WEBSOCKETS_WITHOUT_CIPHER_LIST
++    if (cfg->ssl_ciphers)
++        mrp_log_error("This version of libwebsockets does not support"
++                      "setting a cipher list; Parameter is ignored.\n");
++#else /* !WEBSOCKETS_WITHOUT_CIPHER_LIST */
+     cci.ssl_cipher_list          = cfg->ssl_ciphers;
++#endif /* !WEBSOCKETS_WITHOUT_CIPHER_LIST */
+ 
+     cci.options     = 0;
+     cci.ka_time     = cfg->timeout;

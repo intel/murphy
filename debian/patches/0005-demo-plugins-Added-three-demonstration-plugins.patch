@@ -1,0 +1,1314 @@
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Mon, 20 Oct 2014 18:29:47 +0300
+Subject: demo-plugins: Added three demonstration plugins.
+
+---
+ configure.ac                                |  38 +--
+ src/Makefile.am                             |  69 ++++++
+ src/daemon/murphy.lua                       | 345 ++++++++++------------------
+ src/plugins/plugin-demo-domain-controller.c | 150 ++++++++++++
+ src/plugins/plugin-pulseaudio-volume.c      | 290 +++++++++++++++++++++++
+ src/plugins/plugin-wifi-on.c                | 263 +++++++++++++++++++++
+ 6 files changed, 921 insertions(+), 234 deletions(-)
+ create mode 100644 src/plugins/plugin-demo-domain-controller.c
+ create mode 100644 src/plugins/plugin-pulseaudio-volume.c
+ create mode 100644 src/plugins/plugin-wifi-on.c
+
+diff --git a/configure.ac b/configure.ac
+index 0327584..cab415f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -241,16 +241,22 @@ if test "$enable_pulse" != "no"; then
+     			     [have_pulse=yes], [have_pulse=no])
+     if test "$have_pulse" = "no" -a "$enable_pulse" = "yes"; then
+         AC_MSG_ERROR([PulseAudio development libraries not found.])
+-    fi
++    else
++        PKG_CHECK_MODULES(PULSE_GLIB, libpulse-mainloop-glib >= 0.9.22,
++                         [have_pulse=yes], [have_pulse=no])
++        if test "$have_pulse" = "no" -a "$enable_pulse" = "yes"; then
++            AC_MSG_ERROR([PulseAudio glib mainloop libraries not found.])
++        fi
+ 
+-    if test "$enable_gpl" = "no"; then
+-        if test "$enable_pulse" = "yes"; then
+-           AC_MSG_ERROR([PulseAudio support requires the --enable-gpl option.])
++        if test "$enable_gpl" = "no"; then
++            if test "$enable_pulse" = "yes"; then
++               AC_MSG_ERROR([PulseAudio support requires the --enable-gpl option.])
++            else
++               enable_pulse="no"
++            fi
+         else
+-           enable_pulse="no"
++            enable_pulse="$have_pulse"
+         fi
+-    else
+-        enable_pulse="$have_pulse"
+     fi
+ else
+     AC_MSG_NOTICE([PulseAudio mainloop support is disabled.])
+@@ -508,7 +514,7 @@ esac
+ internal=""; it=""
+ external=""; et=""
+ disabled=""; dt=""
+-for plugin in $all_plugins; do 
++for plugin in $all_plugins; do
+     type=internal
+ 
+     for p in ${dynamic_plugins//,/ }; do
+@@ -564,6 +570,9 @@ AM_CONDITIONAL(DISABLED_PLUGIN_RESOURCE_WRT, [check_if_disabled resource-wrt])
+ AM_CONDITIONAL(DISABLED_PLUGIN_DOMAIN_CONTROL,
+                [check_if_disabled domain-control])
+ AM_CONDITIONAL(DISABLED_PLUGIN_SYSTEMD,  [check_if_disabled systemd])
++AM_CONDITIONAL(DISABLED_PLUGIN_PULSEAUDIO_VOLUME, [check_if_disabled pulseaudio-volume])
++AM_CONDITIONAL(DISABLED_PLUGIN_WIFI_ON, [check_if_disabled wifi-on])
++AM_CONDITIONAL(DISABLED_PLUGIN_DEMO_DC, [check_if_disabled demo-dc])
+ 
+ AM_CONDITIONAL(BUILTIN_PLUGIN_TEST,     [check_if_internal test])
+ AM_CONDITIONAL(BUILTIN_PLUGIN_DBUS,     [check_if_internal dbus])
+@@ -575,9 +584,12 @@ AM_CONDITIONAL(BUILTIN_PLUGIN_DOMAIN_CONTROL,
+                [check_if_internal domain-control])
+ AM_CONDITIONAL(BUILTIN_PLUGIN_LUA,      [check_if_internal lua])
+ AM_CONDITIONAL(BUILTIN_PLUGIN_SYSTEMD,  [check_if_internal systemd])
++AM_CONDITIONAL(BUILTIN_PLUGIN_PULSEAUDIO_VOLUME, [check_if_internal pulseaudio-volume])
++AM_CONDITIONAL(BUILTIN_PLUGIN_WIFI_ON, [check_if_internal wifi-on])
++AM_CONDITIONAL(BUILTIN_PLUGIN_DEMO_DC, [check_if_internal demo-dc])
+ 
+ # Check for Check (unit test framework).
+-PKG_CHECK_MODULES(CHECK, 
++PKG_CHECK_MODULES(CHECK,
+                   check >= 0.9.4,
+                   [has_check="yes"], [has_check="no"])
+ AM_CONDITIONAL(HAVE_CHECK, test "x$has_check" = "xyes")
+@@ -666,7 +678,7 @@ fi
+ AC_CONFIG_FILES([build-aux/shave
+ 		 build-aux/shave-libtool
+ 		 Makefile
+-                 utils/Makefile
++         utils/Makefile
+ 		 src/Makefile
+ 		 src/common/tests/Makefile
+ 		 src/core/tests/Makefile
+@@ -680,10 +692,10 @@ AC_CONFIG_FILES([build-aux/shave
+ 		 src/common/murphy-pulse.pc
+ 		 src/common/murphy-ecore.pc
+ 		 src/common/murphy-glib.pc
+-                 src/common/murphy-qt.pc
++         src/common/murphy-qt.pc
+ 		 src/core/murphy-core.pc
+-                 src/core/lua-utils/murphy-lua-utils.pc
+-                 src/core/lua-decision/murphy-lua-decision.pc
++         src/core/lua-utils/murphy-lua-utils.pc
++         src/core/lua-decision/murphy-lua-decision.pc
+ 		 src/breedline/breedline.pc
+ 		 src/breedline/breedline-murphy.pc
+ 		 src/breedline/breedline-glib.pc
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 475d5ae..7fcc1da 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -1426,6 +1426,75 @@ endif
+ endif
+ endif
+ 
++# pulseaudio volume plugin
++if PULSE_ENABLED
++PULSEAUDIO_VOLUME_PLUGIN_SOURCES = plugins/plugin-pulseaudio-volume.c
++PULSEAUDIO_VOLUME_PLUGIN_CFLAGS  = $(PULSE_CFLAGS) $(PULSE_GLIB_CFLAGS)
++PULSEAUDIO_VOLUME_PLUGIN_LIBS    = $(PULSE_LIBS) $(PULSE_GLIB_LIBS)
++
++if !DISABLED_PLUGIN_PULSEAUDIO_VOLUME
++if BUILTIN_PLUGIN_PULSEAUDIO_VOLUME
++BUILTIN_PLUGINS += $(PULSEAUDIO_VOLUME_PLUGIN_SOURCES)
++BUILTIN_CFLAGS  += $(PULSEAUDIO_VOLUME_PLUGIN_CFLAGS)
++BUILTIN_LIBS    += $(PULSEAUDIO_VOLUME_PLUGIN_LIBS)
++else
++plugin_pulseaudio_volume_la_SOURCES = $(PULSEAUDIO_VOLUME_PLUGIN_SOURCES)
++plugin_pulseaudio_volume_la_CFLAGS  = $(PULSEAUDIO_VOLUME_PLUGIN_CFLAGS) \
++                            $(MURPHY_CFLAGS) \
++                            $(AM_CFLAGS)
++plugin_pulseaudio_volume_la_LDFLAGS = -module -avoid-version
++plugin_pulseaudio_volume_la_LIBADD  = $(PULSEAUDIO_VOLUME_PLUGIN_LIBS)
++
++plugin_LTLIBRARIES += plugin-pulseaudio-volume.la
++endif
++endif
++endif
++
++if LIBDBUS_ENABLED
++WIFI_ON_PLUGIN_SOURCES = plugins/plugin-wifi-on.c
++WIFI_ON_PLUGIN_CFLAGS  = $(LIBDBUS_CFLAGS)
++WIFI_ON_PLUGIN_LIBS    =					\
++				libmurphy-dbus-libdbus.la	\
++				libmurphy-core.la		\
++				libmurphy-common.la		\
++				$(RESOURCE_LIBRARY)
++
++if !DISABLED_PLUGIN_WIFI_ON
++if BUILTIN_PLUGIN_WIFI_ON
++BUILTIN_PLUGINS += $(WIFI_ON_PLUGIN_SOURCES)
++BUILTIN_CFLAGS  += $(WIFI_ON_PLUGIN_CFLAGS)
++BUILTIN_LIBS    += $(WIFI_ON_PLUGIN_LIBS)
++else
++plugin_wifi_on_la_SOURCES = $(WIFI_ON_PLUGIN_SOURCES)
++plugin_wifi_on_la_CFLAGS  = $(WIFI_ON_PLUGIN_CFLAGS) $(MURPHY_CFLAGS) $(AM_CFLAGS)
++plugin_wifi_on_la_LDFLAGS = -module -avoid-version
++plugin_wifi_on_la_LIBADD  = $(WIFI_ON_PLUGIN_LIBS)
++plugin_LTLIBRARIES    += plugin-wifi-on.la
++endif
++endif
++endif
++
++# demo domain controller plugin
++DEMO_DC_PLUGIN_SOURCES = plugins/plugin-demo-domain-controller.c
++DEMO_DC_PLUGIN_CFLAGS  =
++DEMO_DC_PLUGIN_LIBS    = libmurphy-domain-controller.la
++
++if !DISABLED_PLUGIN_DEMO_DC
++if BUILTIN_PLUGIN_DEMO_DC
++BUILTIN_PLUGINS += $(DEMO_DC_PLUGIN_SOURCES)
++BUILTIN_CFLAGS  += $(DEMO_DC_PLUGIN_CFLAGS)
++BUILTIN_LIBS    += $(DEMO_DC_PLUGIN_LIBS)
++else
++plugin_demo_dc_la_SOURCES = $(DEMO_DC_PLUGIN_SOURCES)
++plugin_demo_dc_la_CFLAGS  = $(DEMO_DC_PLUGIN_CFLAGS) \
++                            $(MURPHY_CFLAGS) \
++                            $(AM_CFLAGS)
++plugin_demo_dc_la_LDFLAGS = -module -avoid-version
++plugin_demo_dc_la_LIBADD  = $(DEMO_DC_PLUGIN_LIBS)
++
++plugin_LTLIBRARIES += plugin-demo-dc.la
++endif
++endif
+ 
+ ###################################
+ # murphy daemon
+diff --git a/src/daemon/murphy.lua b/src/daemon/murphy.lua
+index d829682..92c6d62 100644
+--- a/src/daemon/murphy.lua
++++ b/src/daemon/murphy.lua
+@@ -1,52 +1,11 @@
+ m = murphy.get()
+ 
+--- try loading console plugin
++-- try loading console plugin for debugging
+ m:try_load_plugin('console')
+ 
+---[[
+-m:try_load_plugin('console', 'dbusconsole' , {
+-    address = 'dbus:[session]@org.Murphy/console'
+-})
+---]]
+-
+-m:try_load_plugin('console', 'webconsole', {
+-                              address = 'wsck:127.0.0.1:3000/murphy',
+-                              httpdir = 'src/plugins/console',
+---                              sslcert = 'src/plugins/console/console.crt',
+---                              sslpkey = 'src/plugins/console/console.key'
+-         })
+-
+-m:try_load_plugin('systemd')
+-
+--- load a test plugin
+-if m:plugin_exists('test.disabled') then
+-    m:load_plugin('test', {
+-                       string2  = 'this is now string2',
+-                       boolean2 = true,
+-                       int32 = -981,
+-                       double = 2.73,
+-                       object = {
+-                           foo = 1,
+-                           bar = 'bar',
+-                           foobar = 3.141,
+-                           barfoo = 'bar foo',
+-                           array = { 'one', 'two', 'three',
+-                                     { 1, 'two', 3, 'four' } },
+-                           yees = true,
+-                           noou = false
+-                       }
+-                 })
+---    m:load_plugin('test', 'test2')
+---    m:info("Successfully loaded two instances of test...")
+-end
+-
+--- load the dbus plugin if it exists
+--- if m:plugin_exists('dbus') then
+---     m:load_plugin('dbus')
+--- end
+-
+--- load glib plugin, ignoring any errors
+-m:try_load_plugin('glib')
++-- Load glib plugin. This is required for pulseaudio-volume plugin, since this
++-- integrates glib mainloop to Murphy mainloop
++m:load_plugin('glib')
+ 
+ -- load the native resource plugin
+ if m:plugin_exists('resource-native') then
+@@ -56,109 +15,34 @@ else
+     m:info("No native resource plugin found...")
+ end
+ 
+--- load the dbus resource plugin
+-if m:plugin_exists('resource-dbus') then
+-    m:try_load_plugin('resource-dbus', {
+-        dbus_bus = "system",
+-        dbus_service = "org.Murphy",
+-        dbus_track = true,
+-        default_zone = "driver",
+-        default_class = "implicit"
+-      })
+-    m:info("dbus resource plugin loaded")
+-else
+-    m:info("No dbus resource plugin found...")
+-end
+-
+--- load the WRT resource plugin
+-if m:plugin_exists('resource-wrt') then
+-    m:try_load_plugin('resource-wrt', {
+-                          address = "wsck:127.0.0.1:4000/murphy",
+-                          httpdir = "src/plugins/resource-wrt",
+---                          sslcert = 'src/plugins/resource-wrt/resource.crt',
+---                          sslpkey = 'src/plugins/resource-wrt/resource.key'
+-                      })
+-else
+-    m:info("No WRT resource plugin found...")
+-end
+-
+--- load the domain control plugin if it exists
+-if m:plugin_exists('domain-control') then
+-    m:load_plugin('domain-control')
+-else
+-    m:info("No domain-control plugin found...")
+-end
+-
+--- load the domain control plugin if it exists
+-if m:plugin_exists('domain-control') then
+-    m:try_load_plugin('domain-control', 'wrt-export', {
+-        external_address = '',
+-        internal_address = '',
+-        wrt_address = "wsck:127.0.0.1:5000/murphy",
+-        httpdir     = "src/plugins/domain-control"
+-    })
+-else
+-    m:info("No domain-control plugin found...")
+-end
++-- load the domain control plugin
++m:load_plugin('domain-control')
+ 
++-- resource management basic configuration
+ 
+ -- define application classes
+-application_class { name="interrupt", priority=99, modal=true , share=false, order="fifo" }
+-application_class { name="navigator", priority=4 , modal=false, share=true , order="fifo" }
+-application_class { name="phone"    , priority=3 , modal=false, share=true , order="lifo" }
+-application_class { name="game"     , priority=2 , modal=false, share=true , order="lifo" }
+-application_class { name="player"   , priority=1 , modal=false, share=true , order="lifo" }
+-application_class { name="implicit" , priority=0 , modal=false, share=true , order="lifo" }
++
++application_class { name="player", priority=0, modal=false, share=true, order="lifo" }
+ 
+ -- define zone attributes
++
+ zone.attributes {
+     type = {mdb.string, "common", "rw"},
+     location = {mdb.string, "anywhere", "rw"}
+ }
+ 
+ -- define zones
+-zone {
+-     name = "driver",
+-     attributes = {
+-         type = "common",
+-         location = "front-left"
+-     }
+-}
+-
+-zone {
+-     name = "passanger1",
+-     attributes = {
+-         type = "private",
+-         location = "front-right"
+-     }
+-}
+-
+-zone {
+-     name = "passanger2",
+-     attributes = {
+-         type = "private",
+-         location = "back-left"
+-     }
+-}
+-
+-zone {
+-     name = "passanger3",
+-     attributes = {
+-         type = "private",
+-         location = "back-right"
+-     }
+-}
+ 
+ zone {
+-     name = "passanger4",
++     name = "default",
+      attributes = {
+-         type = "private",
+-         location = "back-left"
++         type = "common",
++         location = "anywhere"
+      }
+ }
+ 
+-
+ -- define resource classes
++
+ resource.class {
+      name = "audio_playback",
+      shareable = true,
+@@ -169,115 +53,134 @@ resource.class {
+      }
+ }
+ 
+-resource.class {
+-     name = "audio_recording",
+-     shareable = false,
+-     attributes = {
+-         role = { mdb.string, "music", "rw" },
+-         pid = { mdb.string, "<unknown>", "rw" },
+-         policy = { mdb.string, "relaxed", "rw" }
+-     }
++-- actual decision making
++
++-- Database tables where the system data is gathered. These tables can
++-- be defined either in the plugins themselves or in the Lua
++-- configuration; it's usually a matter of taste. The equivalent
++-- commands for table creation from C code are left commented out in the
++-- plugins.
++
++mdb.table {
++    name = "sink_volume",
++    index = { "id" },
++    create = true,
++    columns = {
++        { "id", mdb.unsigned },
++        { "volume", mdb.unsigned },
++        { "base_volume", mdb.unsigned }
++    }
+ }
+ 
+-resource.class {
+-     name = "video_playback",
+-     shareable = false,
++mdb.table {
++    name = "wifi_enabled",
++    index = { "id" },
++    create = true,
++    columns = {
++        { "id", mdb.unsigned },
++        { "enabled", mdb.unsigned }
++    }
+ }
+ 
+-resource.class {
+-     name = "video_recording",
+-     shareable = false
+-}
++-- Select statements work as persistent database queries. They trigger the
++-- policy decision making elements and contain the values found from the
++-- database.
+ 
+--- test for creating selections
+ mdb.select {
+-           name = "audio_owner",
+-           table = "audio_playback_owner",
+-           columns = {"application_class"},
+-           condition = "zone_name = 'driver'",
++    name = "wifi_changed",
++    table = "wifi_enabled",
++    columns = { "enabled" },
++    condition = "id = 0"
+ }
+ 
+-element.lua {
+-   name    = "speed2volume",
+-   inputs  = { owner = mdb.select.audio_owner, param = 5 },
+-   outputs = {  mdb.table { name = "speedvol",
+-			    index = {"zone", "device"},
+-			    columns = {{"zone", mdb.string, 16},
+-				       {"device", mdb.string, 16},
+-				       {"value", mdb.floating}},
+-                            create = true
+-			   }
+-	     },
+-   update  = function(self)
+-                if (self.inputs.owner.single_value) then
+-                   print("*** element "..self.name.." update "..
+-                          self.inputs.owner.single_value)
+-                else
+-                   print("*** element "..self.name.." update <nil>")
+-                end
+-	     end
++mdb.select {
++    name = "volume_changed",
++    table = "sink_volume",
++    columns = { "volume", "base_volume" },
++    condition = "id = 0"
+ }
+ 
++-- Element is in fact a policy decision making element. You can chain the
++-- elements by writing values to the database and providing select statements
++-- for them.
+ 
+---
+-
+-json = m:JSON({ a = 'foo', b = 'bar', foobar = { 1, 2, 3, 5, 6 } })
+-
+-print(tostring(json))
+-
++oldmode = nil
+ 
+-function connect_cb(self, peer, data)
+-    print('incoming connection from ' .. peer .. ' on ' .. tostring(self))
+-    accepted = self:accept()
+-    print('accepted: ' .. tostring(accepted))
+-end
+-
+-function closed_cb(self, error, data)
+-    print('connection closed by peer')
+-end
+-
+-function recv_cb(self, msg, data)
+-    print('got message ' .. tostring(msg))
+-end
+-
+-t = m:Transport({ connect = connect_cb,
+-                  closed  = closed_cb,
+-                  recv    = recv_cb,
+-                  data    = 'foo',
+-                  address = 'wsck:127.0.0.1:18081/ico_syc_protocol' })
+-
+-print(tostring(t))
++element.lua {
++    name    = "life_mode",
++    inputs  = {
++        wifi_enabled = mdb.select.wifi_changed,
++        sink_volume = mdb.select.volume_changed
++    },
++    outputs = {
++        mdb.table {
++            name = "life_mode",
++            index = { "id" },
++            create = true,
++            columns = {
++                { "id", mdb.unsigned },
++                { "mode", mdb.string, 64 },
++            }
++        }
++    },
++    update = function(self)
++
++        -- this function is called already when one value is known, have some
++        -- sensible defaults
++
++        local wifi_on = false
++        local volume = 0.0
++        local mode = "unknown"
++
++        -- First dig the values out of the database ...
++
++        if self.inputs.wifi_enabled.single_value == 1 then
++            wifi_on = true
++        end
+ 
+-t:listen()
++        if self.inputs.sink_volume[1] and self.inputs.sink_volume[1][1] then
++            current = self.inputs.sink_volume[1][1]
++            base = self.inputs.sink_volume[1][2]
+ 
+-print(tostring(t))
++            if base then -- not 0 or nil
++              volume = current / base
++            end
++        end
+ 
+-print(t.accept)
+-print(t.recv)
++        -- print("wifi: "..tostring(wifi_on)..", volume: "..tostring(volume));
++
++        -- ... then do a policy decision based on the data we got. This example
++        -- is obviously a fake decision - real ones would be based on some
++        -- domain knowledge (and quite possibly be the reason why you are
++        -- running Murphy in the first place). Here we are just figure out if
++        -- there is a party going on.
++
++        if volume > 0.75 and not wifi_on then
++            mode = "party"
++        elseif volume > 0.1 and not wifi_on then
++            mode = "chill"
++        elseif volume < 0.9 and wifi_on then
++            mode = "work"
++        elseif wifi_on then
++            mode = "work_hard"
++        elseif not wifi_on then
++            mode = "sleep"
++        end
+ 
+-function test_rs_create(iterations)
+-    resourceHandler = function (rset) print(rset) end
++        -- write the decision to the database
+ 
+-    for i = 1, iterations do
+-        r = m:ResourceSet({
+-            zone = "driver",
+-            callback = resourceHandler,
+-            application_class = "player"
+-        })
+ 
+-        if r then
++        if not (mode == oldmode) then
++            -- print("updating life mode: "..mode)
++            mdb.table.life_mode:replace({ id = 0, mode = mode })
++        end
+ 
+-            r:addResource({
+-                resource_name = "audio_playback",
+-                mandatory = true
+-            })
++        oldmode = mode
++    end
++}
+ 
+-            r.resources.audio_playback.attributes.pid = tostring(i)
++-- load the demo plugins: first the domain controller, then the input plugins
++m:load_plugin('demo-dc')
+ 
+-            print("pid: " .. r.resources.audio_playback.attributes.pid)
+-            r:acquire()
+-            r:release()
+-        end
+-        r = nil
+-    end
+-end
++m:load_plugin('pulseaudio-volume', { sink_id = 0 })
++m:load_plugin('wifi-on')
+diff --git a/src/plugins/plugin-demo-domain-controller.c b/src/plugins/plugin-demo-domain-controller.c
+new file mode 100644
+index 0000000..d4d7c64
+--- /dev/null
++++ b/src/plugins/plugin-demo-domain-controller.c
+@@ -0,0 +1,150 @@
++/*
++ * Copyright (c) 2014, Intel Corporation
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *
++ *  * Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ *  * Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *  * Neither the name of Intel Corporation nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++
++/* This is a demo plugin to show how data can be processed in a domain
++ * controller. Do not use this module in production!
++ */
++
++#include <murphy/core/plugin.h>
++#include <murphy/common.h>
++
++#include <murphy/domain-control/client.h>
++
++
++typedef struct {
++    mrp_domctl_t *dc;
++} demo_dc_t;
++
++
++static void domctl_connect_cb(mrp_domctl_t *dc, int connected, int error,
++        const char *error_msg, void *user_data)
++{
++    MRP_UNUSED(dc);
++    MRP_UNUSED(connected);
++    MRP_UNUSED(error);
++    MRP_UNUSED(error_msg);
++    MRP_UNUSED(user_data);
++
++    /* mrp_log_info("demo-domain-controller: connection change (%d)!",
++            connected); */
++}
++
++
++static void domctl_watch_cb(mrp_domctl_t *dc, mrp_domctl_data_t *tables,
++        int n_tables, void *user_data)
++{
++    mrp_domctl_value_t *val;
++    const char *life_mode;
++
++    MRP_UNUSED(dc);
++    MRP_UNUSED(user_data);
++
++    if (!tables || n_tables != 1 || tables->nrow != 1 ||tables->ncolumn != 1) {
++        mrp_debug("demo-domain-controller: data not ok yet, ignoring");
++        return;
++    }
++
++    val = tables->rows[0];
++
++    if (val[0].type != MRP_DOMCTL_STRING) {
++        mrp_log_error("demo-domain-controller: wrong type (%d)", val[0].type);
++        return;
++    }
++
++    life_mode = val[0].str;
++
++    mrp_log_info("demo-domain-controller: new life mode: %s", life_mode);
++
++    /* TODO: do here the necessary enforcing to handle the new life mode! */
++}
++
++
++static int demo_dc_init(mrp_plugin_t *plugin)
++{
++    demo_dc_t *ctx;
++
++    /* watch changes in "life_mode" table:
++            SELECT mode FROM life_mode WHERE id = 0
++     */
++
++    mrp_domctl_watch_t watches[] = {
++        MRP_DOMCTL_WATCH("life_mode", "mode", "id = 0", 0),
++    };
++
++    ctx = mrp_allocz(sizeof(*ctx));
++    if (!ctx)
++        return FALSE;
++
++    ctx->dc = mrp_domctl_create("demo", plugin->ctx->ml, NULL, 0,
++            watches, 1, domctl_connect_cb, domctl_watch_cb, ctx);
++
++    if (!ctx->dc)
++        goto error;
++
++    if (!mrp_domctl_connect(ctx->dc, "unxs:@murphy-domctrl", 0)) {
++        mrp_log_error("demo-domain-controller: failed to connect");
++        goto error;
++    }
++
++    plugin->data = ctx;
++
++    return TRUE;
++
++error:
++    if (ctx) {
++        if (ctx->dc)
++            mrp_domctl_destroy(ctx->dc);
++
++        mrp_free(ctx);
++    }
++
++    return FALSE;
++}
++
++
++static void demo_dc_exit(mrp_plugin_t *plugin)
++{
++    demo_dc_t *ctx = plugin->data;
++
++    mrp_domctl_destroy(ctx->dc);
++    mrp_free(ctx);
++}
++
++
++#define DEMO_DC_DESCRIPTION "Plugin for demonstraing domain control"
++#define DEMO_DC_HELP        "This would normally be run as a separate process"
++#define DEMO_DC_VERSION     MRP_VERSION_INT(0, 0, 1)
++#define DEMO_DC_AUTHORS     "Ismo Puustinen <ismo.puustinen@intel.com>"
++
++MURPHY_REGISTER_PLUGIN("demo-domain-controller",
++                       DEMO_DC_VERSION, DEMO_DC_DESCRIPTION,
++                       DEMO_DC_AUTHORS, DEMO_DC_HELP,
++                       MRP_SINGLETON, demo_dc_init, demo_dc_exit,
++                       NULL, 0, NULL, 0, NULL, 0, NULL);
+diff --git a/src/plugins/plugin-pulseaudio-volume.c b/src/plugins/plugin-pulseaudio-volume.c
+new file mode 100644
+index 0000000..453df3a
+--- /dev/null
++++ b/src/plugins/plugin-pulseaudio-volume.c
+@@ -0,0 +1,290 @@
++/*
++ * Copyright (c) 2014, Intel Corporation
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *
++ *  * Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ *  * Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *  * Neither the name of Intel Corporation nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++
++/* This is a demo plugin to show how data is received from a system source into
++ * Murphy. Do not use this module in production!
++ */
++
++/* IMPORTANT: You need to have glib plugin loaded in order for this to work! */
++
++#include <murphy/core/plugin.h>
++#include <murphy/common.h>
++
++/* Murphy database access */
++#include <murphy-db/mdb.h>
++#include <murphy-db/mqi.h>
++#include <murphy-db/mql.h>
++
++/* PulseAudio headers */
++#include <pulse/glib-mainloop.h>
++#include <pulse/error.h>
++#include <pulse/context.h>
++#include <pulse/subscribe.h>
++#include <pulse/introspect.h>
++
++/* enumeration of possible module arguments */
++enum {
++    ARG_SINK_ID,
++};
++
++/* this is the context object */
++typedef struct {
++    uint32_t sink_id;
++
++    GMainContext *g_ctx;
++    pa_glib_mainloop *g_ml;
++    pa_context *c;
++#if 0
++    mqi_handle_t table;
++#endif
++} volume_t;
++
++
++void sink_info_cb(pa_context *c, const pa_sink_info *info, int eol,
++        void *user_data)
++{
++    char buf[256];
++    int ret;
++    volume_t *ctx = (volume_t *) user_data;
++    mqi_handle_t tx;
++    mql_result_t *r;
++
++    MRP_UNUSED(c);
++    MRP_UNUSED(eol);
++    MRP_UNUSED(ctx);
++
++    if (!info)
++        return;
++
++    pa_volume_t v = pa_cvolume_avg(&info->volume);
++
++    mrp_debug("pulseaudio-volume: new volume %d/%d", v, info->base_volume);
++
++    ret = snprintf(buf, sizeof(buf),
++            "replace into sink_volume values (0, %d, %d)", v,
++            info->base_volume);
++
++    if (ret < 0 || ret == sizeof(buf))
++        return;
++
++    tx = mqi_begin_transaction();
++
++    r = mql_exec_string(mql_result_string, buf);
++
++    mrp_debug("pulseaudio-volume: %s", mql_result_is_success(r) ?
++            "updated database" : mql_result_error_get_message(r));
++
++    mql_result_free(r);
++    mqi_commit_transaction(tx);
++}
++
++
++void change_cb(pa_context *c, pa_subscription_event_type_t type, uint32_t id,
++        void *user_data)
++{
++    volume_t *ctx = (volume_t *) user_data;
++
++    if (type == PA_SUBSCRIPTION_EVENT_CHANGE && ctx->sink_id == id) {
++        pa_operation *o;
++        o = pa_context_get_sink_info_by_index(c, id, sink_info_cb, ctx);
++        if (o)
++            pa_operation_unref(o);
++    }
++}
++
++
++void state_cb(pa_context *c, void *user_data)
++{
++    volume_t *ctx = (volume_t *) user_data;
++    enum pa_context_state s = pa_context_get_state(c);
++    pa_operation *o;
++
++    switch (s) {
++        case PA_CONTEXT_UNCONNECTED:
++            /* mrp_log_info("pulseaudio-volume: state UNCONNECTED"); */
++            break;
++        case PA_CONTEXT_CONNECTING:
++            /* mrp_log_info("pulseaudio-volume: state CONNECTING"); */
++            break;
++        case PA_CONTEXT_AUTHORIZING:
++            /* mrp_log_info("pulseaudio-volume: state AUTHORIZING"); */
++            break;
++        case PA_CONTEXT_SETTING_NAME:
++            /* mrp_log_info("pulseaudio-volume: state SETTING_NAME"); */
++            break;
++        case PA_CONTEXT_READY:
++            /* mrp_log_info("pulseaudio-volume: state READY"); */
++            pa_context_set_name(c, "murphy-volume-monitor", NULL, ctx);
++
++            /* get the initial volume level */
++            o = pa_context_get_sink_info_by_index(c, ctx->sink_id, sink_info_cb,
++                    ctx);
++            if (o)
++                pa_operation_unref(o);
++
++            /* subscribe to notifications */
++            pa_context_set_subscribe_callback(c, change_cb, ctx);
++            pa_context_subscribe(c, PA_SUBSCRIPTION_MASK_SINK, NULL, ctx);
++            break;
++        case PA_CONTEXT_FAILED:
++            mrp_log_error("pulseaudio-volume: state FAILED");
++            break;
++        case PA_CONTEXT_TERMINATED:
++            mrp_debug("pulseaudio-volume: state PA_CONTEXT_TERMINATED");
++            break;
++    }
++}
++
++
++void event_cb(pa_context *c, const char *name, pa_proplist *p, void *user_data)
++{
++    MRP_UNUSED(c);
++    MRP_UNUSED(p);
++    MRP_UNUSED(user_data);
++
++    mrp_debug("pulseaudio-volume: event from PA (%s)", name);
++}
++
++
++static int volume_init(mrp_plugin_t *plugin)
++{
++    volume_t *ctx;
++    pa_mainloop_api *api;
++
++#if 0
++    MQI_COLUMN_DEFINITION_LIST(defs,
++        MQI_COLUMN_DEFINITION("id", MQI_UNSIGNED),
++        MQI_COLUMN_DEFINITION("volume", MQI_UNSIGNED),
++        MQI_COLUMN_DEFINITION("base_volume", MQI_UNSIGNED)
++    );
++
++    MQI_INDEX_DEFINITION(index,
++        MQI_INDEX_COLUMN("id")
++    );
++#endif
++
++    ctx = mrp_alloc(sizeof(*ctx));
++    if (!ctx)
++        goto error;
++
++    ctx->g_ctx = g_main_context_default();
++    if (!ctx->g_ctx)
++        goto error;
++
++    ctx->g_ml = pa_glib_mainloop_new(ctx->g_ctx);
++    if (!ctx->g_ml)
++        goto error;
++
++    api = pa_glib_mainloop_get_api(ctx->g_ml);
++    if (!api)
++        goto error;
++
++    ctx->c = pa_context_new(api, "murphy-volume-monitor");
++    if (!ctx->c)
++        goto error;
++
++    pa_context_set_state_callback(ctx->c, state_cb, ctx);
++
++    pa_context_set_event_callback(ctx->c, event_cb, ctx);
++
++    if (pa_context_connect(ctx->c, NULL, 0, NULL) < 0) {
++        mrp_log_error("pulseaudio-volume: connection to PA failed: %s",
++                pa_strerror(pa_context_errno(ctx->c)));
++        goto error;
++    }
++
++    ctx->sink_id = plugin->args[ARG_SINK_ID].u32;
++
++    mrp_debug("pulseaudio-volume: connecting to PA");
++
++#if 0
++    /* create database table for the results */
++
++    ctx->table = MQI_CREATE_TABLE("sink_volume", MQI_TEMPORARY, defs, index);
++#endif
++
++    plugin->data = ctx;
++
++    return TRUE;
++
++error:
++    if (ctx) {
++        if (ctx->c)
++            pa_context_unref(ctx->c);
++
++        if (ctx->g_ml)
++            pa_glib_mainloop_free(ctx->g_ml);
++
++        if (ctx->g_ctx)
++            g_main_context_unref(ctx->g_ctx);
++
++        mrp_free(ctx);
++    }
++
++    return FALSE;
++}
++
++
++static void volume_exit(mrp_plugin_t *plugin)
++{
++    volume_t *ctx = plugin->data;
++
++    if (ctx) {
++        if (ctx->c) {
++            pa_context_disconnect(ctx->c);
++            pa_context_unref(ctx->c);
++        }
++
++        if (ctx->g_ml)
++            pa_glib_mainloop_free(ctx->g_ml);
++
++        if (ctx->g_ctx)
++            g_main_context_unref(ctx->g_ctx);
++
++        mrp_free(ctx);
++    }
++}
++
++
++#define PA_VOLUME_DESCRIPTION "Plugin for getting PulseAudio sink volume"
++#define PA_VOLUME_HELP        "Correct sink id can be given as module parameter"
++#define PA_VOLUME_VERSION     MRP_VERSION_INT(0, 0, 1)
++#define PA_VOLUME_AUTHORS     "Ismo Puustinen <ismo.puustinen@intel.com>"
++
++static mrp_plugin_arg_t args[] = {
++    MRP_PLUGIN_ARGIDX(ARG_SINK_ID , UINT32, "sink_id" , 0),
++};
++
++MURPHY_REGISTER_PLUGIN("pulseaudio-volume",
++                       PA_VOLUME_VERSION, PA_VOLUME_DESCRIPTION,
++                       PA_VOLUME_AUTHORS, PA_VOLUME_HELP,
++                       MRP_SINGLETON, volume_init, volume_exit,
++                       args, MRP_ARRAY_SIZE(args),
++                       NULL, 0, NULL, 0, NULL);
+diff --git a/src/plugins/plugin-wifi-on.c b/src/plugins/plugin-wifi-on.c
+new file mode 100644
+index 0000000..1053e29
+--- /dev/null
++++ b/src/plugins/plugin-wifi-on.c
+@@ -0,0 +1,263 @@
++/*
++ * Copyright (c) 2014, Intel Corporation
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *
++ *  * Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ *  * Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *  * Neither the name of Intel Corporation nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++
++/* This is a demo plugin to show how data is received from a system source into
++ * Murphy. Do not use this module in production!
++ */
++
++#include <murphy/core/plugin.h>
++#include <murphy/common/dbus-libdbus.h>
++#include <murphy/common.h>
++
++/* Murphy database access */
++#include <murphy-db/mdb.h>
++#include <murphy-db/mqi.h>
++#include <murphy-db/mql.h>
++
++typedef struct {
++    mrp_dbus_t *dbus;
++#if 0
++    mqi_handle_t table;
++#endif
++} wifi_on_t;
++
++/*
++
++The signal we are expecting from NetworkManager looks like this:
++
++signal sender=:1.12 -> dest=(null destination) serial=7741 path=/org/freedesktop/NetworkManager; interface=org.freedesktop.NetworkManager; member=PropertiesChanged
++   array [
++      dict entry(
++         string "WirelessEnabled"
++         variant             boolean false
++      )
++      dict entry(
++         string "ActiveConnections"
++         variant             array [
++               object path "/org/freedesktop/NetworkManager/ActiveConnection/3"
++            ]
++      )
++   ]
++*/
++
++static bool update_database(wifi_on_t *ctx, bool wifi_enabled) {
++    char buf[256];
++    int ret;
++    mqi_handle_t tx;
++    mql_result_t *r;
++    bool success = FALSE;
++
++    MRP_UNUSED(ctx);
++
++    mrp_debug("wifi_on: WiFi status change: %u", wifi_enabled);
++
++    ret = snprintf(buf, sizeof(buf),
++            "replace into wifi_enabled values (0, %u)", wifi_enabled);
++
++    if (ret < 0 || ret == sizeof(buf))
++        return success;;
++
++    tx = mqi_begin_transaction();
++
++    r = mql_exec_string(mql_result_string, buf);
++
++    success = mql_result_is_success(r);
++
++    mrp_debug("wifi-on: %s", success ? "updated database" :
++            mql_result_error_get_message(r));
++
++    mql_result_free(r);
++    mqi_commit_transaction(tx);
++
++    return success;
++}
++
++
++static bool variant_handler(wifi_on_t *ctx, mrp_dbus_msg_t *msg)
++{
++    uint32_t enabled = 0;
++    bool success = FALSE;
++
++    MRP_UNUSED(ctx);
++
++    if (mrp_dbus_msg_arg_type(msg, NULL) != MRP_DBUS_TYPE_VARIANT)
++        return success;
++
++    mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_VARIANT, NULL);
++
++    if (mrp_dbus_msg_arg_type(msg, NULL) != MRP_DBUS_TYPE_BOOLEAN)
++        goto end;
++
++    mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_BOOLEAN, &enabled);
++
++    /* update database */
++
++    success = update_database(ctx, enabled != 0);
++end:
++    mrp_dbus_msg_exit_container(msg); /* variant entry */
++
++    return success;
++}
++
++
++static int wifi_status_signal_handler(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg,
++        void *user_data)
++{
++    wifi_on_t *ctx = (wifi_on_t *) user_data;
++
++    MRP_UNUSED(dbus);
++
++    if (mrp_dbus_msg_arg_type(msg, NULL) != MRP_DBUS_TYPE_ARRAY)
++        return TRUE;
++
++    /* loop for all the properties */
++    mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_ARRAY, NULL);
++
++    while (mrp_dbus_msg_arg_type(msg, NULL) == MRP_DBUS_TYPE_DICT_ENTRY) {
++        char *property_name;
++
++        mrp_dbus_msg_enter_container(msg, MRP_DBUS_TYPE_DICT_ENTRY, NULL);
++
++        if (mrp_dbus_msg_arg_type(msg, NULL) != MRP_DBUS_TYPE_STRING)  {
++            mrp_log_error("wifi_on: argument type %c, expected property name",
++                    mrp_dbus_msg_arg_type(msg, NULL));
++            return TRUE;
++        }
++
++        mrp_dbus_msg_read_basic(msg, MRP_DBUS_TYPE_STRING, &property_name);
++
++        /* the right handler for the property is now defined by
++         * property_name and interface */
++
++        if (property_name && strcmp(property_name, "WirelessEnabled") == 0) {
++            variant_handler(ctx, msg);
++        }
++        mrp_dbus_msg_exit_container(msg); /* dict entry */
++    }
++    mrp_dbus_msg_exit_container(msg); /* array entry */
++
++    return TRUE;
++}
++
++static void wifi_status_reply_handler(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg,
++        void *user_data)
++{
++    wifi_on_t *ctx = (wifi_on_t *) user_data;
++
++    MRP_UNUSED(dbus);
++
++    /* Network manager appears to tell that WiFi is enabled even if there is no
++     * WiFi adapter in the system. :-o
++     */
++
++    variant_handler(ctx, msg);
++}
++
++static int wifi_on_init(mrp_plugin_t *plugin)
++{
++    wifi_on_t *ctx;
++
++#if 0
++    MQI_COLUMN_DEFINITION_LIST(defs,
++        MQI_COLUMN_DEFINITION("id", MQI_UNSIGNED),
++        MQI_COLUMN_DEFINITION("enabled", MQI_UNSIGNED)
++    );
++
++    MQI_INDEX_DEFINITION(index,
++        MQI_INDEX_COLUMN("id")
++    );
++#endif
++
++    ctx = mrp_allocz(sizeof(*ctx));
++    if (!ctx)
++        goto error;
++
++    ctx->dbus = mrp_dbus_connect(plugin->ctx->ml, "system", NULL);
++    if (!ctx->dbus) {
++        mrp_log_error("wifi_on: could not get to system D-Bus");
++        goto error;
++    }
++
++    mrp_dbus_subscribe_signal(ctx->dbus, wifi_status_signal_handler, ctx,
++            NULL, "/org/freedesktop/NetworkManager",
++            "org.freedesktop.NetworkManager", "PropertiesChanged", NULL);
++
++#if 0
++    /* create database table for the results */
++
++    ctx->table = MQI_CREATE_TABLE("wifi_enabled", MQI_TEMPORARY, defs, index);
++#endif
++
++    plugin->data = ctx;
++
++    /*
++      dbus-send --system --print-reply --type=method_call \
++          --dest=org.freedesktop.NetworkManager \
++          /org/freedesktop/NetworkManager org.freedesktop.DBus.Properties.Get \
++          string:org.freedesktop.NetworkManager string:WirelessEnabled
++    */
++
++    mrp_dbus_call(ctx->dbus,
++            "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager",
++            "org.freedesktop.DBus.Properties",
++            "Get", 3000, wifi_status_reply_handler, ctx,
++            MRP_DBUS_TYPE_STRING, "org.freedesktop.NetworkManager",
++            MRP_DBUS_TYPE_STRING, "WirelessEnabled",
++            MRP_DBUS_TYPE_INVALID);
++
++    return TRUE;
++
++error:
++
++    return FALSE;
++}
++
++
++static void wifi_on_exit(mrp_plugin_t *plugin)
++{
++    wifi_on_t *ctx = plugin->data;
++
++    if (ctx) {
++
++        mrp_free(ctx);
++    }
++}
++
++
++#define PA_WIFI_ON_DESCRIPTION "Plugin for getting WiFi status"
++#define PA_WIFI_ON_HELP        "Checks only for enabled/disabled status"
++#define PA_WIFI_ON_VERSION     MRP_VERSION_INT(0, 0, 1)
++#define PA_WIFI_ON_AUTHORS     "Ismo Puustinen <ismo.puustinen@intel.com>"
++
++MURPHY_REGISTER_PLUGIN("wifi-on",
++                       PA_WIFI_ON_VERSION, PA_WIFI_ON_DESCRIPTION,
++                       PA_WIFI_ON_AUTHORS, PA_WIFI_ON_HELP,
++                       MRP_SINGLETON, wifi_on_init, wifi_on_exit,
++                       NULL, 0, NULL, 0, NULL, 0, NULL);
