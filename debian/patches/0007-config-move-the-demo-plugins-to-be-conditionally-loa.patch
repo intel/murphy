@@ -1,0 +1,30 @@
+From: Ismo Puustinen <ismo.puustinen@intel.com>
+Date: Thu, 30 Oct 2014 13:38:57 +0200
+Subject: config: move the demo plugins to be conditionally loaded.
+
+---
+ src/daemon/murphy.lua | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/src/daemon/murphy.lua b/src/daemon/murphy.lua
+index 92c6d62..0e13765 100644
+--- a/src/daemon/murphy.lua
++++ b/src/daemon/murphy.lua
+@@ -180,7 +180,14 @@ element.lua {
+ }
+ 
+ -- load the demo plugins: first the domain controller, then the input plugins
+-m:load_plugin('demo-dc')
++if m:plugin_exists('demo-dc') then
++    m:try_load_plugin('demo-dc')
++end
++
++if m:plugin_exists('pulseaudio-volume') then
++    m:try_load_plugin('pulseaudio-volume', { sink_id = 0 })
++end
+ 
+-m:load_plugin('pulseaudio-volume', { sink_id = 0 })
+-m:load_plugin('wifi-on')
++if m:plugin_exists('wifi-on') then
++    m:try_load_plugin('wifi-on')
++end

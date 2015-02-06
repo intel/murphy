@@ -1,0 +1,22 @@
+From: =?utf-8?q?Jan_Ekstr=C3=B6m?= <jan.ekstrom@intel.com>
+Date: Fri, 24 Oct 2014 13:15:54 +0300
+Subject: HACK: Add mql/mqi/mdb to murphyd's linker flags
+
+---
+ src/Makefile.am | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index a9a5d9c..475d5ae 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -1456,6 +1456,9 @@ murphyd_LDADD  =				\
+ 		libmurphy-core.la		\
+ 		libmurphy-lua-utils.la		\
+ 		libmurphy-common.la		\
++		murphy-db/mql/libmql.la		\
++		murphy-db/mqi/libmqi.la		\
++		murphy-db/mdb/libmdb.la		\
+ 		$(JSON_LIBS)
+ 
+ if LIBDBUS_ENABLED

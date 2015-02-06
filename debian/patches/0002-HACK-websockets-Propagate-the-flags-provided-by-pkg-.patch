@@ -1,0 +1,29 @@
+From: =?utf-8?q?Jan_Ekstr=C3=B6m?= <jan.ekstrom@intel.com>
+Date: Tue, 29 Jul 2014 13:31:55 +0300
+Subject: HACK websockets: Propagate the flags provided by pkg-config
+
+---
+ m4/websockets.m4 | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/m4/websockets.m4 b/m4/websockets.m4
+index 1761aa9..d3cb8f1 100644
+--- a/m4/websockets.m4
++++ b/m4/websockets.m4
+@@ -18,6 +18,7 @@ if test "$enable_websockets" != "no"; then
+                       [have_websockets=yes], [have_websockets=no])
+     if test "$have_websockets" = "yes"; then
+         WEBSOCKETS_CFLAGS="`pkg-config --cflags libwebsockets`"
++        WEBSOCKETS_LIBS="`pkg-config --libs libwebsockets`"
+         # Check for a couple of recent features we need to adopt to.
+         saved_CFLAGS="$CFLAGS"
+         saved_LDFLAGS="$LDFLAGS"
+@@ -186,7 +187,7 @@ if test "$enable_websockets" != "no"; then
+         AC_MSG_RESULT([$old_websockets])
+     fi
+ 
+-    WEBSOCKETS_LIBS="-lwebsockets"
++    # WEBSOCKETS_LIBS="-lwebsockets"
+     if test "$old_websockets" = "yes"; then
+         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_OLD"
+     fi

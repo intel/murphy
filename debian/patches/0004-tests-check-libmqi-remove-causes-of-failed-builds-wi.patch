@@ -1,0 +1,39 @@
+From: =?utf-8?q?Jan_Ekstr=C3=B6m?= <jan.ekstrom@intel.com>
+Date: Fri, 24 Oct 2014 12:41:35 +0300
+Subject: tests/check-libmqi: remove causes of failed builds with debian rules
+
+Debian packaging uses -Werror=format-security
+---
+ src/murphy-db/tests/check-libmqi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/murphy-db/tests/check-libmqi.c b/src/murphy-db/tests/check-libmqi.c
+index 907094a..ee96526 100644
+--- a/src/murphy-db/tests/check-libmqi.c
++++ b/src/murphy-db/tests/check-libmqi.c
+@@ -941,14 +941,14 @@ static void print_triggers(void)
+     char *ev;
+     int i;
+ 
+-    printf(separator);
++    fputs(separator, stdout);
+     printf("| trigger       |      table        |"
+            "      selected columns in row        |"
+            "    altered column                            |\n");
+     printf("| event         |  handle name      |"
+            "   id first_name      family_name    |"
+            " idx name         value                       |\n");
+-    printf(separator);
++    fputs(separator, stdout);
+ 
+     if (!ntrigger) {
+         printf("|-<no events>---|-------------------|"
+@@ -994,7 +994,7 @@ static void print_triggers(void)
+         }
+     }
+ 
+-    printf(separator);
++    fputs(separator, stdout);
+ }
+ 
+ static void transaction_event_cb(mqi_event_t *evt, void *user_data)
