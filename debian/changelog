@@ -1,3 +1,21 @@
+murphy (0.0.74-0ubuntu1~trusty1) trusty; urgency=low
+
+  * Updated to latest upstream release.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Wed, 06 Feb 2015 14:42:12 +0300
+
+murphy (0.0.64-0ubuntu1~trusty1) trusty; urgency=low
+
+  * Updated to latest upstream release.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Wed, 05 Nov 2014 14:56:51 +0300
+
+murphy (0.0.61-0ubuntu6~trusty1) trusty; urgency=low
+
+  * Separated demo plugins to different packages.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Thu, 30 Oct 2014 14:35:14 +0300
+
 murphy (0.0.61-0ubuntu5~trusty1) trusty; urgency=low
 
   * Initial release.
