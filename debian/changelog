@@ -1,5 +1,23 @@
+murphy (0.0.74-0ubuntu1~utopic1) utopic; urgency=low
+
+  * Updated to latest upstream release.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Wed, 06 Feb 2015 14:42:12 +0300
+
+murphy (0.0.64-0ubuntu1~utopic1) utopic; urgency=low
+
+  * Updated to latest upstream release.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Wed, 05 Nov 2014 14:56:51 +0300
+
+murphy (0.0.61-0ubuntu6~utopic1) utopic; urgency=low
+
+  * Separated demo plugins to different packages.
+
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Thu, 30 Oct 2014 14:35:14 +0300
+
 murphy (0.0.61-0ubuntu5~utopic1) utopic; urgency=low
 
   * Initial release.
 
- -- Ismo Puustinen <ismo.puustinen@intel.com>  Thu, 30 Oct 2014 11:24:34 +0300
+ -- Ismo Puustinen <ismo.puustinen@intel.com>  Thu, 30 Oct 2014 11:26:21 +0300
