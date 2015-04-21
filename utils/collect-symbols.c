@@ -32,6 +32,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <limits.h>
 #define _GNU_SOURCE
 #include <getopt.h>
 #include <unistd.h>
@@ -75,6 +76,8 @@ typedef struct {
     int  len;                            /* amount of data in buffer */
     int  rd;                             /* data buffer read offset */
     int  nxt;                            /* pushed back data if non-zero */
+    char path[PATH_MAX];                 /* current input file */
+    int  line;                           /* current input line number */
 } input_t;
 
 typedef struct {
@@ -91,6 +94,7 @@ typedef struct {
     char    *output;                     /* output path */
     int      gnuld;                      /* generate GNU ld script */
     int      verbose;                    /* verbosity */
+    int      dump;                       /* just dump preprocessed output */
 } config_t;
 
 typedef struct {
@@ -109,6 +113,7 @@ static void fatal_error(const char *fmt, ...)
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
+    fflush(stderr);
 
     exit(1);
 }
@@ -160,6 +165,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -g, --gnu-ld <script>        generate GNU ld linker script\n"
            "  -v, --verbose                increase verbosity\n"
            "  -q, --quiet                  decrease verbosity\n"
+           "  -D, --dump                   just dump preprocessor output\n"
            "  -h, --help                   show this help on usage\n",
            argv0);
 
@@ -180,7 +186,7 @@ static void set_defaults(config_t *c)
 
 static void parse_cmdline(config_t *cfg, int argc, char **argv)
 {
-#   define OPTIONS "P:c:p:o:gvqh"
+#   define OPTIONS "P:c:p:o:gvqDh"
     struct option options[] = {
         { "preprocessor"  , required_argument, NULL, 'P' },
         { "compiler-flags", required_argument, NULL, 'c' },
@@ -189,6 +195,7 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
         { "gnu-ld"        , no_argument      , NULL, 'g' },
         { "verbose"       , no_argument      , NULL, 'v' },
         { "quiet"         , no_argument      , NULL, 'q' },
+        { "dump"          , no_argument      , NULL, 'D' },
         { "help"          , no_argument      , NULL, 'h' },
         { NULL, 0, NULL, 0 }
     };
@@ -227,6 +234,10 @@ static void parse_cmdline(config_t *cfg, int argc, char **argv)
             verbosity--;
             break;
 
+        case 'D':
+            cfg->dump = 1;
+            break;
+
         case 'h':
             print_usage(argv[0], -1, "");
             exit(0);
@@ -258,13 +269,13 @@ static int preprocess_file(const char *preproc, const char *file,
      */
 
     if (pipe(fd) != 0)
-        fatal_error("failed to create pipe (%d: %s).", errno, strerror(errno));
+        fatal_error("failed to create pipe (%d: %s)\n", errno, strerror(errno));
 
     *pid = fork();
 
     switch (*pid) {
     case -1:
-        fatal_error("failed to for preprocessor (%d: %s).",
+        fatal_error("failed to fork preprocessor (%d: %s)\n",
                     errno, strerror(errno));
         break;
 
@@ -304,11 +315,11 @@ static int preprocess_file(const char *preproc, const char *file,
         }
 
         if (dup2(fd[WR], fileno(stdout)) < 0)
-            fatal_error("failed to redirect stdout (%d: %s)",
+            fatal_error("failed to redirect stdout (%d: %s)\n",
                         errno, strerror(errno));
 
         if (execv("/bin/sh", argv) != 0)
-            fatal_error("failed to exec command '%s' (%d: %s)", cmd,
+            fatal_error("failed to exec command '%s' (%d: %s)\n", cmd,
                         errno, strerror(errno));
         break;
 
@@ -566,31 +577,45 @@ static char *input_collect_word(input_t *in, ringbuf_t *rb)
 }
 
 
-static char *input_parse_linemarker(input_t *in, char *buf, size_t size)
+static int input_parse_linemarker(input_t *in, char *buf, size_t size)
 {
     char ch;
     int  i;
 
-    while((ch = input_read(in)) != '"' && ch != '\n' && ch)
+    while ((ch = input_read(in)) == ' ' || ch == '\t')
         ;
 
-    if (ch != '"')
-        return NULL;
+    verbose_message(2, "**** ch = '%c' (%u) *** \n", ch, (unsigned int)ch);
 
-    for (i = 0; i < (int)size - 1; i++) {
-        buf[i] = ch = input_read(in);
+    if ('0' <= ch && ch <= '9') {
+        while ((ch = input_read(in)) != '"' && ch)
+            ;
 
-        if (ch == '"') {
-            buf[i] = '\0';
+        if (!ch) {
+            fatal_error("missing '\"' from preprocessor linemarker '#'\n");
+            return -1;
+        }
 
-            while ((ch = input_read(in)) != '\n' && ch)
-                ;
+        for (i = 0; i < (int)size - 1; i++) {
+            buf[i] = ch = input_read(in);
 
-            return buf;
+            if (ch == '"') {
+                buf[i] = '\0';
+
+                while ((ch = input_read(in)) != '\n' && ch)
+                    ;
+
+                return 0;
+            }
         }
     }
 
-    return NULL;
+    /* assume a #pragma, or something else, just consume it */
+    while ((ch = input_read(in)) != '\n' && ch)
+        ;
+    *buf = '\0';
+
+    return 0;
 }
 
 
@@ -627,14 +652,15 @@ static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
 
             /* extract path name from preprocessor line-markers */
         case '#':
-            v = input_parse_linemarker(in, path, sizeof(path));
-            if (v != NULL) {
-                tokens[n].type  = TOKEN_LINEMARKER;
-                tokens[n].value = ringbuf_save(rb, v, -1);
-                if (n == 0)
-                    return n + 1;
-                else
-                    return -1;
+            verbose_message(2, "input buffer now [%*.*s]\n",
+                            in->len - in->rd, in->len - in->rd,
+                            in->buf + in->rd);
+            if (input_parse_linemarker(in, path, sizeof(path)) < 0)
+                return -1;
+
+            if (!same_file(in->path, path)) {
+                verbose_message(2, "input switched to file '%s'...\n", path);
+                strcpy(in->path, path);
             }
             break;
 
@@ -652,8 +678,10 @@ static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
         case '{':
         case '(':
         case '[':
-            if (input_discard_block(in, ch) != 0)
+            if (input_discard_block(in, ch) != 0) {
+                fatal_error("failed to discard input block\n");
                 return -1;
+            }
             else {
                 /* filter out __attribute__ ((.*)) token pairs */
                 if (ch == '(' && n > 0 &&
@@ -705,8 +733,10 @@ static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
                 tokens[n].value = v;
                 n++;
             }
-            else
+            else {
+                fatal_error("failed to collect word token\n");
                 return -1;
+            }
             break;
 
         case '=':
@@ -726,6 +756,7 @@ static int collect_tokens(input_t *in, ringbuf_t *rb, token_t *tokens,
     }
 
     errno = EOVERFLOW;
+    fatal_error("input buffer overflow\n");
     return -1;
 }
 
@@ -840,10 +871,10 @@ static void symtab_add(symtab_t *st, char *sym)
             return;
         }
 
-        fatal_error("failed to save symbol '%s'", sym);
+        fatal_error("failed to save symbol '%s'\n", sym);
     }
 
-    fatal_error("failed to allocate new symbol table entry");
+    fatal_error("failed to allocate new symbol table entry\n");
 }
 
 
@@ -902,15 +933,7 @@ static void extract_symbols(const char *preproc, const char *path,
     foreign = 0;
 
     while ((ntoken = collect_tokens(&in, &rb, tokens, MAX_TOKENS)) > 0) {
-        if (tokens[0].type == TOKEN_LINEMARKER) {
-            foreign = !same_file(path, tokens[0].value);
-
-            verbose_message(2, "input switched to %s file '%s'...\n",
-                            foreign ? "foreign" : "input", tokens[0].value);
-
-            continue;
-        }
-
+        foreign = !same_file(path, in.path);
         if (foreign) {
             verbose_message(2, "ignoring token stream from foreign file...\n");
             continue;
@@ -926,11 +949,47 @@ static void extract_symbols(const char *preproc, const char *path,
         }
     }
 
+    {
+        ssize_t n;
+        char    buf[8192];
+
+        while ((n = read(fd, buf, sizeof(buf))) > 0) {
+            verbose_message(2, "%d unprocessed bytes of input from '%s':", n,
+                            path);
+            verbose_message(4, "[%*.*s]", (int)n, (int)n, buf);
+        }
+    }
+
     close(fd);
     waitpid(pp_pid, &pp_status, 0);
 
     if (WIFEXITED(pp_status) && WEXITSTATUS(pp_status) != 0)
-        fatal_error("preprocessing of '%s' failed\n", path);
+        fatal_error("preprocessing of '%s' failed (%d)\n", path,
+                    WEXITSTATUS(pp_status));
+}
+
+
+static void dump_preprocessed(const char *preproc, const char *path,
+                              const char *cflags)
+{
+    pid_t   pp_pid;
+    int     pp_status, fd;
+    ssize_t n;
+    char    buf[8192];
+
+    fd = preprocess_file(preproc, path, cflags, &pp_pid);
+
+    while ((n = read(fd, buf, sizeof(buf))) > 0)
+        printf("%*.*s", (int)n, (int)n, buf);
+
+    printf("\n");
+
+    close(fd);
+    waitpid(pp_pid, &pp_status, 0);
+
+    if (WIFEXITED(pp_status) && WEXITSTATUS(pp_status) != 0)
+        fatal_error("preprocessing of '%s' failed (%d)", path,
+                    WEXITSTATUS(pp_status));
 }
 
 
@@ -956,6 +1015,14 @@ int main(int argc, char *argv[])
     verbose_message(1, "using preprocessor '%s', cflags '%s'\n", cfg.preproc,
                     cfg.cflags ? cfg.cflags : "");
 
+
+    if (cfg.dump) {
+        for (i = 0; i < cfg.nfile; i++)
+            dump_preprocessed(cfg.preproc, cfg.files[i], cfg.cflags);
+
+        exit(0);
+    }
+
     if (cfg.pattern != NULL) {
         err = regcomp(&rebuf, cfg.pattern, REG_EXTENDED);
 
@@ -977,7 +1044,7 @@ int main(int argc, char *argv[])
         out = fopen(cfg.output, "w");
 
         if (out == NULL)
-            fatal_error("failed to open '%s' (%d: %s)", cfg.output,
+            fatal_error("failed to open '%s' (%d: %s)\n", cfg.output,
                         errno, strerror(errno));
     }
     else
