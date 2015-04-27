@@ -47,16 +47,44 @@ typedef struct {
     GMainContext  *mc;
     gint           maxprio;
     mrp_subloop_t *sl;
+    GMutex         gmtx;
+    GCond          gcnd;
 } glib_glue_t;
 
 static glib_glue_t *glib_glue;
 
 
+static int glib_acquire(glib_glue_t *glue)
+{
+    if (g_main_context_acquire(glue->mc))
+        return TRUE;
+
+    while (!g_main_context_wait(glue->mc, &glue->gcnd, &glue->gmtx))
+        ;
+
+    return TRUE;
+}
+
+
+static void glib_release(glib_glue_t *glue)
+{
+    g_main_context_release(glue->mc);
+}
+
+
 static int glib_prepare(void *user_data)
 {
-    glib_glue_t *glue = (glib_glue_t *)user_data;
+    glib_glue_t *glue  = (glib_glue_t *)user_data;
+    int          ready;
 
-    return g_main_context_prepare(glue->mc, &glue->maxprio);
+    glib_acquire(glue);
+    ready = g_main_context_prepare(glue->mc, &glue->maxprio);
+    glib_release(glue);
+
+    mrp_debug("GMainLoop <%p>: prepared and %s", user_data,
+              ready ? "ready" : "not ready");
+
+    return ready;
 }
 
 
@@ -64,17 +92,32 @@ static int glib_query(void *user_data, struct pollfd *fds, int nfd,
                       int *timeout)
 {
     glib_glue_t *glue = (glib_glue_t *)user_data;
+    int          n;
 
-    return g_main_context_query(glue->mc, glue->maxprio, timeout,
-                                (GPollFD *)fds, nfd);
+    glib_acquire(glue);
+    n = g_main_context_query(glue->mc, glue->maxprio, timeout,
+                             (GPollFD *)fds, nfd);
+    glib_release(glue);
+
+    mrp_debug("GMainLoop <%p>: %d fds, timeout %d", user_data, n, *timeout);
+
+    return n;
 }
 
 
 static int glib_check(void *user_data, struct pollfd *fds, int nfd)
 {
     glib_glue_t *glue = (glib_glue_t *)user_data;
+    int          ready;
 
-    return g_main_context_check(glue->mc, glue->maxprio, (GPollFD *)fds, nfd);
+    glib_acquire(glue);
+    ready = g_main_context_check(glue->mc, glue->maxprio, (GPollFD *)fds, nfd);
+    glib_release(glue);
+
+    mrp_debug("GmainLoop <%p>: %s dispatch", user_data,
+              ready ? "ready for" : "nothing to");
+
+    return ready;
 
 }
 
@@ -83,8 +126,9 @@ static void glib_dispatch(void *user_data)
 {
     glib_glue_t *glue = (glib_glue_t *)user_data;
 
+    glib_acquire(glue);
     g_main_context_dispatch(glue->mc);
-
+    glib_release(glue);
 }
 
 
@@ -152,8 +196,6 @@ static void glib_pump_cleanup(void)
 
 static int plugin_init(mrp_plugin_t *plugin)
 {
-    mrp_log_info("%s() called...", __FUNCTION__);
-
     return glib_pump_setup(plugin->ctx->ml);
 }
 
@@ -161,8 +203,6 @@ static int plugin_init(mrp_plugin_t *plugin)
 static void plugin_exit(mrp_plugin_t *plugin)
 {
     MRP_UNUSED(plugin);
-
-    mrp_log_info("%s() called...", __FUNCTION__);
 
     glib_pump_cleanup();
 }
