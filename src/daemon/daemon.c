@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <signal.h>
 
+#include <murphy/config.h>
 #include <murphy/common/macros.h>
 #include <murphy/common/log.h>
 #include <murphy/common/mainloop.h>
@@ -39,6 +40,11 @@
 #include <murphy/resolver/resolver.h>
 #include <murphy/daemon/config.h>
 #include <murphy/daemon/daemon.h>
+
+#ifdef GLIB_ENABLED
+#  include <glib.h>
+#  include <murphy/common/glib-glue.h>
+#endif
 
 
 /*
@@ -59,6 +65,9 @@ MRP_REGISTER_EVENTS(daemon_events,
                     MRP_EVENT(MRP_DAEMON_RUNNING , DAEMON_EVENT_RUNNING ),
                     MRP_EVENT(MRP_DAEMON_STOPPING, DAEMON_EVENT_STOPPING));
 
+static void create_mainloop(mrp_context_t *ctx);
+static void quit_mainloop(mrp_context_t *ctx, int exit_status);
+static void cleanup_mainloop(mrp_context_t *ctx);
 
 static int emit_daemon_event(mrp_context_t *ctx, int idx)
 {
@@ -72,23 +81,22 @@ static int emit_daemon_event(mrp_context_t *ctx, int idx)
 
 static void signal_handler(mrp_sighandler_t *h, int signum, void *user_data)
 {
-    mrp_mainloop_t *ml  = mrp_get_sighandler_mainloop(h);
-    mrp_context_t  *ctx = (mrp_context_t *)user_data;
+    mrp_context_t *ctx = (mrp_context_t *)user_data;
 
-    MRP_UNUSED(ctx);
+    MRP_UNUSED(h);
 
     switch (signum) {
     case SIGINT:
         mrp_log_info("Got SIGINT, stopping...");
-        if (ml != NULL)
-            mrp_mainloop_quit(ml, 0);
+        if (ctx->ml != NULL)
+            quit_mainloop(ctx, 0);
         else
             exit(0);
         break;
 
     case SIGTERM:
         mrp_log_info("Got SIGTERM, stopping...");
-        mrp_mainloop_quit(ml, 0);
+        quit_mainloop(ctx, 0);
         break;
     }
 }
@@ -239,11 +247,70 @@ static void prepare_ruleset(mrp_context_t *ctx)
 }
 
 
+static void create_mainloop(mrp_context_t *ctx)
+{
+#ifdef GLIB_ENABLED
+    if (ctx->gmain) {
+#ifndef GLIB_VERSION_2_36
+        g_type_init();
+#endif
+
+        mrp_log_info("Running with GMainLoop...");
+
+        ctx->gmc = g_main_context_default();
+        ctx->gml = g_main_loop_new(NULL, FALSE);
+
+        if (!mrp_mainloop_register_with_glib(ctx->ml, ctx->gml)) {
+            mrp_log_error("Failed to register mainloop with GMainLoop.");
+            exit(1);
+        }
+    }
+    else
+#endif
+        mrp_log_info("Running with native mainloop...");
+}
+
+
 static void run_mainloop(mrp_context_t *ctx)
 {
     mrp_context_setstate(ctx, MRP_STATE_RUNNING);
     emit_daemon_event(ctx, DAEMON_EVENT_RUNNING);
-    mrp_mainloop_run(ctx->ml);
+
+    if (ctx->gml == NULL)
+        mrp_mainloop_run(ctx->ml);
+#ifdef GLIB_ENABLED
+    else
+        g_main_loop_run(ctx->gml);
+#endif
+}
+
+
+static void quit_mainloop(mrp_context_t *ctx, int exit_status)
+{
+    if (ctx == NULL)
+        return;
+
+#ifdef GLIB_ENABLED
+    if (ctx->gml != NULL)
+        g_main_loop_quit(ctx->gml);
+    else
+#endif
+        mrp_mainloop_quit(ctx->ml, exit_status);
+}
+
+
+static void cleanup_mainloop(mrp_context_t *ctx)
+{
+    mrp_mainloop_destroy(ctx->ml);
+    ctx->ml = NULL;
+
+#ifdef GLIB_ENABLED
+    if (ctx->gml != NULL) {
+        g_main_loop_unref(ctx->gml);
+        ctx->gml = NULL;
+        ctx->gmc = NULL;
+    }
+#endif
 }
 
 
@@ -286,6 +353,7 @@ int main(int argc, char *argv[], char *envp[])
     setup_signals(ctx);
     create_ruleset(ctx);
     parse_cmdline(ctx, argc, argv, envp);
+    create_mainloop(ctx);
     load_configuration(ctx);
     start_plugins(ctx);
     load_ruleset(ctx);
@@ -297,6 +365,7 @@ int main(int argc, char *argv[], char *envp[])
     run_mainloop(ctx);
     stop_plugins(ctx);
 
+    cleanup_mainloop(ctx);
     cleanup_context(ctx);
 
     return 0;
