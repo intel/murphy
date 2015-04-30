@@ -57,6 +57,7 @@ struct mrp_context_s {
     const char *config_dir;                /* plugin configuration directory */
     const char *plugin_dir;                /* plugin directory */
     bool        foreground;                /* whether to stay in foreground*/
+    bool        gmain;                     /* use a GMainLoop */
 
     char       *resolver_ruleset;          /* resolver ruleset file */
 
@@ -72,6 +73,8 @@ struct mrp_context_s {
     /* actual runtime context data */
     int              state;                /* context/daemon state */
     mrp_mainloop_t  *ml;                   /* mainloop */
+    void            *gmc;                  /* GMainContext, if being used */
+    void            *gml;                  /* GMainLoop, if being used */
     mrp_list_hook_t  plugins;              /* list of loaded plugins */
     mrp_event_bus_t *plugin_bus;           /* bus for plugin events */
     mrp_event_bus_t *daemon_bus;           /* bus for daemon events */
