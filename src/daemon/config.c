@@ -40,6 +40,7 @@
 #define _GNU_SOURCE
 #include <getopt.h>
 
+#include <murphy/config.h>
 #include <murphy/common/log.h>
 #include <murphy/core/context.h>
 #include <murphy/core/plugin.h>
@@ -96,6 +97,9 @@ static void print_usage(mrp_context_t *ctx, const char *argv0, int exit_code,
            "  -R, --no-poststart-load        "
                     "disable post-startup plugin loading\n"
            "  -p, --disable-console          disable Murphy debug console\n"
+#ifdef GLIB_ENABLED
+           "  -G, --gmainloop                run with GMainLoop\n"
+#endif
            "  -V, --valgrind                 run through valgrind\n",
            argv0, ctx->config_file, ctx->config_dir, ctx->plugin_dir);
 
@@ -229,7 +233,12 @@ static void config_set_defaults(mrp_context_t *ctx, char *argv0)
 
 void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
 {
-#   define OPTIONS "c:C:l:t:fP:a:vd:hHqB:I:E:w:i:e:RpV"
+#ifdef GLIB_ENABLED
+#    define GMAINOPT "G"
+#else
+#    define GMAINOPT ""
+#endif
+#   define OPTIONS "c:C:l:t:fP:a:vd:hHqB:I:E:w:i:e:Rp"GMAINOPT"V"
     struct option options[] = {
         { "config-file"      , required_argument, NULL, 'c' },
         { "config-dir"       , required_argument, NULL, 'C' },
@@ -252,6 +261,9 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
         { "whitelist-dynamic", required_argument, NULL, 'e' },
         { "no-poststart-load", no_argument      , NULL, 'R' },
         { "disable-console"  , no_argument      , NULL, 'p' },
+#ifdef GLIB_ENABLED
+        { "gmainloop"        , no_argument      , NULL, 'G' },
+#endif
         { "valgrind"         , optional_argument, NULL, 'V' },
         { NULL, 0, NULL, 0 }
     };
@@ -396,6 +408,15 @@ void mrp_parse_cmdline(mrp_context_t *ctx, int argc, char **argv, char **envp)
         case 'p':
             SAVE_OPT("-p");
             ctx->disable_console = TRUE;
+            break;
+#ifdef GLIB_ENABLED
+        case 'G':
+            SAVE_OPT("-G");
+            ctx->gmain = TRUE;
+#else
+            print_usage(ctx, argv[0], EINVAL, "GLib support is disabled.");
+            exit(1);
+#endif
             break;
         case 'V':
             valgrind(optarg, argc, argv, optind, saved_argc, saved_argv, envp);

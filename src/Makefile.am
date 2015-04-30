@@ -1461,6 +1461,12 @@ murphyd_LDADD  =				\
 		libmurphy-common.la		\
 		$(JSON_LIBS)
 
+if GLIB_ENABLED
+murphyd_CFLAGS += $(GLIB_CFLAGS)
+murphyd_LDADD  += libmurphy-glib.la
+endif
+
+
 if LIBDBUS_ENABLED
 murphyd_LDADD +=				\
 		libmurphy-dbus-libdbus.la	\
