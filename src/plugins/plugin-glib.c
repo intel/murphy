@@ -53,6 +53,27 @@ typedef struct {
 
 static glib_glue_t *glib_glue;
 
+static void glib_log(const gchar *domain, GLogLevelFlags level,
+                     const gchar *message, gpointer user_data)
+{
+    MRP_UNUSED(user_data);
+
+    switch (level & G_LOG_LEVEL_MASK) {
+    case G_LOG_LEVEL_DEBUG:
+        mrp_debug("[%s] %s", domain ? domain : "APP", message);
+        break;
+    case G_LOG_LEVEL_INFO:
+        mrp_log_info("[%s] %s", domain ? domain : "APP", message);
+        break;
+    case G_LOG_LEVEL_WARNING:
+        mrp_log_warning("[%s] %s", domain ? domain : "APP", message);
+        break;
+    case G_LOG_LEVEL_ERROR:
+        mrp_log_error("[%s] %s", domain ? domain : "APP", message);
+        break;
+    }
+}
+
 
 static int glib_acquire(glib_glue_t *glue)
 {
@@ -77,6 +98,8 @@ static int glib_prepare(void *user_data)
     glib_glue_t *glue  = (glib_glue_t *)user_data;
     int          ready;
 
+    mrp_debug("*** GMainLoop <%p>: preparing...", user_data);
+
     glib_acquire(glue);
     ready = g_main_context_prepare(glue->mc, &glue->maxprio);
     glib_release(glue);
@@ -94,6 +117,8 @@ static int glib_query(void *user_data, struct pollfd *fds, int nfd,
     glib_glue_t *glue = (glib_glue_t *)user_data;
     int          n;
 
+    mrp_debug("*** GMainLoop <%p>: querying...", user_data);
+
     glib_acquire(glue);
     n = g_main_context_query(glue->mc, glue->maxprio, timeout,
                              (GPollFD *)fds, nfd);
@@ -110,6 +135,8 @@ static int glib_check(void *user_data, struct pollfd *fds, int nfd)
     glib_glue_t *glue = (glib_glue_t *)user_data;
     int          ready;
 
+    mrp_debug("*** GMainLoop <%p>: checking...", user_data);
+
     glib_acquire(glue);
     ready = g_main_context_check(glue->mc, glue->maxprio, (GPollFD *)fds, nfd);
     glib_release(glue);
@@ -118,13 +145,14 @@ static int glib_check(void *user_data, struct pollfd *fds, int nfd)
               ready ? "ready for" : "nothing to");
 
     return ready;
-
 }
 
 
 static void glib_dispatch(void *user_data)
 {
     glib_glue_t *glue = (glib_glue_t *)user_data;
+
+    mrp_debug("*** GMainLoop <%p>: dispatching...", user_data);
 
     glib_acquire(glue);
     g_main_context_dispatch(glue->mc);
@@ -162,6 +190,24 @@ static int glib_pump_setup(mrp_mainloop_t *ml)
         glib_glue->ml = main_loop;
         glib_glue->sl = mrp_add_subloop(ml, &glib_ops, glib_glue);
 
+        {
+            const char *domains[] = {
+                "GLib",
+                "GLib-GObject",
+                "GLib-GIO",
+                "GLib-GRegex",
+                "GThread",
+                "GModule",
+                NULL
+            }, *d;
+            int i;
+
+            for (d = domains[i=0]; d; d = domains[++i])
+                g_log_set_handler(d, G_LOG_LEVEL_MASK, glib_log, NULL);
+
+            g_log_set_handler(NULL, G_LOG_LEVEL_MASK, glib_log, NULL);
+        }
+
         if (glib_glue->sl != NULL)
             return TRUE;
         else
@@ -191,7 +237,6 @@ static void glib_pump_cleanup(void)
         glib_glue = NULL;
     }
 }
-
 
 
 static int plugin_init(mrp_plugin_t *plugin)
