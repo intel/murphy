@@ -203,7 +203,8 @@ struct mrp_subloop_s {
     struct pollfd       *pollfds;                /* pollfds for this subloop */
     int                  npollfd;                /* number of pollfds */
     int                  pending;                /* pending events */
-    int                  poll;                   /* need to poll for events */
+    int                  poll : 1;               /* need to poll for events */
+    int                  ready : 1;              /* ready for dispatch */
 };
 
 
@@ -1145,7 +1146,7 @@ static void subloop_event_cb(mrp_io_watch_t *w, int fd, mrp_io_event_t events,
     MRP_UNUSED(fd);
     MRP_UNUSED(events);
 
-    mrp_debug("subloop %p has events, setting poll to TRUE", sl);
+    mrp_debug("subloop %p has pending I/O events, set poll to TRUE", sl);
 
     sl->poll = TRUE;
 }
@@ -1630,10 +1631,14 @@ static int prepare_subloop(mrp_subloop_t *sl)
     pollfds = sl->pollfds;
     npollfd = sl->npollfd;
 
+#if 0
     if (sl->cb->prepare(sl->user_data)) {
         mrp_debug("subloop %p prepare reported ready, dispatching it", sl);
         sl->cb->dispatch(sl->user_data);
     }
+#else
+    sl->ready = sl->cb->prepare(sl->user_data);
+#endif
     sl->poll = FALSE;
 
     nfd = npollfd;
@@ -1730,10 +1735,10 @@ static int prepare_subloop(mrp_subloop_t *sl)
     }
 
  out:
-    mrp_debug("subloop %p: fds: %d, timeout: %d, poll: %s",
-              sl, sl->npollfd, timeout, sl->poll ? "TRUE" : "FALSE");
+    mrp_debug("subloop %p: fds: %d, timeout: %d, poll: %s", sl, sl->npollfd,
+              sl->ready ? 0 : timeout, sl->poll ? "TRUE" : "FALSE");
 
-    return timeout;
+    return sl->ready ? 0 : timeout;
 }
 
 
@@ -1826,6 +1831,9 @@ int mrp_mainloop_prepare(mrp_mainloop_t *ml)
         ml->poll_timeout = timeout;
     else
         ml->poll_timeout = ext_timeout;
+
+    mrp_debug("*** ext_timeout: %d, timeout: %d => timeout: %d",
+              ext_timeout, timeout, ml->poll_timeout);
 
     if (ml->nevent < ml->niowatch) {
         ml->nevent = ml->niowatch;
@@ -1941,7 +1949,9 @@ static int poll_subloop(mrp_subloop_t *sl)
             }
         }
 
-        mrp_debug("subloop %p has %d fds ready", sl, sl->npollfd);
+        mrp_debug("subloop %p has %d fds ready", sl, n);
+
+        sl->pending = n;
 
         return n;
     }
@@ -2063,13 +2073,16 @@ static void dispatch_subloops(mrp_mainloop_t *ml)
         if (!is_deleted(sl)) {
             poll_subloop(sl);
 
+            mrp_debug("subloop %p, has %d pre-pending events", sl, sl->pending);
             if (sl->cb->check(sl->user_data, sl->pollfds,
-                              sl->npollfd)) {
+                              sl->npollfd) || sl->pending) {
                 mrp_debug("dispatching subloop %p", sl);
                 sl->cb->dispatch(sl->user_data);
             }
             else
                 mrp_debug("skipping subloop %p, check said no", sl);
+
+            sl->pending = 0;
         }
     }
 }
