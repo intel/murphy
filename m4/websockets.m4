@@ -49,6 +49,49 @@ if test "$enable_websockets" != "no"; then
             [websockets_cci=no])
         AC_MSG_RESULT([$websockets_cci])
 
+        # Check for ssl_cipher_list in context creation info
+        if test "$websockets_cci" = "yes"; then
+            AC_MSG_CHECKING([for WEBSOCKETS cipher list support])
+            AC_LINK_IFELSE(
+               [AC_LANG_PROGRAM(
+                     [[#include <stdlib.h>
+                       #include <libwebsockets.h>]],
+                     [[struct libwebsocket_context *ctx;
+                       void *ptr;
+                       ptr = &ctx->ssl_cipher_list;]])],
+                [websockets_cipherlist=yes],
+                [websockets_cipherlist=no])
+            AC_MSG_RESULT([$websockets_cipherlist])
+        fi
+
+        # Check for pollargs struct support
+        if test "$websockets_cci" = "yes"; then
+            AC_MSG_CHECKING([for WEBSOCKETS pollargs support])
+            AC_LINK_IFELSE(
+               [AC_LANG_PROGRAM(
+                     [[#include <stdlib.h>
+                       #include <libwebsockets.h>]],
+                     [[struct libwebsocket_pollargs = NULL;]])],
+                [websockets_passfd=pollargs],
+                [websockets_passfd=no])
+            AC_MSG_RESULT([$websockets_passfd])
+        else
+            websockets_passfd=no
+        fi
+
+        # Argh... try to detect the poll fd passing API...
+        if test "$websocket_passfd" != "pollargs"; then
+            AC_MSG_CHECKING([for WEBSOCKETS POLL fd passing API])
+            AC_LINK_IFELSE(
+               [AC_LANG_PROGRAM(
+                     [[#include <stdlib.h>
+                       #include <libwebsockets.h>]],
+                     [[printf("%d\n", LWS_MAX_HEADER_NAME_LENGTH);]])],
+                [websockets_passfd=user],
+                [websockets_passfd=in])
+            AC_MSG_RESULT([$websockets_passfd])
+        fi
+
         # Check for new libwebsockets_get_internal_extensions.
         AC_MSG_CHECKING([for WEBSOCKETS internal extension query API])
         AC_LINK_IFELSE(
@@ -179,6 +222,19 @@ if test "$enable_websockets" != "no"; then
     if test "$websockets_cci" = "yes"; then
         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CONTEXT_INFO"
     fi
+    if test "$websockets_cipherlist" = "yes"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_CIPHER_LIST"
+    fi
+    if test "$websockets_passfd" = "pollargs"; then
+        WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_PASSFD_POLLARGS"
+    else
+        if test "$websockets_passfd" = "in"; then
+            WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_PASSFD_IN"
+        else
+            WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_PASSFD_USER"
+        fi
+    fi
+
     if test "$websockets_query_ext" = "yes"; then
         WEBSOCKETS_CFLAGS="$WEBSOCKETS_CFLAGS -DWEBSOCKETS_QUERY_EXTENSIONS"
     fi
