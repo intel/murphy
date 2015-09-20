@@ -397,7 +397,16 @@ static int setup_debug_hook(int mask)
     mrp_context_t *ctx     = mrp_lua_get_murphy_context();
     lua_State     *L       = ctx ? ctx->lua_state : NULL;
 
+#if LUA_VERSION_NUM < 503
     return (L != NULL && lua_sethook(L, lua_debug, mask, 0));
+#else
+    if (L != NULL) {
+        lua_sethook(L, lua_debug, mask, 0);
+        return TRUE;
+    }
+    else
+        return FALSE;
+#endif
 }
 
 
