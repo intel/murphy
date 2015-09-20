@@ -53,6 +53,7 @@ libmurphy_common_la_HEADERS =		\
 		common/process.h	\
 		common/mainloop.h	\
 		common/utils.h		\
+		common/regexp.h		\
 		common/file-utils.h	\
 		common/socket-utils.h	\
 		common/msg.h		\
@@ -72,6 +73,7 @@ libmurphy_common_la_REGULAR_SOURCES =		\
 		common/mm.c			\
 		common/mainloop.c		\
 		common/utils.c			\
+		common/regexp.c			\
 		common/file-utils.c		\
 		common/socket-utils.c		\
 		common/process.c 		\

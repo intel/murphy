@@ -463,6 +463,36 @@ AC_SUBST(SYSTEMD_ENABLED)
 AC_SUBST(SYSTEMD_CFLAGS)
 AC_SUBST(SYSTEMD_LIBS)
 
+# Check if we should use PCRE for regexp matching.
+AC_ARG_ENABLE(pcre,
+              [  --enable-pcre           enable PCRE regexp backend],
+	      [enable_pcre=$enableval], [enable_pcre=no])
+
+if test "$enable_pcre" = "yes"; then
+    PKG_CHECK_MODULES(PCRE, libpcre, [have_pcre=yes], [have_pcre=no])
+    if test "$have_pcre" = "no"; then
+        AC_MSG_ERROR([PCRE development libraries not found.])
+    fi
+    AC_MSG_NOTICE([Using PCRE regexp backend.])
+else
+    AC_MSG_NOTICE([Using POSIX/libc regexp backend.])
+fi
+
+if test "$enable_pcre" = "yes"; then
+    AC_DEFINE([PCRE_ENABLED], 1, [Enable PCRE regexp backend ?])
+    REGEXP_CFLAGS="$PCRE_CFLAGS"
+    REGEXP_LIBS="$PCRE_LIBS"
+else
+    REGEXP_CFLAGS=""
+    REGEXP_LIBS=""
+fi
+AM_CONDITIONAL(PCRE_ENABLED, [test "$enable_pcre" = "yes"])
+AC_SUBST(PCRE_ENABLED)
+AC_SUBST(PCRE_CFLAGS)
+AC_SUBST(PCRE_LIBS)
+AC_SUBST(REGEXP_CFLAGS)
+AC_SUBST(REGEXP_LIBS)
+
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
 MURPHY_LIBS=""
@@ -726,6 +756,12 @@ echo "Murphy console plugin and client: $enable_console"
 echo "Resource management support: $with_resources"
 echo "Websockets support: $enable_websockets"
 echo "systemd support: $enable_systemd"
+if test "$enable_pcre" = "yes"; then
+    echo "regexp backend: pcre"
+else
+    echo "regexp backend: libc/POSIX"
+fi
+
 echo "Plugins:"
 echo "  - linked-in:"
 for plugin in ${INTERNAL_PLUGINS:-none}; do
