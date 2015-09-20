@@ -350,6 +350,7 @@ test_run(void)
      * then delete the hash table
      */
 
+    cfg.nentry  = test.nentry;
     cfg.nbucket = test.size / 4;
     cfg.hash    = hash_func;
     cfg.comp    = cmp_func;
