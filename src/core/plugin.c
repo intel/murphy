@@ -475,12 +475,14 @@ mrp_plugin_t *mrp_load_plugin(mrp_context_t *ctx, const char *name,
 }
 
 
-static int load_plugin_cb(const char *file, mrp_dirent_type_t type, void *data)
+static int load_plugin_cb(const char *dir, const char *file,
+                          mrp_dirent_type_t type, void *data)
 {
     mrp_context_t *ctx = (mrp_context_t *)data;
     char           name[PATH_MAX], *start, *end;
     int            len;
 
+    MRP_UNUSED(dir);
     MRP_UNUSED(type);
 
     if ((start = strstr(file, PLUGIN_PREFIX)) != NULL) {

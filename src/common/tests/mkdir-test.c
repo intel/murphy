@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
 
     for (i = 1; i < argc; i++) {
         printf("Trying to create directory '%s'..\n", argv[i]);
-        if (mrp_mkdir(argv[i], 0755) < 0)
+        if (mrp_mkdir(argv[i], 0755, NULL) < 0)
             printf("failed (%d: %s)\n", errno, strerror(errno));
         else
             printf("ok\n");

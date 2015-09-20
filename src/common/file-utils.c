@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Intel Corporation
+ * Copyright (c) 2012-2015, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,25 +33,14 @@
 #include <string.h>
 #include <stdbool.h>
 #include <dirent.h>
-#include <regex.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <murphy/config.h>
 #include <murphy/common/macros.h>
 #include <murphy/common/debug.h>
+#include <murphy/common/regexp.h>
 #include <murphy/common/file-utils.h>
-
-
-static const char *translate_glob(const char *pattern, char *glob, size_t size)
-{
-    MRP_UNUSED(glob);
-    MRP_UNUSED(size);
-
-    /* XXX FIXME: translate pattern to glob-like */
-
-    return pattern;
-}
-
 
 static inline mrp_dirent_type_t dirent_type(mode_t mode)
 {
@@ -75,67 +64,87 @@ int mrp_scan_dir(const char *path, const char *pattern, mrp_dirent_type_t mask,
                  mrp_scan_dir_cb_t cb, void *user_data)
 {
     DIR               *dp;
+    mrp_regexp_t      *re;
     struct dirent     *de;
     struct stat        st;
-    regex_t            regexp;
-    const char        *prefix;
     char               glob[1024], file[PATH_MAX];
-    size_t             size;
-    int                stop;
+    int                status, flags;
+    int              (*statfn)(const char *, struct stat *);
     mrp_dirent_type_t  type;
 
     if ((dp = opendir(path)) == NULL)
-        return FALSE;
+        return -1;
 
+    /* compile pattern if given (converting globs to regexp) */
+    re = NULL;
     if (pattern != NULL) {
-        prefix = MRP_PATTERN_GLOB;
-        size   = sizeof(MRP_PATTERN_GLOB) - 1;
+        if (strstr(pattern, MRP_PATTERN_GLOB) == pattern) {
+            pattern += sizeof(MRP_PATTERN_GLOB) - 1;
 
-        if (!strncmp(pattern, prefix, size)) {
-            pattern = translate_glob(pattern + size, glob, sizeof(glob));
+            if (mrp_regexp_glob(pattern, glob, sizeof(glob)) < 0)
+                goto fail;
 
-            if (pattern == NULL) {
-                closedir(dp);
-                return FALSE;
-            }
+            pattern = glob;
         }
         else {
-            prefix = MRP_PATTERN_REGEX;
-            size   = sizeof(MRP_PATTERN_REGEX) - 1;
-
-            if (!strncmp(pattern, prefix, size))
-                pattern += size;
+            if (strstr(pattern, MRP_PATTERN_REGEX) == pattern)
+                pattern += sizeof(MRP_PATTERN_REGEX) - 1;
         }
 
-        if (regcomp(&regexp, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
-            closedir(dp);
-            return FALSE;
-        }
+        flags = MRP_REGEXP_EXTENDED | MRP_REGEXP_NOSUB;
+        re    = mrp_regexp_compile(pattern, flags);
+
+        if (re == NULL)
+            goto fail;
     }
 
-    stop = FALSE;
-    while ((de = readdir(dp)) != NULL && !stop) {
-        if (pattern != NULL && regexec(&regexp, de->d_name, 0, NULL, 0) != 0)
+    /* follow symlinks if no other preferences are given. */
+    if (!(mask & (MRP_DIRENT_ACTION_LNK)))
+        mask |= MRP_DIRENT_LNK;
+    else if (mask & MRP_DIRENT_ACTUAL_LNK)
+        mask |= MRP_DIRENT_LNK;
+    else if (mask & MRP_DIRENT_IGNORE_LNK)
+        mask &= ~MRP_DIRENT_LNK;
+
+    /* lstat instead of stat if we ignore or pass on symlinks */
+    if (mask & (MRP_DIRENT_ACTUAL_LNK | MRP_DIRENT_IGNORE_LNK))
+        statfn = lstat;
+    else
+        statfn = stat;
+
+    while ((de = readdir(dp)) != NULL) {
+        if (pattern != NULL && !mrp_regexp_matches(re, de->d_name, 0))
             continue;
 
         snprintf(file, sizeof(file), "%s/%s", path, de->d_name);
 
-        if (((mask & MRP_DIRENT_LNK ? lstat : stat))(file, &st) != 0)
+        if (statfn(file, &st) != 0)
             continue;
 
         type = dirent_type(st.st_mode);
+
         if (!(type & mask))
             continue;
 
-        stop = !cb(de->d_name, type, user_data);
+        status = cb(path, de->d_name, type, user_data);
+
+        if (status == 0)
+            break;
+
+        if (status < 0)
+            goto fail;
     }
 
-
     closedir(dp);
-    if (pattern != NULL)
-        regfree(&regexp);
+    mrp_regexp_free(re);
 
-    return TRUE;
+    return 0;
+
+ fail:
+    closedir(dp);
+    mrp_regexp_free(re);
+
+    return -1;
 }
 
 
@@ -183,7 +192,7 @@ int mrp_find_file(const char *file, const char **dirs, int mode, char *buf,
 }
 
 
-int mrp_mkdir(const char *path, mode_t mode)
+int mrp_mkdir(const char *path, mode_t mode, const char *label)
 {
     const char *p;
     char       *q, buf[PATH_MAX];
@@ -194,6 +203,9 @@ int mrp_mkdir(const char *path, mode_t mode)
         errno = path ? EINVAL : EFAULT;
         return -1;
     }
+
+    mrp_debug("checking/creating '%s' (label: %s)...", path,
+              label ? label : "");
 
     /*
      * Notes:
@@ -233,15 +245,19 @@ int mrp_mkdir(const char *path, mode_t mode)
 
         *q = '\0';
 
-        mrp_debug("checking/creating '%s'...", buf);
-
         if (q != buf) {
+            mrp_debug("checking/creating '%s'...", buf);
+
             if (stat(buf, &st) < 0) {
                 if (errno != ENOENT)
                     goto cleanup;
 
                 if (mkdir(buf, mode) < 0)
                     goto cleanup;
+
+                if (label != NULL)
+                    if (mrp_set_label(buf, label, 0) < 0)
+                        goto cleanup;
 
                 undo[n++] = q - buf;
             }
@@ -367,7 +383,7 @@ char *mrp_normalize_path(char *buf, size_t size, const char *path)
     }
 
     /*
-     * finally for other than '/' align trailing slashes
+     * finally for other than '/' strip trailing slashes
      */
 
     if (p > path + 1 && p[-1] != '/')
@@ -377,4 +393,69 @@ char *mrp_normalize_path(char *buf, size_t size, const char *path)
     *q = '\0';
 
     return buf;
+}
+
+
+
+int mrp_set_label(const char *path, const char *label, mrp_label_mode_t mode)
+{
+#ifdef SMACK_ENABLED
+    char old[PATH_MAX];
+    int  len;
+
+    if ((len = lgetxattr(path, XATTR_NAME_SMACK, old, sizeof(old) - 1)) < 0) {
+        if (errno != ENOATTR && errno != ENOTSUP)
+            return -1;
+    }
+    else {
+        old[len] = '\0';
+        if (!strcmp(label, old))
+            return 0;
+    }
+
+    if (label == NULL)
+        len = 0;
+    else
+        len = strlen(label);
+
+    if (lsetxattr(path, XATTR_NAME_SMACK, label, len, mode) < 0) {
+        if (errno == ENOTSUP)
+            return 0;
+        else
+            return -1;
+    }
+
+    return 0;
+#else
+    MRP_UNUSED(path);
+    MRP_UNUSED(label);
+    MRP_UNUSED(mode);
+
+    return 0;
+#endif
+}
+
+
+int mrp_get_label(const char *path, char *buf, size_t size)
+{
+#ifdef SMACK_ENABLED
+    int len;
+
+    if ((len = lgetxattr(path, XATTR_NAME_SMACK, buf, size - 1)) < 0) {
+        if (errno != ENOATTR && errno != ENOTSUP)
+            return -1;
+
+        len = 0;
+    }
+
+    buf[len] = '\0';
+
+    return len;
+#else
+    MRP_UNUSED(path);
+    MRP_UNUSED(size);
+
+    *buf = '\0';
+    return 0;
+#endif
 }
