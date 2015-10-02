@@ -146,12 +146,16 @@ static inline void mrp_list_delete(mrp_list_hook_t *item)
 static inline void mrp_list_move(mrp_list_hook_t *new_hook,
                                  mrp_list_hook_t *old_hook)
 {
-    *new_hook = *old_hook;
+    if (!mrp_list_empty(old_hook)) {
+        *new_hook = *old_hook;
 
-    new_hook->next->prev = new_hook;
-    new_hook->prev->next = new_hook;
+        new_hook->next->prev = new_hook;
+        new_hook->prev->next = new_hook;
 
-    mrp_list_init(old_hook);
+        mrp_list_init(old_hook);
+    }
+    else
+        mrp_list_init(new_hook);
 }
 
 
