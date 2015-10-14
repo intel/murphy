@@ -101,10 +101,59 @@ static hash_limits_t limits = { 0, 0 };
 
 static int calculate_sizes(mrp_hashtbl_t *t)
 {
+#ifndef __INLINED_MASKS__
+
     t->nperchunk = (CHUNKSIZE - sizeof(hash_chunk_t)) / sizeof(hash_entry_t);
 
-    MRP_ASSERT(MRP_OFFSET(hash_chunk_t, entries[t->nperchunk]) <= CHUNKSIZE,
+#else
+
+    int           usable, mask;
+    hash_chunk_t *c;
+    char         *e;
+
+    /*
+     * When inline masks are enabled we keep the chunk allocation bitmask
+     * including the bitmask bits in the chunk itself after the last hash
+     * entry. We need then to calculate nperchunk (the number of entries
+     * that fit into a chunk) so that there is enough room spared at the
+     * end for a bitmask of nperchunk bits. We do this with a brute-force
+     * opportunistic algorithm:
+     *   1) calculate nperchunk disregarding the bitmask bits
+     *   2) see if the last entry in the mask fits in CHUNKSIZE
+     *   3) if not, reduce the usable size by the bitmask necessary for
+     *      the unadjusted nperchunk entries and recalculate nperchunk.
+     *   4) Make a final verification that now we fit into CHUNKSIZE.
+     */
+
+    t->nperchunk = (CHUNKSIZE - sizeof(hash_chunk_t)) / sizeof(hash_entry_t);
+    mask = mrp_mask_inlined_size(t->nperchunk);
+
+    c = (hash_chunk_t *)0x0;
+    e = (char *)&c->entries[t->nperchunk] + mask;
+
+    if (e >= ((char *)c) + CHUNKSIZE) {
+        mrp_debug("adjusting nperchunk (%d, %d bytes) to fit into %d bytes",
+                  t->nperchunk, (int)(ptrdiff_t)e, CHUNKSIZE);
+
+        usable = CHUNKSIZE - sizeof(hash_chunk_t) - mask;
+        t->nperchunk = usable / sizeof(hash_entry_t);
+
+        mask = mrp_mask_inlined_size(t->nperchunk);
+
+        c = (hash_chunk_t *)0x0;
+        e = (char *)&c->entries[t->nperchunk] + mask;
+
+        mrp_debug("adjusted nperchunk to %d, %d bytes", t->nperchunk,
+                  (int)(ptrdiff_t)e);
+
+        MRP_ASSERT(e < ((char *)c) + CHUNKSIZE,
+                   "hash_chunk inlined allocation bitmask overflow");
+    }
+#endif
+
+    MRP_ASSERT(MRP_OFFSET(hash_chunk_t, entries[t->nperchunk]) < CHUNKSIZE,
                "hash_chunk_t overflow, nperchunk too large ?");
+
     if (!t->nbucket) {
         if (t->nlimit)
             t->nbucket = t->nlimit / 16;
@@ -126,9 +175,9 @@ static int calculate_sizes(mrp_hashtbl_t *t)
 
 static inline mrp_mask_t *chunk_mask(hash_chunk_t *c, int nentry)
 {
-#ifdef __INLINED_MASKS__
     mrp_mask_t *m;
 
+#ifdef __INLINED_MASKS__
     m = (void *)&c->entries[nentry];
 #else
     MRP_UNUSED(nentry);
