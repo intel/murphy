@@ -671,7 +671,7 @@ static int appclass_create(lua_State *L)
             break;
 
         case PRIORITY:
-            priority = luaL_checkint(L, -1);
+            priority = luaL_checkinteger(L, -1);
             break;
 
         case MODAL:
