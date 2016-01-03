@@ -2357,6 +2357,8 @@ char *mrp_event_dump_mask(mrp_event_mask_t *mask, char *buf, size_t size)
     char *p, *t;
     int   l, n, id;
 
+    *buf = '\0';
+
     p = buf;
     l = (int)size;
     t = "";
