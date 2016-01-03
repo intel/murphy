@@ -828,7 +828,7 @@ static inline mrp_mask_t *mrp_mask_copy(mrp_mask_t *dst, mrp_mask_t *src)
     d = mrp_mask_words(dst, NULL);
 
     for (i = 0; i < n; i++)
-        s[i] = d[i];
+        d[i] = s[i];
 
     return dst;
 }
