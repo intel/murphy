@@ -64,6 +64,7 @@
 #define RSET_REQUEST                "request"
 #define RSET_RELEASE                "release"
 #define RSET_DELETE                 "delete"
+#define RSET_RELEASING              "releasing"
 
 #define RESOURCE_SET_PROPERTY       "setProperty"
 #define RESOURCE_GET_PROPERTIES     "getProperties"
@@ -753,6 +754,11 @@ static void event_cb(uint32_t request_id, mrp_resource_set_t *set, void *data)
     mrp_log_info("Event for %s: grant 0x%08x, advice 0x%08x",
         rset->path, grant, advice);
 
+    if (mrp_get_resource_set_state(rset->set) == mrp_resource_pending_release) {
+        update_property(rset->status_prop, "releasing");
+        return;
+    }
+
     if (!rset->set || !rset->committed) {
 
         struct deferred_rset_data_s *r_data =
@@ -988,6 +994,8 @@ static void destroy_rset(resource_set_o_t *rset)
     mrp_log_info("destroy rset %s", rset->path);
 
     mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_DELETE,
+            rset_cb, ctx);
+    mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_RELEASING,
             rset_cb, ctx);
     mrp_dbus_remove_method(ctx->dbus, rset->path, RSET_IFACE, RSET_RELEASE,
             rset_cb, ctx);
@@ -1903,6 +1911,20 @@ static int rset_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         mrp_dbus_send_msg(dbus, reply);
         mrp_dbus_msg_unref(reply);
     }
+    else if (strcmp(member, RSET_RELEASING) == 0) {
+
+        mrp_log_info("Releasing cb rset %s", path);
+
+        mrp_resource_set_did_release(rset->set,0);
+
+        reply = mrp_dbus_msg_method_return(dbus, msg);
+
+        if (!reply)
+            goto error;
+
+        mrp_dbus_send_msg(dbus, reply);
+        mrp_dbus_msg_unref(reply);
+    }
     else if (strcmp(member, RSET_SET_PROPERTY) == 0) {
         char *name = NULL;
         char *value = NULL;
@@ -2106,6 +2128,11 @@ static int mgr_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *msg, void *data)
         }
         if (!mrp_dbus_export_method(ctx->dbus, rset->path,
                     RSET_IFACE, RSET_DELETE, rset_cb, ctx)) {
+            destroy_rset(rset);
+            goto error_reply;
+        }
+        if (!mrp_dbus_export_method(ctx->dbus, rset->path,
+                    RSET_IFACE, RSET_RELEASING, rset_cb, ctx)) {
             destroy_rset(rset);
             goto error_reply;
         }
