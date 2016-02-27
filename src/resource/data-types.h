@@ -85,6 +85,7 @@ enum mrp_resource_state_e {
     mrp_resource_no_request = 0,
     mrp_resource_release,
     mrp_resource_acquire,
+    mrp_resource_pending_release,
 };
 
 

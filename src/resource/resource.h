@@ -39,6 +39,7 @@ struct mrp_resource_def_s {
     uint32_t            id;
     const char         *name;
     bool                shareable;
+    bool                sync_release;
     struct {
         mrp_list_hook_t list;
         mrp_resource_mgr_ftbl_t *ftbl;

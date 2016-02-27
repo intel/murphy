@@ -61,6 +61,10 @@ struct mrp_resource_set_s {
             mrp_resource_mask_t mandatory;
             mrp_resource_mask_t grant;
             mrp_resource_mask_t advice;
+            struct {
+                mrp_resource_mask_t acquire;
+                mrp_resource_mask_t release;
+            } pending;
         } mask;
         mrp_list_hook_t list;
         bool share;

@@ -197,6 +197,20 @@ mrp_resource_mask_t mrp_get_resource_set_advice(mrp_resource_set_t *rset)
     return rset->resource.mask.advice;
 }
 
+mrp_resource_mask_t mrp_get_resource_set_pending_release(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->resource.mask.pending.release;
+}
+
+mrp_resource_mask_t mrp_get_resource_set_pending_acquire(mrp_resource_set_t *rset)
+{
+    MRP_ASSERT(rset, "invalid argument");
+
+    return rset->resource.mask.pending.acquire;
+}
+
 mrp_resource_client_t *mrp_get_resource_set_client(mrp_resource_set_t *rset)
 {
     MRP_ASSERT(rset, "invalid argument");
@@ -367,6 +381,8 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
         }
         else {
             rset->state = mrp_resource_release;
+            rset->resource.mask.pending.release = 0;
+            rset->resource.mask.pending.acquire = 0;
             rset->request.id = reqid;
             rset->request.stamp = get_request_stamp();
 
@@ -378,6 +394,32 @@ void mrp_resource_set_release(mrp_resource_set_t *rset, uint32_t reqid)
             mrp_resource_owner_update_zone(rset->zone, rset, reqid);
             mqi_commit_transaction(trh);
         }
+    }
+}
+
+void mrp_resource_set_did_release(mrp_resource_set_t *rset, uint32_t reqid)
+{
+    mqi_handle_t trh;
+
+    MRP_ASSERT(rset, "invalid argument");
+
+    mrp_debug("releasing resource set #%d", rset->id);
+
+    if (!rset->class.ptr)
+        rset->state = mrp_resource_release;
+    else {
+        rset->state = mrp_resource_pending_release;
+        rset->resource.mask.pending.release = 0;
+        rset->request.id = reqid;
+        rset->request.stamp = get_request_stamp();
+
+        mrp_application_class_move_resource_set(rset);
+
+        mrp_resource_set_notify(rset, MRP_RESOURCE_EVENT_RELEASE);
+
+        trh = mqi_begin_transaction();
+        mrp_resource_owner_update_zone(rset->zone, rset, reqid);
+        mqi_commit_transaction(trh);
     }
 }
 

@@ -69,6 +69,8 @@ static mrp_resource_owner_t  resource_owners[MRP_ZONE_MAX * MRP_RESOURCE_MAX];
 static mqi_handle_t          owner_tables[MRP_RESOURCE_MAX];
 
 static mrp_resource_owner_t *get_owner(uint32_t, uint32_t);
+static void restore_owner(mrp_resource_owner_t *owner,
+                          mrp_resource_owner_t *oldowner);
 static void reset_owners(uint32_t, mrp_resource_owner_t *);
 static bool grant_ownership(mrp_resource_owner_t *, mrp_zone_t *,
                             mrp_application_class_t *, mrp_resource_set_t *,
@@ -184,7 +186,11 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     mrp_resource_mask_t mask;
     mrp_resource_mask_t mandatory;
     mrp_resource_mask_t grant;
+    mrp_resource_mask_t old_grant;
     mrp_resource_mask_t advice;
+    mrp_resource_mask_t pending_acquire = 0;
+    mrp_resource_mask_t pending_release = 0;
+    mrp_resource_state_t new_state;
     void *clc, *rsc, *rc;
     uint32_t rid;
     uint32_t rcnt;
@@ -195,6 +201,8 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
     uint32_t replyid;
     uint32_t nevent, maxev;
     event_t *events, *ev, *lastev;
+    bool resource_granted_by_manager;
+    bool owned_by_other;
 
     MRP_ASSERT(zoneid < MRP_ZONE_MAX, "invalid argument");
 
@@ -223,33 +231,77 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             force_release = false;
             mandatory = rset->resource.mask.mandatory;
             grant = 0;
+            old_grant = rset->resource.mask.grant;
             advice = 0;
+            pending_acquire = 0;
+            pending_release = 0;
             rc = NULL;
+
+            if (mrp_resource_pending_release == rset->state &&
+                !rset->resource.mask.pending.release) {
+                /* Release the resource that was pending to be released. */
+
+                if (!rset->resource.mask.grant && rset->auto_release.current) {
+                    rset->state = mrp_resource_release;
+                    rset->auto_release.current = rset->auto_release.client;
+                }
+                else {
+                    rset->state = mrp_resource_acquire;
+                }
+            }
 
             switch (rset->state) {
 
             case mrp_resource_acquire:
                 while ((res = mrp_resource_set_iterate_resources(rset, &rc))) {
+                    resource_granted_by_manager = false;
+
                     rdef  = res->def;
                     rid   = rdef->id;
                     owner = get_owner(zoneid, rid);
 
+                    mask = (mrp_resource_mask_t)1 << rid;
+
                     backup[rid] = *owner;
 
-                    if (grant_ownership(owner, zone, class, rset, res))
+                    /*
+                     * Check if the resource is owned by another client.
+                     * If not - grant it as ordinary,
+                     * otherwise - mark it as pending.
+                     */
+                    old = oldowners + rid;
+                    owned_by_other = old->rset && old->rset != rset &&
+                        (old->rset->state == mrp_resource_acquire ||
+                         (old->rset->state == mrp_resource_pending_release &&
+                          old->rset->resource.mask.pending.release));
+
+                    resource_granted_by_manager =
+                        grant_ownership(owner, zone, class, rset, res);
+                    if (resource_granted_by_manager)
                         grant |= ((mrp_resource_mask_t)1 << rid);
-                    else {
-                        if (owner->rset != rset)
-                            force_release |= owner->modal;
+                    else if (owner->rset != rset) {
+                        force_release |= owner->modal;
+                    }
+
+
+                    if (rdef->sync_release &&
+                        (old_grant & mask) && !(grant & mask)) {
+                        pending_release |= mask;
+                    }
+
+                    if (rdef->sync_release && (grant & mask) && owned_by_other) {
+                        pending_acquire |= mask;
                     }
                 }
                 owners = get_owner(zoneid, 0);
+
+
                 if ((grant & mandatory) == mandatory &&
-                    mrp_resource_lua_veto(zone, rset, owners, grant, reqset))
-                {
+                    mrp_resource_lua_veto(zone, rset, owners, grant, reqset)) {
                     advice = grant;
                 }
                 else {
+
                     /* rollback, ie. restore the backed up state */
                     rc = NULL;
                     while ((res=mrp_resource_set_iterate_resources(rset,&rc))){
@@ -260,8 +312,9 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                         *owner = backup[rid];
 
                         if ((grant & mask)) {
-                            if ((ftbl = rdef->manager.ftbl) && ftbl->free)
+                            if ((ftbl = rdef->manager.ftbl) && ftbl->free) {
                                 ftbl->free(zone, res, rdef->manager.userdata);
+                            }
                         }
 
                         if (advice_ownership(owner, zone, class, rset, res))
@@ -275,7 +328,8 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
 
                     mrp_resource_lua_set_owners(zone, owners);
                 }
-                break;
+                break; /* mrp_resource_acquire */
+
 
             case mrp_resource_release:
                 while ((res = mrp_resource_set_iterate_resources(rset, &rc))) {
@@ -290,6 +344,13 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
                     advice = 0;
                 break;
 
+            case mrp_resource_pending_release:
+                /* Preserve resource state while it is being freed. */
+                grant = rset->resource.mask.grant;
+                pending_release = rset->resource.mask.pending.release;
+                pending_acquire = rset->resource.mask.pending.acquire;
+                break;
+
             default:
                 break;
             }
@@ -299,47 +360,66 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             notify  = 0;
             replyid = (reqset == rset && reqid == rset->request.id) ? reqid:0;
 
+            new_state = rset->state;
 
             if (force_release) {
                 move = (rset->state != mrp_resource_release);
                 notify = move ? MRP_RESOURCE_EVENT_RELEASE : 0;
                 changed = move || rset->resource.mask.grant;
-                rset->state = mrp_resource_release;
                 rset->resource.mask.grant = 0;
+                new_state = mrp_resource_release;
+            }
+            else if (!pending_release && grant &&
+                     pending_acquire && mrp_resource_acquire == rset->state) {
+                /*
+                 * Resource is pending for acquisition. It will be actually
+                 * granted when the current owner frees it. No event is
+                 * emitted at this point.
+                 */
+                rset->resource.mask.grant = 0;
+                replyid = 0;
             }
             else {
                 if (grant == rset->resource.mask.grant) {
-                    if (rset->state == mrp_resource_acquire &&
-                        !grant && rset->dont_wait.current)
-                    {
-                        rset->state = mrp_resource_release;
-                        rset->dont_wait.current = rset->dont_wait.client;
+                    if (rset->state == mrp_resource_acquire && !grant) {
+                        if (pending_acquire != rset->resource.mask.pending.acquire && !pending_acquire) {
+                            changed = true;
+                        }
+                        else if (rset->dont_wait.current) {
+                            new_state = mrp_resource_pending_release;
+                            rset->dont_wait.current = rset->dont_wait.client;
 
-                        notify = MRP_RESOURCE_EVENT_RELEASE;
-                        move = true;
+                            notify = MRP_RESOURCE_EVENT_RELEASE;
+                        }
                     }
                 }
                 else {
                     rset->resource.mask.grant = grant;
                     changed = true;
 
-                    if (rset->state != mrp_resource_release &&
-                        !grant && rset->auto_release.current)
-                    {
-                        rset->state = mrp_resource_release;
-                        rset->auto_release.current = rset->auto_release.client;
-
+                    if (rset->state == mrp_resource_acquire && pending_release) {
                         notify = MRP_RESOURCE_EVENT_RELEASE;
-                        move = true;
+                        new_state = mrp_resource_pending_release;
                     }
                 }
+
+                if (!grant && new_state == mrp_resource_acquire &&
+                    rset->auto_release.current) {
+                    new_state = mrp_resource_release;
+                    rset->auto_release.current = rset->auto_release.client;
+                }
             }
+            rset->state = new_state;
+
+            rset->resource.mask.pending.acquire = pending_acquire;
+            rset->resource.mask.pending.release = pending_release;
 
             if (notify) {
                 mrp_resource_set_notify(rset, notify);
             }
 
-            if (advice != rset->resource.mask.advice) {
+            if (advice != rset->resource.mask.advice &&
+                !pending_release && !pending_acquire) {
                 rset->resource.mask.advice = advice;
                 changed = true;
             }
@@ -353,6 +433,15 @@ void mrp_resource_owner_update_zone(uint32_t zoneid,
             }
         } /* while rset */
     } /* while class */
+
+    for (rid = 0; rid < rcnt; rid++) {
+        owner = get_owner(zoneid, rid);
+
+        if (owner->rset && owner->rset->resource.mask.pending.acquire) {
+            old = oldowners + rid;
+            restore_owner(owner, old);
+        }
+    }
 
     manager_end_transaction(zone);
 
@@ -474,6 +563,12 @@ static mrp_resource_owner_t *get_owner(uint32_t zone, uint32_t resid)
                "invalid argument");
 
     return resource_owners + (zone * MRP_RESOURCE_MAX + resid);
+}
+
+static void restore_owner(mrp_resource_owner_t *owner,
+                          mrp_resource_owner_t *oldowner)
+{
+    memcpy(owner, oldowner, sizeof(mrp_resource_owner_t));
 }
 
 static void reset_owners(uint32_t zone, mrp_resource_owner_t *oldowners)

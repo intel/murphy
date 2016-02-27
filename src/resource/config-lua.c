@@ -79,6 +79,7 @@ enum field_e {
     PRIORITY,
     SHAREABLE,
     MANDATORY,
+    SYNC_RELEASE,
     MODAL,
     SHARE,
     GRANT,
@@ -1031,6 +1032,7 @@ static int resclass_create_from_lua(lua_State *L)
     const char *name = NULL;
     mrp_attr_def_t *attrs = NULL;
     bool shareable = false;
+    bool sync_release = false;
     mrp_resource_mgr_ftbl_t *ftbl = NULL;
     void *mgrdata = NULL;
     attr_def_t *adef;
@@ -1051,6 +1053,13 @@ static int resclass_create_from_lua(lua_State *L)
             shareable = lua_toboolean(L, -1);
             break;
 
+        case SYNC_RELEASE:
+            luaL_argcheck(L, lua_isboolean(L,-1), 2, "attempt to assign "
+                          "non-boolean value to 'sync_release' field");
+            sync_release = lua_toboolean(L, -1);
+            break;
+
+
         case ATTRIBUTES:
             attrs = check_attrdefs(L, -1, &nattr);
             break;
@@ -1064,7 +1073,7 @@ static int resclass_create_from_lua(lua_State *L)
     if (!name)
         luaL_error(L, "missing or wrong name field");
 
-    id = mrp_resource_definition_create(name, shareable, attrs,ftbl,mgrdata);
+    id = mrp_resource_definition_create_with_sync_release(name, shareable, sync_release, attrs,ftbl,mgrdata);
 
     MRP_ASSERT(id < MRP_RESOURCE_MAX, "resource id is out of range");
 
@@ -1107,10 +1116,11 @@ static int resclass_getfield(lua_State *L)
         lua_pushnil(L);
     else {
         switch (fld) {
-        case NAME:       lua_pushstring(L, rd->name);         break;
-        case ID:         lua_pushinteger(L, rd->id + 1);      break;
-        case SHAREABLE:  lua_pushboolean(L, rd->shareable);   break;
-        default:         lua_pushnil(L);                      break;
+        case NAME:          lua_pushstring(L, rd->name);            break;
+        case ID:            lua_pushinteger(L, rd->id + 1);         break;
+        case SHAREABLE:     lua_pushboolean(L, rd->shareable);      break;
+        case SYNC_RELEASE:  lua_pushboolean(L, rd->sync_release);   break;
+        default:            lua_pushnil(L);                         break;
         }
     }
 
@@ -1715,6 +1725,11 @@ static field_t field_name_to_type(const char *name, size_t len)
     case 10:
         if (!strcmp(name, "attributes"))
             return ATTRIBUTES;
+        break;
+
+    case 12:
+        if (!strcmp(name, "sync_release"))
+            return SYNC_RELEASE;
         break;
 
     default:

@@ -77,7 +77,7 @@ static mrp_resource_def_t *resource_def_table[RESOURCE_MAX];
 static MRP_LIST_HOOK(manager_list);
 static mqi_handle_t        resource_user_table[RESOURCE_MAX];
 
-static uint32_t add_resource_definition(const char *, bool, uint32_t,
+static uint32_t add_resource_definition(const char *, bool, bool, uint32_t,
                                         mrp_resource_mgr_ftbl_t *, void *);
 
 #if 0
@@ -103,6 +103,17 @@ uint32_t mrp_resource_definition_create(const char *name, bool shareable,
                                         mrp_resource_mgr_ftbl_t *manager,
                                         void *mgrdata)
 {
+    return mrp_resource_definition_create_with_sync_release(name, shareable,
+                                        false, attrdefs,
+                                        manager, mgrdata);
+}
+
+uint32_t mrp_resource_definition_create_with_sync_release(const char *name, bool shareable,
+                                        bool sync_release,
+                                        mrp_attr_def_t *attrdefs,
+                                        mrp_resource_mgr_ftbl_t *manager,
+                                        void *mgrdata)
+{
     uint32_t nattr;
     uint32_t id;
     mrp_resource_def_t *def;
@@ -117,7 +128,8 @@ uint32_t mrp_resource_definition_create(const char *name, bool shareable,
     for (nattr = 0;  attrdefs && attrdefs[nattr].name;  nattr++)
         ;
 
-    id = add_resource_definition(name, shareable, nattr, manager, mgrdata);
+    id = add_resource_definition(name, shareable, sync_release, nattr, manager,
+                                 mgrdata);
 
     if (id != MRP_RESOURCE_ID_INVALID) {
         def = mrp_resource_definition_find_by_id(id);
@@ -237,6 +249,18 @@ mrp_attr_t *mrp_resource_definition_read_all_attributes(uint32_t resid,
     }
 
     return retval;
+}
+
+bool mrp_resource_definition_get_sync_release(uint32_t resid)
+{
+    bool result = false;
+
+    mrp_resource_def_t *rdef   = mrp_resource_definition_find_by_id(resid);
+    if (rdef) {
+        result = rdef->sync_release;
+    }
+
+    return result;
 }
 
 
@@ -539,6 +563,7 @@ int mrp_resource_attribute_print(mrp_resource_t *res, char *buf, int len)
 
 static uint32_t add_resource_definition(const char *name,
                                         bool        shareable,
+                                        bool        sync_release,
                                         uint32_t    nattr,
                                         mrp_resource_mgr_ftbl_t *mgrftbl,
                                         void       *mgrdata)
@@ -564,10 +589,11 @@ static uint32_t add_resource_definition(const char *name,
 
     id = resource_def_count++;
 
-    def->id        = id;
-    def->name      = dup_name;
-    def->shareable = shareable;
-    def->nattr     = nattr;
+    def->id           = id;
+    def->name         = dup_name;
+    def->shareable    = shareable;
+    def->sync_release = sync_release;
+    def->nattr        = nattr;
 
     if (mgrftbl) {
         def->manager.ftbl = mrp_alloc(sizeof(mrp_resource_mgr_ftbl_t));

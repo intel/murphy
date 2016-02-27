@@ -51,6 +51,7 @@ mrp_attr_t *
 mrp_resource_definition_read_all_attributes(uint32_t resource_id,
                                             uint32_t buflen,
                                             mrp_attr_t *buf);
+bool mrp_resource_definition_get_sync_release(uint32_t resource_id);
 
 const char **mrp_application_class_get_all_names(uint32_t buflen,
                                                  const char **buf);
@@ -78,6 +79,12 @@ mrp_get_resource_set_grant(mrp_resource_set_t *resource_set);
 
 mrp_resource_mask_t
 mrp_get_resource_set_advice(mrp_resource_set_t *resource_set);
+
+mrp_resource_mask_t
+mrp_get_resource_set_pending_release(mrp_resource_set_t *resource_set);
+
+mrp_resource_mask_t
+mrp_get_resource_set_pending_acquire(mrp_resource_set_t *resource_set);
 
 mrp_resource_client_t *
 mrp_get_resource_set_client(mrp_resource_set_t *resource_set);
@@ -110,6 +117,9 @@ void mrp_resource_set_acquire(mrp_resource_set_t *resource_set,
 
 void mrp_resource_set_release(mrp_resource_set_t *resource_set,
                               uint32_t request_id);
+
+void mrp_resource_set_did_release(mrp_resource_set_t *resource_set,
+                                  uint32_t request_id);
 
 mrp_resource_t *
 mrp_resource_set_iterate_resources(mrp_resource_set_t *resource_set,void **it);

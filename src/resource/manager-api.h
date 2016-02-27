@@ -51,6 +51,12 @@ uint32_t mrp_resource_definition_create(const char *name,
                                         mrp_attr_def_t *attrdefs,
                                         mrp_resource_mgr_ftbl_t *manager,
                                         void *manager_data);
+uint32_t mrp_resource_definition_create_with_sync_release(const char *name,
+                                                          bool shareable,
+                                                          bool sync_release,
+                                                          mrp_attr_def_t *attrdefs,
+                                                          mrp_resource_mgr_ftbl_t *manager,
+                                                          void *manager_data);
 void mrp_lua_resclass_create_from_c(uint32_t id);
 
 

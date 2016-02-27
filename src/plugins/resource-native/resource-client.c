@@ -52,7 +52,7 @@
 
 #define GRANT           0
 #define ADVICE          1
-
+#define PENDING         2
 
 typedef struct {
     uint32_t        dim;
@@ -77,6 +77,7 @@ typedef struct {
 
 typedef struct {
     const char        *name;
+    bool              sync_release;
     attribute_array_t *attrs;
 } resource_def_t;
 
@@ -84,6 +85,8 @@ typedef struct {
     uint32_t          dim;
     resource_def_t    defs[0];
 } resource_def_array_t;
+
+typedef void (*mrp_res_cb)();
 
 typedef struct {
     const char           *name;
@@ -104,6 +107,7 @@ typedef struct {
     string_array_t       *class_names;
     string_array_t       *zone_names;
     uint32_t              rset_id;
+    mrp_res_cb            res_release_cb;
 } client_t;
 
 typedef struct {
@@ -121,6 +125,7 @@ static uint64_t           totaltime;
 static uint32_t           reqcount;
 
 static void print_prompt(client_t *, bool);
+static uint32_t acquire_resource_set(client_t *client, bool acquire);
 
 
 static uint64_t reqstamp_current_time(void)
@@ -467,6 +472,8 @@ static int resource_def_array_print(resource_def_array_t *arr,
             def = arr->defs + i;
 
             p += snprintf(p, e-p, "%s%s", rsep, def->name);
+            p += snprintf(p, e-p, "%sresource_sync_release:%s", rsep,
+                          def->sync_release ? "true" : "false");
 
             if (p < e)
                 p += attribute_array_print(def->attrs,ahdr,asep,atrail,p,e-p);
@@ -592,6 +599,7 @@ static bool fetch_resource_set_mask(mrp_msg_t *msg, void **pcursor,
     switch (mask_type) {
     case GRANT:    expected_tag = RESPROTO_RESOURCE_GRANT;     break;
     case ADVICE:   expected_tag = RESPROTO_RESOURCE_ADVICE;    break;
+    case PENDING:  expected_tag = RESPROTO_RESOURCE_PENDING;   break;
     default:       /* don't know what to fetch */              return false;
     }
 
@@ -622,6 +630,25 @@ static bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
     }
 
     *pname = value.str;
+    return true;
+}
+
+static bool fetch_sync_release(mrp_msg_t *msg, void **pcursor,
+                               bool *sync)
+{
+    uint16_t tag;
+    uint16_t type;
+    mrp_msg_value_t value;
+    size_t size;
+
+    if (!mrp_msg_iterate(msg, pcursor, &tag, &type, &value, &size) ||
+        tag != RESPROTO_RESOURCE_SYNC_RELEASE || type != MRP_MSG_FIELD_BOOL)
+    {
+        *sync = false;
+        return false;
+    }
+
+    *sync = value.bln;
     return true;
 }
 
@@ -730,6 +757,8 @@ static void resource_query_response(client_t *client, uint32_t seqno,
         dim = 0;
 
         while (fetch_resource_name(msg, pcursor, &rdef[dim].name)) {
+            if (!fetch_sync_release(msg, pcursor, &rdef[dim].sync_release))
+                goto failed;
             if (!fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX+1, attrs))
                 goto failed;
 
@@ -903,7 +932,7 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
                            void **pcursor)
 {
     uint32_t rset;
-    uint32_t grant, advice;
+    uint32_t grant, advice, pending;
     mrp_resproto_state_t state;
     const char *str_state;
     uint16_t tag;
@@ -923,7 +952,8 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
     if (!fetch_resource_set_id(msg, pcursor, &rset) ||
         !fetch_resource_set_state(msg, pcursor, &state) ||
         !fetch_resource_set_mask(msg, pcursor, GRANT, &grant) ||
-        !fetch_resource_set_mask(msg, pcursor, ADVICE, &advice))
+        !fetch_resource_set_mask(msg, pcursor, ADVICE, &advice) ||
+        !fetch_resource_set_mask(msg, pcursor, PENDING, &pending))
         goto malformed;
 
     switch (state) {
@@ -936,6 +966,7 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
     printf("   state            : %s\n"  , str_state);
     printf("   grant mask       : 0x%x\n", grant);
     printf("   advice mask      : 0x%x\n", advice);
+    printf("   pending mask     : 0x%x\n", pending);
     printf("   resources        :");
 
     cnt = 0;
@@ -956,6 +987,7 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
         printf("         grant      : %s\n", (grant & mask)  ? "yes" : "no");
         printf("         advice     : %savailable\n",
                (advice & mask)  ? "" : "not ");
+        printf("         pending    : %s\n", (pending & mask) ? "yes" : "no");
 
         if (!fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX + 1, attrs))
             goto malformed;
@@ -970,6 +1002,13 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
         printf("%s", buf);
 
         attribute_array_free(list);
+
+        if (pending & mask )
+        {
+            client->res_release_cb();
+            printf("   releasing resource set %u. request no %u\n",
+                client->rset_id, acquire_resource_set(client, false));
+        }
     }
 
     if (!cnt)
@@ -1370,6 +1409,13 @@ static char *parse_resource(mrp_msg_t *msg, char *str, char *sep)
 #undef PUSH
 }
 
+static void resource_release()
+{
+    printf("\n===========================\n"
+           "prepare to resource release\n"
+           "===========================\n\n");
+}
+
 static void create_resource_set(client_t   *client,
                                 const char *class,
                                 const char *zone,
@@ -1413,6 +1459,7 @@ static void create_resource_set(client_t   *client,
 
         mrp_free(buf);
     }
+    client->res_release_cb = resource_release;
 
 #undef PUSH
 }
