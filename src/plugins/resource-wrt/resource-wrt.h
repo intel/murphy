@@ -38,6 +38,7 @@
 #define RESWRT_DESTROY_SET     "destroy"
 #define RESWRT_ACQUIRE_SET     "acquire"
 #define RESWRT_RELEASE_SET     "release"
+#define RESWRT_DID_RELEASE_SET "did_release"
 
 #define RESWRT_EVENT           "event"
 #define RESWRT_STATE_GRANTED   "acquire"

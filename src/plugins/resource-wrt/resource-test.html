@@ -150,6 +150,20 @@ function managerConnected () {
         rset.onsuccess      = resourceSetCreated;
         rset.onerror        = resourceSetFailed;
         rset.onstatechanged = resourceSetEvent;
+        rset.onrelease      = function (grant) {
+            var names = this.getResourceNames();
+            for (var i in names) {
+                if (this.isPending(names[i])) {
+                    console.log("Resource '" + names[i] + "' must be released.");
+                }
+            }
+
+            window.alert("Resource must be released!!");
+
+            if (this.isPending('audio_playback')) {
+                stopAudio();
+            }
+        };
     }
     catch (e) {
         console.log("Query failed: " +

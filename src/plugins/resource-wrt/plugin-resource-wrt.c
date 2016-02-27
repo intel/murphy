@@ -220,6 +220,7 @@ static void query_resources(wrt_client_t *c, mrp_json_t *req)
     mrp_attr_t  *attrs, *a;
     mrp_attr_t   buf[ATTRIBUTE_MAX];
     uint32_t     id;
+    bool         sync_release;
 
     if (!mrp_json_get_integer(req, "seq", &seq)) {
         ignore_invalid_request(c, req, "missing 'seq' field");
@@ -251,6 +252,10 @@ static void query_resources(wrt_client_t *c, mrp_json_t *req)
             goto fail;
 
         if (!mrp_json_add_string (r, "name", resources[id]))
+            goto fail;
+
+        sync_release = mrp_resource_definition_get_sync_release(id);
+        if (!mrp_json_add_boolean(r, "sync_release", sync_release))
             goto fail;
 
         attrs = mrp_resource_definition_read_all_attributes(id,
@@ -605,7 +610,7 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
     mrp_json_t     *msg, *rarr, *r;
     int             rsid;
     const char     *state;
-    int             grant, advice, all, mask;
+    int             grant, pending_release, pending_acquire, advice, all, mask;
     errbuf_t        e;
     mrp_resource_t *res;
     void           *it;
@@ -619,14 +624,21 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
         return;
     }
 
-    if (mrp_get_resource_set_state(rset) == mrp_resource_acquire)
+    pending_release = (int)mrp_get_resource_set_pending_release(rset);
+    pending_acquire = (int)mrp_get_resource_set_pending_acquire(rset);
+
+    if (pending_acquire && !pending_release) {
+        mrp_debug("not emitting event for resource set that is pending acquisition");
+        return;
+    }
+    else if (mrp_get_resource_set_state(rset) == mrp_resource_acquire)
         state = RESWRT_STATE_GRANTED;
     else
         state = RESWRT_STATE_RELEASE;
 
-    rsid   = (int)mrp_get_resource_set_id(rset);
-    grant  = (int)mrp_get_resource_set_grant(rset);
-    advice = (int)mrp_get_resource_set_advice(rset);
+    rsid    = (int)mrp_get_resource_set_id(rset);
+    grant   = (int)mrp_get_resource_set_grant(rset);
+    advice  = (int)mrp_get_resource_set_advice(rset);
 
     msg = alloc_reply(type, seq);
 
@@ -635,10 +647,11 @@ static void emit_resource_set_event(wrt_client_t *c, uint32_t reqid,
 
     rarr = r = NULL;
 
-    if (mrp_json_add_integer(msg, "id"    , rsid ) &&
-        mrp_json_add_string (msg, "state" , state) &&
-        mrp_json_add_integer(msg, "grant" , grant) &&
-        mrp_json_add_integer(msg, "advice", advice)) {
+    if (mrp_json_add_integer(msg, "id"      , rsid   ) &&
+        mrp_json_add_string (msg, "state"   , state  ) &&
+        mrp_json_add_integer(msg, "grant"   , grant  ) &&
+        mrp_json_add_integer(msg, "pending" , pending_release) &&
+        mrp_json_add_integer(msg, "advice"  , advice)) {
 
         all = grant | advice;
         it  = NULL;
@@ -969,6 +982,42 @@ static void release_set(wrt_client_t *c, mrp_json_t *req)
 }
 
 
+static void did_release_set(wrt_client_t *c, mrp_json_t *req)
+{
+    const char         *type = RESWRT_DID_RELEASE_SET;
+    int                 seq;
+    mrp_json_t         *reply;
+    mrp_resource_set_t *rset;
+    uint32_t            rsid;
+
+    if (!mrp_json_get_integer(req, "seq", &seq)) {
+        ignore_invalid_request(c, req, "missing 'seq' field");
+        return;
+    }
+
+    /* get resource set id */
+    if (!mrp_json_get_integer(req, "id", &rsid)) {
+        error_reply(c, type, seq, EINVAL, "missing id");
+        return;
+    }
+
+    rset = mrp_resource_client_find_set(c->rsc, rsid);
+
+    if (rset != NULL) {
+        reply = alloc_reply(type, seq);
+
+        if (reply != NULL) {
+            if (mrp_json_add_integer(reply, "status", 0))
+                send_message(c, reply);
+        }
+
+        mrp_resource_set_did_release(rset, (uint32_t)seq);
+    }
+    else
+        error_reply(c, type, seq, ENOENT, "resource set %d not found", rsid);
+}
+
+
 static wrt_client_t *create_client(wrt_data_t *data, mrp_transport_t *lt)
 {
     wrt_client_t *c;
@@ -1098,6 +1147,8 @@ static void recv_evt(mrp_transport_t *t, void *data, void *user_data)
             acquire_set(c, req);
         else if (!strcmp(type, RESWRT_RELEASE_SET))
             release_set(c, req);
+        else if (!strcmp(type, RESWRT_DID_RELEASE_SET))
+            did_release_set(c, req);
         else
             ignore_unknown_request(c, req, type);
     }

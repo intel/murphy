@@ -196,6 +196,25 @@ WrtResourceManager.prototype.sckmessage = function (message) {
 }
 
 
+/** Map resource definitions to names. */
+WrtResourceManager.prototype.map_resources_by_name = function (resources) {
+    if (this.resource_by_name) {
+        return;
+    }
+
+    this.resource_by_name = {};
+
+    for (var i in resources) {
+        var resource = resources[i];
+        var name = resource.name;
+        this.resource_by_name[name] = {
+            sync_release: resource.sync_release,
+            attributes: resource.attributes,
+        };
+    }
+}
+
+
 /** Resource set constructor. */
 function WrtResourceSet (mgr, reqno) {
     this.manager = mgr;
@@ -213,12 +232,20 @@ WrtResourceSet.prototype.notify = function (msg) {
         if (!this.resources)
             this.resources = msg.resources;
 
-        this.state  = msg.state;
-        this.grant  = msg.grant;
-        this.advice = msg.advice;
+        this.state   = msg.state;
+        this.grant   = msg.grant;
+        this.pending = msg.pending;
+        this.advice  = msg.advice;
 
-        if (this.onstatechanged)
-            this.onstatechanged(this.grant);
+        if (this.pending) {
+            if (this.onrelease) {
+                this.onrelease(this.grant);
+            }
+            this.didRelease();
+        }
+        else if (this.onstatechanged) {
+            this.onstatechanged(this.pending);
+        }
     }
     else if (type == 'create') {
         var status = msg.status;
@@ -243,6 +270,12 @@ WrtResourceSet.prototype.notify = function (msg) {
 }
 
 
+/** The resource set was freed by client. */
+WrtResourceSet.prototype.didRelease = function () {
+    this.manager.send_request({ type: 'did_release', id: this.id });
+}
+
+
 /** Map resources to names. */
 WrtResourceSet.prototype.ensure_resource_map = function () {
     var r;
@@ -262,6 +295,24 @@ WrtResourceSet.prototype.ensure_resource_map = function () {
             attributes: r.attributes
         }
     }
+}
+
+
+/** Check if the resource set release callback is present if it is needed. */
+WrtResourceSet.prototype.isReleaseCallbackOK = function () {
+    var result = true;
+
+    if (!this.onrelease) {
+        for (var i in this.resources) {
+            var name = this.resources[i].name;
+            if (this.manager.resource_by_name[name].sync_release) {
+                result = false;
+                break;
+            }
+        }
+    }
+
+    return result;
 }
 
 
@@ -302,6 +353,11 @@ WrtPendingRequest.prototype.notify = function (msg) {
     if (status == 0) {
         if (this.onsuccess && (m = evtmap[msg.type])) {
             event = m.map ? m.map(msg[m.field]) : msg[m.field];
+
+            if ('resources' == m.field) {
+                this.manager.map_resources_by_name(msg.resources);
+            }
+
             this.onsuccess(event);
         }
     }
@@ -450,7 +506,12 @@ WrtResourceManager.prototype.socketUri = function (http_uri) {
 
 /** Acquire the resource set. */
 WrtResourceSet.prototype.acquire = function () {
-    this.manager.send_request({ type: 'acquire', id: this.id });
+    if (this.isReleaseCallbackOK()) {
+        this.manager.send_request({ type: 'acquire', id: this.id });
+    }
+    else {
+        throw new WrtResourceError("Release callback is not set when it should be.");
+    }
 }
 
 
@@ -554,6 +615,19 @@ WrtResourceSet.prototype.isGranted = function (name) {
     r = this.resource_by_name[name];
 
     if (this.grant & r.mask)
+        return true;
+    else
+        return false;
+}
+
+
+/** Check if the named resource is pending for release/acqusition. */
+WrtResourceSet.prototype.isPending = function (name) {
+    this.ensure_resource_map();
+
+    r = this.resource_by_name[name];
+
+    if (this.pending & r.mask)
         return true;
     else
         return false;
