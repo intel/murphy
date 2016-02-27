@@ -126,7 +126,7 @@ static uint32_t           reqcount;
 
 static void print_prompt(client_t *, bool);
 static uint32_t acquire_resource_set(client_t *client, bool acquire);
-
+static uint32_t did_release_resource_set(client_t *client);
 
 static uint64_t reqstamp_current_time(void)
 {
@@ -785,6 +785,7 @@ static void resource_query_response(client_t *client, uint32_t seqno,
 
             dst->name  = mrp_strdup(src->name);
             dst->attrs = src->attrs;
+            dst->sync_release = src->sync_release;
         }
 
         resource_def_array_print(client->resources,
@@ -1007,7 +1008,7 @@ static void resource_event(client_t *client, uint32_t seqno, mrp_msg_t *msg,
         {
             client->res_release_cb();
             printf("   releasing resource set %u. request no %u\n",
-                client->rset_id, acquire_resource_set(client, false));
+                   client->rset_id, did_release_resource_set(client));
         }
     }
 
@@ -1480,6 +1481,36 @@ static uint32_t acquire_resource_set(client_t *client, bool acquire)
         tag = RESPROTO_ACQUIRE_RESOURCE_SET;
     else
         tag = RESPROTO_RELEASE_RESOURCE_SET;
+
+    req = create_request((reqno = client->seqno++), tag);
+
+    if (!PUSH(req, RESOURCE_SET_ID, UINT32, client->rset_id))
+        mrp_msg_unref(req);
+    else {
+        if (client->msgdump)
+            mrp_msg_dump(req, stdout);
+
+        send_message(client, req);
+    }
+
+    return reqno;
+
+#undef PUSH
+}
+
+static uint32_t did_release_resource_set(client_t *client)
+{
+#define PUSH(msg, tag, typ, val) \
+    mrp_msg_append(msg, MRP_MSG_TAG_##typ(RESPROTO_##tag, val))
+
+    uint16_t   tag;
+    uint32_t   reqno;
+    mrp_msg_t *req;
+
+    if (!client || client->rset_id == INVALID_ID)
+        return 0;
+
+    tag = RESPROTO_DID_RELEASE_RESOURCE_SET;
 
     req = create_request((reqno = client->seqno++), tag);
 
