@@ -62,6 +62,7 @@ typedef struct {
 
 typedef struct {
     const char *name;
+    bool sync_release;
     int num_attrs;
     mrp_res_attribute_t *attrs;
 } resource_def_t;
@@ -75,6 +76,7 @@ struct mrp_res_resource_private_s {
     mrp_res_resource_t *pub; /* composition */
     mrp_res_resource_set_t *set; /* owning set */
 
+    bool sync_release;
     bool mandatory;
     bool shared;
     int num_attributes;
@@ -93,7 +95,9 @@ struct mrp_res_resource_set_private_s {
     bool autorelease;
 
     mrp_res_resource_callback_t cb;
+    mrp_res_resource_release_callback_t release_cb;
     void *user_data;
+    void *release_cb_user_data;
 
     uint32_t num_resources;
     mrp_res_resource_t **resources;

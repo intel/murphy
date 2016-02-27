@@ -89,7 +89,7 @@ static void resource_event(mrp_msg_t *msg,
         void **pcursor)
 {
     uint32_t rset_id;
-    uint32_t grant, advice;
+    uint32_t grant, advice, pending;
     mrp_resproto_state_t state;
     uint16_t tag;
     uint16_t type;
@@ -102,13 +102,15 @@ static void resource_event(mrp_msg_t *msg,
     uint32_t mask, all = 0x0, mandatory = 0x0;
     uint32_t i;
     mrp_res_resource_set_t *rset;
+    bool should_release_resource;
 
     mrp_res_info("Resource event (request no %u):", seqno);
 
     if (!fetch_resource_set_id(msg, pcursor, &rset_id) ||
         !fetch_resource_set_state(msg, pcursor, &state) ||
         !fetch_resource_set_mask(msg, pcursor, 0, &grant) ||
-        !fetch_resource_set_mask(msg, pcursor, 1, &advice)) {
+        !fetch_resource_set_mask(msg, pcursor, 1, &advice) ||
+        !fetch_resource_set_mask(msg, pcursor, 2, &pending)) {
         mrp_res_error("failed to fetch data from message");
         goto ignore;
     }
@@ -197,6 +199,9 @@ static void resource_event(mrp_msg_t *msg,
         if (grant & mask) {
             res->state = MRP_RES_RESOURCE_ACQUIRED;
         }
+        else if (pending & mask) {
+            res->state = MRP_RES_RESOURCE_ABOUT_TO_LOOSE;
+        }
         else {
             res->state = MRP_RES_RESOURCE_LOST;
         }
@@ -205,7 +210,12 @@ static void resource_event(mrp_msg_t *msg,
     mrp_res_info("advice = 0x%08x, grant = 0x%08x, mandatory = 0x%08x, all = 0x%08x",
             advice, grant, mandatory, all);
 
-    if (grant) {
+    should_release_resource = false;
+    if (pending) {
+        rset->state = MRP_RES_RESOURCE_ABOUT_TO_LOOSE;
+        should_release_resource = true;
+    }
+    else if (grant) {
         rset->state = MRP_RES_RESOURCE_ACQUIRED;
     }
     else if (advice == mandatory) {
@@ -224,10 +234,19 @@ static void resource_event(mrp_msg_t *msg,
     print_resource_set(rset);
 #endif
     if (!rset->priv->seqno) {
-        if (rset->priv->cb) {
-            increase_ref(cx, rset);
+        increase_ref(cx, rset);
+        if (should_release_resource) {
+            if (rset->priv->release_cb) {
+                rset->priv->release_cb(cx, rset, rset->priv->release_cb_user_data);
+            }
+        }
+        else if (rset->priv->cb) {
             rset->priv->cb(cx, rset, rset->priv->user_data);
-            decrease_ref(cx, rset);
+        }
+        decrease_ref(cx, rset);
+
+        if (should_release_resource) {
+            did_release_resource_set_request(cx, rset);
         }
     }
 
@@ -358,6 +377,21 @@ static void recvfrom_msg(mrp_transport_t *transp, mrp_msg_t *msg,
             }
 
             /* TODO: make new releases fail until seqno == 0 */
+            rset->priv->seqno = 0;
+
+            break;
+        }
+        case RESPROTO_DID_RELEASE_RESOURCE_SET:
+        {
+            mrp_res_resource_set_t *rset;
+            mrp_res_info("received DID_RELEASE_RESOURCE_SET response");
+
+            rset = acquire_resource_set_response(msg, cx, &cursor);
+
+            if (!rset) {
+                goto error;
+            }
+
             rset->priv->seqno = 0;
 
             break;

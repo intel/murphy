@@ -263,6 +263,9 @@ static char *state_to_str(mrp_res_resource_state_t st)
         case MRP_RES_RESOURCE_PENDING:
             state = "pending";
             break;
+        case MRP_RES_RESOURCE_ABOUT_TO_LOOSE:
+            state = "about to loose";
+            break;
     }
     return state;
 }

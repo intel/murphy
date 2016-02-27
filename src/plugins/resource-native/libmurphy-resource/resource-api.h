@@ -60,6 +60,7 @@ typedef enum {
     MRP_RES_RESOURCE_PENDING,
     MRP_RES_RESOURCE_ACQUIRED,
     MRP_RES_RESOURCE_AVAILABLE,
+    MRP_RES_RESOURCE_ABOUT_TO_LOOSE,
 } mrp_res_resource_state_t;
 
 typedef enum {
@@ -265,6 +266,35 @@ bool mrp_res_equal_resource_set(const mrp_res_resource_set_t *a,
  * @return murphy error code.
  */
 int mrp_res_acquire_resource_set(const mrp_res_resource_set_t *rs);
+
+/**
+ * Prototype for a callback that will be called
+ * when the client is asked to free the resources.
+ * Upon returning from this callback, the client must
+ * stop using the resource and clean up the infrastructure
+ * related to it, e.g. close opened devices.
+ *
+ * @param cx murphy connection context.
+ * @param set resource set with the resources you must free.
+ * @param userdata data you gave when setting the release callback.
+ */
+typedef void (*mrp_res_resource_release_callback_t) (mrp_res_context_t *cx,
+                                          const mrp_res_resource_set_t *rs,
+                                                                  void *userdata);
+
+/**
+ * Set the resource release callback.
+ * This callback will be called to ask client to free the resources.
+ *
+ * @param rs resource set to update.
+ * @param release_cb resource release callback.
+ * @param userdata data you want to access in resource release callback.
+ *
+ * @return true if the release callback was set successfully, false - otherwise.
+ */
+bool mrp_res_set_release_callback(const mrp_res_resource_set_t *rs,
+                           mrp_res_resource_release_callback_t  release_cb,
+                                                          void *userdata);
 
 /**
  * Release a resource set. Releasing a set of resources

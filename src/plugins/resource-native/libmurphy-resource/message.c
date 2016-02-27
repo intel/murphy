@@ -66,6 +66,7 @@ bool fetch_resource_set_mask(mrp_msg_t *msg, void **pcursor,
     switch (mask_type) {
     case 0:    expected_tag = RESPROTO_RESOURCE_GRANT;     break;
     case 1:   expected_tag = RESPROTO_RESOURCE_ADVICE;    break;
+    case 2:   expected_tag = RESPROTO_RESOURCE_PENDING;    break;
     default:       /* don't know what to fetch */              return false;
     }
 
@@ -261,6 +262,25 @@ bool fetch_resource_name(mrp_msg_t *msg, void **pcursor,
     return true;
 }
 
+bool fetch_resource_sync_release(mrp_msg_t *msg, void **pcursor,
+                                    bool *psync_release)
+{
+    uint16_t tag;
+    uint16_t type;
+    mrp_msg_value_t value;
+    size_t size;
+
+    if (!mrp_msg_iterate(msg, pcursor, &tag, &type, &value, &size) ||
+        tag != RESPROTO_RESOURCE_SYNC_RELEASE || type != MRP_MSG_FIELD_BOOL)
+    {
+        *psync_release = false;
+        return false;
+    }
+
+    *psync_release = value.bln;
+    return true;
+}
+
 
 static int priv_res_to_mrp_res(uint32_t id, resource_def_t *src, mrp_res_resource_t *dst,
         mrp_res_resource_set_t *set)
@@ -272,6 +292,7 @@ static int priv_res_to_mrp_res(uint32_t id, resource_def_t *src, mrp_res_resourc
 
     dst->priv->server_id = id;
 
+    dst->priv->sync_release = src->sync_release;
     dst->priv->num_attributes = src->num_attrs;
     dst->priv->attrs = src->attrs;
     dst->priv->set = set;
@@ -302,6 +323,10 @@ mrp_res_resource_set_t *resource_query_response(mrp_res_context_t *cx,
 
         while (fetch_resource_name(msg, pcursor, &rdef[dim].name)) {
             int n_attrs = 0;
+
+            if (!fetch_resource_sync_release(msg, pcursor, &rdef[dim].sync_release)) {
+                goto failed;
+            }
 
             if (!fetch_attribute_array(msg, pcursor, ATTRIBUTE_MAX+1,
                     attrs, &n_attrs))
@@ -494,6 +519,38 @@ int release_resource_set_request(mrp_res_context_t *cx,
             RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno,
             RESPROTO_REQUEST_TYPE, MRP_MSG_FIELD_UINT16,
                     RESPROTO_RELEASE_RESOURCE_SET,
+            RESPROTO_RESOURCE_SET_ID, MRP_MSG_FIELD_UINT32, rset->priv->id,
+            RESPROTO_MESSAGE_END);
+
+    if (!msg)
+        return -1;
+
+    rset->priv->seqno = cx->priv->next_seqno;
+    cx->priv->next_seqno++;
+
+    if (!mrp_transport_send(cx->priv->transp, msg))
+        goto error;
+
+    mrp_msg_unref(msg);
+    return 0;
+
+error:
+    mrp_msg_unref(msg);
+    return -1;
+}
+
+int did_release_resource_set_request(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rset)
+{
+    mrp_msg_t *msg = NULL;
+
+    if (!cx->priv->connected)
+        return -1;
+
+    msg = mrp_msg_create(
+            RESPROTO_SEQUENCE_NO, MRP_MSG_FIELD_UINT32, cx->priv->next_seqno,
+            RESPROTO_REQUEST_TYPE, MRP_MSG_FIELD_UINT16,
+                    RESPROTO_DID_RELEASE_RESOURCE_SET,
             RESPROTO_RESOURCE_SET_ID, MRP_MSG_FIELD_UINT32, rset->priv->id,
             RESPROTO_MESSAGE_END);
 

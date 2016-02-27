@@ -89,4 +89,8 @@ int get_application_classes_request(mrp_res_context_t *cx);
 
 int get_available_resources_request(mrp_res_context_t *cx);
 
+int did_release_resource_set_request(mrp_res_context_t *cx,
+        mrp_res_resource_set_t *rset);
+
+
 #endif

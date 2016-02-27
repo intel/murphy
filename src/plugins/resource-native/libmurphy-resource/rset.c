@@ -50,6 +50,9 @@ static char *state_to_str(mrp_res_resource_state_t st)
         case MRP_RES_RESOURCE_PENDING:
             state = "pending";
             break;
+        case MRP_RES_RESOURCE_ABOUT_TO_LOOSE:
+            state = "about to loose";
+            break;
     }
     return state;
 }
@@ -443,6 +446,8 @@ static int update_library_resource_set(mrp_res_context_t *cx,
     rset->priv->resources = resources;
     rset->priv->num_resources = num_resources;
     rset->priv->autorelease = original->priv->autorelease;
+    rset->priv->release_cb = original->priv->release_cb;
+    rset->priv->release_cb_user_data = original->priv->release_cb_user_data;
 
     return 0;
 
@@ -516,6 +521,7 @@ mrp_res_resource_t *mrp_res_create_resource(
         goto error;
 
     res->priv->server_id = server_id;
+    res->priv->sync_release = proto->priv->sync_release;
     res->priv->mandatory = mandatory;
     res->priv->shared = shared;
     res->priv->pub = res;
@@ -787,16 +793,47 @@ bool mrp_res_set_autorelease(bool status,
     return TRUE;
 }
 
-
-int mrp_res_acquire_resource_set(
-                const mrp_res_resource_set_t *original)
+bool mrp_res_set_release_callback(const mrp_res_resource_set_t *rs,
+                           mrp_res_resource_release_callback_t  release_cb,
+                                                          void *userdata)
 {
-    mrp_res_resource_set_t *rset;
+    bool result = false;
+    mrp_res_resource_t *resource;
+    uint32_t i;
+
+    if (rs && rs->state == MRP_RES_RESOURCE_PENDING) {
+        for (i = 0; i < rs->priv->num_resources; i++) {
+            resource = rs->priv->resources[i];
+            if (resource->priv->sync_release) {
+                result = true;
+                rs->priv->release_cb = release_cb;
+                rs->priv->release_cb_user_data = userdata;
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+static mrp_res_resource_set_t *acquire_resource_set(const mrp_res_resource_set_t *original)
+{
+    mrp_res_resource_set_t *rset = NULL;
+
     mrp_res_context_t *cx = original->priv->cx;
 
     if (!cx->priv->connected) {
         mrp_res_error("not connected to server");
         goto error;
+    }
+
+    if (!original->priv->release_cb) {
+        for (uint32_t i = 0; i < original->priv->num_resources; i++) {
+            if (original->priv->resources[i]->priv->sync_release) {
+                mrp_res_error("release callback is not set");
+                goto error;
+            }
+        }
     }
 
     rset = mrp_htbl_lookup(cx->priv->internal_rset_mapping,
@@ -826,7 +863,7 @@ int mrp_res_acquire_resource_set(
         }
         else {
             /* re-acquire a lost or released set */
-            return acquire_resource_set_request(cx, rset);
+            acquire_resource_set_request(cx, rset);
         }
     }
     else {
@@ -860,11 +897,23 @@ int mrp_res_acquire_resource_set(
         }
     }
 
-    return 0;
+    return rset;
 
 error:
     mrp_log_error("error acquiring a resource set");
-    return -1;
+    return NULL;
+}
+
+int mrp_res_acquire_resource_set(
+                const mrp_res_resource_set_t *original)
+{
+    int result = -1;
+
+    if (acquire_resource_set(original)) {
+        result = 0;
+    }
+
+    return result;
 }
 
 
