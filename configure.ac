@@ -319,7 +319,7 @@ AC_SUBST(GLIB_LIBS)
 # Check if qt mainloop support was enabled.
 AC_ARG_ENABLE(qt,
               [  --enable-qt             enable qt mainloop support],
-              [enable_qt=$enableval], [enable_qt=auto])
+              [enable_qt=$enableval], [enable_qt=no])
 
 if test "$enable_qt" != "no"; then
     PKG_CHECK_MODULES(QTCORE, QtCore,
