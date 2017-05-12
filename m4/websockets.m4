@@ -9,7 +9,7 @@ AC_DEFUN([CHECK_WEBSOCKETS],
 AC_LANG_PUSH([C])
 AC_ARG_ENABLE(websockets,
               [  --enable-websockets     enable websockets support],
-              [enable_websockets=$enableval], [enable_websockets=auto])
+              [enable_websockets=$enableval], [enable_websockets=no])
 
 # Check if we have properly packaged libwebsockets (json-c is now mandatory
 # and already has been tested for).
