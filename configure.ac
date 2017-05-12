@@ -624,7 +624,7 @@ AC_ARG_WITH([documentation],
             [AS_HELP_STRING([--with-documentation],
                             [generate pdf, html and other doc files])],
             [],
-            [with_documentation=auto]
+            [with_documentation=no]
 )
 
 AS_IF( [ test x$with_documentation = xno ],
