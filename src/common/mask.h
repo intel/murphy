@@ -128,12 +128,12 @@ MRP_CDECL_BEGIN
 /**
  * @brief Get mask for the given @bit.
  */
-#define MRP_MASK_BIT(bit) (1ULL << (bit))
+#define MRP_MASK_BIT(bit) (_ONEBIT << (bit))
 
 /**
  * @brief Set all bits to 1 below @bit.
  */
-#define MRP_MASK_BELOW(bit) ((1ULL << (bit)) - 1)
+#define MRP_MASK_BELOW(bit) ((_ONEBIT << (bit)) - 1)
 
 /**
  * @brief Set all bits to 1 above @bit.
@@ -143,7 +143,7 @@ MRP_CDECL_BEGIN
 /**
  * @brief Set all bits to 1 below and including @bit.
  */
-#define MRP_MASK_UPTO(bit) ((1ULL << ((bit) + 1)) - 1)
+#define MRP_MASK_UPTO(bit) ((_ONEBIT << ((bit) + 1)) - 1)
 
 /**
  * @brief Internal helper macros to deal with @_mask_t of different sizes.
