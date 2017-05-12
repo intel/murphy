@@ -42,6 +42,11 @@
  */
 #define __INLINED_MASKS__
 
+/* Note:
+ * Technically CHUNKSIZE could be a per-table setting. It is always used
+ * in a context where the table is also known.
+ */
+
 #define MIN_BUCKETS   16                 /* use at least this many buckets */
 #define MAX_BUCKETS  512                 /* use at most this many buckets */
 #define CHUNKSIZE   4096                 /* allocation chunk size */
@@ -107,9 +112,7 @@ static int calculate_sizes(mrp_hashtbl_t *t)
 
 #else
 
-    int           usable, mask;
-    hash_chunk_t *c;
-    char         *e;
+    int nent, chnk, mask, room;
 
     /*
      * When inline masks are enabled we keep the chunk allocation bitmask
@@ -125,31 +128,43 @@ static int calculate_sizes(mrp_hashtbl_t *t)
      *   4) Make a final verification that now we fit into CHUNKSIZE.
      */
 
-    t->nperchunk = (CHUNKSIZE - sizeof(hash_chunk_t)) / sizeof(hash_entry_t);
-    mask = mrp_mask_inlined_size(t->nperchunk);
+    nent = (CHUNKSIZE - sizeof(hash_chunk_t)) / sizeof(hash_entry_t);
+    mask = mrp_mask_inlined_size(nent);
+    chnk = (int)MRP_OFFSET(hash_chunk_t, entries[nent]) + mask;
 
-    c = (hash_chunk_t *)0x0;
-    e = (char *)&c->entries[t->nperchunk] + mask;
-
-    if (e >= ((char *)c) + CHUNKSIZE) {
+    if (chnk > CHUNKSIZE) {
         mrp_debug("adjusting nperchunk (%d, %d bytes) to fit into %d bytes",
-                  t->nperchunk, (int)(ptrdiff_t)e, CHUNKSIZE);
+                  nent, chnk, CHUNKSIZE);
 
-        usable = CHUNKSIZE - sizeof(hash_chunk_t) - mask;
-        t->nperchunk = usable / sizeof(hash_entry_t);
+        room = CHUNKSIZE - (sizeof(hash_chunk_t) + mask);
+        nent = room / sizeof(hash_entry_t);
+        mask = mrp_mask_inlined_size(nent);
+        chnk = (int)MRP_OFFSET(hash_chunk_t, entries[nent]) + mask;
 
-        mask = mrp_mask_inlined_size(t->nperchunk);
+        mrp_debug("adjusted nperchunk to %d, %d bytes", nent, chnk);
 
-        c = (hash_chunk_t *)0x0;
-        e = (char *)&c->entries[t->nperchunk] + mask;
+#    if 1
+        /*
+         * see if we can squeeze in more entries... never seen it happen
+         */
+        for (;;) {
+            if (mrp_mask_inlined_size(nent + 1) > (unsigned)mask)
+                break;
 
-        mrp_debug("adjusted nperchunk to %d, %d bytes", t->nperchunk,
-                  (int)(ptrdiff_t)e);
+            chnk = (int)MRP_OFFSET(hash_chunk_t, entries[nent + 1]) + mask;
 
-        MRP_ASSERT(e < ((char *)c) + CHUNKSIZE,
-                   "hash_chunk inlined allocation bitmask overflow");
+            if (chnk > CHUNKSIZE)
+                break;
+
+            nent++;
+
+            mrp_debug("readjusted nperchunk to %d, %d bytes", nent, chnk);
+        }
+#    endif
     }
 #endif
+
+    t->nperchunk = nent;
 
     MRP_ASSERT(MRP_OFFSET(hash_chunk_t, entries[t->nperchunk]) < CHUNKSIZE,
                "hash_chunk_t overflow, nperchunk too large ?");
@@ -168,6 +183,10 @@ static int calculate_sizes(mrp_hashtbl_t *t)
         t->nbucket = MAX_BUCKETS;
 
     mrp_debug("%u entries per chunk, %u buckets", t->nperchunk, t->nbucket);
+#ifdef __INLINED_MASKS__
+    chnk = (int)MRP_OFFSET(hash_chunk_t, entries[t->nperchunk]) + mask;
+    mrp_debug("%u bytes wasted per chunk", CHUNKSIZE - chnk);
+#endif
 
     return 0;
 }
@@ -243,6 +262,8 @@ static int allocate_chunks(mrp_hashtbl_t *t, uint32_t nentry)
 
         if (mrp_memalignz((void **)&c, CHUNKSIZE, size) < 0)
             return -1;
+
+        mrp_debug("allocated new chunk of %u bytes", size);
 
         mrp_list_init(&c->hook);
 
@@ -332,6 +353,10 @@ mrp_hashtbl_t *mrp_hashtbl_create(mrp_hashtbl_config_t *config)
 
     if (allocate_chunks(t, t->nalloc) < 0)
         goto fail;
+
+    mrp_debug("hash-table %p created with", t);
+    mrp_debug("    max entries:   %u", t->nlimit);
+    mrp_debug("    entries/chunk: %u", t->nperchunk);
 
     return t;
 
