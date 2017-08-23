@@ -252,6 +252,7 @@ static int append_argument(tkn_args_t *args, tkn_expr_t *expr)
         break;
     case EXPR_CONTEXT_SET:
         set_context_set_arg(&args->args[0], expr->set.name, &expr->set.value);
+        break;
 
     default:
         return FALSE;

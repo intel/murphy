@@ -194,6 +194,7 @@ int execute_call(function_call_t *c, mrp_context_tbl_t *tbl)
                 status = -errno;
                 goto pop_frame;
             }
+            break;
         default:
             status = -EINVAL;
             goto pop_frame;
