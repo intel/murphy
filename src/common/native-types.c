@@ -776,6 +776,7 @@ static int encode_array(mrp_tlv_t *tlv, void *arrp, mrp_native_array_t *m,
         switch (t->id) {
         case MRP_TYPE_STRING:
             v = *(void **)elem;
+            MRP_FALLTHROUGH;
         case MRP_TYPE_INT8:
         case MRP_TYPE_UINT8:
         case MRP_TYPE_INT16:
@@ -1426,6 +1427,7 @@ static int print_array(char **bufp, size_t *sizep, int level,
         switch (et->id) {
         case MRP_TYPE_STRING:
             v = *(void **)elem;
+            MRP_FALLTHROUGH;
         case MRP_TYPE_INT8:
         case MRP_TYPE_UINT8:
         case MRP_TYPE_INT16:

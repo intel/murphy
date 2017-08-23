@@ -670,8 +670,7 @@ static size_t mrp_msg_encode(void **bufp, void *data,
 
             case MRP_MSG_FIELD_BLOB:
                 errno = EOPNOTSUPP;
-                /* intentional fall through */
-
+                MRP_FALLTHROUGH;
             default:
                 if (f->type & MRP_MSG_FIELD_ARRAY) {
                     errno = EOPNOTSUPP;
@@ -786,6 +785,7 @@ static void *mrp_msg_decode(void **bufp, size_t *sizep, size_t data_size,
 
         case MRP_MSG_FIELD_BLOB:
             errno = EOPNOTSUPP;
+            MRP_FALLTHROUGH;
         default:
             if (f->type & MRP_MSG_FIELD_ARRAY) {
                 errno = EOPNOTSUPP;
