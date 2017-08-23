@@ -2067,6 +2067,7 @@ void mrp_lua_object_free_array(void **itemsp, size_t *nitemp, int type)
         saptr = *itemsp;
         for (i = 0; i < nitem; i++)
             mrp_free(saptr[i]);
+        MRP_FALLTHROUGH;
     case MRP_LUA_BOOLEAN_ARRAY:
     case MRP_LUA_INTEGER_ARRAY:
     case MRP_LUA_DOUBLE_ARRAY:

@@ -438,6 +438,7 @@ int mrp_lua_set_debug(mrp_lua_debug_t level)
 
     case MRP_LUA_DEBUG_DETAILED:
         mask |= LUA_MASKLINE;
+        MRP_FALLTHROUGH;
     case MRP_LUA_DEBUG_ENABLED:
         mask |= LUA_MASKCALL | LUA_MASKRET;
         ena   = TRUE;

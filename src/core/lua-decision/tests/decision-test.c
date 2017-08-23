@@ -331,6 +331,7 @@ static int volume_setfield(lua_State *L)
         break;
     case UPDATE:
         vol->update = mrp_funcbridge_create_luafunc(L, 3);
+        break;
     default:
         lua_rawset(L, 1);
         break;
