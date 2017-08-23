@@ -1647,6 +1647,7 @@ static void parse_arguments(client_t *client, int argc, char **argv)
         switch (opt) {
         case 'h':
             usage(client, 0);
+            break;
         case 'v':
             client->msgdump = true;
             break;
