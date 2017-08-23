@@ -97,6 +97,15 @@
 
 /** Mark a variable unused. */
 #    define MRP_UNUSED(var) (void)var
+
+     /** Mark a fallthrough intentional. */
+#    if __GNUC__ >= 7
+#        define MRP_FALLTHROUGH __attribute__((fallthrough))
+#        define MRP_FALLTHRU    MRP_FALLTHROUGH
+#    else
+#        define MRP_FALLTHROUGH
+#        define MRP_FALLTHRU
+#    endif
 #else /* ! __GNUC__ */
 #    define MRP_LIKELY(cond)   (cond)
 #    define MRP_UNLIKELY(cond) (cond)
@@ -110,6 +119,8 @@
 #    define MRP_EXIT
 #    define MRP_EXIT_AT
 #    define MRP_UNUSED(var)
+#    define MRP_FALLTHROUGH
+#    define MRP_FALLTHRU
 #endif
 
 /** Macro that can be used to pass the location of its usage. */
