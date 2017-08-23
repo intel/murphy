@@ -95,7 +95,7 @@
 #    define MRP_EXIT __attribute__ ((destructor(65535)))
 #    define MRP_EXIT_AT(prio) __attribute__ ((destructor(prio)))
 
-/** Mark a variable unused. */
+     /** Mark a variable unused. */
 #    define MRP_UNUSED(var) (void)var
 
      /** Mark a fallthrough intentional. */
