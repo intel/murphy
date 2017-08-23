@@ -119,6 +119,7 @@ static int parse_address(const char *str, int *familyp, char *nodep,
 
         nl = service - node;
         service++;
+        break;
 
     case AF_INET6:
         service = strrchr(node, ':');
