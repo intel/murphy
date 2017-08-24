@@ -537,6 +537,9 @@ void server_init(context_t *c)
             exit(1);
         }
     }
+
+    /* XXX needed for websocket transport */
+    mrp_transport_setopt(c->lt, "send-mode", "binary");
 }
 
 
@@ -773,6 +776,8 @@ void client_init(context_t *c)
         }
     }
 
+    /* XXX needed for websocket transport */
+    mrp_transport_setopt(c->t, "send-mode", "binary");
 
     c->timer = mrp_add_timer(c->ml, 1000, send_cb, c);
 
