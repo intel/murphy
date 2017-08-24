@@ -412,7 +412,33 @@ if test "$have_json_tokener_get_error" = "yes"; then
 fi
 
 # Check if websocket support was/can be enabled.
-CHECK_WEBSOCKETS()
+AC_ARG_ENABLE(websockets,
+              [  --enable-websockets     enable websockets support],
+              [enable_websockets=$enableval], [enable_websockets=no])
+
+if test "$enable_websockets" != "no"; then
+    PKG_CHECK_MODULES(WEBSOCKETS, [libwebsockets],
+                      [have_websockets=yes], [have_websockets=no])
+else
+    AC_MSG_NOTICE([libwebsockets support is disabled.])
+fi
+
+if test "$enable_websockets" = "yes" -a "$have_websockets" = "no"; then
+    AC_MSG_ERROR([libwebsockets development libraries not found.])
+fi
+
+if test "$enable_websockets" = "auto"; then
+    enable_websockets=$have_websockets
+fi
+
+if test "$enable_websockets" = "yes"; then
+    AC_DEFINE([WEBSOCKETS_ENABLED], 1, [Enable websockets support ?])
+fi
+
+AM_CONDITIONAL(WEBSOCKETS_ENABLED, [test "$enable_websockets" = "yes"])
+AC_SUBST(WEBSOCKETS_ENABLED)
+AC_SUBST(WEBSOCKETS_CFLAGS)
+AC_SUBST(WEBSOCKETS_LIBS)
 
 # Check if SMACK support should be enabled.
 AC_ARG_ENABLE(smack,
