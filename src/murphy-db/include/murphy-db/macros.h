@@ -27,8 +27,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __MDB_ASSERT_H__
-#define __MDB_ASSERT_H__
+#ifndef __MDB_MACROS_H__
+#define __MDB_MACROS_H__
 
 
 #define MDB_ASSERT(cond, errcode, retval) \
@@ -42,5 +42,14 @@
 #define MDB_CHECKARG(cond, retval)      MDB_ASSERT(cond, EINVAL, retval)
 #define MDB_PREREQUISITE(cond, retval)  MDB_ASSERT(cond, EIO, retval)
 
+#ifdef __GNUC__
+#    if __GNUC__ >= 7
+#        define MDB_FALLTHROUGH __attribute__((fallthrough))
+#    else
+#        define MDB_FALLTHROUGH
+#    endif
+#else
+#    define MDB_FALLTHROUGH
+#endif
 
-#endif  /* __MDB_ASSERT_H__ */
+#endif  /* __MDB_MACROS_H__ */

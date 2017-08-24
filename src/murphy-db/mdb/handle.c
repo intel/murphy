@@ -34,7 +34,7 @@
 #define __USE_GNU
 #include <string.h>
 
-#include <murphy-db/assert.h>
+#include <murphy-db/macros.h>
 #include <murphy-db/handle.h>
 
 #define HANDLE_INDEX_INVALID -1

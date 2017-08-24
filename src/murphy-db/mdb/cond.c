@@ -37,7 +37,7 @@
 #define _GNU_SOURCE
 #include <string.h>
 
-#include <murphy-db/assert.h>
+#include <murphy-db/macros.h>
 #include <murphy-db/list.h>
 #include <murphy-db/handle.h>
 #include <murphy-db/hash.h>
@@ -261,13 +261,13 @@ static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
         find_new_lastop_and_store_on_stack:
             for (lastop--;  lastop->precedence >= PRECEDENCE_DATA;  lastop--)
                 ;
-            /* intentional fall over */
+            /* intentional fallthrough */
 
         store_on_stack:
             result->precedence   = PRECEDENCE_DATA;
             result->data.type    = mqi_integer;
             result->data.v.integer = value;
-            /* intentional fall over */
+            MDB_FALLTHROUGH;
 
         default:
             stack_advance = newsp - sp;

@@ -3,13 +3,14 @@ pkglib_LTLIBRARIES = libmdb.la
 LINKER_SCRIPT = linker-script.mdb
 QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
 
-libmdb_la_CFLAGS = -I../include
+AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
+libmdb_la_CFLAGS = -I../include $(AM_CFLAGS)
 
 libmdb_ladir     = \
 		$(includedir)/murphy-db
 
 libmdb_la_HEADERS = \
-		../include/murphy-db/assert.h \
+		../include/murphy-db/macros.h \
 		../include/murphy-db/list.h \
 		../include/murphy-db/handle.h \
 		../include/murphy-db/hash.h \

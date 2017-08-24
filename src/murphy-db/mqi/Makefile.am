@@ -3,7 +3,8 @@ pkglib_LTLIBRARIES = libmqi.la
 LINKER_SCRIPT = linker-script.mqi
 QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
 
-libmqi_la_CFLAGS = -I../include
+AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
+libmqi_la_CFLAGS = -I../include $(AM_CFLAGS)
 
 libmqi_ladir     = \
 		$(includedir)/murphy-db

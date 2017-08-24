@@ -13,7 +13,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 
-#include <murphy-db/assert.h>
+#include <murphy-db/macros.h>
 #include <murphy-db/mqi.h>
 #include <murphy-db/mql.h>
 

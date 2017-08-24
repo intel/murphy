@@ -35,7 +35,7 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include <murphy-db/assert.h>
+#include <murphy-db/macros.h>
 #include <murphy-db/mql-result.h>
 #include "mql-parser.h"
 

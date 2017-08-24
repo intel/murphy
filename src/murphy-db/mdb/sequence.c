@@ -40,7 +40,7 @@
 #define SEQUENCE_STATISTICS
 #endif
 
-#include <murphy-db/assert.h>
+#include <murphy-db/macros.h>
 #include <murphy-db/sequence.h>
 
 typedef struct mdb_sequence_entry_s {

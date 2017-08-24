@@ -35,7 +35,7 @@
 #define _GNU_SOURCE
 #include <string.h>
 
-#include <murphy-db/assert.h>
+#include <murphy-db/macros.h>
 #include <murphy-db/handle.h>
 #include <murphy-db/mdb.h>
 

@@ -8,7 +8,8 @@ BUILT_SOURCES   = mql-scanner.c mql-parser.c
 LINKER_SCRIPT = linker-script.mql
 QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
 
-libmql_la_CFLAGS = -I../include
+AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
+libmql_la_CFLAGS = -I../include $(AM_CFLAGS)
 
 libmql_ladir     = \
 		$(includedir)/murphy-db
