@@ -128,10 +128,11 @@ mrp_data_descr_t *data_descr;
 
 typedef enum {
     MODE_DEFAULT = 0,
-    MODE_MESSAGE = 1,
-    MODE_DATA    = 2,
-    MODE_RAW     = 3,
-    MODE_NATIVE  = 4,
+    MODE_MESSAGE,
+    MODE_DATA,
+    MODE_RAW,
+    MODE_NATIVE,
+    MODE_JSON,
 } msg_mode_t;
 
 
@@ -394,6 +395,51 @@ void recv_native(mrp_transport_t *t, void *data, uint32_t type_id,
 }
 
 
+void free_json(mrp_json_t *msg)
+{
+    mrp_json_unref(msg);
+}
+
+
+void recvfrom_json(mrp_transport_t *t, mrp_json_t *msg, mrp_sockaddr_t *addr,
+                   socklen_t addrlen, void *user_data)
+{
+    context_t  *c   = (context_t *)user_data;
+    int         seq;
+    mrp_json_t *rpl;
+    char        buf[256];
+    uint32_t    au32[] = { 9, 8, 7, 6, 5, -1 };
+    int         status;
+
+    seq = mrp_json_integer_value(mrp_json_get(msg, "seq"));
+
+    mrp_log_info("received JSON message #%d", seq);
+    fprintf(stdout, "%s\n", mrp_json_object_to_string(msg));
+
+    if (c->server) {
+        rpl = mrp_json_clone(msg);
+        snprintf(buf, sizeof(buf), "reply to message #%u", seq);
+        mrp_json_add_string(rpl, "rpl", buf);
+        mrp_json_add_int_array(rpl, "au32", au32, sizeof(au32) / sizeof(*au32));
+
+        if (c->connect)
+            status = mrp_transport_sendjson(t, rpl);
+        else
+            status = mrp_transport_sendjsonto(t, rpl, addr, addrlen);
+        if (status)
+            mrp_log_info("reply successfully sent");
+        else
+            mrp_log_error("failed to send reply");
+    }
+}
+
+
+void recv_json(mrp_transport_t *t, mrp_json_t *msg, void *user_data)
+{
+    recvfrom_json(t, msg, NULL, 0, user_data);
+}
+
+
 void closed_evt(mrp_transport_t *t, int error, void *user_data)
 {
     context_t *c = (context_t *)user_data;
@@ -498,6 +544,10 @@ void server_init(context_t *c)
         evt.recvnative     = recv_native;
         evt.recvnativefrom = recvfrom_native;
         break;
+    case MODE_JSON:
+        evt.recvjson       = recv_json;
+        evt.recvjsonfrom   = recvfrom_json;
+        break;
     case MODE_MESSAGE:
     default:
         evt.recvmsg      = recv_msg;
@@ -515,6 +565,7 @@ void server_init(context_t *c)
     case MODE_DATA:    flags |= MRP_TRANSPORT_MODE_DATA;   break;
     case MODE_RAW:     flags |= MRP_TRANSPORT_MODE_RAW;    break;
     case MODE_NATIVE:  flags |= MRP_TRANSPORT_MODE_NATIVE; break;
+    case MODE_JSON:    flags |= MRP_TRANSPORT_MODE_JSON;   break;
     default:
     case MODE_MESSAGE: flags |= MRP_TRANSPORT_MODE_MSG;
     }
@@ -693,6 +744,51 @@ void send_native(context_t *c)
 }
 
 
+void send_json(context_t *c)
+{
+    uint32_t    seq = c->seqno++;
+    mrp_json_t *msg;
+    char        buf[256];
+    char       *astr[] = { "this", "is", "a", "test", "string", "array" };
+    uint32_t    au32[] = { 1, 2, 3, 4, 5, 6, 7, -1 };
+    int         status;
+
+    msg = mrp_json_create(MRP_JSON_OBJECT);
+
+    snprintf(buf, sizeof(buf), "this is message #%u", (unsigned int)seq);
+
+    mrp_json_add_integer(msg, "seq", seq);
+    mrp_json_add_string (msg, "msg", buf);
+
+    mrp_json_add_integer(msg, "u8" ,   seq & 0xf);
+    mrp_json_add_integer(msg, "s8" , -(seq & 0xf));
+    mrp_json_add_integer(msg, "u16",  seq);
+    mrp_json_add_integer(msg, "s16", -seq);
+    mrp_json_add_double (msg, "dbl",  seq / 3.0);
+    mrp_json_add_boolean(msg, "bln",  !!(seq & 0x1));
+
+    mrp_json_add_int_array(msg, "au32", au32, sizeof(au32) / sizeof(*au32));
+    mrp_json_add_string_array(msg, "astr", astr, sizeof(astr) / sizeof(*astr));
+
+    mrp_json_add_integer(msg, "fsck", 1000);
+    mrp_json_add_string (msg, "rpl", "");
+
+    if (c->connect)
+        status = mrp_transport_sendjson(c->t, msg);
+    else
+        status = mrp_transport_sendjsonto(c->t, msg, &c->addr, c->alen);
+
+    if (!status) {
+        mrp_log_error("Failed to send JSON message #%d.", seq);
+        exit(1);
+    }
+    else
+        mrp_log_info("JSON Message #%d succesfully sent.", seq);
+
+    free_json(msg);
+}
+
+
 void send_cb(mrp_timer_t *t, void *user_data)
 {
     context_t *c = (context_t *)user_data;
@@ -703,6 +799,7 @@ void send_cb(mrp_timer_t *t, void *user_data)
     case MODE_DATA:    send_data(c);   break;
     case MODE_RAW:     send_raw(c);    break;
     case MODE_NATIVE:  send_native(c); break;
+    case MODE_JSON:    send_json(c);   break;
     default:
     case MODE_MESSAGE: send_msg(c);
     }
@@ -737,6 +834,11 @@ void client_init(context_t *c)
         evt.recvnative     = recv_native;
         evt.recvnativefrom = recvfrom_native;
         flags              = MRP_TRANSPORT_MODE_NATIVE;
+        break;
+    case MODE_JSON:
+        evt.recvjson       = recv_json;
+        evt.recvjsonfrom   = recvfrom_json;
+        flags              = MRP_TRANSPORT_MODE_JSON;
         break;
     default:
     case MODE_MESSAGE:
@@ -808,6 +910,7 @@ static void print_usage(const char *argv0, int exit_code, const char *fmt, ...)
            "  -m, --message                  use generic messages (default)\n"
            "  -r, --raw                      use raw messages\n"
            "  -n, --native                   use native messages\n"
+           "  -j, --json                     use JSON messages\n"
            "  -b, --buggy                    use buggy data descriptors\n"
            "  -t, --log-target=TARGET        log target to use\n"
            "      TARGET is one of stderr,stdout,syslog, or a logfile path\n"
@@ -837,7 +940,7 @@ static void config_set_defaults(context_t *ctx)
 
 int parse_cmdline(context_t *ctx, int argc, char **argv)
 {
-#   define OPTIONS "scmrnbCa:l:t:v:d:h"
+#   define OPTIONS "scmrnjbCa:l:t:v:d:h"
     struct option options[] = {
         { "server"    , no_argument      , NULL, 's' },
         { "address"   , required_argument, NULL, 'a' },
@@ -845,6 +948,7 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
         { "message"   , no_argument      , NULL, 'm' },
         { "raw"       , no_argument      , NULL, 'r' },
         { "native"    , no_argument      , NULL, 'n' },
+        { "json"      , no_argument      , NULL, 'j' },
         { "connect"   , no_argument      , NULL, 'C' },
 
         { "buggy"     , no_argument      , NULL, 'b' },
@@ -898,6 +1002,15 @@ int parse_cmdline(context_t *ctx, int argc, char **argv)
                 ctx->mode = MODE_NATIVE;
             else {
                 mrp_log_error("Multiple modes requested.");
+                exit(1);
+            }
+            break;
+
+        case 'j':
+            if (ctx->mode == MODE_DEFAULT)
+                ctx->mode = MODE_JSON;
+            else {
+                mrp_log_error("Multiple modes requirested.");
                 exit(1);
             }
             break;
@@ -972,6 +1085,9 @@ int main(int argc, char *argv[])
     case MODE_NATIVE:
         register_native();
         mrp_log_info("Using native messages...");
+        break;
+    case MODE_JSON:
+        mrp_log_info("Using JSON messages...");
         break;
     default:
     case MODE_MESSAGE: mrp_log_info("Using generic messages...");
