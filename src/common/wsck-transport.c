@@ -515,6 +515,31 @@ static int wsck_sendcustom(mrp_transport_t *mt, void *data)
 }
 
 
+static int wsck_sendjson(mrp_transport_t *mt, mrp_json_t *msg)
+{
+    /* we could have casted and used wsck_sendcustom as well... */
+    wsck_t     *t = (wsck_t *)mt;
+    const char *s;
+    int         status;
+
+    s = mrp_json_object_to_string(msg);
+
+    /*
+     * Notes:
+     *     Although json-c internally counts the length of the serialized
+     *     object, it does not provide an API to get it out together with
+     *     the string. Great...
+     */
+
+    if (s != NULL)
+        status = wsl_send(t->sck, (void *)s, strlen(s));
+    else
+        status = FALSE;
+
+    return status;
+}
+
+
 static inline int looks_ipv4(const char *p)
 {
     if (isdigit(p[0])) {
@@ -763,7 +788,8 @@ static void recv_cb(wsl_sck_t *sck, void *data, size_t size, void *user_data,
     mrp_debug("%zu bytes on websocket %p", size, sck);
 
     MRP_TRANSPORT_BUSY(t, {
-            if (t->mode != MRP_TRANSPORT_MODE_CUSTOM)
+            if (t->mode != MRP_TRANSPORT_MODE_CUSTOM &&
+                t->mode != MRP_TRANSPORT_MODE_JSON)
                 t->recv_data((mrp_transport_t *)t, data, size, NULL, 0);
             else {
                 mrp_json_t *json = mrp_json_string_to_object(data, size);
@@ -992,4 +1018,4 @@ MRP_REGISTER_TRANSPORT(wsck, WSCKP, wsck_t, wsck_resolve,
                        wsck_senddata, NULL,
                        wsck_sendcustom, NULL,
                        NULL, NULL,
-                       NULL, NULL);
+                       wsck_sendjson, NULL);
