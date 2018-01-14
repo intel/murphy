@@ -1,5 +1,9 @@
-AM_CPPFLAGS = -I$(top_builddir)/src/murphy-db/include -I$(top_builddir)
-AM_CFLAGS   = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
+AM_CPPFLAGS = \
+       -I$(top_srcdir) \
+       -I$(top_builddir) \
+       -I$(top_srcdir)/src/murphy-db/include
+
+AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
 
 
 noinst_PROGRAMS  = decision-test

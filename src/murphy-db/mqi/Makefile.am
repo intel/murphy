@@ -1,10 +1,11 @@
 pkglib_LTLIBRARIES = libmqi.la
 
-LINKER_SCRIPT = linker-script.mqi
-QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
+LINKER_SCRIPT     = linker-script.mqi
+QUIET_GEN         = $(Q:@=@echo '  GEN   '$@;)
+gen_linker_script = $(top_srcdir)/build-aux/gen-linker-script $(top_builddir)
 
 AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
-libmqi_la_CFLAGS = -I../include $(AM_CFLAGS)
+libmqi_la_CFLAGS = -I$(srcdir)/../include $(AM_CFLAGS)
 
 libmqi_ladir     = \
 		$(includedir)/murphy-db
@@ -24,7 +25,7 @@ libmqi_la_DEPENDENCIES = $(LINKER_SCRIPT)
 
 # linker script generation
 $(LINKER_SCRIPT): $(libmqi_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	$(QUIET_GEN)$(gen_linker_script) -q \
 	    -P "$(CC)" -c "$(libmqi_la_CFLAGS)" -p "^mqi_" -o $@ $^
 
 clean-$(LINKER_SCRIPT):

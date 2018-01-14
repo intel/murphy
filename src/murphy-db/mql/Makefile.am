@@ -5,11 +5,13 @@ AM_YFLAGS       = -p $(PARSER_PREFIX)
 LEX_OUTPUT_ROOT = ./lex.$(PARSER_PREFIX)
 BUILT_SOURCES   = mql-scanner.c mql-parser.c
 
-LINKER_SCRIPT = linker-script.mql
-QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
+LINKER_SCRIPT     = linker-script.mql
+QUIET_GEN         = $(Q:@=@echo '  GEN   '$@;)
+gen_linker_script = $(top_srcdir)/build-aux/gen-linker-script $(top_builddir)
+
 
 AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
-libmql_la_CFLAGS = -I../include $(AM_CFLAGS)
+libmql_la_CFLAGS = -I$(srcdir)/../include $(AM_CFLAGS)
 
 libmql_ladir     = \
 		$(includedir)/murphy-db
@@ -51,7 +53,7 @@ clean-scanner:
 
 # linker script generation
 $(LINKER_SCRIPT): $(libmql_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	$(QUIET_GEN)$(gen_linker_script) -q \
 	    -P "$(CC)" -c "$(libmql_la_CFLAGS)" -p "^mql_" -o $@ $^
 
 clean-$(LINKER_SCRIPT):

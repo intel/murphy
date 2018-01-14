@@ -1,8 +1,12 @@
 AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS  = . utils src doc
+SUBDIRS  = . utils src
 doc_DATA = AUTHORS ChangeLog NEWS README
+
+if BUILD_DOCUMENTATION
+SUBDIRS += doc
+endif
 
 # This is the only way with automake I know of to force 'check-git-hooks'
 # to be evaluated before 'all'. If there is a nicer way, I'm all ears...

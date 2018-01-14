@@ -3,7 +3,9 @@
 #LOG=/tmp/gen-linker-script.log
 #echo "$0 $*" > $LOG
 
-COLLECT_SYMBOLS="${0%gen-linker-script}../utils/collect-symbols"
+top_builddir=$1
+shift
+COLLECT_SYMBOLS="$top_builddir/utils/collect-symbols"
 
 ARGS=""
 

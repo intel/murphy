@@ -4,6 +4,9 @@ else
 TESTDIR =
 endif
 
+AM_CPPFLAGS = -I$(top_srcdir) \
+              -I$(top_srcdir)/src/murphy-db/include
+
 SUBDIRS = mdb mqi mql include $(TESTDIR)
 
 pkgconfigdir = $(libdir)/pkgconfig

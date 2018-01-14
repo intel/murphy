@@ -18,7 +18,7 @@ noinst_PROGRAMS = $(TESTS)
 # MDB tests
 #
 check_libmdb_SOURCES = check-libmdb.c
-check_libmdb_CFLAGS  = @CHECK_CFLAGS@ -I../include \
+check_libmdb_CFLAGS  = @CHECK_CFLAGS@ -I$(srcdir)/../include \
                        -DLOGFILE=\"$(CHECK_LIBMDB_LOG)\"
 check_libmdb_LDADD   = @CHECK_LIBS@ $(MDB_LIBS)
 
@@ -28,7 +28,7 @@ AM_CFLAGS = -g3 -O0
 # MQI tests
 #
 check_libmqi_SOURCES = check-libmqi.c
-check_libmqi_CFLAGS  = @CHECK_CFLAGS@ -I../include \
+check_libmqi_CFLAGS  = @CHECK_CFLAGS@ -I$(srcdir)/../include \
                        -DLOGFILE=\"$(CHECK_LIBMQI_LOG)\"
 check_libmqi_LDADD   = @CHECK_LIBS@ $(MQI_LIBS) $(MDB_LIBS) 
 
@@ -37,7 +37,7 @@ check_libmqi_LDADD   = @CHECK_LIBS@ $(MQI_LIBS) $(MDB_LIBS)
 # MQL tests
 #
 check_libmql_SOURCES = check-libmql.c
-check_libmql_CFLAGS  = @CHECK_CFLAGS@ -I../include \
+check_libmql_CFLAGS  = @CHECK_CFLAGS@ -I$(srcdir)/../include \
                        -DLOGFILE=\"$(CHECK_LIBMQL_LOG)\"
 check_libmql_LDADD   = @CHECK_LIBS@ $(MQL_LIBS) $(MQI_LIBS) $(MDB_LIBS) 
 

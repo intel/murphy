@@ -1,10 +1,11 @@
 pkglib_LTLIBRARIES = libmdb.la
 
-LINKER_SCRIPT = linker-script.mdb
-QUIET_GEN     = $(Q:@=@echo '  GEN   '$@;)
+LINKER_SCRIPT     = linker-script.mdb
+QUIET_GEN         = $(Q:@=@echo '  GEN   '$@;)
+gen_linker_script = $(top_srcdir)/build-aux/gen-linker-script $(top_builddir)
 
 AM_CFLAGS = $(WARNING_CFLAGS) $(AM_CPPFLAGS)
-libmdb_la_CFLAGS = -I../include $(AM_CFLAGS)
+libmdb_la_CFLAGS = -I$(srcdir)/../include $(AM_CFLAGS)
 
 libmdb_ladir     = \
 		$(includedir)/murphy-db
@@ -38,7 +39,7 @@ libmdb_la_DEPENDENCIES = $(LINKER_SCRIPT)
 
 # linker script generation
 $(LINKER_SCRIPT): $(libmdb_la_HEADERS)
-	$(QUIET_GEN)$(top_builddir)/build-aux/gen-linker-script -q \
+	$(QUIET_GEN)$(gen_linker_script) -q \
 	    -P "$(CC)" -c "$(libmdb_la_CFLAGS)" -p "^(mdb_)|(mqi_)" -o $@ $^
 
 clean-$(LINKER_SCRIPT):
