@@ -470,7 +470,7 @@ AC_ARG_ENABLE(systemd,
 	      [enable_systemd=$enableval], [enable_systemd=auto])
 
 if test "$enable_systemd" != "no"; then
-    PKG_CHECK_MODULES(SYSTEMD, libsystemd-journal libsystemd-daemon,
+    PKG_CHECK_MODULES(SYSTEMD, libsystemd,
                       [have_systemd=yes], [have_systemd=no])
     if test "$have_systemd" = "no" -a "$enable_systemd" = "yes"; then
         AC_MSG_ERROR([systemd development libraries not found.])
