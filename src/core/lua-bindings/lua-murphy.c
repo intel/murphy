@@ -35,6 +35,7 @@
 #include <murphy/common/mm.h>
 #include <murphy/common/log.h>
 #include <murphy/core/plugin.h>
+#include <murphy/core/lua-utils/lua-compat.h>
 #include <murphy/core/lua-utils/funcbridge.h>
 #include <murphy/core/lua-decision/mdb.h>
 #include <murphy/core/lua-decision/element.h>

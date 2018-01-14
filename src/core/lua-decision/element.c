@@ -39,6 +39,7 @@
 #include <murphy/core/scripting.h>
 #include <murphy/core/lua-decision/element.h>
 #include <murphy/core/lua-decision/mdb.h>
+#include <murphy/core/lua-utils/lua-compat.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-utils/strarray.h>
 #include <murphy/core/lua-utils/funcbridge.h>

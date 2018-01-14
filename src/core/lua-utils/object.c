@@ -45,6 +45,7 @@
 #include <murphy/common/refcnt.h>
 
 #include <murphy/core/lua-bindings/murphy.h>
+#include <murphy/core/lua-utils/lua-compat.h>
 #include <murphy/core/lua-utils/object.h>
 #include <murphy/core/lua-utils/error.h>
 

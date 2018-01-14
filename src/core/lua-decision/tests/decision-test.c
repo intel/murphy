@@ -41,6 +41,7 @@
 
 #include <murphy/common.h>
 
+#include <murphy/core/lua-utils/lua-compat.h>
 #include <murphy/core/lua-utils/funcbridge.h>
 #include <murphy/core/lua-utils/strarray.h>
 #include <murphy/core/lua-utils/object.h>
