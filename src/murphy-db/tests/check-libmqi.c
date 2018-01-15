@@ -941,14 +941,14 @@ static void print_triggers(void)
     char *ev;
     int i;
 
-    printf(separator);
+    printf("%s", separator);
     printf("| trigger       |      table        |"
            "      selected columns in row        |"
            "    altered column                            |\n");
     printf("| event         |  handle name      |"
            "   id first_name      family_name    |"
            " idx name         value                       |\n");
-    printf(separator);
+    printf("%s", separator);
 
     if (!ntrigger) {
         printf("|-<no events>---|-------------------|"
@@ -994,7 +994,7 @@ static void print_triggers(void)
         }
     }
 
-    printf(separator);
+    printf("%s", separator);
 }
 
 static void transaction_event_cb(mqi_event_t *evt, void *user_data)
