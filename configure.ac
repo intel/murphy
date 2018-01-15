@@ -210,8 +210,8 @@ AC_ARG_ENABLE(sdbus,
 	      [enable_sdbus=$enableval], [enable_sdbus=no])
 
 if test "$enable_sdbus" = "yes"; then
-    PKG_CHECK_MODULES(SDBUS, libsystemd-bus)
-    AC_DEFINE([SDBUS_ENABLED], 1, [Enable systemd-bus support ?])
+    PKG_CHECK_MODULES(SDBUS, libsystemd)
+    AC_DEFINE([SDBUS_ENABLED], 1, [Enable sd-bus support ?])
 
     if test -z "$DBUS_SESSION_DIR"; then
         # Try to determine the session bus service directory.
@@ -223,7 +223,7 @@ if test "$enable_sdbus" = "yes"; then
         AC_SUBST(DBUS_SESSION_DIR)
     fi
 else
-    AC_MSG_NOTICE([libsystemd-bus based D-Bus support is disabled.])
+    AC_MSG_NOTICE([sd-bus based D-Bus support is disabled.])
 fi
 
 AM_CONDITIONAL(SDBUS_ENABLED, [test "$enable_sdbus" = "yes"])

@@ -60,7 +60,7 @@ static int bus_query(void *user_data, struct pollfd *fds, int nfd, int *timeout)
 
     if (nfd > 0) {
         fds[0].fd      = sd_bus_get_fd(b->bus);
-        fds[0].events  = sd_bus_get_events(b->bus) | POLLIN | POLLHUP;
+        fds[0].events  = sd_bus_get_events(b->bus);
         fds[0].revents = 0;
 
         if (sd_bus_get_timeout(b->bus, &usec) < 0)
@@ -86,9 +86,8 @@ static int bus_check(void *user_data, struct pollfd *fds, int nfd)
         if (b->events != 0)
             return TRUE;
     }
-    else
-        b->events = 0;
 
+    b->events = 0;
     return FALSE;
 }
 
@@ -103,7 +102,7 @@ static void bus_dispatch(void *user_data)
         mrp_debug("sd_bus peer has closed the connection");
 
     while (sd_bus_process(b->bus, NULL) > 0)
-        sd_bus_flush(b->bus);
+        ;
 
     mrp_debug("done dispatching");
 }

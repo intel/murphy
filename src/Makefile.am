@@ -1872,6 +1872,7 @@ endif
 
 if SDBUS_ENABLED
 TESTS     += sdbus-test dbus-sdbus-test sdbus-transport-test sdbus-error-message
+TESTS     +=  dbus-sdbus-test sdbus-transport-test sdbus-error-message
 
 sdbus_test_SOURCES = common/tests/sdbus-test.c
 sdbus_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(SDBUS_CFLAGS)

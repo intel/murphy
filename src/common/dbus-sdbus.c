@@ -48,25 +48,13 @@
 /* XXX check these... */
 #define SDBUS_ERROR_FAILED   "org.DBus.error.failed"
 
-/* D-Bus name request flags and reply statuses. */
-#define SDBUS_NAME_REQUEST_REPLACE 0x2
-#define SDBUS_NAME_REQUEST_DONTQ   0x4
-
-#define SDBUS_NAME_STATUS_OWNER    0x1
-#define SDBUS_NAME_STATUS_QUEUING  0x2
-#define SDBUS_NAME_STATUS_EXISTS   0x3
-#define SDBUS_NAME_STATUS_GOTIT    0x4
-
-#define SDBUS_NAME_STATUS_RELEASED 0x1
-#define SDBUS_NAME_STATUS_UNKNOWN  0x2
-#define SDBUS_NAME_STATUS_FOREIGN  0x3
-
 #define USEC_TO_MSEC(usec) ((unsigned int)((usec) / 1000))
 #define MSEC_TO_USEC(msec) ((uint64_t)(msec) * 1000)
 
 struct mrp_dbus_s {
     char            *address;            /* bus address */
     sd_bus          *bus;                /* actual D-BUS connection */
+    sd_bus_slot     *fallback;           /* our fallback slot */
     mrp_mainloop_t  *ml;                 /* murphy mainloop */
     mrp_subloop_t   *sl;                 /* subloop for pumping the bus */
     mrp_htbl_t      *objects;            /* object path (refcount) table */
@@ -77,11 +65,8 @@ struct mrp_dbus_s {
     uint32_t         call_id;            /* next call id */
     const char      *unique_name;        /* our unique D-BUS address */
     int              priv;               /* whether a private connection */
-    int              signal_filter;      /* if signal dispatching is set up */
-    int              register_fallback;  /* if the fallback object is set up */
     mrp_refcnt_t     refcnt;             /* reference count */
 };
-
 
 struct mrp_dbus_msg_s {
     sd_bus_message  *msg;                /* actual D-Bus message */
@@ -119,9 +104,25 @@ typedef struct {
  */
 
 typedef struct {
-    char *path;                         /* object path */
-    int   cnt;                          /* reference count */
+    char        *path;                  /* object path */
+    int          cnt;                   /* reference count */
+    sd_bus_slot *slot;                  /* associated slot (for destroying) */
 } object_t;
+
+typedef struct {
+    char            *key;
+    mrp_list_hook_t  handlers;
+} signal_t;
+
+
+typedef struct {
+    mrp_list_hook_t     hook;
+    mrp_dbus_t         *dbus;
+    mrp_dbus_handler_t  handler;
+    void               *user_data;
+    sd_bus_slot        *slot;
+} signal_handler_t;
+
 
 typedef struct {
     char            *member;            /* signal/method name */
@@ -134,13 +135,12 @@ typedef struct {
     char               *path;
     char               *interface;
     char               *member;
+    char               *key;
     mrp_dbus_handler_t  handler;
     void               *user_data;
 } handler_t;
 
 #define method_t handler_t
-#define signal_t handler_t
-
 
 typedef struct {
     mrp_list_hook_t     hook;           /* hook to name tracker list */
@@ -148,6 +148,7 @@ typedef struct {
     mrp_dbus_name_cb_t  cb;             /* status change callback */
     void               *user_data;      /* opaque callback user data */
     int32_t             qid;            /* initial query ID */
+    sd_bus_slot        *slot;           /* signal match slot */
 } name_tracker_t;
 
 
@@ -156,7 +157,7 @@ typedef struct {
     int32_t              id;             /* call id */
     mrp_dbus_reply_cb_t  cb;             /* completion notification callback */
     void                *user_data;      /* opaque callback data */
-    uint64_t             serial;         /* DBUS call */
+    sd_bus_slot         *slot;           /* DBUS call */
     mrp_list_hook_t      hook;           /* hook to list of pending calls */
     sd_bus_message      *msg;            /* original message */
 } call_t;
@@ -171,47 +172,30 @@ static mrp_htbl_t *buses;
 
 
 
-static int dispatch_signal(sd_bus *b, int r, sd_bus_message *msg, void *data);
-static int dispatch_method(sd_bus *b, int r, sd_bus_message *msg, void *data);
+static int dispatch_signal(sd_bus_message *msg, void *data, sd_bus_error *err);
+static int dispatch_method(sd_bus_message *msg, void *data, sd_bus_error *err);
 
 static void purge_name_trackers(mrp_dbus_t *dbus);
 static void purge_calls(mrp_dbus_t *dbus);
+static int purge_signals(void *key, void *entry, void *user_data);
 static void handler_list_free_cb(void *key, void *entry);
 static void handler_free(handler_t *h);
 static int name_owner_change_cb(mrp_dbus_t *dbus, mrp_dbus_msg_t *m,
                                 void *data);
+static void signal_free_cb(void *key, void *entry);
 static void call_free(call_t *call);
 static void object_free_cb(void *key, void *entry);
 
 
 static int purge_objects(void *key, void *entry, void *user_data)
 {
-    mrp_dbus_t *dbus = (mrp_dbus_t *)user_data;
-    object_t   *o    = (object_t *)entry;
+    object_t *o = (object_t *)entry;
 
+    MRP_UNUSED(user_data);
     MRP_UNUSED(key);
 
-    sd_bus_remove_object(dbus->bus, o->path, dispatch_method, dbus);
-
-    return MRP_HTBL_ITER_MORE;
-}
-
-
-static int purge_filters(void *key, void *entry, void *user_data)
-{
-    mrp_dbus_t      *dbus = (mrp_dbus_t *)user_data;
-    handler_list_t  *l    = (handler_list_t *)entry;
-    mrp_list_hook_t *p, *n;
-    handler_t       *h;
-
-    MRP_UNUSED(key);
-
-    mrp_list_foreach(&l->handlers, p, n) {
-        h = mrp_list_entry(p, handler_t, hook);
-        mrp_dbus_remove_filter(dbus,
-                               h->sender, h->path, h->interface,
-                               h->member, NULL);
-    }
+    sd_bus_slot_unref(o->slot);
+    o->slot = NULL;
 
     return MRP_HTBL_ITER_MORE;
 }
@@ -223,12 +207,12 @@ static void dbus_disconnect(mrp_dbus_t *dbus)
         mrp_htbl_remove(buses, dbus->bus, FALSE);
 
         if (dbus->objects) {
-            mrp_htbl_foreach(dbus->signals, purge_objects, dbus);
+            mrp_htbl_foreach(dbus->objects, purge_objects, dbus);
             mrp_htbl_destroy(dbus->objects, TRUE);
         }
 
         if (dbus->signals) {
-            mrp_htbl_foreach(dbus->signals, purge_filters, dbus);
+            mrp_htbl_foreach(dbus->signals, purge_signals, dbus);
             mrp_htbl_destroy(dbus->signals, TRUE);
         }
         if (dbus->methods)
@@ -238,10 +222,8 @@ static void dbus_disconnect(mrp_dbus_t *dbus)
         purge_calls(dbus);
 
         if (dbus->bus != NULL) {
-            if (dbus->signal_filter)
-                sd_bus_remove_filter(dbus->bus, dispatch_signal, dbus);
-            if (dbus->register_fallback)
-                sd_bus_remove_fallback(dbus->bus, "/", dispatch_method, dbus);
+            if (dbus->fallback)
+                sd_bus_slot_unref(dbus->fallback);
             if (dbus->priv)
                 sd_bus_close(dbus->bus);
             else
@@ -318,6 +300,9 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
 {
     mrp_htbl_config_t  hcfg;
     mrp_dbus_t        *dbus;
+    sd_bus_slot       *slot;
+
+    mrp_debug("connection to address %s requested", address ? address: "-");
 
     if ((dbus = dbus_get(ml, address)) != NULL)
         return mrp_dbus_ref(dbus);
@@ -374,23 +359,17 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
      * set up our message dispatchers and take our name on the bus
      */
 
-    if (sd_bus_add_filter(dbus->bus, dispatch_signal, dbus) != 0) {
-        mrp_dbus_error_set(errp, SDBUS_ERROR_FAILED,
-                         "Failed to set up signal dispatching.");
-        goto fail;
-    }
-    dbus->signal_filter = TRUE;
-
-    if (sd_bus_add_fallback(dbus->bus, "/", dispatch_method, dbus) != 0) {
+    if (sd_bus_add_fallback(dbus->bus, &slot, "/",dispatch_method, dbus) != 0) {
         mrp_dbus_error_set(errp, SDBUS_ERROR_FAILED,
                            "Failed to set up method dispatching.");
         goto fail;
     }
-    dbus->register_fallback = TRUE;
+    dbus->fallback = slot;
 
     mrp_clear(&hcfg);
     hcfg.comp = mrp_string_comp;
     hcfg.hash = mrp_string_hash;
+
     hcfg.free = object_free_cb;
 
     if ((dbus->objects = mrp_htbl_create(&hcfg)) == NULL) {
@@ -407,30 +386,13 @@ mrp_dbus_t *mrp_dbus_connect(mrp_mainloop_t *ml, const char *address,
         goto fail;
     }
 
+    hcfg.free = signal_free_cb;
+
     if ((dbus->signals = mrp_htbl_create(&hcfg)) == NULL) {
         mrp_dbus_error_set(errp, SDBUS_ERROR_FAILED,
                            "Failed to create DBUS signal table.");
         goto fail;
     }
-
-
-    /*
-     * install handler for NameOwnerChanged for tracking clients/peers
-     */
-
-    if (!mrp_dbus_add_signal_handler(dbus,
-                                     BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
-                                     BUS_NAME_CHANGED, name_owner_change_cb,
-                                     NULL)) {
-        mrp_dbus_error_set(errp, SDBUS_ERROR_FAILED,
-                           "Failed to install NameOwnerChanged handler.");
-        goto fail;
-    }
-
-    /* install a 'safe' filter to avoid receiving all name change signals */
-    mrp_dbus_install_filter(dbus,
-                            BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
-                            BUS_NAME_CHANGED, BUS_SERVICE, NULL);
 
     mrp_list_init(&dbus->name_trackers);
     dbus->call_id = 1;
@@ -465,39 +427,51 @@ int mrp_dbus_unref(mrp_dbus_t *dbus)
 int mrp_dbus_acquire_name(mrp_dbus_t *dbus, const char *name,
                           mrp_dbus_err_t *error)
 {
-    int flags = SDBUS_NAME_REQUEST_REPLACE | SDBUS_NAME_REQUEST_DONTQ;
-    int status;
+    mrp_debug("acquiring name '%s'...", name);
 
     mrp_dbus_error_init(error);
 
-    status = sd_bus_request_name(dbus->bus, name, flags);
-
-    if (status == SDBUS_NAME_STATUS_OWNER || status == SDBUS_NAME_STATUS_GOTIT)
-        return TRUE;
-    else {
+    if (sd_bus_request_name(dbus->bus, name, 0) < 0) {
         mrp_dbus_error_set(error, SDBUS_ERROR_FAILED, "failed to request name");
-
         return FALSE;
     }
+
+    /*
+     * Notes: (REALLY BAD VOODOO)
+     *   Failing to pump the bus until there are no further messages here
+     *   drives sd-bus crazy with sd_bus_get_timeout all the time returning
+     *   0 which then driver our mainloop (glue) into a practical busy-loop.
+     *
+     *   Hmmaybe we should use the async version with completion callback,
+     *   since I think now this seemingly synchronous function call can
+     *   result in signal/method call callback being triggered which will
+     *   be highly counter-intuitive and unexpected by the user.
+     *
+     *   BTW the same voodoo does not seem to be necessary when releasing
+     *   a name.
+     */
+
+    while (sd_bus_process(dbus->bus, NULL) > 0)
+        ;
+
+    return TRUE;
 }
 
 
 int mrp_dbus_release_name(mrp_dbus_t *dbus, const char *name,
                           mrp_dbus_err_t *error)
 {
-    int status;
+    mrp_debug("releasing name '%s'...", name);
 
     mrp_dbus_error_init(error);
 
-    status = sd_bus_release_name(dbus->bus, name);
-
-    if (status == SDBUS_NAME_STATUS_RELEASED)
-        return TRUE;
-    else {
+    if (sd_bus_release_name(dbus->bus, name) < 0) {
         mrp_dbus_error_set(error, SDBUS_ERROR_FAILED, "failed to release name");
 
         return FALSE;
     }
+    else
+        return TRUE;
 }
 
 
@@ -577,17 +551,19 @@ int mrp_dbus_follow_name(mrp_dbus_t *dbus, const char *name,
 {
     name_tracker_t *t;
 
+    mrp_debug("starting to track name '%s'...", name);
+
     if ((t = mrp_allocz(sizeof(*t))) != NULL) {
         if ((t->name = mrp_strdup(name)) != NULL) {
             t->cb        = cb;
             t->user_data = user_data;
 
-            if (mrp_dbus_install_filter(dbus,
-                                        BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
-                                        BUS_NAME_CHANGED, name,
-                                        NULL)) {
+            if (mrp_dbus_subscribe_signal(dbus,
+                                          name_owner_change_cb, t,
+                                          BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
+                                          BUS_NAME_CHANGED, name,
+                                          NULL) == 0) {
                 mrp_list_append(&dbus->name_trackers, &t->hook);
-
                 t->qid = mrp_dbus_call(dbus,
                                        BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
                                        BUS_GET_OWNER, 5000,
@@ -613,10 +589,7 @@ int mrp_dbus_forget_name(mrp_dbus_t *dbus, const char *name,
     mrp_list_hook_t *p, *n;
     name_tracker_t  *t;
 
-    mrp_dbus_remove_filter(dbus,
-                           BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
-                           BUS_NAME_CHANGED, name,
-                           NULL);
+    mrp_debug("done with tracking name '%s'...", name);
 
     mrp_list_foreach(&dbus->name_trackers, p, n) {
         t = mrp_list_entry(p, name_tracker_t, hook);
@@ -624,6 +597,12 @@ int mrp_dbus_forget_name(mrp_dbus_t *dbus, const char *name,
         if (t->cb == cb && t->user_data == user_data && !strcmp(t->name,name)) {
             mrp_list_delete(&t->hook);
             mrp_free(t->name);
+
+            mrp_dbus_unsubscribe_signal(dbus,
+                                        name_owner_change_cb, t,
+                                        BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
+                                        BUS_NAME_CHANGED, name,
+                                        NULL);
 
             if (!t->qid)
                 mrp_free(t);
@@ -650,10 +629,10 @@ static void purge_name_trackers(mrp_dbus_t *dbus)
         t = mrp_list_entry(p, name_tracker_t, hook);
 
         mrp_list_delete(p);
-        mrp_dbus_remove_filter(dbus,
-                               BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
-                               BUS_NAME_CHANGED, t->name,
-                               NULL);
+        mrp_dbus_unsubscribe_signal(dbus, name_owner_change_cb, t,
+                                    BUS_SERVICE, BUS_PATH, BUS_INTERFACE,
+                                    BUS_NAME_CHANGED, t->name,
+                                    NULL);
         mrp_free(t->name);
         mrp_free(t);
     }
@@ -831,7 +810,10 @@ static void object_free_cb(void *key, void *entry)
 
 static object_t *object_add(mrp_dbus_t *dbus, const char *path)
 {
-    object_t *o;
+    object_t    *o;
+    sd_bus_slot *slot;
+
+    mrp_debug("adding object %s...", path);
 
     o = mrp_alloc(sizeof(*o));
 
@@ -844,11 +826,14 @@ static object_t *object_add(mrp_dbus_t *dbus, const char *path)
             return NULL;
         }
 
-        if (sd_bus_add_object(dbus->bus, o->path, dispatch_method, dbus) == 0) {
-            if (mrp_htbl_insert(dbus->objects, o->path, o))
+        if (sd_bus_add_object(dbus->bus, &slot,
+                              o->path, dispatch_method, dbus) >= 0) {
+            if (mrp_htbl_insert(dbus->objects, o->path, o)) {
+                o->slot = slot;
                 return o;
+            }
             else
-                sd_bus_remove_object(dbus->bus, o->path, dispatch_method, dbus);
+                sd_bus_slot_unref(slot);
         }
 
         mrp_free(o->path);
@@ -890,7 +875,7 @@ static void object_unref(mrp_dbus_t *dbus, const char *path)
 
         if (o->cnt <= 0) {
             mrp_htbl_remove(dbus->objects, (void *)path, FALSE);
-            sd_bus_remove_object(dbus->bus, o->path, dispatch_method, dbus);
+            sd_bus_slot_unref(o->slot);
 
             mrp_free(o->path);
             mrp_free(o);
@@ -905,6 +890,8 @@ int mrp_dbus_export_method(mrp_dbus_t *dbus, const char *path,
 {
     handler_list_t *methods;
     handler_t      *m;
+
+    mrp_debug("exporting method %s:%s.%s", path, interface, member);
 
     if (!object_ref(dbus, path))
         return FALSE;
@@ -938,6 +925,8 @@ int mrp_dbus_remove_method(mrp_dbus_t *dbus, const char *path,
     handler_list_t *methods;
     handler_t      *m;
 
+    mrp_debug("removing method %s:%s.%s", path, interface, member);
+
     if ((methods = mrp_htbl_lookup(dbus->methods, (void *)member)) == NULL)
         return FALSE;
 
@@ -962,6 +951,10 @@ int mrp_dbus_add_signal_handler(mrp_dbus_t *dbus, const char *sender,
 {
     handler_list_t *signals;
     handler_t      *s;
+
+    mrp_debug("adding signal handler for %s/%s:%s.%s",
+              sender ? sender : "-", path ? path : "-",
+              interface ? interface : "-", member ? member : "-");
 
     if ((signals = mrp_htbl_lookup(dbus->signals, (void *)member)) == NULL) {
         if ((signals = handler_list_alloc(member)) == NULL)
@@ -998,6 +991,10 @@ int mrp_dbus_del_signal_handler(mrp_dbus_t *dbus, const char *sender,
 
     MRP_UNUSED(sender);
 
+    mrp_debug("removing signal handler for %s/%s:%s.%s",
+              sender ? sender : "-", path ? path : "-",
+              interface ? interface : "-", member ? member : "-");
+
     if ((signals = mrp_htbl_lookup(dbus->signals, (void *)member)) == NULL)
         return FALSE;
 
@@ -1017,30 +1014,210 @@ int mrp_dbus_del_signal_handler(mrp_dbus_t *dbus, const char *sender,
 }
 
 
+static char *message_filter(char *buf, size_t size,
+                            const char *sender, const char *path,
+                            const char *interface, const char *member,
+                            va_list args)
+{
+#define ADD_TAG(tag, value) do {                                        \
+        if (value != NULL) {                                            \
+            l = snprintf(p, n, "%s%s='%s'", p == filter ? "" : ",",     \
+                         tag, value);                                   \
+            if (l >= n) {                                               \
+                errno = ENOBUFS;                                        \
+                return NULL;                                            \
+            }                                                           \
+            n -= l;                                                     \
+            p += l;                                                     \
+        }                                                               \
+    } while (0)
+
+    va_list ap;
+    char    filter[size], *p, argn[16], *val;
+    int     n, l, i;
+
+    p = filter;
+    n = size - 1;
+
+    ADD_TAG("type"     , "signal");
+    ADD_TAG("sender"   ,  sender);
+    ADD_TAG("path"     ,  path);
+    ADD_TAG("interface",  interface);
+    ADD_TAG("member"   ,  member);
+
+    va_copy(ap, args);
+    i = 0;
+    while ((val = va_arg(ap, char *)) != NULL) {
+        if (i >= (int)(sizeof(argn) / sizeof(argn[0]))) {
+            errno = ENOBUFS;
+            return NULL;
+        }
+        snprintf(argn, sizeof(argn), "arg%d", i++);
+        ADD_TAG(argn, val);
+    }
+    va_end(ap);
+
+    strcpy(buf, filter);
+
+    return buf;
+}
+
+
+static void signal_handler_free(signal_handler_t *h)
+{
+    if (h != NULL) {
+        mrp_list_delete(&h->hook);
+
+        if (h->slot)
+            sd_bus_slot_unref(h->slot);
+
+        mrp_free(h);
+    }
+}
+
+
+static int signal_handler_add(mrp_dbus_t *dbus, char *key, signal_handler_t *h)
+{
+    signal_t *sig;
+
+    if ((sig = mrp_htbl_lookup(dbus->signals, (void *)key)) == NULL) {
+        sig = mrp_allocz(sizeof(*sig));
+        if (sig == NULL)
+            return -1;
+
+        mrp_list_init(&sig->handlers);
+
+        sig->key = mrp_strdup(key);
+        if (sig->key == NULL) {
+            mrp_free(sig);
+            return -1;
+        }
+
+        if (!mrp_htbl_insert(dbus->signals, sig->key, sig)) {
+            mrp_free(sig->key);
+            mrp_free(sig);
+            return -1;
+        }
+    }
+
+    mrp_list_append(&sig->handlers, &h->hook);
+    return 0;
+}
+
+
+static signal_t *signal_lookup(mrp_dbus_t *dbus, char *key)
+{
+    return (signal_t *)mrp_htbl_lookup(dbus->signals, (void *)key);
+}
+
+
+static int signal_handler_del(mrp_dbus_t *dbus, char *key,
+                              mrp_dbus_handler_t handler, void *user_data)
+{
+    signal_t         *sig;
+    signal_handler_t *h;
+    mrp_list_hook_t  *p, *n;
+
+    if ((sig = signal_lookup(dbus, key)) == NULL)
+        return -1;
+
+    h = NULL;
+    mrp_list_foreach(&sig->handlers, p, n) {
+        signal_handler_t *hp = mrp_list_entry(p, typeof(*h), hook);
+
+        if (hp->handler == handler && hp->user_data == user_data)
+            h = hp;
+    }
+
+    if (h == NULL)
+        return -1;
+
+    signal_handler_free(h);
+
+    if (mrp_list_empty(&sig->handlers)) {
+        mrp_htbl_remove(dbus->signals, sig->key, TRUE);
+    }
+
+    return 0;
+}
+
+
+static int purge_signals(void *key, void *entry, void *user_data)
+{
+    signal_t         *sig = (signal_t *)entry;
+    signal_handler_t *h;
+    mrp_list_hook_t  *p, *n;
+
+    MRP_UNUSED(key);
+    MRP_UNUSED(user_data);
+
+    mrp_free(sig->key);
+    mrp_list_foreach(&sig->handlers, p, n) {
+        h = mrp_list_entry(p, typeof(*h), hook);
+        if (h->slot) {
+            sd_bus_slot_unref(h->slot);
+            h->slot = NULL;
+        }
+    }
+
+    return MRP_HTBL_ITER_MORE;
+}
+
+
+static void signal_free_cb(void *key, void *entry)
+{
+    signal_t         *sig = (signal_t *)entry;
+    signal_handler_t *h;
+    mrp_list_hook_t  *p, *n;
+
+    MRP_UNUSED(key);
+
+    mrp_free(sig->key);
+    mrp_list_foreach(&sig->handlers, p, n) {
+        h = mrp_list_entry(p, typeof(*h), hook);
+        signal_handler_free(h);
+    }
+    mrp_free(sig);
+}
+
 
 int mrp_dbus_subscribe_signal(mrp_dbus_t *dbus,
                               mrp_dbus_handler_t handler, void *user_data,
                               const char *sender, const char *path,
                               const char *interface, const char *member, ...)
 {
-    va_list ap;
-    int     success;
+    va_list           ap;
+    char              key[1024], *p;
+    signal_handler_t *h;
 
+    va_start(ap, member);
+    p = message_filter(key, sizeof(key), sender, path, interface, member, ap);
+    va_end(ap);
 
-    if (mrp_dbus_add_signal_handler(dbus, sender, path, interface, member,
-                                    handler, user_data)) {
-        va_start(ap, member);
-        success = mrp_dbus_install_filterv(dbus,
-                                           sender, path, interface, member, ap);
-        va_end(ap);
+    mrp_debug("subscribing for signals %s", p ? p : "-");
 
-        if (success)
-            return TRUE;
-        else
-            mrp_dbus_del_signal_handler(dbus, sender, path, interface, member,
-                                        handler, user_data);
-    }
+    if (p == NULL)
+        return FALSE;
 
+    h = mrp_allocz(sizeof(*h));
+    if (h == NULL)
+        goto fail;
+
+    mrp_list_init(&h->hook);
+    h->dbus      = dbus;
+    h->handler   = handler;
+    h->user_data = user_data;
+
+    if (sd_bus_add_match(dbus->bus, &h->slot, key, dispatch_signal, h) < 0)
+        goto fail;
+
+    if (signal_handler_add(dbus, key, h) < 0)
+        goto fail;
+
+    return TRUE;
+
+ fail:
+    signal_handler_free(h);
     return FALSE;
 }
 
@@ -1051,128 +1228,20 @@ int mrp_dbus_unsubscribe_signal(mrp_dbus_t *dbus,
                                 const char *interface, const char *member, ...)
 {
     va_list ap;
-    int     status;
+    char    key[1024], *p;
 
-    status = mrp_dbus_del_signal_handler(dbus, sender, path, interface, member,
-                                         handler, user_data);
     va_start(ap, member);
-    status &= mrp_dbus_remove_filterv(dbus,
-                                      sender, path, interface, member, ap);
+    p = message_filter(key, sizeof(key), sender, path, interface, member, ap);
     va_end(ap);
 
-    return status;
-}
+    mrp_debug("unsubscribing from signals %s", p ? p : "-");
 
-
-int mrp_dbus_install_filterv(mrp_dbus_t *dbus, const char *sender,
-                             const char *path, const char *interface,
-                             const char *member, va_list args)
-{
-#define ADD_TAG(tag, value) do {                                          \
-        if (value != NULL) {                                              \
-            l = snprintf(p, n, "%s%s='%s'", p == filter ? "" : ",",       \
-                         tag, value);                                     \
-            if (l >= n)                                                   \
-                return FALSE;                                             \
-            n -= l;                                                       \
-            p += l;                                                       \
-        }                                                                 \
-    } while (0)
-
-    va_list   ap;
-    char      filter[1024], *p, argn[16], *val;
-    int       n, l, i;
-
-    p = filter;
-    n = sizeof(filter);
-
-    ADD_TAG("type"     , "signal");
-    ADD_TAG("sender"   ,  sender);
-    ADD_TAG("path"     ,  path);
-    ADD_TAG("interface",  interface);
-    ADD_TAG("member"   ,  member);
-
-    va_copy(ap, args);
-    i = 0;
-    while ((val = va_arg(ap, char *)) != NULL) {
-        snprintf(argn, sizeof(argn), "arg%d", i);
-        ADD_TAG(argn, val);
-        i++;
-    }
-    va_end(ap);
-
-    if (sd_bus_add_match(dbus->bus, filter, NULL, NULL) != 0) {
-        mrp_log_error("Failed to install filter '%s'.", filter);
-
+    if (p == NULL)
         return FALSE;
-    }
-    else
-        return TRUE;
 
-}
-
-
-int mrp_dbus_install_filter(mrp_dbus_t *dbus, const char *sender,
-                            const char *path, const char *interface,
-                            const char *member, ...)
-{
-    va_list ap;
-    int     status;
-
-    va_start(ap, member);
-    status = mrp_dbus_install_filterv(dbus,
-                                      sender, path, interface, member, ap);
-    va_end(ap);
-
-    return status;
-}
-
-
-int mrp_dbus_remove_filterv(mrp_dbus_t *dbus, const char *sender,
-                            const char *path, const char *interface,
-                            const char *member, va_list args)
-{
-    va_list ap;
-    char    filter[1024], *p, argn[16], *val;
-    int     n, l, i;
-
-    p = filter;
-    n = sizeof(filter);
-
-    ADD_TAG("type"     , "signal");
-    ADD_TAG("sender"   ,  sender);
-    ADD_TAG("path"     ,  path);
-    ADD_TAG("interface",  interface);
-    ADD_TAG("member"   ,  member);
-
-    va_copy(ap, args);
-    i = 0;
-    while ((val = va_arg(ap, char *)) != NULL) {
-        snprintf(argn, sizeof(argn), "arg%d", i);
-        ADD_TAG(argn, val);
-        i++;
-    }
-    va_end(ap);
-
-    sd_bus_remove_match(dbus->bus, filter, NULL, NULL);
+    signal_handler_del(dbus, key, handler, user_data);
 
     return TRUE;
-#undef ADD_TAG
-}
-
-
-int mrp_dbus_remove_filter(mrp_dbus_t *dbus, const char *sender,
-                           const char *path, const char *interface,
-                           const char *member, ...)
-{
-    va_list ap;
-    int     status;
-
-    va_start(ap, member);
-    status = mrp_dbus_remove_filterv(dbus, sender, path, interface, member, ap);
-    va_end(ap);
-
-    return status;
 }
 
 
@@ -1288,14 +1357,14 @@ static inline int verify_type(sd_bus_message *msg, int expected_type)
 {
     uint8_t type;
 
-    if (sd_bus_message_get_type(msg, &type) != 0 || type == expected_type)
+    if (sd_bus_message_get_type(msg, &type) != 0 || type != expected_type)
         return FALSE;
     else
         return TRUE;
 }
 
 
-static int dispatch_method(sd_bus *bus,int ret, sd_bus_message *msg, void *data)
+static int dispatch_method(sd_bus_message *msg, void *data, sd_bus_error *err)
 {
 #define SAFESTR(str) (str ? str : "<none>")
     mrp_dbus_t     *dbus      = (mrp_dbus_t *)data;
@@ -1307,8 +1376,7 @@ static int dispatch_method(sd_bus *bus,int ret, sd_bus_message *msg, void *data)
     handler_list_t *l;
     handler_t      *h;
 
-    MRP_UNUSED(bus);
-    MRP_UNUSED(ret);
+    MRP_UNUSED(err);
 
     if (!verify_type(msg, MRP_DBUS_MESSAGE_TYPE_METHOD_CALL) || !member)
         return r;
@@ -1346,62 +1414,25 @@ static int dispatch_method(sd_bus *bus,int ret, sd_bus_message *msg, void *data)
 }
 
 
-static int dispatch_signal(sd_bus *bus,int ret, sd_bus_message *msg, void *data)
+static int dispatch_signal(sd_bus_message *msg, void *data, sd_bus_error *err)
 {
-#define MATCHES(h, field) (!*field || !h->field || !*h->field || \
-                           !strcmp(field, h->field))
-    mrp_dbus_t     *dbus      = (mrp_dbus_t *)data;
-    mrp_dbus_msg_t *m         = NULL;
-    const char     *path      = sd_bus_message_get_path(msg);
-    const char     *interface = sd_bus_message_get_interface(msg);
-    const char     *member    = sd_bus_message_get_member(msg);
-    mrp_list_hook_t *p, *n;
-    handler_list_t  *l;
-    handler_t       *h;
-    int              retried = FALSE;
-    int              handled = FALSE;
+#define SAFESTR(str) (str ? str : "<none>")
+    signal_handler_t *h         = (signal_handler_t *)data;
+    mrp_dbus_msg_t   *m         = NULL;
+    const char       *path      = sd_bus_message_get_path(msg);
+    const char       *interface = sd_bus_message_get_interface(msg);
+    const char       *member    = sd_bus_message_get_member(msg);
 
-    MRP_UNUSED(bus);
-    MRP_UNUSED(ret);
-
-    if (!verify_type(msg, MRP_DBUS_MESSAGE_TYPE_SIGNAL) || !member)
-        return FALSE;
+    MRP_UNUSED(err);
 
     mrp_debug("%s(path='%s', interface='%s', member='%s')...",
               __FUNCTION__, SAFESTR(path), SAFESTR(interface), SAFESTR(member));
 
-    if ((l = mrp_htbl_lookup(dbus->signals, (void *)member)) != NULL) {
-    retry:
-        mrp_list_foreach(&l->handlers, p, n) {
-            h = mrp_list_entry(p, handler_t, hook);
-
-            if (MATCHES(h,path) && MATCHES(h,interface) && MATCHES(h,member)) {
-                sd_bus_message_rewind(msg, TRUE);
-
-                if (m == NULL)
-                    m = create_message(msg, TRUE);
-
-                h->handler(dbus, m, h->user_data);
-                handled = TRUE;
-            }
-        }
-    }
-
-    if (!retried) {
-        if ((l = mrp_htbl_lookup(dbus->signals, "")) != NULL) {
-            retried = TRUE;
-            goto retry;
-        }
-    }
-
-    if (!handled)
-        mrp_debug("Unhandled signal path=%s, %s.%s.", SAFESTR(path),
-                  SAFESTR(interface), SAFESTR(member));
-
+    m = create_message(msg, TRUE);
+    h->handler(h->dbus, m, h->user_data);
     mrp_dbus_msg_unref(m);
 
     return FALSE;
-#undef MATCHES
 #undef SAFESTR
 }
 
@@ -1495,39 +1526,20 @@ static int append_args_inttype(sd_bus_message *msg, int type, va_list ap)
 }
 
 
-static int call_reply_cb(sd_bus *bus, int ret, sd_bus_message *msg,
-                         void *user_data)
+static int call_reply_cb(sd_bus_message *msg, void *user_data, sd_bus_error *e)
 {
     call_t         *call  = (call_t *)user_data;
     mrp_dbus_msg_t *reply = create_message(msg, TRUE);
-    sd_bus_error    error;
 
-    MRP_UNUSED(bus);
+    MRP_UNUSED(e);
 
-    call->serial = 0;
+    call->slot = NULL;
     mrp_list_delete(&call->hook);
 
-    if (ret == 0) {
-        reply = create_message(msg, TRUE);
-        sd_bus_message_rewind(reply->msg, TRUE);
-    }
-    else {
-        sd_bus_message *err = NULL;
-
-        if (ret == ETIMEDOUT)
-            error = SD_BUS_ERROR_MAKE(MRP_DBUS_ERROR_TIMEOUT,
-                                      "D-Bus call timed out");
-        else
-            error = SD_BUS_ERROR_MAKE(MRP_DBUS_ERROR_FAILED,
-                                      "D-Bus call failed");
-
-        if (sd_bus_message_new_method_error(bus, call->msg, &error, &err) == 0)
-            reply = create_message(err, FALSE);
-        else
-            reply = NULL;
-    }
-
+    reply = create_message(msg, TRUE);
+    sd_bus_message_rewind(reply->msg, TRUE);
     call->cb(call->dbus, reply, call->user_data);
+
     call_free(call);
     mrp_dbus_msg_unref(reply);
 
@@ -1547,8 +1559,8 @@ int32_t mrp_dbus_call(mrp_dbus_t *dbus, const char *dest, const char *path,
 
     call = NULL;
 
-    if (sd_bus_message_new_method_call(dbus->bus, dest, path, interface, member,
-                                       &msg) != 0)
+    if (sd_bus_message_new_method_call(dbus->bus, &msg,
+                                       dest, path, interface, member) != 0)
         return 0;
 
     if (cb != NULL) {
@@ -1580,14 +1592,13 @@ int32_t mrp_dbus_call(mrp_dbus_t *dbus, const char *dest, const char *path,
         goto fail;
 
     if (cb == NULL) {
-        sd_bus_message_set_no_reply(msg, TRUE);
-        if (sd_bus_send(dbus->bus, msg, NULL) != 0)
+        if (sd_bus_send(dbus->bus, msg, NULL) < 0)
             goto fail;
         sd_bus_message_unref(msg);
     }
     else {
-        if (sd_bus_send_with_reply(dbus->bus, msg, call_reply_cb, call,
-                                   timeout * 1000, &call->serial) != 0)
+        if (sd_bus_call_async(dbus->bus, &call->slot, msg, call_reply_cb, call,
+                              timeout * 1000) != 0)
             goto fail;
 
         mrp_list_append(&dbus->calls, &call->hook);
@@ -1606,12 +1617,13 @@ int32_t mrp_dbus_call(mrp_dbus_t *dbus, const char *dest, const char *path,
 
 int mrp_dbus_send_msg(mrp_dbus_t *dbus, mrp_dbus_msg_t *m)
 {
+    uint64_t cookie;
     /*bus_message_dump(m->msg);*/
 
-    if (sd_bus_send(dbus->bus, m->msg, NULL) == 0)
-        return TRUE;
-    else
+    if (sd_bus_send(dbus->bus, m->msg, &cookie) < 0)
         return FALSE;
+    else
+        return TRUE;
 }
 
 
@@ -1626,8 +1638,8 @@ int mrp_dbus_call_cancel(mrp_dbus_t *dbus, int32_t id)
         if (call->id == id) {
             mrp_list_delete(p);
 
-            sd_bus_send_with_reply_cancel(dbus->bus, call->serial);
-            call->serial = 0;
+            sd_bus_slot_unref(call->slot);
+            call->slot = NULL;
 
             call_free(call);
             return TRUE;
@@ -1644,7 +1656,7 @@ int mrp_dbus_reply(mrp_dbus_t *dbus, mrp_dbus_msg_t *m, int type, ...)
     sd_bus_message *rpl;
     int             success;
 
-    if (sd_bus_message_new_method_return(dbus->bus, m->msg, &rpl) != 0)
+    if (sd_bus_message_new_method_return(m->msg, &rpl) != 0)
         return FALSE;
 
     va_start(ap, type);
@@ -1654,7 +1666,7 @@ int mrp_dbus_reply(mrp_dbus_t *dbus, mrp_dbus_msg_t *m, int type, ...)
     if (!success)
         goto fail;
 
-    if (sd_bus_send(dbus->bus, rpl, NULL) != 0)
+    if (sd_bus_send(dbus->bus, rpl, NULL) < 0)
         goto fail;
 
     sd_bus_message_unref(rpl);
@@ -1678,7 +1690,7 @@ int mrp_dbus_reply_error(mrp_dbus_t *dbus, mrp_dbus_msg_t *m,
 
     sd_bus_error_set_const(&err, errname, errmsg);
 
-    if (sd_bus_message_new_method_error(dbus->bus, m->msg, &err, &rpl) != 0)
+    if (sd_bus_message_new_method_error(m->msg, &rpl, &err) != 0)
         return FALSE;
 
     va_start(ap, type);
@@ -1688,7 +1700,7 @@ int mrp_dbus_reply_error(mrp_dbus_t *dbus, mrp_dbus_msg_t *m,
     if (!success)
         goto fail;
 
-    if (sd_bus_send(dbus->bus, rpl, NULL) != 0)
+    if (sd_bus_send(dbus->bus, rpl, NULL) < 0)
         goto fail;
 
     sd_bus_message_unref(rpl);
@@ -1721,8 +1733,8 @@ static void purge_calls(mrp_dbus_t *dbus)
 
         mrp_list_delete(&call->hook);
 
-        if (call->serial != 0)
-            sd_bus_send_with_reply_cancel(dbus->bus, call->serial);
+        if (call->slot != NULL)
+            sd_bus_slot_unref(call->slot);
 
         mrp_free(call);
     }
@@ -1736,9 +1748,9 @@ int mrp_dbus_signal(mrp_dbus_t *dbus, const char *dest, const char *path,
     sd_bus_message *msg;
     int             success;
 
-    if (sd_bus_message_new_signal(dbus->bus, path, interface, member,
-                                  &msg) != 0)
-        return 0;
+    if (sd_bus_message_new_signal(dbus->bus, &msg,
+                                  path, interface, member) != 0)
+         return 0;
 
     va_start(ap, type);
     success = append_args_inttype(msg, type, ap);
@@ -1751,7 +1763,7 @@ int mrp_dbus_signal(mrp_dbus_t *dbus, const char *dest, const char *path,
         if (sd_bus_message_set_destination(msg, dest) != 0)
             goto fail;
 
-    if (sd_bus_send(dbus->bus, msg, NULL) != 0)
+    if (sd_bus_send(dbus->bus, msg, NULL) < 0)
         goto fail;
 
     sd_bus_message_unref(msg);
@@ -1773,11 +1785,11 @@ mrp_dbus_msg_t *mrp_dbus_msg_method_call(mrp_dbus_t *dbus,
 {
     sd_bus_message *msg;
 
-    if (sd_bus_message_new_method_call(dbus->bus, destination,
-                                       path, interface, member, &msg) == 0)
-        return create_message(msg, FALSE);
-    else
+    if (sd_bus_message_new_method_call(dbus->bus, &msg, destination,
+                                       path, interface, member) < 0)
         return NULL;
+    else
+        return create_message(msg, FALSE);
 }
 
 
@@ -1786,12 +1798,14 @@ mrp_dbus_msg_t *mrp_dbus_msg_method_return(mrp_dbus_t *dbus,
 {
     sd_bus_message *req, *rpl;
 
+    MRP_UNUSED(dbus);
+
     req = (sd_bus_message *)msg;
 
-    if (sd_bus_message_new_method_return(dbus->bus, req, &rpl) == 0)
-        return create_message(rpl, FALSE);
-    else
+    if (sd_bus_message_new_method_return(req, &rpl) < 0)
         return NULL;
+    else
+        return create_message(rpl, FALSE);
 }
 
 
@@ -1800,12 +1814,14 @@ mrp_dbus_msg_t *mrp_dbus_msg_error(mrp_dbus_t *dbus, mrp_dbus_msg_t *m,
 {
     sd_bus_message *req, *rpl;
 
+    MRP_UNUSED(dbus);
+
     req = m->msg;
 
-    if (sd_bus_message_new_method_error(dbus->bus, req, err, &rpl) == 0)
-        return create_message(rpl, FALSE);
-    else
+    if (sd_bus_message_new_method_error(req, &rpl, err) < 0)
         return NULL;
+    else
+        return create_message(rpl, FALSE);
 }
 
 
@@ -1817,13 +1833,13 @@ mrp_dbus_msg_t *mrp_dbus_msg_signal(mrp_dbus_t *dbus,
 {
     sd_bus_message *msg = NULL;
 
-    if (sd_bus_message_new_signal(dbus->bus, path, interface, member,
-                                  &msg) == 0) {
-        if (destination != NULL) {
-            if (sd_bus_message_set_destination(msg, destination) != 0) {
-                sd_bus_message_unref(msg);
-                msg = NULL;
-            }
+    if (sd_bus_message_new_signal(dbus->bus, &msg, path, interface, member) < 0)
+        return NULL;
+
+    if (destination != NULL) {
+        if (sd_bus_message_set_destination(msg, destination) < 0) {
+            sd_bus_message_unref(msg);
+            msg = NULL;
         }
     }
 
@@ -1835,10 +1851,10 @@ mrp_dbus_msg_type_t mrp_dbus_msg_type(mrp_dbus_msg_t *m)
 {
     uint8_t type;
 
-    if (sd_bus_message_get_type(m->msg, &type) == 0)
-        return (mrp_dbus_msg_type_t)type;
-    else
+    if (sd_bus_message_get_type(m->msg, &type) < 0)
         return MRP_DBUS_MESSAGE_TYPE_INVALID;
+    else
+        return (mrp_dbus_msg_type_t)type;
 }
 
 #define WRAP_GETTER(type, what)                                        \

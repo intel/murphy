@@ -268,6 +268,8 @@ static size_t peer_address(mrp_sockaddr_t *addrp, const char *sender,
     char           *q;
     int             l, n;
 
+    addr->db_family = MRP_AF_DBUS;
+
     q = addr->db_fqa;
     l = sizeof(addr->db_fqa);
     p = ANY_ADDRESS;
@@ -1778,5 +1780,6 @@ MRP_REGISTER_TRANSPORT(dbus, DBUS, dbus_t, dbus_resolve,
                        dbus_sendmsg, dbus_sendmsgto,
                        dbus_sendraw, dbus_sendrawto,
                        dbus_senddata, dbus_senddatato,
+                       NULL, NULL,
                        NULL, NULL,
                        NULL, NULL);

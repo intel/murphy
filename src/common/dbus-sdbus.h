@@ -198,7 +198,7 @@ static inline mrp_dbus_err_t *mrp_dbus_error_set(mrp_dbus_err_t *err,
                                                  const char *name,
                                                  const char *message)
 {
-    sd_bus_error_set(err, name, "%s", message);
+    sd_bus_error_setf(err, name, "%s", message);
 
     return err;
 }
@@ -248,8 +248,8 @@ typedef enum {
 #ifndef SD_BUS_MESSAGE_TYPE_INVALID
 #   define SD_BUS_MESSAGE_TYPE_INVALID _SD_BUS_MESSAGE_TYPE_INVALID
 #endif
-#   define MAP(t, f) MRP_DBUS_MESSAGE_TYPE_##t = SD_BUS_MESSAGE_TYPE_##f
-    MAP(INVALID      , INVALID),
+#   define MAP(t, f) MRP_DBUS_MESSAGE_TYPE_##t = SD_BUS_MESSAGE_##f
+    MAP(INVALID      , TYPE_INVALID),
     MAP(METHOD_CALL  , METHOD_CALL),
     MAP(METHOD_RETURN, METHOD_RETURN),
     MAP(ERROR        , METHOD_ERROR),
