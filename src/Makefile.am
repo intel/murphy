@@ -1,4 +1,4 @@
-SUBDIRS         = murphy-db . \
+SUBDIRS         = . \
 		  common/tests breedline/tests core/tests \
 		  core/lua-decision/tests resolver/tests \
 		  daemon/tests  plugins/tests
@@ -22,8 +22,234 @@ AM_CPPFLAGS     = -I$(top_srcdir) \
                   -I$(top_builddir) \
                   -I$(top_srcdir)/src/murphy-db/include
 BUILT_SOURCES   =
+TESTS           =
+noinst_PROGRAMS = $(TESTS)
+
 
 gen_linker_script = $(top_srcdir)/build-aux/gen-linker-script $(top_builddir)
+
+###################################
+# murphy database has three components: libmdb, libmqi, and libmql.
+#
+
+# libmdb
+
+lib_LTLIBRARIES += libmdb.la
+
+MDB_LINKER_SCRIPT = linker-script.mdb
+
+libmdb_la_CFLAGS = $(AM_CFLAGS)
+
+libmdb_ladir     = \
+		murphy-db/include/murphy-db
+
+libmdb_la_HEADERS = \
+		murphy-db/include/murphy-db/macros.h \
+		murphy-db/include/murphy-db/list.h \
+		murphy-db/include/murphy-db/handle.h \
+		murphy-db/include/murphy-db/hash.h \
+		murphy-db/include/murphy-db/sequence.h \
+		murphy-db/include/murphy-db/mqi-types.h \
+		murphy-db/include/murphy-db/mdb.h
+
+libmdb_la_SOURCES = \
+		$(libmdb_la_HEADERS) \
+		murphy-db/mdb/list.h \
+		murphy-db/mdb/handle.c \
+		murphy-db/mdb/hash.c \
+		murphy-db/mdb/sequence.c \
+		murphy-db/mdb/mqi-types.c \
+		murphy-db/mdb/column.h \
+		murphy-db/mdb/column.c \
+		murphy-db/mdb/cond.h \
+		murphy-db/mdb/cond.c \
+		murphy-db/mdb/index.h \
+		murphy-db/mdb/index.c \
+		murphy-db/mdb/log.h \
+		murphy-db/mdb/log.c \
+		murphy-db/mdb/row.h \
+		murphy-db/mdb/row.c \
+		murphy-db/mdb/table.h \
+		murphy-db/mdb/table.c \
+		murphy-db/mdb/transaction.h \
+		murphy-db/mdb/transaction.c \
+		murphy-db/mdb/trigger.h \
+		murphy-db/mdb/trigger.c
+
+libmdb_la_LDFLAGS =		\
+		-Wl,-version-script=$(abs_top_builddir)/src/$(MDB_LINKER_SCRIPT)
+
+libmdb_la_DEPENDENCIES = $(abs_top_builddir)/src/$(MDB_LINKER_SCRIPT)
+
+# linker script generation
+$(abs_top_builddir)/src/$(MDB_LINKER_SCRIPT): $(libmdb_la_HEADERS)
+	$(QUIET_GEN)$(gen_linker_script) -q \
+	    -P "$(CC)" -c "$(libmdb_la_CFLAGS)" -p "^(mdb_)|(mqi_)" -o $@ $^
+
+clean-$(MDB_LINKER_SCRIPT):
+	-rm -f $(abs_top_builddir)/src/$(MDB_LINKER_SCRIPT)
+
+clean-local:: clean-$(MDB_LINKER_SCRIPT)
+
+# libmqi
+
+lib_LTLIBRARIES += libmqi.la
+
+MQI_LINKER_SCRIPT = linker-script.mqi
+
+libmqi_la_CFLAGS = $(AM_CFLAGS)
+
+libmqi_ladir     = \
+		src/murphy-db/include/murphy-db
+
+libmqi_la_HEADERS = \
+		murphy-db/include/murphy-db/mqi.h
+
+libmqi_la_SOURCES = \
+		$(libmqi_la_HEADERS) \
+		murphy-db/mqi/mqi.c \
+		murphy-db/mqi/db.h \
+		murphy-db/mqi/mdb-backend.h \
+		murphy-db/mqi/mdb-backend.c
+
+libmqi_la_LDFLAGS =		\
+		-Wl,-version-script=$(abs_top_builddir)/src/$(MQI_LINKER_SCRIPT)
+
+libmqi_la_LIBADD = libmdb.la
+
+libmqi_la_DEPENDENCIES = $(abs_top_builddir)/src/$(MQI_LINKER_SCRIPT) libmdb.la
+
+# linker script generation
+$(abs_top_builddir)/src/$(MQI_LINKER_SCRIPT): $(libmqi_la_HEADERS)
+	$(QUIET_GEN)$(gen_linker_script) -q \
+	    -P "$(CC)" -c "$(libmqi_la_CFLAGS)" -p "^mqi_" -o $@ $^
+
+clean-$(MQI_LINKER_SCRIPT):
+	-rm -f $(abs_top_builddir)/src/$(MQI_LINKER_SCRIPT)
+
+clean-local:: clean-$(MQI_LINKER_SCRIPT)
+
+# libmql
+
+lib_LTLIBRARIES += libmql.la
+
+MQL_PARSER_PREFIX   = yy_mql_
+BUILT_SOURCES      += murphy-db/mql/mql-scanner.c murphy-db/mql/mql-parser.c
+
+MQL_LINKER_SCRIPT = linker-script.mql
+
+libmql_la_CFLAGS = $(AM_CFLAGS)
+
+libmql_ladir     = \
+		murphy-db/include/murphy-db
+
+libmql_la_HEADERS = \
+		murphy-db/include/murphy-db/mql.h \
+		murphy-db/include/murphy-db/mql-statement.h \
+		murphy-db/include/murphy-db/mql-result.h \
+		murphy-db/include/murphy-db/mql-trigger.h
+
+libmql_la_SOURCES = \
+		$(libmql_la_HEADERS) \
+		murphy-db/mql/mql-scanner.c \
+		murphy-db/mql/mql-parser.c \
+		murphy-db/mql/statement.c \
+		murphy-db/mql/result.c \
+		murphy-db/mql/trigger.c \
+		murphy-db/mql/transaction.c
+
+libmql_la_LDFLAGS =		\
+		-Wl,-version-script=$(abs_top_builddir)/src/$(MQL_LINKER_SCRIPT)
+
+libmql_la_LIBADD = libmqi.la libmdb.la
+
+libmql_la_DEPENDENCIES = $(abs_top_builddir)/src/$(MQL_LINKER_SCRIPT) libmqi.la
+
+murphy-db/mql/mql-parser.h murphy-db/mql/mql-parser.c: murphy-db/mql/mql-parser.y
+	$(YACCCOMPILE) -p $(MQL_PARSER_PREFIX) $<
+	mv -f y.tab.h murphy-db/mql/mql-parser.h
+	mv -f y.tab.c murphy-db/mql/mql-parser.c
+
+murphy-db/mql/mql-scanner.c: murphy-db/mql/mql-scanner.l murphy-db/mql/mql-parser.c
+	$(LEXCOMPILE) -P $(MQL_PARSER_PREFIX) $<
+	mv lex.$(MQL_PARSER_PREFIX).c $@
+
+clean-parser:
+	-rm -f murphy-db/mql/mql-parser.[hc] *.tab.[hc]
+
+clean-scanner:
+	-rm -f murphy-db/mql/mql-scanner.c
+
+# linker script generation
+$(abs_top_builddir)/src/$(MQL_LINKER_SCRIPT): $(libmql_la_HEADERS)
+	$(QUIET_GEN)$(gen_linker_script) -q \
+	    -P "$(CC)" -c "$(libmql_la_CFLAGS)" -p "^mql_" -o $@ $^
+
+clean-$(MQL_LINKER_SCRIPT):
+	-rm -f $(abs_top_builddir)/src/$(MQL_LINKER_SCRIPT)
+
+clean-local:: clean-parser clean-scanner clean-$(MQL_LINKER_SCRIPT)
+
+EXTRA_DIST      += murphy-db.pc
+pkgconfig_DATA  += murphy-db.pc
+
+# murphy db pkg-config
+
+murphy-db.pc: murphy-db/murphy-db.pc.in
+	sed -e 's![@]prefix[@]!$(prefix)!g' \
+            -e 's![@]exec_prefix[@]!$(exec_prefix)!g' \
+            -e 's![@]includedir[@]!$(includedir)!g' \
+            -e 's![@]libdir[@]!$(libdir)!g' \
+            -e 's![@]PACKAGE_VERSION[@]!$(PACKAGE_VERSION)!g' \
+        $< > $@
+
+clean-murphy-db-pc:
+	rm -f murphy-db.pc
+
+clean-local:: clean-murphy-db-pc
+
+# murphy db tests
+
+CHECK_LIBMDB_LOG = check-libmdb.log
+CHECK_LIBMQI_LOG = check-libmqi.log
+CHECK_LIBMQL_LOG = check-libmql.log
+
+MURPHY_DB_TESTS  =
+
+if HAVE_CHECK
+MURPHY_DB_TESTS += check-libmdb check-libmqi check-libmql
+TESTS           += $(MURPHY_DB_TESTS)
+
+#
+# MDB tests
+#
+check_libmdb_SOURCES = murphy-db/tests/check-libmdb.c
+check_libmdb_CFLAGS  = @CHECK_CFLAGS@ -I$(srcdir)/../include -g3 -O0 \
+                       -DLOGFILE=\"$(CHECK_LIBMDB_LOG)\"
+check_libmdb_LDADD   = @CHECK_LIBS@ libmdb.la
+
+#
+# MQI tests
+#
+check_libmqi_SOURCES = murphy-db/tests/check-libmqi.c
+check_libmqi_CFLAGS  = @CHECK_CFLAGS@ -I$(srcdir)/../include -g3 -O0 \
+                       -DLOGFILE=\"$(CHECK_LIBMQI_LOG)\" \
+                       $(YFLAGS) $(AM_YFLAGS)
+check_libmqi_LDADD   = @CHECK_LIBS@ libmqi.la libmdb.la
+
+
+#
+# MQL tests
+#
+check_libmql_SOURCES = murphy-db/tests/check-libmql.c
+check_libmql_CFLAGS  = @CHECK_CFLAGS@ -I$(srcdir)/../include -g3 -O0 \
+                       -DLOGFILE=\"$(CHECK_LIBMQL_LOG)\"
+check_libmql_LDADD   = @CHECK_LIBS@ libmql.la libmqi.la libmdb.la
+endif
+
+clean-local::
+	rm -f $(CHECK_LIBMDB_LOG) $(CHECK_LIBMQI_LOG) $(CHECK_LIBMQL_LOG) \
+              $(MURPHY_DB_TESTS)
 
 ###################################
 # murphy common library
@@ -99,7 +325,7 @@ libmurphy_common_la_CFLAGS  =		\
 		$(JSON_CFLAGS)
 
 libmurphy_common_la_LDFLAGS =					\
-		-Wl,-version-script=linker-script.common	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.common	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_common_la_LIBADD  = 		\
@@ -107,7 +333,7 @@ libmurphy_common_la_LIBADD  = 		\
 		-lrt
 
 libmurphy_common_la_DEPENDENCIES =	\
-		linker-script.common	\
+		$(abs_top_builddir)/src/linker-script.common	\
 		$(filter %.la, $(libmurphy_common_la_LIBADD))
 
 libcommonincludedir      = $(includedir)/murphy/common
@@ -138,12 +364,12 @@ endif
 
 
 # linker script generation
-linker-script.common: $(libmurphy_common_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.common: $(libmurphy_common_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_common_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.common
+	-rm -f $(abs_top_builddir)/src/linker-script.common
 
 ###################################
 # murphy lua utilities
@@ -180,7 +406,7 @@ libmurphy_lua_utils_la_CFLAGS =					\
 		$(LUA_CFLAGS)
 
 libmurphy_lua_utils_la_LDFLAGS =				\
-		-Wl,-version-script=linker-script.lua-utils	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.lua-utils	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_lua_utils_la_LIBADD =	    				\
@@ -188,16 +414,16 @@ libmurphy_lua_utils_la_LIBADD =	    				\
 		$(LUA_LIBS)
 
 libmurphy_lua_utils_la_DEPENDENCIES =				\
-		linker-script.lua-utils				\
+		$(abs_top_builddir)/src/linker-script.lua-utils				\
 		$(filter %.la, $(libmurphy_lua_utils_la_LIBADD))
 
 # lua-utils linker script generation
-linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.lua-utils: $(libmurphy_lua_utils_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_lua_utils_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.lua-utils
+	-rm -f $(abs_top_builddir)/src/linker-script.lua-utils
 
 ###################################
 # murphy lua decision network
@@ -226,28 +452,28 @@ libmurphy_lua_decision_la_CFLAGS =				\
 		$(LUA_CFLAGS)
 
 libmurphy_lua_decision_la_LDFLAGS =				\
-		-Wl,-version-script=linker-script.lua-decision	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.lua-decision	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_lua_decision_la_LIBADD =	\
 		libmurphy-common.la	\
 		libmurphy-lua-utils.la  \
-		murphy-db/mql/libmql.la \
-		murphy-db/mqi/libmqi.la \
-		murphy-db/mdb/libmdb.la \
+		libmql.la \
+		libmqi.la \
+		libmdb.la \
 		$(LUA_LIBS)
 
 libmurphy_lua_decision_la_DEPENDENCIES =	\
-		linker-script.lua-decision	\
+		$(abs_top_builddir)/src/linker-script.lua-decision	\
 		$(filter %.la, $(libmurphy_lua_decision_la_LIBADD))
 
 # lua-decision linker script generation
-linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.lua-decision: $(libmurphy_lua_decision_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
 	    -P "$(CC)" -c "$(libmurphy_lua_decision_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.lua-decision
+	-rm -f $(abs_top_builddir)/src/linker-script.lua-decision
 
 ###################################
 # murphy core library
@@ -325,32 +551,32 @@ libmurphy_core_la_CFLAGS  =		\
 		$(SMACK_CFLAGS)
 
 libmurphy_core_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.core \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.core \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_core_la_LIBADD  =			\
 		libmurphy-common.la 		\
 		libmurphy-lua-decision.la	\
 		libmurphy-lua-utils.la		\
-		murphy-db/mql/libmql.la 	\
-		murphy-db/mqi/libmqi.la 	\
-		murphy-db/mdb/libmdb.la		\
+		libmql.la 			\
+		libmqi.la 			\
+		libmdb.la			\
 		$(LUA_LIBS) 			\
 		$(SMACK_LIBS)			\
 		-ldl
 
 libmurphy_core_la_DEPENDENCIES =		\
-		linker-script.core        	\
+		$(abs_top_builddir)/src/linker-script.core        	\
 		$(filter %.la, $(libmurphy_core_la_LIBADD))
 
 # core linker script generation
-linker-script.core: $(libmurphy_core_la_HEADERS) \
+$(abs_top_builddir)/src/linker-script.core: $(libmurphy_core_la_HEADERS) \
 		    $(libmurphy_core_lua_bindings_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_core_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.core
+	-rm -f $(abs_top_builddir)/src/linker-script.core
 
 ###################################
 # murphy dbus library
@@ -417,7 +643,7 @@ libmurphy_libdbus_la_CFLAGS = 		\
 		$(LIBDBUS_CFLAGS)
 
 libmurphy_libdbus_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.libdbus \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.libdbus \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_libdbus_la_LIBADD  = 		\
@@ -426,7 +652,7 @@ libmurphy_libdbus_la_LIBADD  = 		\
 		-lrt
 
 libmurphy_libdbus_la_DEPENDENCIES =	\
-		linker-script.libdbus	\
+		$(abs_top_builddir)/src/linker-script.libdbus	\
 		$(filter %.la, $(libmurphy_libdbus_la_LIBADD))
 
 libmurphy_libdbusdir      = $(includedir)/murphy/dbus
@@ -434,12 +660,12 @@ libmurphy_libdbus_HEADERS = $(libmurphy_libdbus_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.libdbus: $(murphy_libdbus_headers)
+$(abs_top_builddir)/src/linker-script.libdbus: $(murphy_libdbus_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_libdbus_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.libdbus
+	-rm -f $(abs_top_builddir)/src/linker-script.libdbus
 
 # libdbus-based library with full abstraction
 murphy_dbus_libdbus_headers =		\
@@ -469,7 +695,7 @@ libmurphy_dbus_libdbus_la_CFLAGS = 	\
 		$(LIBDBUS_CFLAGS)
 
 libmurphy_dbus_libdbus_la_LDFLAGS =	\
-		-Wl,-version-script=linker-script.dbus-libdbus \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.dbus-libdbus \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_dbus_libdbus_la_LIBADD  = 	\
@@ -477,7 +703,7 @@ libmurphy_dbus_libdbus_la_LIBADD  = 	\
 		-lrt $(LIBDBUS_LIBS)
 
 libmurphy_dbus_libdbus_la_DEPENDENCIES =	\
-		linker-script.dbus-libdbus	\
+		$(abs_top_builddir)/src/linker-script.dbus-libdbus	\
 		$(filter %.la, $(libmurphy_dbus_libdbus_la_LIBADD))
 
 libmurphy_dbus_libdbusdir      = $(includedir)/murphy/dbus
@@ -485,12 +711,12 @@ libmurphy_dbus_libdbus_HEADERS = $(libmurphy_dbus_libdbus_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.dbus-libdbus: $(murphy_dbus_libdbus_headers)
+$(abs_top_builddir)/src/linker-script.dbus-libdbus: $(murphy_dbus_libdbus_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_dbus_libdbus_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.dbus-libdbus
+	-rm -f $(abs_top_builddir)/src/linker-script.dbus-libdbus
 
 # systemd-bus based library
 murphy_dbus_sdbus_headers = 			\
@@ -520,14 +746,14 @@ libmurphy_dbus_sdbus_la_CFLAGS  =	\
 		$(SDBUS_CFLAGS)
 
 libmurphy_dbus_sdbus_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.dbus-sdbus \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.dbus-sdbus \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_dbus_sdbus_la_LIBADD  = 		\
 		-lrt $(SDBUS_LIBS)
 
 libmurphy_dbus_sdbus_la_DEPENDENCIES =		\
-		linker-script.dbus-sdbus	\
+		$(abs_top_builddir)/src/linker-script.dbus-sdbus	\
 		$(filter %.la, $(libmurphy_dbus_sdbus_la_LIBADD))
 
 libmurphy_dbus_sdbusdir      = $(includedir)/murphy/dbus
@@ -535,12 +761,12 @@ libmurphy_dbus_sdbus_HEADERS = $(libmurphy_dbus_sdbus_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.dbus-sdbus: $(murphy_dbus_sdbus_headers)
+$(abs_top_builddir)/src/linker-script.dbus-sdbus: $(murphy_dbus_sdbus_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_dbus_sdbus_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.sd-bus
+	-rm -f $(abs_top_builddir)/src/linker-script.sd-bus
 
 ###################################
 # murphy pulse glue library
@@ -569,7 +795,7 @@ libmurphy_pulse_la_CFLAGS  =		\
 		$(PULSE_CFLAGS)
 
 libmurphy_pulse_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.pulse \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.pulse \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_pulse_la_LIBADD  =		\
@@ -577,7 +803,7 @@ libmurphy_pulse_la_LIBADD  =		\
 		$(PULSE_LIBS)
 
 libmurphy_pulse_la_DEPENDENCIES =	\
-		linker-script.pulse	\
+		$(abs_top_builddir)/src/linker-script.pulse	\
 		$(filter %.la, $(libmurphy_pulse_la_LIBADD))
 
 libpulseincludedir      = $(includedir)/murphy/pulse
@@ -585,13 +811,13 @@ libpulseinclude_HEADERS = $(libmurphy_pulse_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.pulse: $(murphy_pulse_headers)
+$(abs_top_builddir)/src/linker-script.pulse: $(murphy_pulse_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_pulse_la_CFLAGS)" \
             -p '^mrp_|^_mrp|^pa_' -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.pulse
+	-rm -f $(abs_top_builddir)/src/linker-script.pulse
 
 ###################################
 # murphy ecore glue library
@@ -618,7 +844,7 @@ libmurphy_ecore_la_CFLAGS  =		\
 		$(ECORE_CFLAGS)
 
 libmurphy_ecore_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.ecore \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.ecore \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_ecore_la_LIBADD  =		\
@@ -626,7 +852,7 @@ libmurphy_ecore_la_LIBADD  =		\
 		$(ECORE_LIBS)
 
 libmurphy_ecore_la_DEPENDENCIES =	\
-		linker-script.ecore	\
+		$(abs_top_builddir)/src/linker-script.ecore	\
 		$(filter %.la, $(libmurphy_ecore_la_LIBADD))
 
 libecoreincludedir      = $(includedir)/murphy/ecore
@@ -634,12 +860,12 @@ libecoreinclude_HEADERS = $(libmurphy_ecore_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.ecore: $(murphy_ecore_headers)
+$(abs_top_builddir)/src/linker-script.ecore: $(murphy_ecore_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
                 -P "$(CC)" -c "$(libmurphy_ecore_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.ecore
+	-rm -f $(abs_top_builddir)/src/linker-script.ecore
 
 ###################################
 # murphy glib glue library
@@ -666,7 +892,7 @@ libmurphy_glib_la_CFLAGS  =		\
 		$(GLIB_CFLAGS)
 
 libmurphy_glib_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.glib \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.glib \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_glib_la_LIBADD  =		\
@@ -674,7 +900,7 @@ libmurphy_glib_la_LIBADD  =		\
 		$(GLIB_LIBS)
 
 libmurphy_glib_la_DEPENDENCIES =	\
-		linker-script.glib	\
+		$(abs_top_builddir)/src/linker-script.glib	\
 		$(filter %.la, $(libmurphy_glib_la_LIBADD))
 
 libglibincludedir      = $(includedir)/murphy/glib
@@ -682,12 +908,12 @@ libglibinclude_HEADERS = $(libmurphy_glib_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.glib: $(murphy_glib_headers)
+$(abs_top_builddir)/src/linker-script.glib: $(murphy_glib_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_glib_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.glib
+	-rm -f $(abs_top_builddir)/src/linker-script.glib
 
 ###################################
 # murphy qt glue library
@@ -716,13 +942,13 @@ libmurphy_qt_la_CPPFLAGS  =		\
 		$(QTCORE_CFLAGS)
 
 libmurphy_qt_la_LDFLAGS =		\
-		-Wl,-version-script=linker-script.qt \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.qt \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_qt_la_LIBADD  = $(QTCORE_LIBS)
 
 libmurphy_qt_la_DEPENDENCIES =		\
-		linker-script.qt	\
+		$(abs_top_builddir)/src/linker-script.qt	\
 		$(filter %.la, $(libmurphy_qt_la_LIBADD))
 
 libqtincludedir      = $(includedir)/murphy/qt
@@ -734,13 +960,13 @@ common/qt-glue-priv.moc.h: common/qt-glue-priv.h
 endif
 
 # linker script generation
-linker-script.qt: $(murphy_qt_headers)
+$(abs_top_builddir)/src/linker-script.qt: $(murphy_qt_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_qt_la_CPPFLAGS) -DQT_ENABLED=1" \
 		-o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.qt
+	-rm -f $(abs_top_builddir)/src/linker-script.qt
 
 ###################################
 # murphy resolver library
@@ -785,18 +1011,18 @@ libmurphy_resolver_la_CFLAGS =			\
                 -I$(srcdir)/resolver/scripting/simple
 
 libmurphy_resolver_la_LDFLAGS =			\
-		-Wl,-version-script=linker-script.resolver \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.resolver \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resolver_la_LIBADD =	    	\
 		libmurphy-core.la   	\
 		libmurphy-common.la 	\
-		murphy-db/mql/libmql.la \
-		murphy-db/mqi/libmqi.la \
-		murphy-db/mdb/libmdb.la
+		libmql.la 		\
+		libmqi.la 		\
+		libmdb.la
 
 libmurphy_resolver_la_DEPENDENCIES =	\
-		linker-script.resolver  \
+		$(abs_top_builddir)/src/linker-script.resolver  \
 		$(filter %.la, $(libmurphy_resolver_la_LIBADD))
 
 # resolver lexical analyser and parser generation
@@ -810,12 +1036,12 @@ resolver/parser.h resolver/parser.c: resolver/parser.y
 	$(YACCCOMPILE) -p $(RESOLVER_PARSER_PREFIX) $< -o resolver/parser.c
 
 # resolver linker script generation
-linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.resolver: $(libmurphy_resolver_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_resolver_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.resolver
+	-rm -f $(abs_top_builddir)/src/linker-script.resolver
 
 # simple interpreter lexical analyser and parser generation
 SIMPLE_PARSER_PREFIX  = yy_smpl_
@@ -879,30 +1105,30 @@ libmurphy_resource_backend_la_CFLAGS =		\
 		$(LUA_CFLAGS)
 
 libmurphy_resource_backend_la_LDFLAGS =                        \
-		-Wl,-version-script=linker-script.resource_backend \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.resource_backend \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resource_backend_la_LIBADD =     \
 		libmurphy-core.la          \
 		libmurphy-common.la        \
 		libmurphy-lua-utils.la     \
-		murphy-db/mql/libmql.la    \
-		murphy-db/mqi/libmqi.la    \
-		murphy-db/mdb/libmdb.la    \
+		libmql.la		   \
+		libmqi.la		   \
+		libmdb.la		   \
 		$(LUA_LIBS)
 
 libmurphy_resource_backend_la_DEPENDENCIES =	\
-		linker-script.resource_backend	\
+		$(abs_top_builddir)/src/linker-script.resource_backend	\
 		$(filter %.la, $(libmurphy_resource_backend_la_LIBADD))
 endif
 
 # resource linker script generation
-linker-script.resource_backend: $(libmurphy_resource_backend_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.resource_backend: $(libmurphy_resource_backend_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libmurphy_resource_backend_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.resource_backend
+	-rm -f $(abs_top_builddir)/src/linker-script.resource_backend
 
 ##########################
 # readline replacement
@@ -926,25 +1152,25 @@ libbreedline_la_CFLAGS  =		\
 		-I$(top_srcdir)/src
 
 libbreedline_la_LDFLAGS =					\
-		-Wl,-version-script=linker-script.breedline	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.breedline	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libbreedline_la_LIBADD =
 
 libbreedline_la_DEPENDENCIES =			\
-		linker-script.breedline		\
+		$(abs_top_builddir)/src/linker-script.breedline		\
 		$(filter %.la, $(libbreedline_la_LIBADD))
 
 libbreedlineincludedir      = $(includedir)/breedline
 libbreedlineinclude_HEADERS = $(libbreedline_la_HEADERS)
 
 # linker script generation
-linker-script.breedline: $(libbreedline_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.breedline: $(libbreedline_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libbreedline_la_CFLAGS)" -p '^brl_' -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.breedline
+	-rm -f $(abs_top_builddir)/src/linker-script.breedline
 
 ##########################
 # breedline murphy glue library
@@ -962,7 +1188,7 @@ libbreedline_murphy_la_CFLAGS  = \
 		-I$(top_srcdir)/src
 
 libbreedline_murphy_la_LDFLAGS =	\
-		-Wl,-version-script=linker-script.breedline-murphy	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.breedline-murphy	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libbreedline_murphy_la_LIBADD = 	\
@@ -970,20 +1196,20 @@ libbreedline_murphy_la_LIBADD = 	\
 		libbreedline.la
 
 libbreedline_murphy_la_DEPENDENCIES =		\
-		linker-script.breedline-murphy	\
+		$(abs_top_builddir)/src/linker-script.breedline-murphy	\
 		$(filter %.la,$(libbreedline_murphy_la_LIBADD))
 
 libbreedline_murphyincludedir      = $(includedir)/breedline
 libbreedline_murphyinclude_HEADERS = $(libbreedline_murphy_la_HEADERS)
 
 # linker script generation
-linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
             -P "$(CC)" -c "$(libbreedline_murphy_la_CFLAGS)" \
             -p '^brl_' -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.breedline-murphy
+	-rm -f $(abs_top_builddir)/src/linker-script.breedline-murphy
 
 ##########################
 # breedline glib glue library
@@ -1007,7 +1233,7 @@ libbreedline_glib_la_CFLAGS  = \
 		$(GLIB_CFLAGS)
 
 libbreedline_glib_la_LDFLAGS = \
-		-Wl,-version-script=linker-script.breedline-glib	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.breedline-glib	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libbreedline_glib_la_LIBADD =		\
@@ -1015,7 +1241,7 @@ libbreedline_glib_la_LIBADD =		\
 		$(GLIB_LIBS)
 
 libbreedline_glib_la_DEPENDENCIES =		\
-		linker-script.breedline-glib	\
+		$(abs_top_builddir)/src/linker-script.breedline-glib	\
 		$(filter %.la, $(libbreedline_glib_la_LIBADD))
 
 libbreedline_glibincludedir      = $(includedir)/breedline
@@ -1023,13 +1249,13 @@ libbreedline_glibinclude_HEADERS = $(libbreedline_glib_la_HEADERS)
 endif
 
 # linker script generation
-linker-script.breedline-glib: $(breedline_glib_headers)
+$(abs_top_builddir)/src/linker-script.breedline-glib: $(breedline_glib_headers)
 	$(QUIET_GEN)$(gen_linker_script) -q \
 	    -P "$(CC)" -c "$(libbreedline_glib_la_CFLAGS)" -p '^brl_' \
 	    -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.breedline-glib
+	-rm -f $(abs_top_builddir)/src/linker-script.breedline-glib
 
 ###################################
 # murphy resource external library
@@ -1059,7 +1285,7 @@ libmurphy_resource_la_CFLAGS =          \
         $(AM_CFLAGS)
 
 libmurphy_resource_la_LDFLAGS =	\
-		-Wl,-version-script=linker-script.resource	\
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.resource	\
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_resource_la_LIBADD =      \
@@ -1067,16 +1293,16 @@ libmurphy_resource_la_LIBADD =      \
 
 libmurphy_resource_la_DEPENDENCIES =	\
 		libmurphy-common.la	\
-		linker-script.resource	\
+		$(abs_top_builddir)/src/linker-script.resource	\
 		$(filter %.la, $(libmurphy_resource_la_LIBADD))
 
 # linker script generation
-linker-script.resource: $(libmurphy_resource_la_HEADERS)
+$(abs_top_builddir)/src/linker-script.resource: $(libmurphy_resource_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
 		-P "$(CC)" -c "$(libmurphy_resource_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.resource
+	-rm -f $(abs_top_builddir)/src/linker-script.resource
 
 # resource-api-test
 bin_PROGRAMS += resource-api-test
@@ -1323,18 +1549,18 @@ libmurphy_plugin_domain_control_la_CFLAGS =			 \
 		$(JSON_CFLAGS)
 
 libmurphy_plugin_domain_control_la_LDFLAGS =			 \
-		-Wl,-version-script=linker-script.domain-control \
+		-Wl,-version-script=$(abs_top_builddir)/src/linker-script.domain-control \
 		-version-info @MURPHY_VERSION_INFO@
 
 libmurphy_plugin_domain_control_la_LIBADD =		\
 		libmurphy-core.la   			\
-		libmurphy-common.la 			\
-		murphy-db/mql/libmql.la			\
-		murphy-db/mqi/libmqi.la			\
-		murphy-db/mdb/libmdb.la
+		libmurphy-common.la			\
+		libmql.la				\
+		libmqi.la				\
+		libmdb.la
 
 libmurphy_plugin_domain_control_la_DEPENDENCIES =	\
-		linker-script.domain-control		\
+		$(abs_top_builddir)/src/linker-script.domain-control		\
 	$(filter %.la, $(libmurphy_plugin_domain_control_la_LIBADD))
 else
 plugin_domain_control_la_SOURCES = $(DOMAIN_CONTROL_PLUGIN_SOURCES)
@@ -1364,9 +1590,9 @@ libmurphy_domain_controller_la_CFLAGS   =		\
 		$(JSON_CFLAGS)
 libmurphy_domain_controller_la_LIBADD   = 	\
 		libmurphy-common.la		\
-		murphy-db/mql/libmql.la		\
-		murphy-db/mqi/libmqi.la		\
-		murphy-db/mdb/libmdb.la		\
+		libmql.la			\
+		libmqi.la			\
+		libmdb.la			\
 		$(JSON_LIBS)
 
 if WEBSOCKETS_ENABLED
@@ -1389,12 +1615,12 @@ test_domain_controller_LDADD   = libmurphy-domain-controller.la \
 endif
 
 # linkedin domain control plugin linker script generation
-linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
+$(abs_top_builddir)/src/linker-script.domain-control: $(DOMAIN_CONTROL_PLUGIN_LOADER:%.c=%.h)
 	$(QUIET_GEN)$(gen_linker_script) -q \
 		-P "$(CC)" -c "$(libmurphy_domain_controller_la_CFLAGS)" -o $@ $^
 
 clean-linker-script::
-	-rm -f linker-script.domain-control
+	-rm -f $(abs_top_builddir)/src/linker-script.domain-control
 
 # Lua plugin
 LUA_PLUGIN_SOURCES = plugins/plugin-lua.c
@@ -1540,5 +1766,5 @@ murphy_console_LDFLAGS = -rdynamic
 endif
 
 # cleanup
-clean-local:: # clean-linker-script
-	-rm -f *~
+#clean-local:: # clean-linker-script
+#	-rm -f *~

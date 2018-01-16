@@ -564,7 +564,7 @@ esac
 internal=""; it=""
 external=""; et=""
 disabled=""; dt=""
-for plugin in $all_plugins; do 
+for plugin in $all_plugins; do
     type=internal
 
     for p in ${dynamic_plugins//,/ }; do
@@ -633,7 +633,7 @@ AM_CONDITIONAL(BUILTIN_PLUGIN_LUA,      [check_if_internal lua])
 AM_CONDITIONAL(BUILTIN_PLUGIN_SYSTEMD,  [check_if_internal systemd])
 
 # Check for Check (unit test framework).
-PKG_CHECK_MODULES(CHECK, 
+PKG_CHECK_MODULES(CHECK,
                   check >= 0.9.4,
                   [has_check="yes"], [has_check="no"])
 AM_CONDITIONAL(HAVE_CHECK, test "x$has_check" = "xyes")
@@ -751,12 +751,6 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/breedline/breedline-murphy.pc
 		 src/breedline/breedline-glib.pc
 		 src/breedline/tests/Makefile
-		 src/murphy-db/Makefile
-		 src/murphy-db/mdb/Makefile
-		 src/murphy-db/mqi/Makefile
-		 src/murphy-db/mql/Makefile
-		 src/murphy-db/include/Makefile
-		 src/murphy-db/tests/Makefile
 		 src/resolver/murphy-resolver.pc
 		 src/resolver/tests/Makefile
 		 src/plugins/domain-control/murphy-domain-controller.pc

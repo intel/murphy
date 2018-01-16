@@ -16,7 +16,7 @@ decision_test_LDADD   =	../../../libmurphy-lua-utils.la		\
 			../../../libmurphy-resolver.la		\
 			../../../libmurphy-core.la   		\
 			../../../libmurphy-common.la 		\
-			../../../murphy-db/mql/libmql.la        \
-			../../../murphy-db/mqi/libmqi.la        \
-			../../../murphy-db/mdb/libmdb.la        \
+			../../../libmql.la			\
+			../../../libmqi.la			\
+			../../../libmdb.la			\
 			$(LUA_LIBS)

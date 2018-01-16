@@ -50,5 +50,5 @@ check-git-hooks:
 	fi
 
 # cleanup
-clean-local:
+clean-local::
 	rm -f *~
