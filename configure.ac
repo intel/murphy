@@ -729,13 +729,8 @@ fi
 AC_CONFIG_FILES([build-aux/shave
 		 build-aux/shave-libtool
 		 Makefile
-                 utils/Makefile
+		 utils/Makefile
 		 src/Makefile
-		 src/common/tests/Makefile
-		 src/core/tests/Makefile
-		 src/core/lua-decision/tests/Makefile
-		 src/daemon/tests/Makefile
-		 src/plugins/tests/Makefile
 		 src/common/murphy-common.pc
 		 src/common/murphy-libdbus.pc
 		 src/common/murphy-dbus-libdbus.pc
@@ -743,16 +738,14 @@ AC_CONFIG_FILES([build-aux/shave
 		 src/common/murphy-pulse.pc
 		 src/common/murphy-ecore.pc
 		 src/common/murphy-glib.pc
-                 src/common/murphy-qt.pc
+		 src/common/murphy-qt.pc
 		 src/core/murphy-core.pc
-                 src/core/lua-utils/murphy-lua-utils.pc
-                 src/core/lua-decision/murphy-lua-decision.pc
+		 src/core/lua-utils/murphy-lua-utils.pc
+		 src/core/lua-decision/murphy-lua-decision.pc
 		 src/breedline/breedline.pc
 		 src/breedline/breedline-murphy.pc
 		 src/breedline/breedline-glib.pc
-		 src/breedline/tests/Makefile
 		 src/resolver/murphy-resolver.pc
-		 src/resolver/tests/Makefile
 		 src/plugins/domain-control/murphy-domain-controller.pc
 		 doc/Makefile
 		 doc/plugin-developer-guide/Makefile

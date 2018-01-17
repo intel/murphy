@@ -1,8 +1,3 @@
-SUBDIRS         = . \
-		  common/tests breedline/tests core/tests \
-		  core/lua-decision/tests resolver/tests \
-		  daemon/tests  plugins/tests
-
 AM_CFLAGS       = $(WARNING_CFLAGS) $(AM_CPPFLAGS) \
 		  -DSYSCONFDIR=\"@SYSCONFDIR@\" -DLIBDIR=\"@LIBDIR@\"
 MURPHY_CFLAGS   =
@@ -1767,5 +1762,210 @@ murphy_console_LDFLAGS = -rdynamic
 endif
 
 # cleanup
-#clean-local:: # clean-linker-script
-#	-rm -f *~
+clean-local:: clean-linker-script
+
+
+###################################
+# Various tests: resolver, daemon, plugins
+#
+
+TESTS     += parser-test
+
+# parser test
+parser_test_SOURCES = \
+		resolver/tests/parser-test.c
+parser_test_CFLAGS  = \
+		$(AM_CFLAGS) \
+		$(WARNING_CFLAGS) $(JSON_CFLAGS)
+parser_test_LDADD   = libmurphy-resolver.la \
+		libmqi.la \
+        libmdb.la \
+        libmurphy-common.la
+
+TESTS     += mm-test hash-test hash12-test msg-test transport-test \
+		internal-transport-test process-watch-test native-test \
+		mkdir-test path-test mask-test hash-table-test fragbuf-test
+
+if LIBDBUS_ENABLED
+TESTS     += mainloop-test dbus-test
+endif
+
+# memory management test
+mm_test_SOURCES = common/tests/mm-test.c
+mm_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+mm_test_LDADD   = libmurphy-common.la
+
+# hash table test
+hash_test_SOURCES = common/tests/hash-test.c
+hash_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+hash_test_LDADD   = libmurphy-common.la
+
+# hash12-test
+hash12_test_SOURCES = common/tests/hash12-test.c
+hash12_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+hash12_test_LDADD   = libmurphy-common.la
+
+# mainloop test
+mainloop_test_SOURCES = common/tests/mainloop-test.c
+mainloop_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(GLIB_CFLAGS) $(LIBDBUS_CFLAGS)
+mainloop_test_LDADD   = libmurphy-common.la $(GLIB_LIBS) $(LIBDBUS_LIBS)
+if PULSE_ENABLED
+mainloop_test_CFLAGS += $(WARNING_CFLAGS) $(PULSE_CFLAGS)
+mainloop_test_LDADD  += libmurphy-pulse.la $(PULSE_LIBS)
+endif
+if ECORE_ENABLED
+mainloop_test_CFLAGS += $(WARNING_CFLAGS) $(ECORE_CFLAGS)
+mainloop_test_LDADD  += libmurphy-ecore.la $(ECORE_LIBS)
+endif
+if GLIB_ENABLED
+mainloop_test_CFLAGS += $(WARNING_CFLAGS) $(GLIB_CFLAGS)
+mainloop_test_LDADD  += libmurphy-glib.la $(GLIB_LIBS)
+endif
+
+if QT_ENABLED
+noinst_LTLIBRARIES = libmainloop-qt-test.la
+libmainloop_qt_test_la_SOURCES  = common/tests/mainloop-qt-test.cpp
+libmainloop_qt_test_la_CPPFLAGS = $(WARNING_CFLAGS) $(AM_CFLAGS) $(QTCORE_CFLAGS)
+libmainloop_qt_test_la_LIBADD   = libmurphy-common.la \
+		libmurphy-qt.la $(QTCORE_LIBS)
+mainloop_test_LDADD            += libmainloop-qt-test.la $(QTCORE_LIBS) -lstdc++
+endif
+
+# msg test
+msg_test_SOURCES = common/tests/msg-test.c
+msg_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+msg_test_LDADD   = libmurphy-common.la
+
+# native type test
+native_test_SOURCES = common/tests/native-test.c
+native_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+native_test_LDADD   = libmurphy-common.la
+
+# transport test
+transport_test_SOURCES = common/tests/transport-test.c
+transport_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+transport_test_LDADD   = libmurphy-common.la
+
+# internal transport test
+internal_transport_test_SOURCES = common/tests/internal-transport-test.c
+internal_transport_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+internal_transport_test_LDADD   = libmurphy-common.la
+
+# process watch test
+process_watch_test_SOURCES = common/tests/process-test.c
+process_watch_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+process_watch_test_LDADD   = libmurphy-common.la
+
+if LIBDBUS_ENABLED
+transport_test_LDADD  += libmurphy-libdbus.la
+
+TESTS     += mainloop-test
+
+# DBUS tests
+TESTS              += dbus-test
+dbus_test_SOURCES = common/tests/dbus-test.c
+dbus_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(LIBDBUS_CFLAGS)
+dbus_test_LDADD   = libmurphy-libdbus.la libmurphy-common.la $(LIBDBUS_LIBS)
+
+TESTS     += libdbus-test libdbus-transport-test
+libdbus_test_SOURCES = common/tests/libdbus-test.c
+libdbus_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(LIBDBUS_CFLAGS)
+libdbus_test_LDADD   = libmurphy-dbus-libdbus.la libmurphy-common.la $(LIBDBUS_LIBS)
+
+libdbus_transport_test_SOURCES = common/tests/libdbus-transport-test.c
+libdbus_transport_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+libdbus_transport_test_LDADD   = libmurphy-common.la \
+                                 libmurphy-dbus-libdbus.la
+endif
+
+if SDBUS_ENABLED
+TESTS     += sdbus-test dbus-sdbus-test sdbus-transport-test sdbus-error-message
+
+sdbus_test_SOURCES = common/tests/sdbus-test.c
+sdbus_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(SDBUS_CFLAGS)
+sdbus_test_LDADD   = libmurphy-common.la $(SDBUS_LIBS)
+
+dbus_sdbus_test_SOURCES = common/tests/dbus-sdbus-test.c
+dbus_sdbus_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(SDBUS_CFLAGS)
+dbus_sdbus_test_LDADD   = 				\
+			libmurphy-common.la	\
+			libmurphy-dbus-sdbus.la
+
+sdbus_transport_test_SOURCES = common/tests/libdbus-transport-test.c
+sdbus_transport_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+sdbus_transport_test_LDADD   =				\
+			libmurphy-common.la	\
+			libmurphy-dbus-sdbus.la
+
+sdbus_error_message_SOURCES = common/tests/sdbus-error-message.c
+sdbus_error_message_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(SDBUS_CFLAGS)
+sdbus_error_message_LDADD   =				\
+			libmurphy-common.la	\
+			libmurphy-dbus-sdbus.la
+endif
+
+# fragbuf test
+fragbuf_test_SOURCES = common/tests/fragbuf-test.c
+fragbuf_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+fragbuf_test_LDADD   = libmurphy-common.la
+
+# mkdir-test
+mkdir_test_SOURCES = common/tests/mkdir-test.c
+mkdir_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) -I.
+mkdir_test_LDADD   = libmurphy-common.la
+
+# path-test
+path_test_SOURCES = common/tests/path-test.c
+path_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) -I.
+path_test_LDADD   = libmurphy-common.la
+
+mask_test_SOURCES = common/tests/mask-test.c
+mask_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) -I.
+mask_test_LDADD   = libmurphy-common.la
+
+# hash-table-test
+hash_table_test_SOURCES = common/tests/hash-table-test.c
+hash_table_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) -I.
+hash_table_test_LDADD   = libmurphy-common.la
+
+TESTS     += decision-test
+
+# lua decision network test
+decision_test_SOURCES = core/lua-decision/tests/decision-test.c
+decision_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS) $(LUA_CFLAGS)
+decision_test_LDADD   =	libmurphy-lua-utils.la		\
+			libmurphy-lua-decision.la				\
+			libmurphy-resolver.la					\
+			libmurphy-core.la   					\
+			libmurphy-common.la 					\
+			libmql.la								\
+			libmqi.la								\
+			libmdb.la								\
+			$(LUA_LIBS)
+
+# murphy breedline test
+TESTS     += breedline-murphy-test
+
+breedline_murphy_test_SOURCES = breedline/tests/breedline-murphy-test.c
+breedline_murphy_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+breedline_murphy_test_LDADD   = libbreedline-murphy.la	\
+			libbreedline.la		\
+			libmurphy-common.la
+
+# basic (blocking) breedline test
+TESTS     += breedline-test
+
+breedline_test_SOURCES = breedline/tests/breedline-test.c
+breedline_test_CFLAGS  = $(WARNING_CFLAGS) $(AM_CFLAGS)
+breedline_test_LDADD   = libbreedline.la
+
+if GLIB_ENABLED
+# breedline glib test
+TESTS     += breedline-glib-test
+
+breedline_glib_test_SOURCES = breedline/tests/breedline-glib-test.c
+breedline_glib_test_CFLAGS  = $(AM_CFLAGS) $(GLIB_CFLAGS)
+breedline_glib_test_LDADD   = libbreedline-glib.la	\
+			libbreedline.la		\
+			$(GLIB_LIBS)
+endif
