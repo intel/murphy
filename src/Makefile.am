@@ -138,7 +138,8 @@ BUILT_SOURCES      += murphy-db/mql/mql-scanner.c murphy-db/mql/mql-parser.c
 
 MQL_LINKER_SCRIPT = linker-script.mql
 
-libmql_la_CFLAGS = $(AM_CFLAGS)
+libmql_la_CFLAGS = $(AM_CFLAGS) \
+		-I$(top_builddir)/src/murphy-db/mql # generated mql headers
 
 libmql_ladir     = \
 		murphy-db/include/murphy-db
