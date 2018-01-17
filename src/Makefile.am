@@ -1157,9 +1157,6 @@ libbreedline_la_DEPENDENCIES =			\
 		$(abs_top_builddir)/src/linker-script.breedline		\
 		$(filter %.la, $(libbreedline_la_LIBADD))
 
-libbreedlineincludedir      = $(includedir)/breedline
-libbreedlineinclude_HEADERS = $(libbreedline_la_HEADERS)
-
 # linker script generation
 $(abs_top_builddir)/src/linker-script.breedline: $(libbreedline_la_HEADERS)
 	$(QUIET_GEN)$(gen_linker_script) -q \
@@ -1194,9 +1191,6 @@ libbreedline_murphy_la_LIBADD = 	\
 libbreedline_murphy_la_DEPENDENCIES =		\
 		$(abs_top_builddir)/src/linker-script.breedline-murphy	\
 		$(filter %.la,$(libbreedline_murphy_la_LIBADD))
-
-libbreedline_murphyincludedir      = $(includedir)/breedline
-libbreedline_murphyinclude_HEADERS = $(libbreedline_murphy_la_HEADERS)
 
 # linker script generation
 $(abs_top_builddir)/src/linker-script.breedline-murphy: $(libbreedline_murphy_la_HEADERS)
@@ -1240,8 +1234,6 @@ libbreedline_glib_la_DEPENDENCIES =		\
 		$(abs_top_builddir)/src/linker-script.breedline-glib	\
 		$(filter %.la, $(libbreedline_glib_la_LIBADD))
 
-libbreedline_glibincludedir      = $(includedir)/breedline
-libbreedline_glibinclude_HEADERS = $(libbreedline_glib_la_HEADERS)
 endif
 
 # linker script generation
