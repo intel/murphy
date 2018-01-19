@@ -95,7 +95,7 @@ MQI_LINKER_SCRIPT = linker-script.mqi
 libmqi_la_CFLAGS = $(AM_CFLAGS)
 
 libmqi_ladir     = \
-		src/murphy-db/include/murphy-db
+		murphy-db/include/murphy-db
 
 libmqi_la_HEADERS = \
 		murphy-db/include/murphy-db/mqi.h
@@ -246,6 +246,12 @@ endif
 clean-local::
 	rm -f $(CHECK_LIBMDB_LOG) $(CHECK_LIBMQI_LOG) $(CHECK_LIBMQL_LOG) \
               $(MURPHY_DB_TESTS)
+
+libmurphydbincludedir      = $(includedir)/murphy-db
+libmurphydbinclude_HEADERS = \
+		$(libmdb_la_HEADERS) \
+		$(libmqi_la_HEADERS) \
+		$(libmql_la_HEADERS)
 
 ###################################
 # murphy common library
