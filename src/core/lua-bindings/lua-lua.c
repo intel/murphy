@@ -147,12 +147,22 @@ static int disable_include(lua_State *L)
 }
 
 
+static int open_stdlibs(lua_State *L)
+{
+    luaL_openlibs(L);
+    return 0;
+}
+
+
 static int open_lualib(lua_State *L)
 {
     struct {
         const char  *name;
         int        (*loader)(lua_State *L);
     } *lib, libs[] = {
+        { "stdlibs", open_stdlibs    },
+        { "stdlib" , open_stdlibs    },
+        { "all"    , open_stdlibs    },
         { "math"   , luaopen_math    },
         { "string" , luaopen_string  },
         { "io"     , luaopen_io      },
@@ -186,10 +196,12 @@ static int open_lualib(lua_State *L)
                 break;
 
         if (lib->loader != NULL) {
-            mrp_debug("loading Lua lib '%s' with %p...", name, lib->loader);
-            lib->loader(L);
+            mrp_debug("loading Lua library '%s'...", name);
+            luaL_requiref(L, lib->name, lib->loader, 1);
         }
         else {
+            mrp_debug("including Lua library '%s'...", name);
+
             if (include_disabled)
                 return luaL_error(L, "Lua inclusion is disabled.");
 
@@ -205,6 +217,7 @@ static int open_lualib(lua_State *L)
 
 
 MURPHY_REGISTER_LUA_BINDINGS(murphy, NULL,
+                             { "load"            , open_lualib          },
                              { "open_lualib"     , open_lualib          },
                              { "include"         , include_luafile      },
                              { "include_once"    , include_once_luafile },
