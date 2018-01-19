@@ -8,4 +8,4 @@ Description: Murphy policy framework, LUA support library
 Requires:
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lmurphy-lua-utils @LUA_LIBS@
-Cflags: -I${includedir}
+Cflags: -I${includedir} @LUA_CFLAGS@
