@@ -1080,7 +1080,7 @@ static void event_cb(mrp_event_watch_t *w, uint32_t id, int format,
     MRP_UNUSED(w);
     MRP_UNUSED(format);
 
-    mrp_log_info("%s: got event 0x%x (%s):", plugin->instance, id, event);
+    mrp_debug("%s: got event 0x%x (%s):", plugin->instance, id, event);
 
     if (data && event) {
         if (!strcmp(event, MRP_PLUGIN_EVENT_STARTED)) {
@@ -1162,8 +1162,7 @@ static int resource_init(mrp_plugin_t *plugin)
 #endif
     resource_data_t  *data;
 
-    mrp_log_info("%s() called for resource instance '%s'...", __FUNCTION__,
-                 plugin->instance);
+    mrp_debug("initialising instance '%s'...", plugin->instance);
 
     if (!(data = mrp_allocz(sizeof(*data)))) {
         mrp_log_error("Failed to allocate private data for resource plugin "
@@ -1186,8 +1185,7 @@ static int resource_init(mrp_plugin_t *plugin)
 
 static void resource_exit(mrp_plugin_t *plugin)
 {
-    mrp_log_info("%s() called for test instance '%s'...", __FUNCTION__,
-                 plugin->instance);
+    mrp_debug("cleaning up instance '%s'...", plugin->instance);
 
     unsubscribe_events(plugin);
 }
