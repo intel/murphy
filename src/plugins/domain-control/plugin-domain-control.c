@@ -100,7 +100,7 @@ static void cmd_cb(mrp_console_t *c, void *user_data, int argc, char **argv)
     "for their domain or data necessary for local decision making in\n"      \
     "the controller itself. The controllers typically export also some\n"    \
     "domain-specific data to Murphy which can then be used for decision\n"   \
-    "making in other domains other domains.\n"
+    "making in other domains.\n"
 
 #define DOMCTL_VERSION MRP_VERSION_INT(0, 0, 2)
 #define DOMCTL_AUTHORS "Krisztian Litkey <krisztian.litkey@intel.com>"
