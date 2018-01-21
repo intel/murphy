@@ -83,7 +83,6 @@ static void print_usage(mrp_context_t *ctx, const char *argv0, int exit_code,
            "      LEVELS is a comma separated list of info, error and warning\n"
            "  -v, --verbose                  increase logging verbosity\n"
            "  -d, --debug                    enable given debug configuration\n"
-           "  -D, --list-debug               list known debug sites\n"
            "  -f, --foreground               don't daemonize\n"
            "  -h, --help                     show help on usage\n"
            "  -q, --query-plugins            show detailed information about\n"
