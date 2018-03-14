@@ -63,7 +63,10 @@ static int collect_watch_notification(pep_watch_t *w)
         if (!exec_mql(mql_result_rows, &r, "select %s from %s%s%s",
                       w->mql_columns, w->table->name,
                       w->mql_where[0] ? " where " : "", w->mql_where)) {
-            mrp_debug("select from table %s failed", w->table->name);
+            mrp_debug("select from table %s (select %s from %s%s%s) failed",
+                      w->table->name,
+                      w->mql_columns, w->table->name,
+                      w->mql_where[0] ? " where " : "", w->mql_where);
             goto fail;
         }
     }
