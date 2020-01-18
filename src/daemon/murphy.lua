@@ -70,11 +70,13 @@ RESOURCES = {
    audio_playback  = { shareable = true, attributes = {
                           role   = { mdb.string, 'music'    , 'rw' },
                           pid    = { mdb.string, '<unknown>', 'rw' },
-                          policy = { mdb.string, 'relaxed'  , 'rw' } } },
+                          policy = { mdb.string, 'relaxed'  , 'rw' },
+                          name   = { mdb.string, '<unknown>', 'rw' } } },
    audio_recording = { shareable = false, attributes = {
                           role   = { mdb.string, 'music'    , 'rw' },
                           pid    = { mdb.string, '<unknown>', 'rw' },
-                          policy = { mdb.string, 'relaxed'  , 'rw' } } },
+                          policy = { mdb.string, 'relaxed'  , 'rw' },
+                          name   = { mdb.string, '<unknown>', 'rw' } } },
    video_playback  = { shareable = false },
    video_recording = { shareable = false },
 }
