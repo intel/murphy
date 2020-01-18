@@ -86,6 +86,7 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
         [ mqi_less  ] = 4,
         [ mqi_leq   ] = 4,
         [ mqi_eq    ] = 4,
+        [ mqi_neq   ] = 4,
         [ mqi_geq   ] = 4,
         [ mqi_gt    ] = 4,
         [ mqi_not   ] = 5
@@ -138,6 +139,7 @@ int mdb_cond_evaluate(mdb_table_t *tbl, mqi_cond_entry_t **cond_ptr,void *data)
             case mqi_less:
             case mqi_leq:
             case mqi_eq:
+            case mqi_neq:
             case mqi_geq:
             case mqi_gt:
             case mqi_not:
@@ -245,6 +247,7 @@ static int cond_eval(cond_stack_t *sp,cond_stack_t *lastop,int new_precedence)
         case mqi_less:
         case mqi_leq:
         case mqi_eq:
+        case mqi_neq:
         case mqi_geq:
         case mqi_gt:
             /* stack: (-1)operand1, (0)operator, (1)operand2 => (-1)result */
@@ -327,6 +330,7 @@ static int cond_relop(mqi_operator_t op, cond_stack_t *v1, cond_stack_t *v2)
         case mqi_less:  return cmp <  0;
         case mqi_leq:   return cmp <= 0;
         case mqi_eq:    return cmp == 0;
+        case mqi_neq:   return cmp != 0;
         case mqi_geq:   return cmp >= 0;
         case mqi_gt:    return cmp >  0;
         default:        return 0;

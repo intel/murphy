@@ -185,6 +185,7 @@ static FILE        *mqlout;
 %token <string>   TKN_LESS
 %token <string>   TKN_LESS_OR_EQUAL
 %token <string>   TKN_EQUAL
+%token <string>   TKN_NOT_EQUAL
 %token <string>   TKN_GREATER_OR_EQUAL
 %token <string>   TKN_GREATER
 %token <string>   TKN_NOT
@@ -1290,6 +1291,11 @@ relational_operator:
 | TKN_EQUAL {
     cond->type = mqi_operator;
     cond->u.operator_ = mqi_eq;
+    cond++;
+  }
+| TKN_NOT_EQUAL {
+    cond->type = mqi_operator;
+    cond->u.operator_ = mqi_neq;
     cond++;
   }
 | TKN_GREATER_OR_EQUAL {
