@@ -338,8 +338,6 @@ libmurphy_common_la_DEPENDENCIES =	\
 		$(abs_top_builddir)/src/linker-script.common	\
 		$(filter %.la, $(libmurphy_common_la_LIBADD))
 
-libcommonincludedir      = $(includedir)/murphy/common
-libcommoninclude_HEADERS = $(libmurphy_common_la_HEADERS)
 
 if WEBSOCKETS_ENABLED
 libmurphy_common_la_HEADERS +=			\
@@ -784,7 +782,7 @@ EXTRA_DIST      += common/murphy-pulse.pc
 pkgconfig_DATA  += common/murphy-pulse.pc
 
 libmurphy_pulse_ladir      =		\
-		$(includedir)/murphy/common
+		$(includedir)/murphy/pulse
 
 libmurphy_pulse_la_HEADERS = $(murphy_pulse_headers)
 
@@ -808,8 +806,6 @@ libmurphy_pulse_la_DEPENDENCIES =	\
 		$(abs_top_builddir)/src/linker-script.pulse	\
 		$(filter %.la, $(libmurphy_pulse_la_LIBADD))
 
-libpulseincludedir      = $(includedir)/murphy/pulse
-libpulseinclude_HEADERS = $(libmurphy_pulse_la_HEADERS)
 endif
 
 # linker script generation
@@ -857,8 +853,7 @@ libmurphy_ecore_la_DEPENDENCIES =	\
 		$(abs_top_builddir)/src/linker-script.ecore	\
 		$(filter %.la, $(libmurphy_ecore_la_LIBADD))
 
-libecoreincludedir      = $(includedir)/murphy/ecore
-libecoreinclude_HEADERS = $(libmurphy_ecore_la_HEADERS)
+
 endif
 
 # linker script generation
@@ -904,9 +899,6 @@ libmurphy_glib_la_LIBADD  =		\
 libmurphy_glib_la_DEPENDENCIES =	\
 		$(abs_top_builddir)/src/linker-script.glib	\
 		$(filter %.la, $(libmurphy_glib_la_LIBADD))
-
-libglibincludedir      = $(includedir)/murphy/glib
-libglibinclude_HEADERS = $(libmurphy_glib_la_HEADERS)
 endif
 
 # linker script generation
@@ -952,9 +944,6 @@ libmurphy_qt_la_LIBADD  = $(QTCORE_LIBS)
 libmurphy_qt_la_DEPENDENCIES =		\
 		$(abs_top_builddir)/src/linker-script.qt	\
 		$(filter %.la, $(libmurphy_qt_la_LIBADD))
-
-libqtincludedir      = $(includedir)/murphy/qt
-libqtinclude_HEADERS = $(libmurphy_qt_la_HEADERS)
 
 # run moc to generate Qt meta objects
 common/qt-glue-priv.moc.h: common/qt-glue-priv.h
