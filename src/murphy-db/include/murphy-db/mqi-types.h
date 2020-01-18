@@ -97,6 +97,7 @@ enum mqi_operator_e {
     mqi_less,
     mqi_leq,
     mqi_eq,
+    mqi_neq,
     mqi_geq,
     mqi_gt,
     mqi_not,

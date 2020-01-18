@@ -149,6 +149,7 @@ LOGICAL_OR        \|
 LESS              <
 LESS_OR_EQUAL     <=
 EQUAL             =
+NOT_EQUAL         \!=
 GREATER_OR_EQUAL  >=
 GREATER           >
 NOT               \!
@@ -222,6 +223,7 @@ SLASH             \/
 {LESS}             { ARGLESS_TOKEN (LESS);             }
 {LESS_OR_EQUAL}    { ARGLESS_TOKEN (LESS_OR_EQUAL);    }
 {EQUAL}            { ARGLESS_TOKEN (EQUAL);            }
+{NOT_EQUAL}        { ARGLESS_TOKEN (NOT_EQUAL);        }
 {GREATER_OR_EQUAL} { ARGLESS_TOKEN (GREATER_OR_EQUAL); }
 {GREATER}          { ARGLESS_TOKEN (GREATER);          }
 {NOT}              { ARGLESS_TOKEN (NOT);              }
