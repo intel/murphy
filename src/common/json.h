@@ -35,16 +35,22 @@
 
 #include "murphy/config.h"
 
+#define JSONC_VERSION(maj, min, mic) (((maj) << 16) | ((min) << 8) | (mic))
+#define JSONC_013 JSONC_VERSION(0, 13, 0)
 #ifndef JSON_INCLUDE_PATH_JSONC
 #    include <json/json.h>
 #    include <json/linkhash.h>
 /* workaround for older broken json-c not exposing json_object_iter */
-#    include <json/json_object_private.h>
+#  if !defined(JSON_C_VERSION_NUM) || JSON_C_VERSION_NUM < JSONC_013
+#      include <json/json_object_private.h>
+#  endif
 #else
 #    include <json-c/json.h>
 #    include <json-c/linkhash.h>
 /* workaround for older broken json-c not exposing json_object_iter */
-#    include <json-c/json_object_private.h>
+#  if !defined(JSON_C_VERSION_NUM) || JSON_C_VERSION_NUM < JSONC_013
+#      include <json-c/json_object_private.h>
+#  endif
 #endif
 
 #include <murphy/common/macros.h>
