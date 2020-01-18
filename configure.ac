@@ -519,6 +519,29 @@ AC_SUBST(PCRE_LIBS)
 AC_SUBST(REGEXP_CFLAGS)
 AC_SUBST(REGEXP_LIBS)
 
+# Check for XATTR_CREATE in sys/xattr.h.
+AC_MSG_CHECKING([if XATTR_CREATE is defined in attr/xattr.h header file.])
+saved_CFLAGS="$CFLAGS"
+saved_LIBS="$LIBS"
+CFLAGS=""
+LIBS=""
+AC_COMPILE_IFELSE(
+   [AC_LANG_PROGRAM([[
+         #include <sys/types.h>
+         #include <sys/xattr.h>
+         ]],
+         [[return XATTR_CREATE;]])],
+    [have_sys_xattr_create=yes],
+    [have_sys_xattr_create=no])
+AC_MSG_RESULT([$have_sys_xattr_create])
+CFLAGS="$saved_CFLAGS"
+LIBS="$saved_LIBS"
+
+if test "$have_sys_xattr_create" = "yes"; then
+    AC_DEFINE([HAVE_SYS_XATTR_CREATE], 1, [XATTR_CREATE in sys/xattr.h ?])
+fi
+
+
 # Set up murphy CFLAGS and LIBS.
 MURPHY_CFLAGS=""
 MURPHY_LIBS=""
