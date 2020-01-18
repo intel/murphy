@@ -34,8 +34,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
-#include <linux/xattr.h>
-#include <attr/xattr.h>
+
+#include "murphy/config.h"
+
+#ifndef HAVE_SYS_XATTR_CREATE
+/* assume these, if we don't have XATTR_CREATE defined in sys/xattr.h */
+#  include <linux/xattr.h>
+#  include <attr/xattr.h>
+#endif
 
 #include <murphy/common/macros.h>
 
