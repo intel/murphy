@@ -36,7 +36,7 @@ MDB_LINKER_SCRIPT = linker-script.mdb
 libmdb_la_CFLAGS = $(AM_CFLAGS)
 
 libmdb_ladir     = \
-		murphy-db/include/murphy-db
+		$(includedir)/murphy-db
 
 libmdb_la_HEADERS = \
 		murphy-db/include/murphy-db/macros.h \
@@ -95,7 +95,7 @@ MQI_LINKER_SCRIPT = linker-script.mqi
 libmqi_la_CFLAGS = $(AM_CFLAGS)
 
 libmqi_ladir     = \
-		murphy-db/include/murphy-db
+		$(includedir)/murphy-db
 
 libmqi_la_HEADERS = \
 		murphy-db/include/murphy-db/mqi.h
@@ -137,7 +137,7 @@ libmql_la_CFLAGS = $(AM_CFLAGS) \
 		-I$(top_builddir)/src/murphy-db/mql # generated mql headers
 
 libmql_ladir     = \
-		murphy-db/include/murphy-db
+		$(includedir)/murphy-db
 
 libmql_la_HEADERS = \
 		murphy-db/include/murphy-db/mql.h \
@@ -246,12 +246,6 @@ endif
 clean-local::
 	rm -f $(CHECK_LIBMDB_LOG) $(CHECK_LIBMQI_LOG) $(CHECK_LIBMQL_LOG) \
               $(MURPHY_DB_TESTS)
-
-libmurphydbincludedir      = $(includedir)/murphy-db
-libmurphydbinclude_HEADERS = \
-		$(libmdb_la_HEADERS) \
-		$(libmqi_la_HEADERS) \
-		$(libmql_la_HEADERS)
 
 ###################################
 # murphy common library
