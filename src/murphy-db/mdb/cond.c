@@ -283,43 +283,70 @@ static int cond_relop(mqi_operator_t op, cond_stack_t *v1, cond_stack_t *v2)
 {
     cond_data_t *d1 = &v1->data;
     cond_data_t *d2 = &v2->data;
+    unsigned i1, i2;
     int cmp;
 
     if (v1->precedence >= PRECEDENCE_DATA &&
-        v2->precedence >= PRECEDENCE_DATA &&
-        d1->type == d2->type)
-    {
-        switch (d1->type) {
-        case mqi_varchar:
-            if (!d1->v.varchar && !d2->v.varchar)
-                cmp = 0;
-            else if (!d1->v.varchar)
-                cmp = -1;
-            else if (!d2->v.varchar)
-                cmp = 1;
-            else
-                cmp = strcmp(d1->v.varchar, d2->v.varchar);
-            break;
+        v2->precedence >= PRECEDENCE_DATA) {
+        if (d1->type == d2->type) {
+                switch (d1->type) {
+                case mqi_varchar:
+                    if (!d1->v.varchar && !d2->v.varchar)
+                        cmp = 0;
+                    else if (!d1->v.varchar)
+                        cmp = -1;
+                    else if (!d2->v.varchar)
+                        cmp = 1;
+                    else
+                        cmp = strcmp(d1->v.varchar, d2->v.varchar);
+                    break;
 
-        case mqi_integer:
-            if (d1->v.integer > d2->v.integer)
+                case mqi_integer:
+                    if (d1->v.integer > d2->v.integer)
+                        cmp = 1;
+                    else if (d1->v.integer == d2->v.integer)
+                        cmp = 0;
+                    else
+                        cmp = -1;
+                    break;
+
+                case mqi_unsignd:
+                    if (d1->v.unsignd > d2->v.unsignd)
+                        cmp = 1;
+                    else if (d1->v.unsignd == d2->v.unsignd)
+                        cmp = 0;
+                    else
+                        cmp = -1;
+                    break;
+
+                default:
+                    return 0;
+                }
+        } else if (d1->type == mqi_integer && d2->type == mqi_unsignd) {
+            if (d1->v.integer < 0 || ((int)d2->v.unsignd) < 0) {
+                return 0;
+            }
+            i1 = (unsigned)d1->v.integer;
+            i2 = d2->v.unsignd;
+            if (i1 > i2)
                 cmp = 1;
-            else if (d1->v.integer == d2->v.integer)
+            else if (i1 == i2)
                 cmp = 0;
             else
                 cmp = -1;
-            break;
-
-        case mqi_unsignd:
-            if (d1->v.unsignd > d2->v.unsignd)
+        } else if (d1->type == mqi_unsignd && d2->type == mqi_integer) {
+            if (((int)d1->v.unsignd) < 0 || d2->v.integer < 0) {
+                return 0;
+            }
+            i1 = d1->v.unsignd;
+            i2 = (unsigned)d2->v.integer;
+            if (i1 > i2)
                 cmp = 1;
-            else if (d1->v.unsignd == d2->v.unsignd)
+            else if (i1 == i2)
                 cmp = 0;
             else
                 cmp = -1;
-            break;
-
-        default:
+        } else {
             return 0;
         }
 
